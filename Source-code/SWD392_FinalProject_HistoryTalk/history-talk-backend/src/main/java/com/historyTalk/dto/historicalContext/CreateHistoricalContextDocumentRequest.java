@@ -26,5 +26,4 @@ public class CreateHistoricalContextDocumentRequest {
     @NotBlank(message = "Content is required")
     @Size(min = 10, message = "Content must be at least 10 characters")
     private String content;
-    
 }

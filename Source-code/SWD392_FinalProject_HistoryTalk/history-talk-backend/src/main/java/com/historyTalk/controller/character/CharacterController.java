@@ -1,6 +1,7 @@
 package com.historyTalk.controller.character;
 
 import com.historyTalk.dto.ApiResponse;
+import com.historyTalk.dto.PaginatedResponse;
 import com.historyTalk.dto.character.CharacterResponse;
 import com.historyTalk.dto.character.CreateCharacterRequest;
 import com.historyTalk.dto.character.UpdateCharacterRequest;
@@ -28,11 +29,14 @@ public class CharacterController {
     private final CharacterService characterService;
 
     @GetMapping
-    @Operation(summary = "Get all characters", description = "Retrieve all characters, optionally filtered by search keyword")
-    public ResponseEntity<ApiResponse<?>> getAllCharacters(
-            @RequestParam(required = false, defaultValue = "") String search) {
-        log.info("GET /v1/characters - search: {}", search);
-        List<CharacterResponse> result = characterService.getAllCharacters(search);
+    @Operation(summary = "Get all characters", description = "Retrieve paginated characters, optionally filtered by search keyword and era")
+    public ResponseEntity<ApiResponse<PaginatedResponse<CharacterResponse>>> getAllCharacters(
+            @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String era,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "8") int limit) {
+        log.info("GET /v1/characters - search: {}, era: {}, page: {}, limit: {}", search, era, page, limit);
+        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era, page, limit);
         return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
     }
 

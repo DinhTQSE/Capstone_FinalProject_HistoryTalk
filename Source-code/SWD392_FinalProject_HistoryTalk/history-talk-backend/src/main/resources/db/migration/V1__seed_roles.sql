@@ -1,0 +1,13 @@
+-- Seed default roles: ADMIN and STAFF
+-- Flyway will only run this once (tracked in flyway_schema_history)
+CREATE TABLE IF NOT EXISTS role (
+                                    role_id UUID PRIMARY KEY,
+                                    role_name VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(255)
+    );
+
+INSERT INTO role (role_id, role_name, description)
+VALUES
+    (gen_random_uuid(), 'ADMIN', 'Administrator with full access'),
+    (gen_random_uuid(), 'STAFF', 'Staff member with content management access')
+ON CONFLICT (role_name) DO NOTHING;

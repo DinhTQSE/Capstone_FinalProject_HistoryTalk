@@ -150,7 +150,7 @@ public class HistoricalContextDocumentService {
             validateContent(request.getContent());
             doc.setContent(request.getContent());
         }
-        
+
         HistoricalContextDocument updated = documentRepository.save(doc);
         log.info("Document updated: {}", docId);
         return mapToResponse(updated);

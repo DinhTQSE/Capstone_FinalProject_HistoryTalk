@@ -33,6 +33,9 @@ public class Character {
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
+    @Column(name = "title", length = 150)
+    private String title;
+
     @Lob
     @Column(name = "background", columnDefinition = "TEXT", nullable = false)
     private String background;
@@ -42,6 +45,12 @@ public class Character {
 
     @Column(name = "personality", length = 500)
     private String personality;
+
+    @Column(name = "lifespan", length = 50)
+    private String lifespan;
+
+    @Column(name = "side", length = 100)
+    private String side;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "context_id", nullable = false)
