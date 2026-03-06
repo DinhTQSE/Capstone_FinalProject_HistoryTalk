@@ -150,7 +150,22 @@ public class HistoricalContextDocumentService {
             validateContent(request.getContent());
             doc.setContent(request.getContent());
         }
-        
+        if (request.getEra() != null) {
+            doc.setEra(request.getEra());
+        }
+        if (request.getCategory() != null) {
+            doc.setCategory(request.getCategory());
+        }
+        if (request.getYear() != null) {
+            doc.setYear(request.getYear());
+        }
+        if (request.getStartYear() != null) {
+            doc.setStartYear(request.getStartYear());
+        }
+        if (request.getEndYear() != null) {
+            doc.setEndYear(request.getEndYear());
+        }
+
         HistoricalContextDocument updated = documentRepository.save(doc);
         log.info("Document updated: {}", docId);
         return mapToResponse(updated);

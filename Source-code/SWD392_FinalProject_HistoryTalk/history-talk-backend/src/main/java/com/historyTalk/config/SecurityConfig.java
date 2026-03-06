@@ -87,7 +87,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/swagger-ui/**").permitAll()
 
                         // Auth endpoints - register-staff requires admin auth, others are public
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register-staff").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register-staff").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
                         // Historical Context endpoints - GET public, mutating requires auth

@@ -91,6 +91,11 @@ public class HistoricalContextService {
         HistoricalContext context = HistoricalContext.builder()
                 .name(request.getName())
                 .description(request.getDescription())
+                .era(request.getEra())
+                .category(request.getCategory())
+                .year(request.getYear())
+                .startYear(request.getStartYear())
+                .endYear(request.getEndYear())
                 .staff(staff)
                 .build();
 
@@ -136,6 +141,21 @@ public class HistoricalContextService {
         if (request.getDescription() != null) {
             context.setDescription(request.getDescription());
         }
+        if (request.getEra() != null) {
+            context.setEra(request.getEra());
+        }
+        if (request.getCategory() != null) {
+            context.setCategory(request.getCategory());
+        }
+        if (request.getYear() != null) {
+            context.setYear(request.getYear());
+        }
+        if (request.getStartYear() != null) {
+            context.setStartYear(request.getStartYear());
+        }
+        if (request.getEndYear() != null) {
+            context.setEndYear(request.getEndYear());
+        }
         HistoricalContext updatedContext = contextRepository.save(context);
         log.info("Historical context updated successfully with ID: {}", contextId);
         
@@ -173,6 +193,14 @@ public class HistoricalContextService {
                 .contextId(context.getContextId().toString())
                 .name(context.getName())
                 .description(context.getDescription())
+                .era(context.getEra())
+                .category(context.getCategory())
+                .year(context.getYear())
+                .startYear(context.getStartYear())
+                .endYear(context.getEndYear())
+                .period(context.getStartYear() != null && context.getEndYear() != null
+                        ? context.getStartYear() + "\u2013" + context.getEndYear()
+                        : null)
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
                         .staffId(context.getStaff().getStaffId().toString())
                         .name(context.getStaff().getName())

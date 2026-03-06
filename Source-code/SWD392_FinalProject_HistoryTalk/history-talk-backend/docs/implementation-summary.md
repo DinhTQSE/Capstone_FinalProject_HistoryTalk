@@ -149,8 +149,102 @@ but argument is of type 'java.lang.String'
 | 1 | **JWT Blacklist là in-memory** | Mất khi restart. Production cần Redis hoặc DB table |
 | 2 | **CORS wildcard `*`** | `allowCredentials=false`; production cần giới hạn origins |
 | 3 | **secretKey.properties chứa real password** | Đã gitignore; KHÔNG push lên remote |
-| 4 | **Staff registration chưa có** | Hiện chỉ `register` tạo `REGISTERED` user; Staff accounts cần flow riêng (admin tạo Staff entity + tạo User với `userType=STAFF`) |
-| 5 | **Mapper/UserInformation stubs** | `UserInformationMapper` và `UserInformationMapperImpl` đang là stub rỗng; cần implement khi làm user profile |
+| 4 | **Mapper/UserInformation stubs** | `UserInformationMapper` và `UserInformationMapperImpl` đang là stub rỗng; cần implement khi làm user profile |
+
+---
+
+## Character CRUD Module (March 6, 2026)
+
+### 🆕 File Mới Tạo
+
+| File | Mô tả |
+|------|-------|
+| `repository/CharacterRepository.java` | `findAllWithSearch(search)` dùng ILIKE; `findByHistoricalContextContextId`; `findByStaffStaffId` |
+| `dto/character/CreateCharacterRequest.java` | `name`, `background`, `image`, `personality`, `contextId`; staffId từ header |
+| `dto/character/UpdateCharacterRequest.java` | Tất cả fields optional |
+| `dto/character/CharacterResponse.java` | Nested `ContextInfo` + `StaffInfo` |
+| `service/character/CharacterService.java` | CRUD + search + getByContext; ownership check dùng `InvalidRequestException` |
+| `controller/character/CharacterController.java` | 6 endpoints; `@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")` trên write ops |
+
+### ✏️ File Sửa
+
+| File | Thay đổi |
+|------|---------|
+| `config/SecurityConfig.java` | Thêm routes `/v1/characters/**` — GET public, POST/PUT/DELETE authenticated |
+
+### API Endpoints
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/v1/characters?search=` | Public |
+| GET | `/v1/characters/{id}` | Public |
+| GET | `/v1/characters/context/{ctxId}` | Public |
+| POST | `/v1/characters` | STAFF / ADMIN |
+| PUT | `/v1/characters/{id}` | STAFF / ADMIN |
+| DELETE | `/v1/characters/{id}` | STAFF / ADMIN |
+
+---
+
+## Staff Account Registration (March 6, 2026)
+
+### 🆕 File Mới Tạo
+
+| File | Mô tả |
+|------|-------|
+| `repository/RoleRepository.java` | `findByRoleNameIgnoreCase(roleName)` |
+| `dto/authentication/RegisterStaffRequest.java` | `userName`, `name`, `email`, `password`, `confirmPassword`, `roleName` |
+| `dto/authentication/RegisterStaffResponse.java` | `uid`, `staffId`, `userName`, `name`, `email`, `roleName` |
+
+### ✏️ File Sửa
+
+| File | Thay đổi |
+|------|---------|
+| `service/authentication/AuthService.java` | Thêm method `registerStaff(RegisterStaffRequest)` |
+| `service/authentication/AuthServiceImpl.java` | Inject `StaffRepository` + `RoleRepository`; implement `registerStaff` — tạo `Staff` record rồi `User` (type=STAFF) linked với Staff |
+| `controller/authentication/AuthController.java` | Thêm `POST /api/v1/auth/register-staff` — yêu cầu `ROLE_ADMIN` |
+| `config/SecurityConfig.java` | `/api/v1/auth/register-staff` → `authenticated()`; phần còn lại `/api/v1/auth/**` → `permitAll()` |
+
+### Lưu Ý
+
+- `roleName` trong request phải tồn tại trong bảng `role` của DB (phải seed trước).
+- `UserPrincipal.buildAuthorities()` tự gán `ROLE_STAFF` + `ROLE_<roleName>` khi login.
+
+---
+
+## Enum Fields – EventEra, EventCategory, MessageRole (March 6, 2026)
+
+### 🆕 File Mới Tạo
+
+| File | Mô tả |
+|------|-------|
+| `entity/enums/EventEra.java` | `ANCIENT`, `MEDIEVAL`, `MODERN`, `CONTEMPORARY` |
+| `entity/enums/EventCategory.java` | `WAR`, `POLITICS`, `CULTURE`, `SCIENCE`, `RELIGION`, `OTHER` |
+| `entity/enums/MessageRole.java` | `USER`, `ASSISTANT` |
+
+### ✏️ File Sửa
+
+| File | Thay đổi |
+|------|---------|
+| `entity/historicalContext/HistoricalContextDocument.java` | Thêm `era` (`EventEra`), `category` (`EventCategory`), `year`/`startYear`/`endYear` (`Integer`) — tất cả nullable |
+| `entity/chat/Message.java` | Thêm `role` (`MessageRole`); `@PrePersist` tự derive từ `is_from_ai` nếu `role == null` |
+| `dto/historicalContext/CreateHistoricalContextDocumentRequest.java` | Thêm `era`, `category`, `year`, `startYear`, `endYear` — optional |
+| `dto/historicalContext/UpdateHistoricalContextDocumentRequest.java` | Tương tự — optional |
+| `dto/historicalContext/HistoricalContextDocumentResponse.java` | Thêm `era`, `category`, `year`, `startYear`, `endYear`; `period` computed = `"startYear–endYear"` |
+| `service/historicalContext/HistoricalContextDocumentService.java` | Map các field mới trong `createDocument`, `updateDocument`, `mapToResponse`; tính `period` từ `startYear`/`endYear` |
+
+### Thiết Kế `period`
+
+`period` **không lưu DB** — được tính toán tại tầng service:
+```java
+period = (startYear != null && endYear != null) ? startYear + "–" + endYear : null
+```
+- `year` — năm sự kiện cụ thể xảy ra (VD: `938`)
+- `startYear` / `endYear` — khoảng thời gian (VD: `938` / `1857`)
+- `period` — computed string trả về trong response (VD: `"938–1857"`)
+
+### DB Migration
+
+`ddl-auto=update` — Hibernate tự `ALTER TABLE` thêm column mới (`year`, `start_year`, `end_year`). Cột `period` cũ vẫn còn trong DB nhưng không được map — cần drop thủ công nếu cần dọn dẹp schema.
 
 ---
 

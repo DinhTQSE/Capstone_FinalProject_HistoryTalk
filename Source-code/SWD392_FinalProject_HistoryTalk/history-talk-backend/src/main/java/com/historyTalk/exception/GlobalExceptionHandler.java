@@ -45,11 +45,6 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex);
     }
 
-    @ExceptionHandler(DataConflictException.class)
-    public ResponseEntity<ErrorResponse> handleDataConflict(DataConflictException ex) {
-        return buildErrorResponse(ex);
-    }
-
     @ExceptionHandler(SystemException.class)
     public ResponseEntity<ErrorResponse> handleSystem(SystemException ex) {
         return buildErrorResponse(ex);

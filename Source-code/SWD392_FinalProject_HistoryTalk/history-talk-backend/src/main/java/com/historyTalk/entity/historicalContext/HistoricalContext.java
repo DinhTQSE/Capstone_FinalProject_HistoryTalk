@@ -1,5 +1,7 @@
 package com.historyTalk.entity.historicalContext;
 
+import com.historyTalk.entity.enums.EventCategory;
+import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.entity.quiz.Quiz;
 import com.historyTalk.entity.staff.Staff;
 import com.historyTalk.entity.character.Character;
@@ -35,6 +37,23 @@ public class HistoricalContext {
     @Lob
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "era", length = 50)
+    private EventEra era;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 50)
+    private EventCategory category;
+
+    @Column(name = "year")
+    private Integer year;
+
+    @Column(name = "start_year")
+    private Integer startYear;
+
+    @Column(name = "end_year")
+    private Integer endYear;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "staff_id", nullable = false)

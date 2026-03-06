@@ -1,6 +1,8 @@
 package com.historyTalk.dto.historicalContext;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.historyTalk.entity.enums.EventCategory;
+import com.historyTalk.entity.enums.EventEra;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,5 +22,19 @@ public class UpdateHistoricalContextRequest {
     @JsonProperty("description")
     @Size(min = 10, max = 5000, message = "Context description must be between 10 and 5000 characters")
     private String description;
-    
+
+    @JsonProperty("era")
+    private EventEra era;
+
+    @JsonProperty("category")
+    private EventCategory category;
+
+    @JsonProperty("year")
+    private Integer year;
+
+    @JsonProperty("startYear")
+    private Integer startYear;
+
+    @JsonProperty("endYear")
+    private Integer endYear;
 }
