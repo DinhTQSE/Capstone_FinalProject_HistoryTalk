@@ -1,5 +1,8 @@
-package com.historyTalk.entity;
+package com.historyTalk.entity.historicalContext;
 
+import com.historyTalk.entity.quiz.Quiz;
+import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.character.Character;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

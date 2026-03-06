@@ -1,5 +1,8 @@
-package com.historyTalk.entity;
+package com.historyTalk.entity.character;
 
+import com.historyTalk.entity.chat.ChatSession;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
+import com.historyTalk.entity.staff.Staff;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

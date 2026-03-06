@@ -1,6 +1,6 @@
 package com.historyTalk.dto.authentication;
 
-import com.historyTalk.entity.UserType;
+import com.historyTalk.entity.user.UserType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

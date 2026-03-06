@@ -1,11 +1,11 @@
 package com.historyTalk.service.historicalContext;
 
-import com.historyTalk.dto.CreateHistoricalContextDocumentRequest;
-import com.historyTalk.dto.HistoricalContextDocumentResponse;
-import com.historyTalk.dto.UpdateHistoricalContextDocumentRequest;
-import com.historyTalk.entity.HistoricalContext;
-import com.historyTalk.entity.HistoricalContextDocument;
-import com.historyTalk.entity.Staff;
+import com.historyTalk.dto.historicalContext.CreateHistoricalContextDocumentRequest;
+import com.historyTalk.dto.historicalContext.HistoricalContextDocumentResponse;
+import com.historyTalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
+import com.historyTalk.entity.historicalContext.HistoricalContextDocument;
+import com.historyTalk.entity.staff.Staff;
 import com.historyTalk.exception.ForbiddenException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.HistoricalContextDocumentRepository;

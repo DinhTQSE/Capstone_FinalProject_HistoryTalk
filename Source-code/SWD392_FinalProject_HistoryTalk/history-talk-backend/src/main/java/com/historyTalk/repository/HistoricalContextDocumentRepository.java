@@ -1,6 +1,6 @@
 package com.historyTalk.repository;
 
-import com.historyTalk.entity.HistoricalContextDocument;
+import com.historyTalk.entity.historicalContext.HistoricalContextDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

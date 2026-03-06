@@ -1,5 +1,7 @@
-package com.historyTalk.entity;
+package com.historyTalk.entity.quiz;
 
+import com.historyTalk.entity.quiz.Quiz;
+import com.historyTalk.entity.quiz.QuizAnswerDetail;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

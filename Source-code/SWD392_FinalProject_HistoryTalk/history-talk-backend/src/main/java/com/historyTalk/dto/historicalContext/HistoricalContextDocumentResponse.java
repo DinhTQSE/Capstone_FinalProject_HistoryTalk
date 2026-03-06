@@ -1,4 +1,4 @@
-package com.historyTalk.dto;
+package com.historyTalk.dto.historicalContext;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
