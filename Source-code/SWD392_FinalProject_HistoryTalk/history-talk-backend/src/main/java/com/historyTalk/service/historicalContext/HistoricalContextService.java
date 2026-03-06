@@ -204,6 +204,6 @@ public class HistoricalContextService {
     }
 
         private String normalize(String value) {
-                return value == null ? "" : value.trim();
+                return value == null ? "" : value.trim().toLowerCase();
         }
 }

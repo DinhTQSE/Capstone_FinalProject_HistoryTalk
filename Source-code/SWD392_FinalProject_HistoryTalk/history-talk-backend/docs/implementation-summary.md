@@ -77,6 +77,24 @@ Toàn bộ auth module đã được viết lại từ đầu. Dự án biên d�
 
 ---
 
+## Hotfix – HistoricalContextRepository ILIKE (March 6, 2026)
+
+**Lỗi runtime:**
+```
+FunctionArgumentException: Parameter 1 of function 'lower()' has type 'STRING',
+but argument is of type 'java.lang.String'
+```
+
+**Nguyên nhân:** Hibernate 6.3.1 có regression bug — `lower()` trong HQL bị reject ngay cả khi áp dụng lên entity path (`hc.name`), không chỉ riêng parameters.
+
+**Fix trong [HistoricalContextRepository.java](../src/main/java/com/historyTalk/repository/HistoricalContextRepository.java):**
+- Thay `LOWER(hc.name) LIKE CONCAT('%', :search, '%')` bằng `hc.name ILIKE CONCAT('%', :search, '%')`
+- Hibernate 6 hỗ trợ `ILIKE` keyword trong HQL natively, dịch sang `ILIKE` trên PostgreSQL
+- Không cần `LOWER()` nữa — `ILIKE` đã xử lý case-insensitive matching
+- `normalize()` trong service vẫn giữ `.toLowerCase()` để uniform search input
+
+---
+
 ## Luồng Xác Thực Sau Khi Triển Khai
 
 ```
