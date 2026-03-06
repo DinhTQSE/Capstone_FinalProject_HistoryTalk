@@ -1,6 +1,6 @@
 package com.historyTalk.repository;
 
-import com.historyTalk.entity.HistoricalContext;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

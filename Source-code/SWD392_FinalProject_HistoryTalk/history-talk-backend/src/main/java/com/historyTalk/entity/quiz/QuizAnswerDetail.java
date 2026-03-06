@@ -1,4 +1,4 @@
-package com.historyTalk.entity;
+package com.historyTalk.entity.quiz;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

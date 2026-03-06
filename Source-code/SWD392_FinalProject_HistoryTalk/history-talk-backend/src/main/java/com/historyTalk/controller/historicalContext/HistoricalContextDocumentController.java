@@ -1,9 +1,9 @@
 package com.historyTalk.controller.historicalContext;
 
 import com.historyTalk.dto.ApiResponse;
-import com.historyTalk.dto.CreateHistoricalContextDocumentRequest;
-import com.historyTalk.dto.HistoricalContextDocumentResponse;
-import com.historyTalk.dto.UpdateHistoricalContextDocumentRequest;
+import com.historyTalk.dto.historicalContext.CreateHistoricalContextDocumentRequest;
+import com.historyTalk.dto.historicalContext.HistoricalContextDocumentResponse;
+import com.historyTalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
 import com.historyTalk.service.historicalContext.HistoricalContextDocumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

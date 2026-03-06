@@ -1,5 +1,11 @@
-package com.historyTalk.entity;
+package com.historyTalk.entity.staff;
 
+import com.historyTalk.entity.Role;
+import com.historyTalk.entity.character.Character;
+import com.historyTalk.entity.character.CharacterDocument;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
+import com.historyTalk.entity.historicalContext.HistoricalContextDocument;
+import com.historyTalk.entity.quiz.Quiz;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,7 +33,7 @@ public class Staff {
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column(name = "email", length = 100, nullable = false)
+    @Column(name = "email", length = 100, nullable = false, unique = true)
     private String email;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -1,8 +1,8 @@
 package com.historyTalk.security;
 
-import com.historyTalk.entity.Staff;
-import com.historyTalk.entity.User;
-import com.historyTalk.entity.UserType;
+import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
+import com.historyTalk.entity.user.UserType;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

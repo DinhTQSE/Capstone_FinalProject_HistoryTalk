@@ -1,11 +1,11 @@
 package com.historyTalk.service.historicalContext;
 
-import com.historyTalk.dto.CreateHistoricalContextRequest;
-import com.historyTalk.dto.HistoricalContextResponse;
+import com.historyTalk.dto.historicalContext.CreateHistoricalContextRequest;
+import com.historyTalk.dto.historicalContext.HistoricalContextResponse;
 import com.historyTalk.dto.PaginatedResponse;
-import com.historyTalk.dto.UpdateHistoricalContextRequest;
-import com.historyTalk.entity.HistoricalContext;
-import com.historyTalk.entity.Staff;
+import com.historyTalk.dto.historicalContext.UpdateHistoricalContextRequest;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
+import com.historyTalk.entity.staff.Staff;
 import com.historyTalk.exception.DuplicateResourceException;
 import com.historyTalk.exception.ForbiddenException;
 import com.historyTalk.exception.ResourceNotFoundException;

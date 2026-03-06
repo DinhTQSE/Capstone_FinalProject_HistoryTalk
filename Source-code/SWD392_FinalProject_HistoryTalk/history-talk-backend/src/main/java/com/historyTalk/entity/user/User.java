@@ -1,5 +1,8 @@
-package com.historyTalk.entity;
+package com.historyTalk.entity.user;
 
+import com.historyTalk.entity.chat.ChatSession;
+import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.quiz.QuizResult;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,10 +27,10 @@ public class User {
     @Column(name = "uid", length = 50)
     private String uid;
 
-    @Column(name = "user_name", length = 100, nullable = false)
+    @Column(name = "user_name", length = 100, nullable = false, unique = true)
     private String userName;
 
-    @Column(name = "email", length = 100, nullable = false)
+    @Column(name = "email", length = 100, nullable = false, unique = true)
     private String email;
 
     @Column(name = "password", length = 100, nullable = false)

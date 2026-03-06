@@ -1,4 +1,4 @@
-package com.historyTalk.dto;
+package com.historyTalk.dto.historicalContext;
 
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
