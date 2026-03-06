@@ -5,10 +5,14 @@ import com.historyTalk.dto.authentication.LoginResponse;
 import com.historyTalk.dto.authentication.RefreshTokenResponse;
 import com.historyTalk.dto.authentication.RegisterRequest;
 import com.historyTalk.dto.authentication.RegisterResponse;
+import com.historyTalk.dto.authentication.RegisterStaffRequest;
+import com.historyTalk.dto.authentication.RegisterStaffResponse;
 
 public interface AuthService {
 
     RegisterResponse register(RegisterRequest request);
+
+    RegisterStaffResponse registerStaff(RegisterStaffRequest request);
 
     LoginResponse login(LoginRequest request);
 

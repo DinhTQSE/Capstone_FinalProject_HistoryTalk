@@ -5,10 +5,18 @@ import com.historyTalk.dto.authentication.LoginResponse;
 import com.historyTalk.dto.authentication.RefreshTokenResponse;
 import com.historyTalk.dto.authentication.RegisterRequest;
 import com.historyTalk.dto.authentication.RegisterResponse;
+import com.historyTalk.dto.authentication.RegisterStaffRequest;
+import com.historyTalk.dto.authentication.RegisterStaffResponse;
+import com.historyTalk.entity.Role;
+import com.historyTalk.entity.staff.Staff;
 import com.historyTalk.entity.user.User;
 import com.historyTalk.entity.user.UserType;
+import com.historyTalk.exception.DataConflictException;
 import com.historyTalk.exception.InvalidRequestException;
+import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.exception.UnauthorizedException;
+import com.historyTalk.repository.RoleRepository;
+import com.historyTalk.repository.StaffRepository;
 import com.historyTalk.repository.UserRepository;
 import com.historyTalk.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +45,8 @@ public class AuthServiceImpl implements AuthService {
             Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final UserRepository userRepository;
+    private final StaffRepository staffRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
@@ -150,6 +160,57 @@ public class AuthServiceImpl implements AuthService {
         String token = authorizationHeader.substring(7);
         BLACKLISTED_TOKENS.add(token);
         log.info("Token blacklisted on logout");
+    }
+
+    @Override
+    @Transactional
+    public RegisterStaffResponse registerStaff(RegisterStaffRequest request) {
+        log.info("Registering new staff account: {}", request.getEmail());
+
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new InvalidRequestException("Password and confirmation password do not match");
+        }
+        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            throw new DataConflictException("Email already exists");
+        }
+        if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
+            throw new DataConflictException("Username already exists");
+        }
+        if (staffRepository.findByEmailIgnoreCase(request.getEmail()).isPresent()) {
+            throw new DataConflictException("Staff email already exists");
+        }
+
+        Role role = roleRepository.findByRoleNameIgnoreCase(request.getRoleName())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Role '" + request.getRoleName() + "' not found"));
+
+        Staff staff = Staff.builder()
+                .name(request.getName())
+                .email(request.getEmail().toLowerCase())
+                .role(role)
+                .build();
+        Staff savedStaff = staffRepository.save(staff);
+
+        User user = User.builder()
+                .userName(request.getUserName())
+                .email(request.getEmail().toLowerCase())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .userType(UserType.STAFF)
+                .staff(savedStaff)
+                .build();
+        User savedUser = userRepository.save(user);
+
+        log.info("Staff account registered with uid: {}, staffId: {}", savedUser.getUid(), savedStaff.getStaffId());
+
+        return RegisterStaffResponse.builder()
+                .uid(savedUser.getUid().toString())
+                .staffId(savedStaff.getStaffId().toString())
+                .userName(savedUser.getUserName())
+                .name(savedStaff.getName())
+                .email(savedUser.getEmail())
+                .roleName(role.getRoleName())
+                .message("Staff account registered successfully")
+                .build();
     }
 
     private Map<String, Object> buildClaims(UserPrincipal principal) {

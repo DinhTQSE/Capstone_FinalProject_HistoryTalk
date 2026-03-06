@@ -8,9 +8,13 @@ import com.historyTalk.dto.authentication.RefreshTokenRequest;
 import com.historyTalk.dto.authentication.RefreshTokenResponse;
 import com.historyTalk.dto.authentication.RegisterRequest;
 import com.historyTalk.dto.authentication.RegisterResponse;
+import com.historyTalk.dto.authentication.RegisterStaffRequest;
+import com.historyTalk.dto.authentication.RegisterStaffResponse;
 import com.historyTalk.service.authentication.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +45,20 @@ public class AuthController {
         RegisterResponse data = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(data, "User registered successfully"));
+    }
+
+    @PostMapping("/register-staff")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Register staff/admin account",
+               description = "Creates a new STAFF or ADMIN account. Requires ADMIN role.")
+    public ResponseEntity<ApiResponse<RegisterStaffResponse>> registerStaff(
+            @Valid @RequestBody RegisterStaffRequest request) {
+
+        log.info("POST /api/v1/auth/register-staff - email: {}", request.getEmail());
+        RegisterStaffResponse data = authService.registerStaff(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(data, "Staff account registered successfully"));
     }
 
     @PostMapping("/login")
