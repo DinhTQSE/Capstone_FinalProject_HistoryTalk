@@ -33,7 +33,7 @@ public class Staff {
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column(name = "email", length = 100, nullable = false)
+    @Column(name = "email", length = 100, nullable = false, unique = true)
     private String email;
 
     @ManyToOne(fetch = FetchType.LAZY)
