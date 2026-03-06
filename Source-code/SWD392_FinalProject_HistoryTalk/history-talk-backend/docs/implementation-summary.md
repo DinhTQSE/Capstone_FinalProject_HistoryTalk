@@ -225,18 +225,37 @@ but argument is of type 'java.lang.String'
 
 | File | Thay đổi |
 |------|---------|
-| `entity/historicalContext/HistoricalContextDocument.java` | Thêm `era` (`EventEra`), `category` (`EventCategory`), `year`/`startYear`/`endYear` (`Integer`) — tất cả nullable |
+| `entity/historicalContext/HistoricalContextDocument.java` | ~~Thêm `era`, `category`, `year`/`startYear`/`endYear`~~ → **đã xóa, xem correction bên dưới** |
 | `entity/chat/Message.java` | Thêm `role` (`MessageRole`); `@PrePersist` tự derive từ `is_from_ai` nếu `role == null` |
-| `dto/historicalContext/CreateHistoricalContextDocumentRequest.java` | Thêm `era`, `category`, `year`, `startYear`, `endYear` — optional |
-| `dto/historicalContext/UpdateHistoricalContextDocumentRequest.java` | Tương tự — optional |
-| `dto/historicalContext/HistoricalContextDocumentResponse.java` | Thêm `era`, `category`, `year`, `startYear`, `endYear`; `period` computed = `"startYear–endYear"` |
-| `service/historicalContext/HistoricalContextDocumentService.java` | Map các field mới trong `createDocument`, `updateDocument`, `mapToResponse`; tính `period` từ `startYear`/`endYear` |
+
+> ⚠️ **Correction (March 7, 2026):** `era`, `category`, `year`, `startYear`, `endYear` ban đầu được thêm nhầm vào `HistoricalContextDocument`. Các field này đã được **chuyển sang `HistoricalContext`** — xem section bên dưới.
+
+---
+
+## Enum Fields Migration: Document → Context (March 7, 2026)
+
+**Lý do:** `era`, `category`, `year`, `startYear`, `endYear` là thông tin của *thời đại lịch sử* (context), không phải của từng *tài liệu riêng lẻ*. Tất cả document thuộc một context đều chia sẻ cùng era/category/timespan.
+
+### ✏️ File Sửa
+
+| File | Thay đổi |
+|------|---------|
+| `entity/historicalContext/HistoricalContext.java` | Thêm `era` (`EventEra`), `category` (`EventCategory`), `year`/`startYear`/`endYear` (`Integer`) — tất cả nullable |
+| `entity/historicalContext/HistoricalContextDocument.java` | Xóa `era`, `category`, `year`, `startYear`, `endYear` và các import liên quan |
+| `dto/historicalContext/CreateHistoricalContextRequest.java` | Thêm `era`, `category`, `year`, `startYear`, `endYear` — optional |
+| `dto/historicalContext/UpdateHistoricalContextRequest.java` | Tương tự — optional |
+| `dto/historicalContext/HistoricalContextResponse.java` | Thêm `era`, `category`, `year`, `startYear`, `endYear`; `period` computed = `"startYear–endYear"` |
+| `dto/historicalContext/CreateHistoricalContextDocumentRequest.java` | Xóa 5 fields trên |
+| `dto/historicalContext/UpdateHistoricalContextDocumentRequest.java` | Xóa 5 fields trên |
+| `dto/historicalContext/HistoricalContextDocumentResponse.java` | Xóa 5 fields + `period` |
+| `service/historicalContext/HistoricalContextService.java` | `createContext`/`updateContext` set 5 fields mới; `mapToResponse` tính `period` |
+| `service/historicalContext/HistoricalContextDocumentService.java` | Xóa mapping era/category/year trong create, update, mapToResponse |
 
 ### Thiết Kế `period`
 
 `period` **không lưu DB** — được tính toán tại tầng service:
 ```java
-period = (startYear != null && endYear != null) ? startYear + "–" + endYear : null
+period = (startYear != null && endYear != null) ? startYear + "\u2013" + endYear : null
 ```
 - `year` — năm sự kiện cụ thể xảy ra (VD: `938`)
 - `startYear` / `endYear` — khoảng thời gian (VD: `938` / `1857`)
@@ -244,7 +263,46 @@ period = (startYear != null && endYear != null) ? startYear + "–" + endYear : 
 
 ### DB Migration
 
-`ddl-auto=update` — Hibernate tự `ALTER TABLE` thêm column mới (`year`, `start_year`, `end_year`). Cột `period` cũ vẫn còn trong DB nhưng không được map — cần drop thủ công nếu cần dọn dẹp schema.
+`ddl-auto=update` — Hibernate tự `ALTER TABLE historical_context` thêm column mới (`era`, `category`, `year`, `start_year`, `end_year`). Các column cũ trên `historical_context_document` vẫn còn trong DB nhưng không được map — cần drop thủ công nếu muốn dọn schema.
+
+---
+
+## Character API Enhancement (March 7, 2026)
+
+### ✏️ File Sửa
+
+| File | Thay đổi |
+|------|---------|
+| `entity/character/Character.java` | Thêm `title` (VARCHAR 150), `lifespan` (VARCHAR 50), `side` (VARCHAR 100) — tất cả nullable |
+| `repository/CharacterRepository.java` | Thay `findAllWithSearch(search): List` bằng `findAllWithFilter(search, era, pageable): Page` với split count query; `era` filter từ `historicalContext.era` |
+| `dto/character/CharacterResponse.java` | Thêm `title`, `lifespan`, `side`, `era` (`EventEra`), `events[]` (nested `EventInfo{id, name, era, year}`) |
+| `dto/character/CreateCharacterRequest.java` | Thêm optional `title`, `lifespan`, `side` |
+| `dto/character/UpdateCharacterRequest.java` | Thêm optional `title`, `lifespan`, `side` |
+| `service/character/CharacterService.java` | `getAllCharacters` → `PaginatedResponse<CharacterResponse>`; `era` string → `EventEra` enum (throws `InvalidRequestException` nếu invalid); limit capped at 20; `mapToResponse` populate `era` + `events[]` từ `historicalContext` |
+| `controller/character/CharacterController.java` | `GET /v1/characters` nhận `era`, `page` (default 1), `limit` (default 8); trả `PaginatedResponse` |
+
+### API Endpoints (Cập Nhật)
+
+| Method | Path | Query Params | Auth |
+|--------|------|-------------|------|
+| GET | `/v1/characters` | `search`, `era`, `page` (default 1), `limit` (default 8, max 20) | Public |
+| GET | `/v1/characters/{id}` | — | Public |
+| GET | `/v1/characters/context/{ctxId}` | — | Public |
+| POST | `/v1/characters` | — | STAFF / ADMIN |
+| PUT | `/v1/characters/{id}` | — | STAFF / ADMIN |
+| DELETE | `/v1/characters/{id}` | — | STAFF / ADMIN |
+
+### `events[]` Shape
+
+`events[]` lấy từ `character.historicalContext.documents` (lazy-fetched), mỗi item:
+```json
+{
+  "id": "<docId>",
+  "name": "<document title>",
+  "era": "<EventEra từ historicalContext>",
+  "year": "<Integer year từ historicalContext>"
+}
+```
 
 ---
 
