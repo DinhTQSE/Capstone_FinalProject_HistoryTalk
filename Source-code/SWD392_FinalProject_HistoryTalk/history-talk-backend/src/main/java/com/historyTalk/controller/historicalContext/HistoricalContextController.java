@@ -1,0 +1,141 @@
+package com.historyTalk.controller.historicalContext;
+
+import com.historyTalk.dto.ApiResponse;
+import com.historyTalk.dto.historicalContext.CreateHistoricalContextRequest;
+import com.historyTalk.dto.historicalContext.UpdateHistoricalContextRequest;
+import com.historyTalk.service.historicalContext.HistoricalContextService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/v1/historical-contexts")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Historical Context", description = "API endpoints for managing historical contexts")
+public class HistoricalContextController {
+    
+    private final HistoricalContextService contextService;
+    
+    /**
+     * GET /v1/historical-contexts
+     * Retrieve all historical contexts
+     */
+    @GetMapping
+    @Operation(summary = "Get all historical contexts", description = "Retrieve a list of all historical contexts")
+    public ResponseEntity<ApiResponse<?>> getAllContexts(
+            @RequestParam(required = false, defaultValue = "") String search) {
+        
+        log.info("GET /v1/historical-contexts - search: {}", search);
+        
+        var response = contextService.getAllContextsSimple(search);
+        
+        return ResponseEntity.ok(ApiResponse.success(
+                response,
+                "Historical contexts retrieved successfully"
+        ));
+    }
+    
+    /**
+     * GET /v1/historical-contexts/{contextId}
+     * Retrieve a specific historical context by ID
+     */
+    @GetMapping("/{contextId}")
+    @Operation(summary = "Get historical context by ID", description = "Retrieve details of a specific historical context")
+    public ResponseEntity<ApiResponse<?>> getContextById(
+            @PathVariable String contextId) {
+        
+        log.info("GET /v1/historical-contexts/{} ", contextId);
+        
+        var response = contextService.getContextById(contextId);
+        
+        return ResponseEntity.ok(ApiResponse.success(
+                response,
+                "Historical context retrieved successfully"
+        ));
+    }
+    
+    /**
+     * POST /v1/historical-contexts
+     * Create a new historical context (Staff only)
+     */
+    @PostMapping
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Create a new historical context", description = "Create a new historical context (Staff/Admin only)")
+    public ResponseEntity<ApiResponse<?>> createContext(
+            @Valid @RequestBody CreateHistoricalContextRequest request,
+            @RequestHeader(value = "X-Staff-Id", required = false) String staffId) {
+        
+        log.info("POST /v1/historical-contexts - Creating context: {}", request.getName());
+        
+        // In real scenario, extract from JWT token
+        if (staffId == null) staffId = "staff_001"; // Default for testing
+        
+        var response = contextService.createContext(request, staffId);
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                response,
+                "Historical context created successfully"
+        ));
+    }
+    
+    /**
+     * PUT /v1/historical-contexts/{contextId}
+     * Update an existing historical context
+     */
+    @PutMapping("/{contextId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Update a historical context", description = "Update an existing historical context (Creator/Admin only)")
+    public ResponseEntity<ApiResponse<?>> updateContext(
+            @PathVariable String contextId,
+            @Valid @RequestBody UpdateHistoricalContextRequest request,
+            @RequestHeader(value = "X-Staff-Id", required = false) String staffId,
+            @RequestHeader(value = "X-Staff-Role", required = false) String staffRole) {
+        
+        log.info("PUT /v1/historical-contexts/{} - Updating context", contextId);
+        
+        // In real scenario, extract from JWT token
+        if (staffId == null) staffId = "staff_001"; // Default for testing
+        if (staffRole == null) staffRole = "STAFF"; // Default for testing
+        
+        var response = contextService.updateContext(contextId, request, staffId, staffRole);
+        
+        return ResponseEntity.ok(ApiResponse.success(
+                response,
+                "Historical context updated successfully"
+        ));
+    }
+    
+        /**
+         * DELETE /v1/historical-contexts/{contextId}
+         * Delete a historical context
+         */
+    @DeleteMapping("/{contextId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+        @Operation(summary = "Delete a historical context", description = "Delete a historical context (Creator/Admin only)")
+    public ResponseEntity<Void> deleteContext(
+            @PathVariable String contextId,
+            @RequestHeader(value = "X-Staff-Id", required = false) String staffId,
+            @RequestHeader(value = "X-Staff-Role", required = false) String staffRole) {
+        
+        log.info("DELETE /v1/historical-contexts/{} - Deleting context", contextId);
+        
+        // In real scenario, extract from JWT token
+        if (staffId == null) staffId = "staff_001"; // Default for testing
+        if (staffRole == null) staffRole = "STAFF"; // Default for testing
+        
+        contextService.deleteContext(contextId, staffId, staffRole);
+        
+        return ResponseEntity.noContent().build();
+    }
+}

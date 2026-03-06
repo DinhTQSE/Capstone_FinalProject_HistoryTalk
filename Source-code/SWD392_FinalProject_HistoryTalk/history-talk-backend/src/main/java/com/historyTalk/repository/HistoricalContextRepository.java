@@ -1,6 +1,6 @@
 package com.historyTalk.repository;
 
-import com.historyTalk.entity.HistoricalContext;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,16 +23,16 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
        @Query("""
                      SELECT hc FROM HistoricalContext hc
                      WHERE (:search IS NULL OR :search = ''
-                            OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                            OR LOWER(hc.description) LIKE LOWER(CONCAT('%', :search, '%')))
+                            OR hc.name ILIKE CONCAT('%', :search, '%')
+                            OR hc.description ILIKE CONCAT('%', :search, '%'))
                      """)
        Page<HistoricalContext> findAllWithSearch(@Param("search") String search, Pageable pageable);
 
        @Query("""
                      SELECT hc FROM HistoricalContext hc
                      WHERE (:search IS NULL OR :search = ''
-                            OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                            OR LOWER(hc.description) LIKE LOWER(CONCAT('%', :search, '%')))
+                            OR hc.name ILIKE CONCAT('%', :search, '%')
+                            OR hc.description ILIKE CONCAT('%', :search, '%'))
                      ORDER BY hc.createdDate DESC
                      """)
        List<HistoricalContext> findAllSimple(@Param("search") String search);
