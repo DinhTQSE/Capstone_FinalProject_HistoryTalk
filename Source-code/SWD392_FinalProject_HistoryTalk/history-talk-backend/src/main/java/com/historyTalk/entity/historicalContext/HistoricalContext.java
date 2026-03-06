@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -23,8 +24,10 @@ import java.util.UUID;
 public class HistoricalContext {
 
     @Id
-    @Column(name = "context_id", length = 50)
-    private String contextId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "context_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID contextId;
 
     @Column(name = "name", nullable = false, length = 100, unique = true)
     private String name;
@@ -57,10 +60,4 @@ public class HistoricalContext {
     @OneToMany(mappedBy = "historicalContext", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Quiz> quizzes = new ArrayList<>();
 
-    @PrePersist
-    protected void onCreate() {
-        if (this.contextId == null) {
-            this.contextId = UUID.randomUUID().toString();
-        }
-    }
 }

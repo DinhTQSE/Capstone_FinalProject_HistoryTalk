@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -21,8 +22,10 @@ import java.util.UUID;
 public class Message {
 
     @Id
-    @Column(name = "message_id", length = 50)
-    private String messageId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "message_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID messageId;
 
     @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
@@ -40,10 +43,7 @@ public class Message {
     private LocalDateTime timestamp;
 
     @PrePersist
-    void ensureId() {
-        if (this.messageId == null) {
-            this.messageId = UUID.randomUUID().toString();
-        }
+    void ensureDefaults() {
         if (this.isFromAi == null) {
             this.isFromAi = Boolean.FALSE;
         }

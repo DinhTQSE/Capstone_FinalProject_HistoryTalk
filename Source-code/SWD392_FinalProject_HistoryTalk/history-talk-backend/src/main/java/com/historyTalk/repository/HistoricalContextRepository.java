@@ -10,15 +10,16 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface HistoricalContextRepository extends JpaRepository<HistoricalContext, String> {
+public interface HistoricalContextRepository extends JpaRepository<HistoricalContext, UUID> {
 
        Optional<HistoricalContext> findByNameIgnoreCase(String name);
 
-       boolean existsByNameIgnoreCaseAndContextIdNot(String name, String contextId);
+       boolean existsByNameIgnoreCaseAndContextIdNot(String name, UUID contextId);
 
-       Page<HistoricalContext> findByStaffStaffId(String staffId, Pageable pageable);
+       Page<HistoricalContext> findByStaffStaffId(UUID staffId, Pageable pageable);
 
        @Query("""
                      SELECT hc FROM HistoricalContext hc

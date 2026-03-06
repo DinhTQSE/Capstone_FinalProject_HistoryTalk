@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,8 +23,10 @@ import java.util.UUID;
 public class Role {
 
     @Id
-    @Column(name = "role_id", length = 50)
-    private String roleId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "role_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID roleId;
 
     @Column(name = "role_name", length = 50, nullable = false, unique = true)
     private String roleName;
@@ -35,10 +38,4 @@ public class Role {
     @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     private List<Staff> staffMembers = new ArrayList<>();
 
-    @PrePersist
-    void ensureId() {
-        if (this.roleId == null) {
-            this.roleId = UUID.randomUUID().toString();
-        }
-    }
 }

@@ -12,6 +12,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +28,10 @@ import java.util.UUID;
 public class Staff {
 
     @Id
-    @Column(name = "staff_id", length = 50)
-    private String staffId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "staff_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID staffId;
 
     @Column(name = "name", length = 100, nullable = false)
     private String name;
@@ -60,10 +63,4 @@ public class Staff {
     @OneToMany(mappedBy = "staff", fetch = FetchType.LAZY)
     private List<Quiz> quizzes = new ArrayList<>();
 
-    @PrePersist
-    void ensureId() {
-        if (this.staffId == null) {
-            this.staffId = UUID.randomUUID().toString();
-        }
-    }
 }

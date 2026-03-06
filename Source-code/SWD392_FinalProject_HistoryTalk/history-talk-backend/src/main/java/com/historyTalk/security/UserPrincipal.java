@@ -29,7 +29,7 @@ public class UserPrincipal implements UserDetails {
     private final Collection<? extends GrantedAuthority> authorities;
 
     public UserPrincipal(User user) {
-        this.uid = user.getUid();
+        this.uid = user.getUid().toString();
         this.userName = user.getUserName();
         this.email = user.getEmail();
         this.password = user.getPassword();

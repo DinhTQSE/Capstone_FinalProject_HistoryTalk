@@ -6,7 +6,7 @@ import com.historyTalk.dto.historicalContext.UpdateHistoricalContextDocumentRequ
 import com.historyTalk.entity.historicalContext.HistoricalContext;
 import com.historyTalk.entity.historicalContext.HistoricalContextDocument;
 import com.historyTalk.entity.staff.Staff;
-import com.historyTalk.exception.ForbiddenException;
+import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.HistoricalContextDocumentRepository;
 import com.historyTalk.repository.HistoricalContextRepository;
@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -57,7 +58,7 @@ public class HistoricalContextDocumentService {
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> getDocumentsByContextId(String contextId) {
         log.info("Fetching documents for context: {}", contextId);
-        return documentRepository.findByHistoricalContextContextIdOrderByUploadDateDesc(contextId)
+        return documentRepository.findByHistoricalContextContextIdOrderByUploadDateDesc(UUID.fromString(contextId))
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -69,7 +70,7 @@ public class HistoricalContextDocumentService {
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> getDocumentsByStaffId(String staffId) {
         log.info("Fetching documents uploaded by staff: {}", staffId);
-        return documentRepository.findByStaffStaffIdOrderByUploadDateDesc(staffId)
+        return documentRepository.findByStaffStaffIdOrderByUploadDateDesc(UUID.fromString(staffId))
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -93,7 +94,7 @@ public class HistoricalContextDocumentService {
     @Transactional(readOnly = true)
     public HistoricalContextDocumentResponse getDocumentById(String docId) {
         log.info("Fetching document: {}", docId);
-        HistoricalContextDocument doc = documentRepository.findById(docId)
+        HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
         return mapToResponse(doc);
     }
@@ -105,12 +106,11 @@ public class HistoricalContextDocumentService {
     public HistoricalContextDocumentResponse createDocument(CreateHistoricalContextDocumentRequest request, String staffId) {
         log.info("Creating document: {} by staff: {}", request.getTitle(), staffId);
 
-        HistoricalContext context = contextRepository.findById(request.getContextId())
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Historical Context", "contextId", request.getContextId()));
+        HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Not found resource with ID: "+request.getContextId().toString()));
 
-        Staff staff = staffRepository.findById(staffId)
-            .orElseThrow(() -> new ResourceNotFoundException("Staff", "staffId", staffId));
+        Staff staff = staffRepository.findById(UUID.fromString(staffId))
+            .orElseThrow(() -> new ResourceNotFoundException("Not found staff with ID: "+staffId));
 
         validateContent(request.getContent());
 
@@ -133,13 +133,13 @@ public class HistoricalContextDocumentService {
     public HistoricalContextDocumentResponse updateDocument(String docId, UpdateHistoricalContextDocumentRequest request, String staffId) {
         log.info("Updating document: {} by staff: {}", docId, staffId);
         
-        HistoricalContextDocument doc = documentRepository.findById(docId)
+        HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
         
         // Only creator or admin can update
-        if (!doc.getStaff().getStaffId().equals(staffId)) {
+        if (!doc.getStaff().getStaffId().equals(UUID.fromString(staffId))) {
             log.warn("Unauthorized update attempt on document {} by staff {}", docId, staffId);
-            throw new ForbiddenException("Only document creator can update this record");
+            throw new InvalidRequestException("Only document creator can update this record");
         }
         
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
@@ -163,13 +163,13 @@ public class HistoricalContextDocumentService {
     public void deleteDocument(String docId, String staffId) {
         log.info("Deleting document: {} by staff: {}", docId, staffId);
         
-        HistoricalContextDocument doc = documentRepository.findById(docId)
+        HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
         
         // Only creator or admin can delete
-        if (!doc.getStaff().getStaffId().equals(staffId)) {
+        if (!doc.getStaff().getStaffId().equals(UUID.fromString(staffId))) {
             log.warn("Unauthorized delete attempt on document {} by staff {}", docId, staffId);
-            throw new ForbiddenException("Only document creator can delete this record");
+            throw new InvalidRequestException("Only document creator can delete this record");
         }
 
         documentRepository.delete(doc);
@@ -181,9 +181,9 @@ public class HistoricalContextDocumentService {
      */
     private HistoricalContextDocumentResponse mapToResponse(HistoricalContextDocument doc) {
         return HistoricalContextDocumentResponse.builder()
-                .docId(doc.getDocId())
-                .contextId(doc.getHistoricalContext().getContextId())
-                .staffId(doc.getStaff().getStaffId())
+                .docId(doc.getDocId().toString())
+                .contextId(doc.getHistoricalContext().getContextId().toString())
+                .staffId(doc.getStaff().getStaffId().toString())
                 .staffName(doc.getStaff().getName())
                 .title(doc.getTitle())
                 .content(doc.getContent())

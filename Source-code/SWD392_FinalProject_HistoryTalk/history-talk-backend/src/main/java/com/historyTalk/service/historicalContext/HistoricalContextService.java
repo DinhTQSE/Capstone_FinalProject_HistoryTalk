@@ -6,8 +6,7 @@ import com.historyTalk.dto.PaginatedResponse;
 import com.historyTalk.dto.historicalContext.UpdateHistoricalContextRequest;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
 import com.historyTalk.entity.staff.Staff;
-import com.historyTalk.exception.DuplicateResourceException;
-import com.historyTalk.exception.ForbiddenException;
+import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.HistoricalContextRepository;
 import com.historyTalk.repository.StaffRepository;
@@ -19,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -65,10 +65,8 @@ public class HistoricalContextService {
     public HistoricalContextResponse getContextById(String contextId) {
         log.info("Fetching historical context with ID: {}", contextId);
         
-        HistoricalContext context = contextRepository.findById(contextId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Historical Context", "contextId", contextId
-                ));
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
+                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: "+contextId));
         
         return mapToResponse(context);
     }
@@ -84,11 +82,11 @@ public class HistoricalContextService {
         
         // Check for duplicate name
         if (contextRepository.findByNameIgnoreCase(request.getName()).isPresent()) {
-            throw new DuplicateResourceException("Historical Context", "name", request.getName());
+            throw new InvalidRequestException("Historical context already existed");
         }
 
-        Staff staff = staffRepository.findById(staffId)
-                .orElseThrow(() -> new ResourceNotFoundException("Staff", "staffId", staffId));
+        Staff staff = staffRepository.findById(UUID.fromString(staffId))
+                .orElseThrow(() -> new ResourceNotFoundException("Staff"));
 
         HistoricalContext context = HistoricalContext.builder()
                 .name(request.getName())
@@ -112,14 +110,14 @@ public class HistoricalContextService {
         
         log.info("Updating historical context with ID: {}", contextId);
         
-        HistoricalContext context = contextRepository.findById(contextId)
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Historical Context", "contextId", contextId
+                        "Historical context not found with ID: "+contextId
                 ));
         
         // Check if user has permission to update (creator or admin)
-        if (!context.getStaff().getStaffId().equals(staffId) && !"ADMIN".equalsIgnoreCase(staffRole)) {
-            throw new ForbiddenException(
+        if (!context.getStaff().getStaffId().equals(UUID.fromString(staffId)) && !"ADMIN".equalsIgnoreCase(staffRole)) {
+            throw new InvalidRequestException(
                     "You do not have permission to update this historical context"
             );
         }
@@ -127,8 +125,8 @@ public class HistoricalContextService {
         // Check for duplicate name (if name is being changed)
         if (request.getName() != null && 
             !request.getName().equalsIgnoreCase(context.getName()) &&
-            contextRepository.existsByNameIgnoreCaseAndContextIdNot(request.getName(), contextId)) {
-            throw new DuplicateResourceException("Historical Context", "name", request.getName());
+            contextRepository.existsByNameIgnoreCaseAndContextIdNot(request.getName(), UUID.fromString(contextId))) {
+            throw new InvalidRequestException("Name already existed"+request.getName());
         }
         
         // Update fields
@@ -151,14 +149,14 @@ public class HistoricalContextService {
     public void deleteContext(String contextId, String staffId, String staffRole) {
         log.info("Deleting historical context with ID: {}", contextId);
         
-        HistoricalContext context = contextRepository.findById(contextId)
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Historical Context", "contextId", contextId
+                        "Not found with ID: "+contextId
                 ));
         
         // Check if user has permission to delete (creator or admin)
-        if (!context.getStaff().getStaffId().equals(staffId) && !"ADMIN".equalsIgnoreCase(staffRole)) {
-            throw new ForbiddenException(
+        if (!context.getStaff().getStaffId().equals(UUID.fromString(staffId)) && !"ADMIN".equalsIgnoreCase(staffRole)) {
+            throw new InvalidRequestException(
                     "You do not have permission to delete this historical context"
             );
         }
@@ -172,11 +170,11 @@ public class HistoricalContextService {
      */
     private HistoricalContextResponse mapToResponse(HistoricalContext context) {
         return HistoricalContextResponse.builder()
-                .contextId(context.getContextId())
+                .contextId(context.getContextId().toString())
                 .name(context.getName())
                 .description(context.getDescription())
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
-                        .staffId(context.getStaff().getStaffId())
+                        .staffId(context.getStaff().getStaffId().toString())
                         .name(context.getStaff().getName())
                         .build())
                 .createdDate(context.getCreatedDate())
