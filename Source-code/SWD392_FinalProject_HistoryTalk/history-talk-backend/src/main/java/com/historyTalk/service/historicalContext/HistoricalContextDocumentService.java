@@ -1,4 +1,4 @@
-package com.historyTalk.service;
+package com.historyTalk.service.historicalContext;
 
 import com.historyTalk.dto.CreateHistoricalContextDocumentRequest;
 import com.historyTalk.dto.HistoricalContextDocumentResponse;
