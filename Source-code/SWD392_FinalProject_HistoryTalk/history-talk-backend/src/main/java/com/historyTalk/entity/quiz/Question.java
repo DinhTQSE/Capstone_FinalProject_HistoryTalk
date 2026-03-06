@@ -1,13 +1,12 @@
 package com.historyTalk.entity.quiz;
 
-import com.historyTalk.entity.quiz.Quiz;
-import com.historyTalk.entity.quiz.QuizAnswerDetail;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,8 +22,10 @@ import java.util.UUID;
 public class Question {
 
     @Id
-    @Column(name = "question_id", length = 50)
-    private String questionId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "question_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID questionId;
 
     @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
@@ -45,10 +46,4 @@ public class Question {
     @OneToMany(mappedBy = "question", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<QuizAnswerDetail> answerDetails = new ArrayList<>();
 
-    @PrePersist
-    void ensureId() {
-        if (this.questionId == null) {
-            this.questionId = UUID.randomUUID().toString();
-        }
-    }
 }

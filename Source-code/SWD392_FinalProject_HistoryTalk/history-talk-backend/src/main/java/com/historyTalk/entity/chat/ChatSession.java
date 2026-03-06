@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,8 +26,10 @@ import java.util.UUID;
 public class ChatSession {
 
     @Id
-    @Column(name = "session_id", length = 50)
-    private String sessionId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "session_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID sessionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uid", nullable = false)
@@ -44,10 +47,4 @@ public class ChatSession {
     @OneToMany(mappedBy = "chatSession", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Message> messages = new ArrayList<>();
 
-    @PrePersist
-    void ensureId() {
-        if (this.sessionId == null) {
-            this.sessionId = UUID.randomUUID().toString();
-        }
-    }
 }

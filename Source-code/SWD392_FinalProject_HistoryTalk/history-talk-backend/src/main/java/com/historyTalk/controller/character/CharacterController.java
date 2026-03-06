@@ -1,0 +1,94 @@
+package com.historyTalk.controller.character;
+
+import com.historyTalk.dto.ApiResponse;
+import com.historyTalk.dto.character.CharacterResponse;
+import com.historyTalk.dto.character.CreateCharacterRequest;
+import com.historyTalk.dto.character.UpdateCharacterRequest;
+import com.historyTalk.service.character.CharacterService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/v1/characters")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Characters", description = "API endpoints for managing historical characters")
+public class CharacterController {
+
+    private final CharacterService characterService;
+
+    @GetMapping
+    @Operation(summary = "Get all characters", description = "Retrieve all characters, optionally filtered by search keyword")
+    public ResponseEntity<ApiResponse<?>> getAllCharacters(
+            @RequestParam(required = false, defaultValue = "") String search) {
+        log.info("GET /v1/characters - search: {}", search);
+        List<CharacterResponse> result = characterService.getAllCharacters(search);
+        return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
+    }
+
+    @GetMapping("/{characterId}")
+    @Operation(summary = "Get character by ID")
+    public ResponseEntity<ApiResponse<?>> getCharacterById(@PathVariable String characterId) {
+        log.info("GET /v1/characters/{}", characterId);
+        CharacterResponse result = characterService.getCharacterById(characterId);
+        return ResponseEntity.ok(ApiResponse.success(result, "Character retrieved successfully"));
+    }
+
+    @GetMapping("/context/{contextId}")
+    @Operation(summary = "Get characters by historical context")
+    public ResponseEntity<ApiResponse<?>> getCharactersByContext(@PathVariable String contextId) {
+        log.info("GET /v1/characters/context/{}", contextId);
+        List<CharacterResponse> result = characterService.getCharactersByContext(contextId);
+        return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Create a new character", description = "Create a new historical character (Staff/Admin only)")
+    public ResponseEntity<ApiResponse<?>> createCharacter(
+            @Valid @RequestBody CreateCharacterRequest request,
+            @RequestHeader(value = "X-Staff-Id", defaultValue = "staff_default") String staffId) {
+        log.info("POST /v1/characters - name: {}", request.getName());
+        CharacterResponse result = characterService.createCharacter(request, staffId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(result, "Character created successfully"));
+    }
+
+    @PutMapping("/{characterId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Update a character", description = "Update character details (creator or Admin only)")
+    public ResponseEntity<ApiResponse<?>> updateCharacter(
+            @PathVariable String characterId,
+            @Valid @RequestBody UpdateCharacterRequest request,
+            @RequestHeader(value = "X-Staff-Id", defaultValue = "staff_default") String staffId,
+            @RequestHeader(value = "X-Staff-Role", defaultValue = "STAFF") String staffRole) {
+        log.info("PUT /v1/characters/{}", characterId);
+        CharacterResponse result = characterService.updateCharacter(characterId, request, staffId, staffRole);
+        return ResponseEntity.ok(ApiResponse.success(result, "Character updated successfully"));
+    }
+
+    @DeleteMapping("/{characterId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Delete a character", description = "Delete a character (creator or Admin only)")
+    public ResponseEntity<ApiResponse<?>> deleteCharacter(
+            @PathVariable String characterId,
+            @RequestHeader(value = "X-Staff-Id", defaultValue = "staff_default") String staffId,
+            @RequestHeader(value = "X-Staff-Role", defaultValue = "STAFF") String staffRole) {
+        log.info("DELETE /v1/characters/{}", characterId);
+        characterService.deleteCharacter(characterId, staffId, staffRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Character deleted successfully"));
+    }
+}

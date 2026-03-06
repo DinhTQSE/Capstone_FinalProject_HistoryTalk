@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.util.UUID;
 
@@ -19,8 +20,10 @@ import java.util.UUID;
 public class QuizAnswerDetail {
 
     @Id
-    @Column(name = "detail_id", length = 50)
-    private String detailId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "detail_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID detailId;
 
     @Column(name = "selected_option", length = 255, nullable = false)
     private String selectedOption;
@@ -37,10 +40,7 @@ public class QuizAnswerDetail {
     private Question question;
 
     @PrePersist
-    void ensureId() {
-        if (this.detailId == null) {
-            this.detailId = UUID.randomUUID().toString();
-        }
+    void ensureDefaults() {
         if (this.isCorrect == null) {
             this.isCorrect = Boolean.FALSE;
         }

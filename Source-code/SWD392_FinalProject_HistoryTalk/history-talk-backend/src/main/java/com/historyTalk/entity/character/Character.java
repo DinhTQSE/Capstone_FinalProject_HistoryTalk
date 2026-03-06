@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +25,10 @@ import java.util.UUID;
 public class Character {
 
     @Id
-    @Column(name = "character_id", length = 50)
-    private String characterId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "character_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID characterId;
 
     @Column(name = "name", length = 100, nullable = false)
     private String name;
@@ -56,10 +59,4 @@ public class Character {
     @OneToMany(mappedBy = "character", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChatSession> chatSessions = new ArrayList<>();
 
-    @PrePersist
-    void ensureId() {
-        if (this.characterId == null) {
-            this.characterId = UUID.randomUUID().toString();
-        }
-    }
 }

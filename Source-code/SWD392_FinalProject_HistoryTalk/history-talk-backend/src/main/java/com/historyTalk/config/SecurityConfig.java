@@ -101,6 +101,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/v1/historical-documents/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/v1/historical-documents/**").authenticated()
 
+                        // Character endpoints - GET public, mutating requires auth
+                        .requestMatchers(HttpMethod.GET, "/v1/characters/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/characters/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/v1/characters/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/v1/characters/**").authenticated()
+
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )

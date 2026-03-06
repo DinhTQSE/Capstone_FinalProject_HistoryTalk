@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -26,8 +27,10 @@ import java.util.UUID;
 public class HistoricalContextDocument {
 
     @Id
-    @Column(name = "doc_id", length = 50)
-    private String docId;
+    @GeneratedValue
+    @UuidGenerator
+    @Column(name = "doc_id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID docId;
 
     @Column(name = "title", length = 255, nullable = false)
     private String title;
@@ -52,10 +55,4 @@ public class HistoricalContextDocument {
     @Column(name = "updated_date")
     private LocalDateTime updatedDate;
 
-    @PrePersist
-    public void prePersist() {
-        if (this.docId == null) {
-            this.docId = UUID.randomUUID().toString();
-        }
-    }
 }

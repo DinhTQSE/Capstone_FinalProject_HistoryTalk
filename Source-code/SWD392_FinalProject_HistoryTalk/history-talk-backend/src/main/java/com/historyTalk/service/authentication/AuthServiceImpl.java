@@ -7,7 +7,7 @@ import com.historyTalk.dto.authentication.RegisterRequest;
 import com.historyTalk.dto.authentication.RegisterResponse;
 import com.historyTalk.entity.user.User;
 import com.historyTalk.entity.user.UserType;
-import com.historyTalk.exception.DuplicateResourceException;
+import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.UnauthorizedException;
 import com.historyTalk.repository.UserRepository;
 import com.historyTalk.security.UserPrincipal;
@@ -50,10 +50,10 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Password and confirmation password do not match");
         }
         if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new DuplicateResourceException("User", "email", request.getEmail());
+            throw new InvalidRequestException("Your email already existed");
         }
         if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
-            throw new DuplicateResourceException("User", "userName", request.getUserName());
+            throw new InvalidRequestException("Your username already existed");
         }
 
         User user = User.builder()
@@ -67,7 +67,7 @@ public class AuthServiceImpl implements AuthService {
         log.info("User registered with uid: {}", saved.getUid());
 
         return RegisterResponse.builder()
-                .uid(saved.getUid())
+                .uid(saved.getUid().toString())
                 .userName(saved.getUserName())
                 .email(saved.getEmail())
                 .userType(saved.getUserType())
@@ -106,7 +106,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenExpirationMs())
-                .uid(user.getUid())
+                .uid(user.getUid().toString())
                 .userName(user.getUserName())
                 .email(user.getEmail())
                 .userType(user.getUserType())
