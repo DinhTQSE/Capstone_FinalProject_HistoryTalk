@@ -25,6 +25,7 @@ public class UserPrincipal implements UserDetails {
     private final String email;
     private final String password;
     private final UserType userType;
+    private final String staffId;  // non-null only when userType = STAFF
     private final String roleName; // non-null only when userType = STAFF
     private final Collection<? extends GrantedAuthority> authorities;
 
@@ -35,12 +36,17 @@ public class UserPrincipal implements UserDetails {
         this.password = user.getPassword();
         this.userType = user.getUserType();
 
-        // Resolve role name from linked Staff entity
+        // Resolve staffId and role from linked Staff entity
+        String resolvedStaffId = null;
         String resolvedRole = null;
         Staff staff = user.getStaff();
-        if (staff != null && staff.getRole() != null) {
-            resolvedRole = staff.getRole().getRoleName();
+        if (staff != null) {
+            resolvedStaffId = staff.getStaffId().toString();
+            if (staff.getRole() != null) {
+                resolvedRole = staff.getRole().getRoleName();
+            }
         }
+        this.staffId = resolvedStaffId;
         this.roleName = resolvedRole;
         this.authorities = buildAuthorities(user.getUserType(), resolvedRole);
     }

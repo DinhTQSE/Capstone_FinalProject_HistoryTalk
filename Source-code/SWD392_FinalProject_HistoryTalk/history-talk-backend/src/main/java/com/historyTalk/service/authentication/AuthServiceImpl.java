@@ -217,6 +217,9 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("uid", principal.getUid());
         claims.put("userType", principal.getUserType().name());
+        if (principal.getStaffId() != null) {
+            claims.put("staffId", principal.getStaffId());
+        }
         if (principal.getRoleName() != null) {
             claims.put("roleName", principal.getRoleName());
         }

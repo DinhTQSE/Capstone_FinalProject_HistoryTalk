@@ -13,6 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.historyTalk.security.AuthenticatedPrincipal;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,8 +59,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 List<SimpleGrantedAuthority> authorities = buildAuthoritiesFromClaims(claims);
 
+                String uid      = claims.get("uid",      String.class);
+                String staffId  = claims.get("staffId",  String.class);
+                String roleName = claims.get("roleName", String.class);
+                String userType = claims.get("userType", String.class);
+                AuthenticatedPrincipal principal =
+                        new AuthenticatedPrincipal(email, uid, staffId, roleName, userType);
+
                 UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(email, null, authorities);
+                        new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 log.debug("JWT auth set for user: {}", email);
