@@ -42,13 +42,15 @@ com.historyTalk
 │   └── GlobalExceptionHandler.java
 ├── repository/    # HistoricalContextRepository, HistoricalContextDocumentRepository,
 │                  # StaffRepository, UserRepository
-├── security/      # JwtAuthenticationFilter, JwtTokenProvider, UserPrincipal
+├── security/      # JwtAuthenticationFilter, JwtTokenProvider, UserPrincipal, AuthenticatedPrincipal
 ├── service/
 │   ├── authentication/ # AuthService (interface), AuthServiceImpl, JwtService, JwtServiceImpl,
 │   │                   # CustomUserDetailsService
 │   └── historicalContext/ # HistoricalContextService, HistoricalContextDocumentService
 ├── mapper/        # (character/, historicalContext/, user/ sub-packages)
-└── utils/authentication/
+└── utils/
+    ├── authentication/
+    └── SecurityUtils.java  # getStaffId(), getRoleName() from SecurityContext
 ```
 
 ## Entity & ID Conventions
@@ -84,8 +86,11 @@ All exceptions extend `BaseException(message, errorCode, httpStatus)` except `Bu
   - `GET /Historical-tell/v1/**` → public
   - Mutating verbs (`POST/PUT/DELETE /v1/**`) → require authenticated JWT
   - `@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")` on write endpoints
-- `UserPrincipal` wraps `User` entity for Spring Security; `uid` is stored as `String` (`.toString()` from UUID).
-- Controllers accept `X-Staff-Id` / `X-Staff-Role` headers defaulting to test values for Swagger — **never use these defaults in real business logic**.
+- `UserPrincipal` wraps `User` entity for Spring Security; `uid` and `staffId` are stored as `String` (`.toString()` from UUID).
+- **JWT claims**: `sub` (email), `uid`, `userType`, `staffId` (STAFF only), `roleName` (STAFF only). `staffId` in the token is always `Staff.staffId` — never `User.uid`.
+- **`AuthenticatedPrincipal`**: lightweight object set as the `Authentication` principal after JWT validation. Fields: `email`, `uid`, `staffId`, `roleName`, `userType`. Populated directly from JWT claims — no DB call.
+- **`SecurityUtils`** (`utils/SecurityUtils.java`): use `SecurityUtils.getStaffId()` and `SecurityUtils.getRoleName()` in controllers to get caller identity. **Never** read `X-Staff-Id` / `X-Staff-Role` headers in business logic — they can be spoofed.
+- `X-Staff-Id` / `X-Staff-Role` headers exist only as a fallback in `JwtAuthenticationFilter` for Swagger testing without a token. Do not add them as `@RequestHeader` parameters on any write endpoint.
 - CORS is wide-open (`allowedOrigins = "*"`) with stateless sessions.
 
 ## Repository Conventions
@@ -97,7 +102,7 @@ All exceptions extend `BaseException(message, errorCode, httpStatus)` except `Bu
 ## Data & Validation Rules
 - `HistoricalContext.name` must be unique (case-insensitive). Use `DataConflictException` for duplicates.
 - `HistoricalContextDocument.content` is capped at **10 MB** (validated via UTF-8 byte length). Follow this pattern for any large text fields.
-- Ownership checks on mutating ops: compare `entity.getStaff().getStaffId()` (UUID) with `UUID.fromString(staffId)` from header; allow bypass if `staffRole.equalsIgnoreCase("ADMIN")`.
+- Ownership checks on mutating ops: get `staffId` via `SecurityUtils.getStaffId()` and `staffRole` via `SecurityUtils.getRoleName()` — compare `entity.getStaff().getStaffId()` with `UUID.fromString(staffId)`; allow bypass if `staffRole.equalsIgnoreCase("ADMIN")`.
 - `User.email` and `User.userName` must be unique (`unique = true` on `@Column`). `Staff.email` must also be unique.
 
 ## Developer Workflow
