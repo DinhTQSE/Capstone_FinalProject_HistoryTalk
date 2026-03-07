@@ -1,9 +1,15 @@
 package com.historyTalk.controller.historicalContext;
 
 import com.historyTalk.dto.ApiResponse;
+import com.historyTalk.dto.PaginatedResponse;
 import com.historyTalk.dto.historicalContext.CreateHistoricalContextRequest;
+import com.historyTalk.dto.historicalContext.HistoricalContextResponse;
 import com.historyTalk.dto.historicalContext.UpdateHistoricalContextRequest;
+import com.historyTalk.entity.enums.EventCategory;
+import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.service.historicalContext.HistoricalContextService;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,13 +35,19 @@ public class HistoricalContextController {
      * Retrieve all historical contexts
      */
     @GetMapping
-    @Operation(summary = "Get all historical contexts", description = "Retrieve a list of all historical contexts")
-    public ResponseEntity<ApiResponse<?>> getAllContexts(
-            @RequestParam(required = false, defaultValue = "") String search) {
+    @Operation(summary = "Get all historical contexts", description = "Retrieve paginated historical contexts with optional filters")
+    public ResponseEntity<ApiResponse<PaginatedResponse<HistoricalContextResponse>>> getAllContexts(
+            @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) EventEra era,
+            @RequestParam(required = false) EventCategory category,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "6") int limit) {
         
-        log.info("GET /v1/historical-contexts - search: {}", search);
+        log.info("GET /v1/historical-contexts - search: {}, era: {}, category: {}, page: {}, limit: {}",
+                search, era, category, page, limit);
         
-        var response = contextService.getAllContextsSimple(search);
+        var pageable = PageRequest.of(Math.max(page - 1, 0), limit, Sort.by(Sort.Direction.DESC, "createdDate"));
+        var response = contextService.getAllContexts(search, era, category, pageable);
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,

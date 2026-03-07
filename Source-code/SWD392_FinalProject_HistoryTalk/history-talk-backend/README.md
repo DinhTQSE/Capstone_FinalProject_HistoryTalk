@@ -843,7 +843,7 @@ Build: Maven 3.8+
 
 **Build**: `mvn clean install`  
 **Run**: `mvn spring-boot:run`  
-**API Docs**: http://localhost:8080/swagger-ui.html  
+**API Docs**: http://localhost:8080/Historical-tell/api/v1/swagger-ui  
 **Test**: http://localhost:8080/v1/historical-contexts  
 
 ---

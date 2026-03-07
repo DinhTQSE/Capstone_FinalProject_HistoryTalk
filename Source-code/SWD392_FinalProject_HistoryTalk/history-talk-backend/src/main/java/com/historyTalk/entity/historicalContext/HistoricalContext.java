@@ -55,6 +55,16 @@ public class HistoricalContext {
     @Column(name = "end_year")
     private Integer endYear;
 
+    @Builder.Default
+    @Column(name = "before_tcn", columnDefinition = "boolean not null default false")
+    private Boolean beforeTCN = false;
+
+    @Column(name = "location", length = 255)
+    private String location;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "staff_id", nullable = false)
     private Staff staff;
