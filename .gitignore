@@ -60,3 +60,5 @@ application-prod.yml
 .vscode
 diagram
 Source-code/SWD392_FinalProject_HistoryTalk/history-talk-frontend
+#src/main/resources/secretKey.properties
+src/main/resources/standbyMigration

@@ -63,7 +63,7 @@ public class AuthServiceImpl implements AuthService {
                 .userName(request.getUserName())
                 .email(request.getEmail().toLowerCase())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(UserRole.USER)
+                .role(UserRole.CUSTOMER)
                 .build();
 
         User saved = userRepository.save(user);
@@ -176,7 +176,7 @@ public class AuthServiceImpl implements AuthService {
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException("Invalid role: " + request.getRole() + ". Must be STAFF or ADMIN");
         }
-        if (role == UserRole.USER) {
+        if (role == UserRole.CUSTOMER) {
             throw new InvalidRequestException("Cannot register a privileged account with role USER. Use the public register endpoint instead.");
         }
 
