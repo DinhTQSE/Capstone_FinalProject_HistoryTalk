@@ -98,7 +98,7 @@ public class HistoricalContextDocumentController {
      * Create/upload new document (Staff/Admin only)
      */
     @PostMapping
-    @SecurityRequirement(name = "bearerAuth")
+//    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload document", description = "Upload a new historical document (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createDocument(
             @Valid @RequestBody CreateHistoricalContextDocumentRequest request) {
@@ -114,7 +114,7 @@ public class HistoricalContextDocumentController {
      * Update document content/metadata (Staff/Admin only)
      */
     @PutMapping("/{docId}")
-    @SecurityRequirement(name = "bearerAuth")
+//    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update document", description = "Update document content or metadata (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateDocument(
             @PathVariable String docId,
@@ -130,7 +130,7 @@ public class HistoricalContextDocumentController {
      * Delete document
      */
     @DeleteMapping("/{docId}")
-    @SecurityRequirement(name = "bearerAuth")
+//    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete document", description = "Delete a document")
     public ResponseEntity<ApiResponse<?>> deleteDocument(
             @PathVariable String docId) {
