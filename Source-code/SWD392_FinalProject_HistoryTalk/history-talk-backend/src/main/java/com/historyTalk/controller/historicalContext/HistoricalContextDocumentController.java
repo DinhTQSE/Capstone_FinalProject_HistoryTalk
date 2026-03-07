@@ -29,7 +29,7 @@ import java.util.List;
  * - DELETE /v1/historical-documents/{docId} - Remove document (Staff/Admin)
  */
 @RestController
-@RequestMapping("/v1/historical-documents")
+@RequestMapping("/api/v1/historical-documents")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Historical Context Documents", description = "API for managing historical documents")

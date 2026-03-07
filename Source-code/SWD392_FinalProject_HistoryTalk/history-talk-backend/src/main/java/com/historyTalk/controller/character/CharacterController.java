@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/characters")
+@RequestMapping("/api/v1/characters")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Characters", description = "API endpoints for managing historical characters")
