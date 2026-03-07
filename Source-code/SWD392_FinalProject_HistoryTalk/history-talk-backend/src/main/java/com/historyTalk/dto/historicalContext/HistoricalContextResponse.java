@@ -42,6 +42,18 @@ public class HistoricalContextResponse {
     @JsonProperty("period")
     private String period;
 
+    @JsonProperty("yearLabel")
+    private String yearLabel;
+
+    @JsonProperty("beforeTCN")
+    private Boolean beforeTCN;
+
+    @JsonProperty("location")
+    private String location;
+
+    @JsonProperty("imageUrl")
+    private String imageUrl;
+
     @JsonProperty("createdBy")
     private CreatedByInfo createdBy;
     

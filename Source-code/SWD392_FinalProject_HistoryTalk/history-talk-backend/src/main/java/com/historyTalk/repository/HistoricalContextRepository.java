@@ -1,5 +1,7 @@
 package com.historyTalk.repository;
 
+import com.historyTalk.entity.enums.EventCategory;
+import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,8 +28,14 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                      WHERE (:search IS NULL OR :search = ''
                             OR hc.name ILIKE CONCAT('%', :search, '%')
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
+                     AND (:era IS NULL OR hc.era = :era)
+                     AND (:category IS NULL OR hc.category = :category)
                      """)
-       Page<HistoricalContext> findAllWithSearch(@Param("search") String search, Pageable pageable);
+       Page<HistoricalContext> findAllWithSearch(
+                     @Param("search") String search,
+                     @Param("era") EventEra era,
+                     @Param("category") EventCategory category,
+                     Pageable pageable);
 
        @Query("""
                      SELECT hc FROM HistoricalContext hc

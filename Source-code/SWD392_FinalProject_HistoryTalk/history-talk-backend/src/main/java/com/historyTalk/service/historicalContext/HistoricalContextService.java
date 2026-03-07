@@ -4,6 +4,8 @@ import com.historyTalk.dto.historicalContext.CreateHistoricalContextRequest;
 import com.historyTalk.dto.historicalContext.HistoricalContextResponse;
 import com.historyTalk.dto.PaginatedResponse;
 import com.historyTalk.dto.historicalContext.UpdateHistoricalContextRequest;
+import com.historyTalk.entity.enums.EventCategory;
+import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
 import com.historyTalk.entity.staff.Staff;
 import com.historyTalk.exception.InvalidRequestException;
@@ -34,12 +36,12 @@ public class HistoricalContextService {
      */
     @Transactional(readOnly = true)
     public PaginatedResponse<HistoricalContextResponse> getAllContexts(
-            String search, Pageable pageable) {
+            String search, EventEra era, EventCategory category, Pageable pageable) {
         
-        log.info("Fetching historical contexts with search: {}", search);
+        log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
         Page<HistoricalContext> page = contextRepository
-                .findAllWithSearch(normalize(search), pageable);
+                .findAllWithSearch(normalize(search), era, category, pageable);
         
         return mapPageToPaginatedResponse(page);
     }
@@ -96,6 +98,9 @@ public class HistoricalContextService {
                 .year(request.getYear())
                 .startYear(request.getStartYear())
                 .endYear(request.getEndYear())
+                .beforeTCN(request.getBeforeTCN() != null ? request.getBeforeTCN() : false)
+                .location(request.getLocation())
+                .imageUrl(request.getImageUrl())
                 .staff(staff)
                 .build();
 
@@ -156,6 +161,15 @@ public class HistoricalContextService {
         if (request.getEndYear() != null) {
             context.setEndYear(request.getEndYear());
         }
+        if (request.getBeforeTCN() != null) {
+            context.setBeforeTCN(request.getBeforeTCN());
+        }
+        if (request.getLocation() != null) {
+            context.setLocation(request.getLocation());
+        }
+        if (request.getImageUrl() != null) {
+            context.setImageUrl(request.getImageUrl());
+        }
         HistoricalContext updatedContext = contextRepository.save(context);
         log.info("Historical context updated successfully with ID: {}", contextId);
         
@@ -201,6 +215,12 @@ public class HistoricalContextService {
                 .period(context.getStartYear() != null && context.getEndYear() != null
                         ? context.getStartYear() + "\u2013" + context.getEndYear()
                         : null)
+                .yearLabel(context.getYear() != null
+                        ? context.getYear() + (Boolean.TRUE.equals(context.getBeforeTCN()) ? " TCN" : " SCN")
+                        : null)
+                .beforeTCN(context.getBeforeTCN())
+                .location(context.getLocation())
+                .imageUrl(context.getImageUrl())
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
                         .staffId(context.getStaff().getStaffId().toString())
                         .name(context.getStaff().getName())

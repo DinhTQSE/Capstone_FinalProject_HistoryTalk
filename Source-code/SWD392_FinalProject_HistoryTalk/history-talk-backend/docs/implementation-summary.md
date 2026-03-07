@@ -314,3 +314,76 @@ period = (startYear != null && endYear != null) ? startYear + "\u2013" + endYear
 4. Thử `POST /api/v1/auth/login` → Copy `accessToken`
 5. Nhấn **Authorize** → nhập `Bearer <accessToken>`
 6. Thử các endpoint historical-context có authentication
+
+---
+
+## Historical Context – Events API Enhancement (March 7, 2026)
+
+### Mục Tiêu
+Nâng cấp `GET /v1/historical-contexts` để đáp ứng requirement `/events` frontend: pagination, filter `era`/`category`, thêm field `yearLabel`, `location`, `imageUrl`, `beforeTCN`.
+
+### ✏️ File Sửa
+
+| File | Thay đổi |
+|------|---------|
+| `entity/historicalContext/HistoricalContext.java` | Thêm `beforeTCN` (`Boolean`, default `false`, NOT NULL), `location` (`VARCHAR 255`, nullable), `imageUrl` (`VARCHAR 500`, nullable) |
+| `repository/HistoricalContextRepository.java` | Thêm import `EventEra`, `EventCategory`; sửa `findAllWithSearch` nhận thêm `era` + `category` params với filter `AND (:era IS NULL OR hc.era = :era) AND (:category IS NULL OR hc.category = :category)` |
+| `dto/historicalContext/HistoricalContextResponse.java` | Thêm `yearLabel` (String), `beforeTCN` (Boolean), `location` (String), `imageUrl` (String) |
+| `dto/historicalContext/CreateHistoricalContextRequest.java` | Thêm `beforeTCN` (Boolean, default `false`), `location` (`@Size` max 255), `imageUrl` (`@Size` max 500) |
+| `dto/historicalContext/UpdateHistoricalContextRequest.java` | Thêm `beforeTCN` (Boolean), `location` (`@Size` max 255), `imageUrl` (`@Size` max 500) |
+| `service/historicalContext/HistoricalContextService.java` | `getAllContexts` thêm `EventEra era`, `EventCategory category`; `createContext`/`updateContext` set 3 fields mới; `mapToResponse` tính `yearLabel` + populate `beforeTCN`, `location`, `imageUrl` |
+| `controller/historicalContext/HistoricalContextController.java` | `GET /v1/historical-contexts` đổi từ `getAllContextsSimple` sang paginated `getAllContexts`; thêm query params `era`, `category`, `page`, `limit`; thêm import `PageRequest`, `Sort`, `EventEra`, `EventCategory`, `PaginatedResponse` |
+
+### Thiết Kế `yearLabel`
+
+`yearLabel` **không lưu DB** — tính tại tầng service:
+```java
+yearLabel = (year != null)
+    ? year + (Boolean.TRUE.equals(beforeTCN) ? " TCN" : " SCN")
+    : null;
+```
+- `beforeTCN = true` + `year = 111` → `yearLabel = "111 TCN"`
+- `beforeTCN = false` + `year = 938` → `yearLabel = "938 SCN"`
+
+### API Endpoints (Cập Nhật)
+
+| Method | Path | Query Params | Auth | Response |
+|--------|------|-------------|------|---------|
+| GET | `/v1/historical-contexts` | `search`, `era`, `category`, `page` (default 1), `limit` (default 6) | Public | `PaginatedResponse<HistoricalContextResponse>` |
+| GET | `/v1/historical-contexts/{contextId}` | — | Public | `HistoricalContextResponse` |
+| POST | `/v1/historical-contexts` | — | STAFF / ADMIN | `HistoricalContextResponse` |
+| PUT | `/v1/historical-contexts/{contextId}` | — | STAFF / ADMIN | `HistoricalContextResponse` |
+| DELETE | `/v1/historical-contexts/{contextId}` | — | STAFF / ADMIN | `204 No Content` |
+
+### Response Shape (`HistoricalContextResponse`)
+
+```json
+{
+  "contextId": "uuid-string",
+  "name": "Trận Bạch Đằng",
+  "description": "...",
+  "era": "ANCIENT",
+  "category": "WAR",
+  "year": 938,
+  "startYear": null,
+  "endYear": null,
+  "period": null,
+  "yearLabel": "938 SCN",
+  "beforeTCN": false,
+  "location": "Sông Bạch Đằng, Quảng Ninh",
+  "imageUrl": "/images/events/bach-dang.jpg",
+  "createdBy": { "staffId": "...", "name": "..." },
+  "createdDate": "2026-03-07T10:00:00",
+  "updatedDate": "2026-03-07T10:00:00"
+}
+```
+
+### DB Migration
+
+`ddl-auto=update` — Hibernate tự `ALTER TABLE historical_context` thêm 3 column mới: `before_tcn` (boolean not null default false), `location` (varchar 255), `image_url` (varchar 500).
+
+### Lưu Ý
+
+- `getAllContextsSimple(search)` vẫn còn trong service — dùng nội bộ nếu cần list không paginate
+- `page` param là **1-based** (frontend friendly); service convert sang 0-based trước khi truyền `PageRequest`
+- `era` / `category` filter dùng `IS NULL` check trong JPQL nên không truyền param = trả toàn bộ (không filter)

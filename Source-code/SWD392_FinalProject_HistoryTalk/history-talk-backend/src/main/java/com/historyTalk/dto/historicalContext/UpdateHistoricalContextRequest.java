@@ -37,4 +37,15 @@ public class UpdateHistoricalContextRequest {
 
     @JsonProperty("endYear")
     private Integer endYear;
+
+    @JsonProperty("beforeTCN")
+    private Boolean beforeTCN;
+
+    @JsonProperty("location")
+    @Size(max = 255, message = "Location must be at most 255 characters")
+    private String location;
+
+    @JsonProperty("imageUrl")
+    @Size(max = 500, message = "Image URL must be at most 500 characters")
+    private String imageUrl;
 }
