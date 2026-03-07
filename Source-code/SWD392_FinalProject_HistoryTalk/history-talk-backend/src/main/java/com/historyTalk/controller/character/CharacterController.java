@@ -5,6 +5,7 @@ import com.historyTalk.dto.PaginatedResponse;
 import com.historyTalk.dto.character.CharacterResponse;
 import com.historyTalk.dto.character.CreateCharacterRequest;
 import com.historyTalk.dto.character.UpdateCharacterRequest;
+import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.service.character.CharacterService;
 import com.historyTalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.chrono.Era;
 import java.util.List;
 
 @RestController
@@ -33,11 +35,11 @@ public class CharacterController {
     @Operation(summary = "Get all characters", description = "Retrieve paginated characters, optionally filtered by search keyword and era")
     public ResponseEntity<ApiResponse<PaginatedResponse<CharacterResponse>>> getAllCharacters(
             @RequestParam(required = false, defaultValue = "") String search,
-            @RequestParam(required = false) String era,
+            @RequestParam(required = false) EventEra era,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "8") int limit) {
         log.info("GET /v1/characters - search: {}, era: {}, page: {}, limit: {}", search, era, page, limit);
-        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era, page, limit);
+        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era.toString(), page, limit);
         return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
     }
 
