@@ -86,10 +86,10 @@ public class CharacterResponse {
     @AllArgsConstructor
     @Builder
     public static class StaffInfo {
-        @JsonProperty("staffId")
-        private String staffId;
+        @JsonProperty("uid")
+        private String uid;
 
-        @JsonProperty("name")
-        private String name;
+        @JsonProperty("userName")
+        private String userName;
     }
 }

@@ -1,6 +1,6 @@
 package com.historyTalk.entity.historicalContext;
 
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,7 +17,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "historical_context_document", indexes = {
         @Index(name = "idx_context_id", columnList = "context_id"),
-        @Index(name = "idx_staff_id", columnList = "staff_id")
+        @Index(name = "idx_created_by", columnList = "created_by")
 })
 @Getter
 @Setter
@@ -44,8 +44,8 @@ public class HistoricalContextDocument {
     private HistoricalContext historicalContext;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff_id", nullable = false)
-    private Staff staff;
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
     @CreationTimestamp
     @Column(name = "upload_date", nullable = false, updatable = false)

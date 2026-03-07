@@ -2,7 +2,7 @@ package com.historyTalk.entity.character;
 
 import com.historyTalk.entity.chat.ChatSession;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,8 +57,8 @@ public class Character {
     private HistoricalContext historicalContext;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff_id", nullable = false)
-    private Staff staff;
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
     @Builder.Default
     @OneToMany(mappedBy = "character", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

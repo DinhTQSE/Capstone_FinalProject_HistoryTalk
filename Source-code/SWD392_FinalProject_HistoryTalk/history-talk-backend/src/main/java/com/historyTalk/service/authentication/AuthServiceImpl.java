@@ -7,16 +7,11 @@ import com.historyTalk.dto.authentication.RegisterRequest;
 import com.historyTalk.dto.authentication.RegisterResponse;
 import com.historyTalk.dto.authentication.RegisterStaffRequest;
 import com.historyTalk.dto.authentication.RegisterStaffResponse;
-import com.historyTalk.entity.Role;
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.enums.UserRole;
 import com.historyTalk.entity.user.User;
-import com.historyTalk.entity.user.UserType;
 import com.historyTalk.exception.DataConflictException;
 import com.historyTalk.exception.InvalidRequestException;
-import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.exception.UnauthorizedException;
-import com.historyTalk.repository.RoleRepository;
-import com.historyTalk.repository.StaffRepository;
 import com.historyTalk.repository.UserRepository;
 import com.historyTalk.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +40,6 @@ public class AuthServiceImpl implements AuthService {
             Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final UserRepository userRepository;
-    private final StaffRepository staffRepository;
-    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
@@ -70,7 +63,7 @@ public class AuthServiceImpl implements AuthService {
                 .userName(request.getUserName())
                 .email(request.getEmail().toLowerCase())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .userType(UserType.REGISTERED)
+                .role(UserRole.USER)
                 .build();
 
         User saved = userRepository.save(user);
@@ -80,7 +73,7 @@ public class AuthServiceImpl implements AuthService {
                 .uid(saved.getUid().toString())
                 .userName(saved.getUserName())
                 .email(saved.getEmail())
-                .userType(saved.getUserType())
+                .role(saved.getRole().name())
                 .message("User registered successfully")
                 .build();
     }
@@ -119,7 +112,7 @@ public class AuthServiceImpl implements AuthService {
                 .uid(user.getUid().toString())
                 .userName(user.getUserName())
                 .email(user.getEmail())
-                .userType(user.getUserType())
+                .role(user.getRole().name())
                 .build();
     }
 
@@ -165,7 +158,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public RegisterStaffResponse registerStaff(RegisterStaffRequest request) {
-        log.info("Registering new staff account: {}", request.getEmail());
+        log.info("Registering new staff/admin account: {}", request.getEmail());
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new InvalidRequestException("Password and confirmation password do not match");
@@ -176,39 +169,32 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
             throw new DataConflictException("Username already exists");
         }
-        if (staffRepository.findByEmailIgnoreCase(request.getEmail()).isPresent()) {
-            throw new DataConflictException("Staff email already exists");
+
+        UserRole role;
+        try {
+            role = UserRole.valueOf(request.getRole().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException("Invalid role: " + request.getRole() + ". Must be STAFF or ADMIN");
         }
-
-        Role role = roleRepository.findByRoleNameIgnoreCase(request.getRoleName())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Role '" + request.getRoleName() + "' not found"));
-
-        Staff staff = Staff.builder()
-                .name(request.getName())
-                .email(request.getEmail().toLowerCase())
-                .role(role)
-                .build();
-        Staff savedStaff = staffRepository.save(staff);
+        if (role == UserRole.USER) {
+            throw new InvalidRequestException("Cannot register a privileged account with role USER. Use the public register endpoint instead.");
+        }
 
         User user = User.builder()
                 .userName(request.getUserName())
                 .email(request.getEmail().toLowerCase())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .userType(UserType.STAFF)
-                .staff(savedStaff)
+                .role(role)
                 .build();
-        User savedUser = userRepository.save(user);
+        User saved = userRepository.save(user);
 
-        log.info("Staff account registered with uid: {}, staffId: {}", savedUser.getUid(), savedStaff.getStaffId());
+        log.info("Staff/admin account registered with uid: {}", saved.getUid());
 
         return RegisterStaffResponse.builder()
-                .uid(savedUser.getUid().toString())
-                .staffId(savedStaff.getStaffId().toString())
-                .userName(savedUser.getUserName())
-                .name(savedStaff.getName())
-                .email(savedUser.getEmail())
-                .roleName(role.getRoleName())
+                .uid(saved.getUid().toString())
+                .userName(saved.getUserName())
+                .email(saved.getEmail())
+                .role(saved.getRole().name())
                 .message("Staff account registered successfully")
                 .build();
     }
@@ -216,13 +202,7 @@ public class AuthServiceImpl implements AuthService {
     private Map<String, Object> buildClaims(UserPrincipal principal) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("uid", principal.getUid());
-        claims.put("userType", principal.getUserType().name());
-        if (principal.getStaffId() != null) {
-            claims.put("staffId", principal.getStaffId());
-        }
-        if (principal.getRoleName() != null) {
-            claims.put("roleName", principal.getRoleName());
-        }
+        claims.put("role", principal.getRole().name());
         return claims;
     }
 }

@@ -13,7 +13,5 @@ public class AuthenticatedPrincipal {
 
     private final String email;
     private final String uid;
-    private final String staffId;   // null for REGISTERED users
-    private final String roleName;  // e.g. "ADMIN", "STAFF" — null for REGISTERED users
-    private final String userType;  // "STAFF" or "REGISTERED"
+    private final String role;  // e.g. "USER", "STAFF", "ADMIN"
 }

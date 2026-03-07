@@ -387,3 +387,97 @@ yearLabel = (year != null)
 - `getAllContextsSimple(search)` vẫn còn trong service — dùng nội bộ nếu cần list không paginate
 - `page` param là **1-based** (frontend friendly); service convert sang 0-based trước khi truyền `PageRequest`
 - `era` / `category` filter dùng `IS NULL` check trong JPQL nên không truyền param = trả toàn bộ (không filter)
+
+---
+
+## Role System Redesign – Staff → UserRole Enum (March 7, 2026)
+
+**Build Status:** ✅ `mvn compile` – BUILD SUCCESS
+
+### Mục Tiêu
+
+Đơn giản hóa model phân quyền: xóa các entity/table phụ (`Staff`, `RoleTable`), thay thế bằng enum `UserRole` gắn trực tiếp lên `User`. Tất cả nội dung entity chuyển từ FK `Staff` sang FK `User createdBy`.
+
+### 🗑️ File Đã Xóa
+
+| File | Lý do |
+|------|-------|
+| `entity/user/UserType.java` | Thay bằng `UserRole` enum |
+| `entity/staff/Staff.java` | Không còn Staff entity riêng |
+| `entity/RoleTable.java` | Role giờ là enum field trên User |
+| `repository/StaffRepository.java` | Không còn Staff entity |
+| `repository/RoleRepository.java` | Không còn RoleTable entity |
+
+### 🆕 File Mới Tạo
+
+| File | Mô tả |
+|------|-------|
+| `entity/enums/UserRole.java` | Enum: `USER \| STAFF \| ADMIN` |
+
+### ✏️ File Đã Sửa
+
+| File | Thay đổi chính |
+|------|---------------|
+| `entity/user/User.java` | Xóa `UserType userType` + FK `Staff staff`; thêm `@Enumerated(EnumType.STRING) UserRole role` |
+| `entity/historicalContext/HistoricalContext.java` | `@JoinColumn(name="staff_id") Staff staff` → `@JoinColumn(name="created_by") User createdBy` |
+| `entity/historicalContext/HistoricalContextDocument.java` | Như trên; `@Index(name="idx_staff_id")` → `idx_created_by` |
+| `entity/character/Character.java` | `Staff staff` → `User createdBy` |
+| `entity/character/CharacterDocument.java` | `Staff staff` → `User createdBy` |
+| `entity/quiz/Quiz.java` | `Staff staff` → `User createdBy` |
+| `security/UserPrincipal.java` | Xóa `staffId`, `roleName`, `userType`; authority = single `ROLE_<UserRole>` |
+| `security/AuthenticatedPrincipal.java` | Fields rút gọn: `email`, `uid`, `role` (String) |
+| `security/JwtAuthenticationFilter.java` | Đọc `uid` + `role` từ JWT; build authority `ROLE_<role>`; fallback header `X-Staff-Role` vẫn giữ cho Swagger testing |
+| `utils/SecurityUtils.java` | `getStaffId()` → `getUserId()` — trả `ap.getUid()` |
+| `dto/authentication/LoginResponse.java` | `UserType userType` → `String role` |
+| `dto/authentication/RegisterResponse.java` | `UserType userType` → `String role` |
+| `dto/authentication/RegisterStaffRequest.java` | Xóa `name`, `roleName`; thêm `String role` (nhận `"STAFF"` hoặc `"ADMIN"`) |
+| `dto/authentication/RegisterStaffResponse.java` | Xóa `staffId`, `name`; `roleName` → `role` |
+| `dto/historicalContext/HistoricalContextResponse.java` | `CreatedByInfo.staffId` → `uid`; `CreatedByInfo.name` → `userName` |
+| `dto/historicalContext/HistoricalContextDocumentResponse.java` | `staffId` → `uid`; `staffName` → `userName` |
+| `dto/character/CharacterResponse.java` | `StaffInfo.staffId` → `uid`; `StaffInfo.name` → `userName` |
+| `service/authentication/AuthServiceImpl.java` | Xóa inject `StaffRepository`, `RoleRepository`; `register` dùng `UserRole.USER`; `registerStaff` validate role enum, tạo `User` với role trực tiếp; JWT claims: `uid` + `role` |
+| `service/historicalContext/HistoricalContextService.java` | Inject `UserRepository` thay `StaffRepository`; dùng `User createdBy`; ownership: `getCreatedBy().getUid()` |
+| `service/historicalContext/HistoricalContextDocumentService.java` | Như trên |
+| `service/character/CharacterService.java` | Inject `UserRepository`; `getCreatedBy().getUid()` |
+| `repository/HistoricalContextRepository.java` | `findByStaffStaffId(UUID, Pageable)` → `findByCreatedByUid(UUID, Pageable)` |
+| `repository/HistoricalContextDocumentRepository.java` | `findByStaffStaffIdOrderByUploadDateDesc(UUID)` → `findByCreatedByUidOrderByUploadDateDesc(UUID)` |
+| `controller/character/CharacterController.java` | `SecurityUtils.getStaffId()` → `SecurityUtils.getUserId()` |
+| `controller/historicalContext/HistoricalContextController.java` | Như trên |
+| `controller/historicalContext/HistoricalContextDocumentController.java` | Như trên |
+
+### JWT Claims Mới
+
+| Claim | Giá trị |
+|-------|--------|
+| `sub` | email |
+| `uid` | User UUID (String) |
+| `role` | `"USER"` / `"STAFF"` / `"ADMIN"` |
+
+**Xóa bỏ:** `userType`, `staffId`, `roleName`
+
+### Response Shape Thay Đổi
+
+`createdBy` trong các response DTO:
+
+**Trước:**
+```json
+"createdBy": { "staffId": "...", "name": "Nguyễn Văn A" }
+```
+
+**Sau:**
+```json
+"createdBy": { "uid": "...", "userName": "nguyenvana" }
+```
+
+### DB Migration
+
+`ddl-auto=update` — Hibernate tự:
+- `ALTER TABLE historical_context` đổi column `staff_id` → `created_by` (FK sang `user`)
+- Tương tự trên `historical_context_document`, `character`, `character_document`, `quiz`
+- `ALTER TABLE user` thêm column `role` (VARCHAR, NOT NULL)
+
+### Lưu Ý
+
+- `getUserId()` trong `SecurityUtils` trả `uid` của `User` — **không phải** staffId cũ
+- `X-Staff-Id` / `X-Staff-Role` headers vẫn còn trong `JwtAuthenticationFilter` **chỉ cho Swagger testing** — không dùng trong business logic
+- `registerStaff` endpoint vẫn là `POST /v1/auth/register-staff`, yêu cầu `ROLE_ADMIN`; `role` field trong request nhận `"STAFF"` hoặc `"ADMIN"`

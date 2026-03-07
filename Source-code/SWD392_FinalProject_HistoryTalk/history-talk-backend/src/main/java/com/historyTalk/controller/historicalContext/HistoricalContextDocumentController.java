@@ -98,13 +98,13 @@ public class HistoricalContextDocumentController {
      * Create/upload new document (Staff/Admin only)
      */
     @PostMapping
-//    @SecurityRequirement(name = "bearerAuth")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload document", description = "Upload a new historical document (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createDocument(
             @Valid @RequestBody CreateHistoricalContextDocumentRequest request) {
         
-        String staffId = SecurityUtils.getStaffId();
-        log.info("POST /v1/historical-documents - Create document by staff: {}", staffId);
+        String staffId = SecurityUtils.getUserId();
+        log.info("POST /v1/historical-documents - Create document by user: {}", staffId);
         HistoricalContextDocumentResponse document = documentService.createDocument(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(document, "Document uploaded successfully"));
@@ -114,14 +114,14 @@ public class HistoricalContextDocumentController {
      * Update document content/metadata (Staff/Admin only)
      */
     @PutMapping("/{docId}")
-//    @SecurityRequirement(name = "bearerAuth")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update document", description = "Update document content or metadata (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateDocument(
             @PathVariable String docId,
             @Valid @RequestBody UpdateHistoricalContextDocumentRequest request) {
         
-        String staffId = SecurityUtils.getStaffId();
-        log.info("PUT /v1/historical-documents/{} - Update document by staff: {}", docId, staffId);
+        String staffId = SecurityUtils.getUserId();
+        log.info("PUT /v1/historical-documents/{} - Update document by user: {}", docId, staffId);
         HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId);
         return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
     }
@@ -130,13 +130,13 @@ public class HistoricalContextDocumentController {
      * Delete document
      */
     @DeleteMapping("/{docId}")
-//    @SecurityRequirement(name = "bearerAuth")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete document", description = "Delete a document")
     public ResponseEntity<ApiResponse<?>> deleteDocument(
             @PathVariable String docId) {
         
-        String staffId = SecurityUtils.getStaffId();
-        log.info("DELETE /v1/historical-documents/{} - Delete document by staff: {}", docId, staffId);
+        String staffId = SecurityUtils.getUserId();
+        log.info("DELETE /v1/historical-documents/{} - Delete document by user: {}", docId, staffId);
         documentService.deleteDocument(docId, staffId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }

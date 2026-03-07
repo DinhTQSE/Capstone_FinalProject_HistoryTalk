@@ -12,10 +12,8 @@ import lombok.NoArgsConstructor;
 public class RegisterStaffResponse {
 
     private String uid;
-    private String staffId;
     private String userName;
-    private String name;
     private String email;
-    private String roleName;
+    private String role;
     private String message;
 }

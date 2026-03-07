@@ -1,7 +1,7 @@
 package com.historyTalk.entity.user;
 
 import com.historyTalk.entity.chat.ChatSession;
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.enums.UserRole;
 import com.historyTalk.entity.quiz.QuizResult;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -40,12 +40,8 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "user_type", length = 50, nullable = false)
-    private UserType userType;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff_id")
-    private Staff staff;
+    @Column(name = "role", length = 50, nullable = false)
+    private UserRole role;
 
     @Builder.Default
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)

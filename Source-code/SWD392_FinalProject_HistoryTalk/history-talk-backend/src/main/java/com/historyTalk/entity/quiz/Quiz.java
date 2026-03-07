@@ -1,6 +1,6 @@
 package com.historyTalk.entity.quiz;
 
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -37,8 +37,8 @@ public class Quiz {
     private HistoricalContext historicalContext;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff_id", nullable = false)
-    private Staff staff;
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
     @Builder.Default
     @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

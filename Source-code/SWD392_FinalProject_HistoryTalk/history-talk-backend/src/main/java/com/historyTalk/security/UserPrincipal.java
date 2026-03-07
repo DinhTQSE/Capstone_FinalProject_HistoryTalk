@@ -1,21 +1,19 @@
 package com.historyTalk.security;
 
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.enums.UserRole;
 import com.historyTalk.entity.user.User;
-import com.historyTalk.entity.user.UserType;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 /**
  * Spring Security UserDetails adapter for the User entity.
  * Username  = email (used as JWT subject)
- * Authorities derived from userType + linked Staff role (if any)
+ * Authorities derived from user.role (UserRole enum)
  */
 @Getter
 public class UserPrincipal implements UserDetails {
@@ -24,9 +22,7 @@ public class UserPrincipal implements UserDetails {
     private final String userName;
     private final String email;
     private final String password;
-    private final UserType userType;
-    private final String staffId;  // non-null only when userType = STAFF
-    private final String roleName; // non-null only when userType = STAFF
+    private final UserRole role;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public UserPrincipal(User user) {
@@ -34,34 +30,8 @@ public class UserPrincipal implements UserDetails {
         this.userName = user.getUserName();
         this.email = user.getEmail();
         this.password = user.getPassword();
-        this.userType = user.getUserType();
-
-        // Resolve staffId and role from linked Staff entity
-        String resolvedStaffId = null;
-        String resolvedRole = null;
-        Staff staff = user.getStaff();
-        if (staff != null) {
-            resolvedStaffId = staff.getStaffId().toString();
-            if (staff.getRole() != null) {
-                resolvedRole = staff.getRole().getRoleName();
-            }
-        }
-        this.staffId = resolvedStaffId;
-        this.roleName = resolvedRole;
-        this.authorities = buildAuthorities(user.getUserType(), resolvedRole);
-    }
-
-    private static List<SimpleGrantedAuthority> buildAuthorities(UserType userType, String roleName) {
-        List<SimpleGrantedAuthority> auths = new ArrayList<>();
-        if (userType == UserType.STAFF) {
-            auths.add(new SimpleGrantedAuthority("ROLE_STAFF"));
-            if (roleName != null && !roleName.isBlank()) {
-                auths.add(new SimpleGrantedAuthority("ROLE_" + roleName.toUpperCase()));
-            }
-        } else {
-            auths.add(new SimpleGrantedAuthority("ROLE_REGISTERED"));
-        }
-        return auths;
+        this.role = user.getRole();
+        this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
     }
 
     /** JWT subject is the user's email */

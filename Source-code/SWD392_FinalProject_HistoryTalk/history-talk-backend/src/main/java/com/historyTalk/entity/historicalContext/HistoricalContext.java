@@ -3,7 +3,7 @@ package com.historyTalk.entity.historicalContext;
 import com.historyTalk.entity.enums.EventCategory;
 import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.entity.quiz.Quiz;
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import com.historyTalk.entity.character.Character;
 import jakarta.persistence.*;
 import lombok.*;
@@ -66,8 +66,8 @@ public class HistoricalContext {
     private String imageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff_id", nullable = false)
-    private Staff staff;
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
     @CreationTimestamp
     @Column(name = "created_date", nullable = false, updatable = false)
