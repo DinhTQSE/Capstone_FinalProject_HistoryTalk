@@ -22,7 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/v1/historical-contexts")
+@RequestMapping("/api/v1/historical-contexts")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Historical Context", description = "API endpoints for managing historical contexts")
