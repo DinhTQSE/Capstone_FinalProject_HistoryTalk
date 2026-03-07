@@ -65,6 +65,9 @@ public class HistoricalContext {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "video_url", length = 500)
+    private String videoUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;

@@ -101,6 +101,7 @@ public class HistoricalContextService {
                 .beforeTCN(request.getBeforeTCN() != null ? request.getBeforeTCN() : false)
                 .location(request.getLocation())
                 .imageUrl(request.getImageUrl())
+                .videoUrl(request.getVideoUrl())
                 .createdBy(user)
                 .build();
 
@@ -170,6 +171,9 @@ public class HistoricalContextService {
         if (request.getImageUrl() != null) {
             context.setImageUrl(request.getImageUrl());
         }
+        if (request.getVideoUrl() != null) {
+            context.setVideoUrl(request.getVideoUrl());
+        }
         HistoricalContext updatedContext = contextRepository.save(context);
         log.info("Historical context updated successfully with ID: {}", contextId);
         
@@ -221,6 +225,7 @@ public class HistoricalContextService {
                 .beforeTCN(context.getBeforeTCN())
                 .location(context.getLocation())
                 .imageUrl(context.getImageUrl())
+                .videoUrl(context.getVideoUrl())
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
                         .uid(context.getCreatedBy().getUid().toString())
                         .userName(context.getCreatedBy().getUserName())
