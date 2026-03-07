@@ -54,6 +54,9 @@ public class HistoricalContextResponse {
     @JsonProperty("imageUrl")
     private String imageUrl;
 
+    @JsonProperty("videoUrl")
+    private String videoUrl;
+
     @JsonProperty("createdBy")
     private CreatedByInfo createdBy;
     
