@@ -6,6 +6,7 @@ import com.historyTalk.dto.character.CharacterResponse;
 import com.historyTalk.dto.character.CreateCharacterRequest;
 import com.historyTalk.dto.character.UpdateCharacterRequest;
 import com.historyTalk.service.character.CharacterService;
+import com.historyTalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -61,9 +62,9 @@ public class CharacterController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new character", description = "Create a new historical character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createCharacter(
-            @Valid @RequestBody CreateCharacterRequest request,
-            @RequestHeader(value = "X-Staff-Id", defaultValue = "staff_default") String staffId) {
+            @Valid @RequestBody CreateCharacterRequest request) {
         log.info("POST /v1/characters - name: {}", request.getName());
+        String staffId = SecurityUtils.getStaffId();
         CharacterResponse result = characterService.createCharacter(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(result, "Character created successfully"));
@@ -75,10 +76,10 @@ public class CharacterController {
     @Operation(summary = "Update a character", description = "Update character details (creator or Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(
             @PathVariable String characterId,
-            @Valid @RequestBody UpdateCharacterRequest request,
-            @RequestHeader(value = "X-Staff-Id", defaultValue = "staff_default") String staffId,
-            @RequestHeader(value = "X-Staff-Role", defaultValue = "STAFF") String staffRole) {
+            @Valid @RequestBody UpdateCharacterRequest request) {
         log.info("PUT /v1/characters/{}", characterId);
+        String staffId = SecurityUtils.getStaffId();
+        String staffRole = SecurityUtils.getRoleName();
         CharacterResponse result = characterService.updateCharacter(characterId, request, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(result, "Character updated successfully"));
     }
@@ -88,10 +89,10 @@ public class CharacterController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete a character", description = "Delete a character (creator or Admin only)")
     public ResponseEntity<ApiResponse<?>> deleteCharacter(
-            @PathVariable String characterId,
-            @RequestHeader(value = "X-Staff-Id", defaultValue = "staff_default") String staffId,
-            @RequestHeader(value = "X-Staff-Role", defaultValue = "STAFF") String staffRole) {
+            @PathVariable String characterId) {
         log.info("DELETE /v1/characters/{}", characterId);
+        String staffId = SecurityUtils.getStaffId();
+        String staffRole = SecurityUtils.getRoleName();
         characterService.deleteCharacter(characterId, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(null, "Character deleted successfully"));
     }

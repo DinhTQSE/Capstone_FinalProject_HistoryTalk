@@ -5,6 +5,7 @@ import com.historyTalk.dto.historicalContext.CreateHistoricalContextDocumentRequ
 import com.historyTalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historyTalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
 import com.historyTalk.service.historicalContext.HistoricalContextDocumentService;
+import com.historyTalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -100,12 +101,9 @@ public class HistoricalContextDocumentController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload document", description = "Upload a new historical document (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createDocument(
-            @Valid @RequestBody CreateHistoricalContextDocumentRequest request,
-            @RequestHeader(value = "X-Staff-Id", required = false) String staffId) {
+            @Valid @RequestBody CreateHistoricalContextDocumentRequest request) {
         
-        // Use header for testing; in production use JWT
-        if (staffId == null) staffId = "staff_default";
-        
+        String staffId = SecurityUtils.getStaffId();
         log.info("POST /v1/historical-documents - Create document by staff: {}", staffId);
         HistoricalContextDocumentResponse document = documentService.createDocument(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -120,12 +118,9 @@ public class HistoricalContextDocumentController {
     @Operation(summary = "Update document", description = "Update document content or metadata (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateDocument(
             @PathVariable String docId,
-            @Valid @RequestBody UpdateHistoricalContextDocumentRequest request,
-            @RequestHeader(value = "X-Staff-Id", required = false) String staffId) {
+            @Valid @RequestBody UpdateHistoricalContextDocumentRequest request) {
         
-        // Use header for testing; in production use JWT
-        if (staffId == null) staffId = "staff_default";
-        
+        String staffId = SecurityUtils.getStaffId();
         log.info("PUT /v1/historical-documents/{} - Update document by staff: {}", docId, staffId);
         HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId);
         return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
@@ -138,12 +133,9 @@ public class HistoricalContextDocumentController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete document", description = "Delete a document")
     public ResponseEntity<ApiResponse<?>> deleteDocument(
-            @PathVariable String docId,
-            @RequestHeader(value = "X-Staff-Id", required = false) String staffId) {
+            @PathVariable String docId) {
         
-        // Use header for testing; in production use JWT
-        if (staffId == null) staffId = "staff_default";
-        
+        String staffId = SecurityUtils.getStaffId();
         log.info("DELETE /v1/historical-documents/{} - Delete document by staff: {}", docId, staffId);
         documentService.deleteDocument(docId, staffId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
