@@ -18,10 +18,6 @@ public class RegisterStaffRequest {
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String userName;
 
-    @NotBlank(message = "Name is required")
-    @Size(max = 100, message = "Name must not exceed 100 characters")
-    private String name;
-
     @NotBlank(message = "Email is required")
     @Email(message = "Email format is invalid")
     private String email;
@@ -33,6 +29,7 @@ public class RegisterStaffRequest {
     @NotBlank(message = "Confirmation password is required")
     private String confirmPassword;
 
-    @NotBlank(message = "Role name is required")
-    private String roleName;
+    /** Role to assign: STAFF or ADMIN */
+    @NotBlank(message = "Role is required")
+    private String role;
 }

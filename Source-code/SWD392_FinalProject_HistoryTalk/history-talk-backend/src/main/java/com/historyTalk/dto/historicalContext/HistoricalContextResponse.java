@@ -68,10 +68,10 @@ public class HistoricalContextResponse {
     @AllArgsConstructor
     @Builder
     public static class CreatedByInfo {
-        @JsonProperty("staffId")
-        private String staffId;
+        @JsonProperty("uid")
+        private String uid;
         
-        @JsonProperty("name")
-        private String name;
+        @JsonProperty("userName")
+        private String userName;
     }
 }

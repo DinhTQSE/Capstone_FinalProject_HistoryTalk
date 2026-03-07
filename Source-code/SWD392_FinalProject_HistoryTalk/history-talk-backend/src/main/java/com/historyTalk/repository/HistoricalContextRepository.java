@@ -21,7 +21,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        boolean existsByNameIgnoreCaseAndContextIdNot(String name, UUID contextId);
 
-       Page<HistoricalContext> findByStaffStaffId(UUID staffId, Pageable pageable);
+       Page<HistoricalContext> findByCreatedByUid(UUID uid, Pageable pageable);
 
        @Query("""
                      SELECT hc FROM HistoricalContext hc

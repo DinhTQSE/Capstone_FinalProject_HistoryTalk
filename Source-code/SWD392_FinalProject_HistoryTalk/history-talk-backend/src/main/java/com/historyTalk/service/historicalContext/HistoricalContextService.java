@@ -7,11 +7,11 @@ import com.historyTalk.dto.historicalContext.UpdateHistoricalContextRequest;
 import com.historyTalk.entity.enums.EventCategory;
 import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.HistoricalContextRepository;
-import com.historyTalk.repository.StaffRepository;
+import com.historyTalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 public class HistoricalContextService {
 
         private final HistoricalContextRepository contextRepository;
-        private final StaffRepository staffRepository;
+        private final UserRepository userRepository;
     
     /**
      * Get all historical contexts with pagination and search
@@ -78,17 +78,17 @@ public class HistoricalContextService {
      */
     @Transactional
     public HistoricalContextResponse createContext(
-            CreateHistoricalContextRequest request, String staffId) {
+            CreateHistoricalContextRequest request, String userId) {
         
-        log.info("Creating historical context: {} by staff: {}", request.getName(), staffId);
+        log.info("Creating historical context: {} by user: {}", request.getName(), userId);
         
         // Check for duplicate name
         if (contextRepository.findByNameIgnoreCase(request.getName()).isPresent()) {
             throw new InvalidRequestException("Historical context already existed");
         }
 
-        Staff staff = staffRepository.findById(UUID.fromString(staffId))
-                .orElseThrow(() -> new ResourceNotFoundException("Staff"));
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         HistoricalContext context = HistoricalContext.builder()
                 .name(request.getName())
@@ -101,7 +101,7 @@ public class HistoricalContextService {
                 .beforeTCN(request.getBeforeTCN() != null ? request.getBeforeTCN() : false)
                 .location(request.getLocation())
                 .imageUrl(request.getImageUrl())
-                .staff(staff)
+                .createdBy(user)
                 .build();
 
         HistoricalContext savedContext = contextRepository.save(context);
@@ -116,7 +116,7 @@ public class HistoricalContextService {
     @Transactional
     public HistoricalContextResponse updateContext(
             String contextId, UpdateHistoricalContextRequest request, 
-            String staffId, String staffRole) {
+            String userId, String userRole) {
         
         log.info("Updating historical context with ID: {}", contextId);
         
@@ -126,7 +126,7 @@ public class HistoricalContextService {
                 ));
         
         // Check if user has permission to update (creator or admin)
-        if (!context.getStaff().getStaffId().equals(UUID.fromString(staffId)) && !"ADMIN".equalsIgnoreCase(staffRole)) {
+        if (!context.getCreatedBy().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to update this historical context"
             );
@@ -180,7 +180,7 @@ public class HistoricalContextService {
          * Delete a historical context (only creator or admin)
          */
     @Transactional
-    public void deleteContext(String contextId, String staffId, String staffRole) {
+    public void deleteContext(String contextId, String userId, String userRole) {
         log.info("Deleting historical context with ID: {}", contextId);
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
@@ -189,7 +189,7 @@ public class HistoricalContextService {
                 ));
         
         // Check if user has permission to delete (creator or admin)
-        if (!context.getStaff().getStaffId().equals(UUID.fromString(staffId)) && !"ADMIN".equalsIgnoreCase(staffRole)) {
+        if (!context.getCreatedBy().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to delete this historical context"
             );
@@ -222,8 +222,8 @@ public class HistoricalContextService {
                 .location(context.getLocation())
                 .imageUrl(context.getImageUrl())
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
-                        .staffId(context.getStaff().getStaffId().toString())
-                        .name(context.getStaff().getName())
+                        .uid(context.getCreatedBy().getUid().toString())
+                        .userName(context.getCreatedBy().getUserName())
                         .build())
                 .createdDate(context.getCreatedDate())
                 .updatedDate(context.getUpdatedDate())

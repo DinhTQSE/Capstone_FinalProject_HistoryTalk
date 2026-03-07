@@ -17,8 +17,8 @@ public class HistoricalContextDocumentResponse {
 
     private String docId;
     private String contextId;
-    private String staffId;
-    private String staffName;
+    private String uid;
+    private String userName;
     private String title;
     private String content;
     private LocalDateTime uploadDate;

@@ -17,12 +17,12 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     List<Character> findByHistoricalContextContextIdOrderByNameAsc(UUID contextId);
 
-    List<Character> findByStaffStaffIdOrderByNameAsc(UUID staffId);
+    List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
     @Query(value = """
             SELECT c FROM Character c
             JOIN FETCH c.historicalContext hc
-            JOIN FETCH c.staff s
+            JOIN FETCH c.createdBy u
             WHERE (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))

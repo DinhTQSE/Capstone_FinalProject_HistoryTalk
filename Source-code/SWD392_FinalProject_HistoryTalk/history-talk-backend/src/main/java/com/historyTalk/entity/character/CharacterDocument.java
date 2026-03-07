@@ -1,6 +1,6 @@
 package com.historyTalk.entity.character;
 
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,8 +40,8 @@ public class CharacterDocument {
     private Character character;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff_id", nullable = false)
-    private Staff staff;
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
     @CreationTimestamp
     @Column(name = "upload_date", nullable = false, updatable = false)

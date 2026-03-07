@@ -23,10 +23,9 @@ com.historyTalk
 │   ├── PaginatedResponse.java
 │   └── ValidationErrorResponse.java
 ├── entity/
-│   ├── Role.java
 │   ├── ContextStatus.java (enum – unused, kept for future)
-│   ├── staff/     # Staff
-│   ├── user/      # User, UserType (enum: REGISTERED | STAFF)
+│   ├── enums/     # UserRole (enum: USER | STAFF | ADMIN)
+│   ├── user/      # User (has UserRole role directly)
 │   ├── historicalContext/ # HistoricalContext, HistoricalContextDocument
 │   ├── character/ # Character, CharacterDocument
 │   ├── chat/      # ChatSession, Message
@@ -41,7 +40,7 @@ com.historyTalk
 │   ├── BusinessRuleViolationException  → RuntimeException (uncategorized rule breaks)
 │   └── GlobalExceptionHandler.java
 ├── repository/    # HistoricalContextRepository, HistoricalContextDocumentRepository,
-│                  # StaffRepository, UserRepository
+│                  # UserRepository
 ├── security/      # JwtAuthenticationFilter, JwtTokenProvider, UserPrincipal, AuthenticatedPrincipal
 ├── service/
 │   ├── authentication/ # AuthService (interface), AuthServiceImpl, JwtService, JwtServiceImpl,
@@ -50,7 +49,7 @@ com.historyTalk
 ├── mapper/        # (character/, historicalContext/, user/ sub-packages)
 └── utils/
     ├── authentication/
-    └── SecurityUtils.java  # getStaffId(), getRoleName() from SecurityContext
+    └── SecurityUtils.java  # getUserId(), getRoleName() from SecurityContext
 ```
 
 ## Entity & ID Conventions
@@ -86,24 +85,25 @@ All exceptions extend `BaseException(message, errorCode, httpStatus)` except `Bu
   - `GET /Historical-tell/v1/**` → public
   - Mutating verbs (`POST/PUT/DELETE /v1/**`) → require authenticated JWT
   - `@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")` on write endpoints
-- `UserPrincipal` wraps `User` entity for Spring Security; `uid` and `staffId` are stored as `String` (`.toString()` from UUID).
-- **JWT claims**: `sub` (email), `uid`, `userType`, `staffId` (STAFF only), `roleName` (STAFF only). `staffId` in the token is always `Staff.staffId` — never `User.uid`.
-- **`AuthenticatedPrincipal`**: lightweight object set as the `Authentication` principal after JWT validation. Fields: `email`, `uid`, `staffId`, `roleName`, `userType`. Populated directly from JWT claims — no DB call.
-- **`SecurityUtils`** (`utils/SecurityUtils.java`): use `SecurityUtils.getStaffId()` and `SecurityUtils.getRoleName()` in controllers to get caller identity. **Never** read `X-Staff-Id` / `X-Staff-Role` headers in business logic — they can be spoofed.
+- `UserPrincipal` wraps `User` entity for Spring Security; `uid` is stored as `String` (`.toString()` from UUID). Authority is a single `ROLE_<role>` derived from `UserRole`.
+- **JWT claims**: `sub` (email), `uid`, `role` (e.g. `"USER"`, `"STAFF"`, `"ADMIN"`).
+- **`AuthenticatedPrincipal`**: lightweight object set as the `Authentication` principal after JWT validation. Fields: `email`, `uid`, `role`. Populated directly from JWT claims — no DB call.
+- **`SecurityUtils`** (`utils/SecurityUtils.java`): use `SecurityUtils.getUserId()` and `SecurityUtils.getRoleName()` in controllers to get caller identity. **Never** read `X-Staff-Id` / `X-Staff-Role` headers in business logic — they can be spoofed.
 - `X-Staff-Id` / `X-Staff-Role` headers exist only as a fallback in `JwtAuthenticationFilter` for Swagger testing without a token. Do not add them as `@RequestHeader` parameters on any write endpoint.
 - CORS is wide-open (`allowedOrigins = "*"`) with stateless sessions.
 
 ## Repository Conventions
-- `HistoricalContextRepository`: `findAllSimple(search)` (list, ordered), `findAllWithSearch(search, pageable)` (paginated), `findByStaffStaffId(UUID, Pageable)`.
-- `HistoricalContextDocumentRepository`: `search(keyword)`, `findByHistoricalContextContextIdOrderByUploadDateDesc(UUID)`, `findByStaffStaffIdOrderByUploadDateDesc(UUID)`.
+- `HistoricalContextRepository`: `findAllSimple(search)` (list, ordered), `findAllWithSearch(search, pageable)` (paginated), `findByCreatedByUid(UUID, Pageable)`.
+- `HistoricalContextDocumentRepository`: `search(keyword)`, `findByHistoricalContextContextIdOrderByUploadDateDesc(UUID)`, `findByCreatedByUidOrderByUploadDateDesc(UUID)`.
 - Use `ILIKE` (not `LOWER()`) for case-insensitive search in JPQL — Hibernate 6.3 rejects `LOWER()` on entity path expressions.
 - Normalize search input to lowercase in Java before passing to `ILIKE` queries.
 
 ## Data & Validation Rules
 - `HistoricalContext.name` must be unique (case-insensitive). Use `DataConflictException` for duplicates.
 - `HistoricalContextDocument.content` is capped at **10 MB** (validated via UTF-8 byte length). Follow this pattern for any large text fields.
-- Ownership checks on mutating ops: get `staffId` via `SecurityUtils.getStaffId()` and `staffRole` via `SecurityUtils.getRoleName()` — compare `entity.getStaff().getStaffId()` with `UUID.fromString(staffId)`; allow bypass if `staffRole.equalsIgnoreCase("ADMIN")`.
-- `User.email` and `User.userName` must be unique (`unique = true` on `@Column`). `Staff.email` must also be unique.
+- Ownership checks on mutating ops: get `userId` via `SecurityUtils.getUserId()` and `role` via `SecurityUtils.getRoleName()` — compare `entity.getCreatedBy().getUid()` with `UUID.fromString(userId)`; allow bypass if `role.equalsIgnoreCase("ADMIN")`.
+- `User.email` and `User.userName` must be unique (`unique = true` on `@Column`).
+- All content entities (`HistoricalContext`, `HistoricalContextDocument`, `Character`, `CharacterDocument`, `Quiz`) use `@ManyToOne User createdBy` with `@JoinColumn(name="created_by")` instead of a Staff FK.
 
 ## Developer Workflow
 - **Build**: `mvn clean install` from `history-talk-backend/`

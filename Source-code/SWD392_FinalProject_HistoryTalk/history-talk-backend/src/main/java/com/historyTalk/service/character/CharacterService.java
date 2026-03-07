@@ -7,12 +7,12 @@ import com.historyTalk.dto.character.UpdateCharacterRequest;
 import com.historyTalk.entity.character.Character;
 import com.historyTalk.entity.enums.EventEra;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
-import com.historyTalk.entity.staff.Staff;
+import com.historyTalk.entity.user.User;
 import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.CharacterRepository;
 import com.historyTalk.repository.HistoricalContextRepository;
-import com.historyTalk.repository.StaffRepository;
+import com.historyTalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,7 +32,7 @@ public class CharacterService {
 
     private final CharacterRepository characterRepository;
     private final HistoricalContextRepository contextRepository;
-    private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public PaginatedResponse<CharacterResponse> getAllCharacters(String search, String eraStr, int page, int limit) {
@@ -78,16 +78,16 @@ public class CharacterService {
     }
 
     @Transactional
-    public CharacterResponse createCharacter(CreateCharacterRequest request, String staffId) {
-        log.info("Creating character: {} by staff: {}", request.getName(), staffId);
+    public CharacterResponse createCharacter(CreateCharacterRequest request, String userId) {
+        log.info("Creating character: {} by user: {}", request.getName(), userId);
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Historical Context not found with id: " + request.getContextId()));
 
-        Staff staff = staffRepository.findById(UUID.fromString(staffId))
+        User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Staff not found with id: " + staffId));
+                        "User not found with id: " + userId));
 
         Character character = Character.builder()
                 .name(request.getName())
@@ -98,7 +98,7 @@ public class CharacterService {
                 .lifespan(request.getLifespan())
                 .side(request.getSide())
                 .historicalContext(context)
-                .staff(staff)
+                .createdBy(user)
                 .build();
 
         Character saved = characterRepository.save(character);
@@ -108,15 +108,15 @@ public class CharacterService {
 
     @Transactional
     public CharacterResponse updateCharacter(String characterId, UpdateCharacterRequest request,
-                                              String staffId, String staffRole) {
-        log.info("Updating character: {} by staff: {}", characterId, staffId);
+                                              String userId, String userRole) {
+        log.info("Updating character: {} by user: {}", characterId, userId);
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Character not found with id: " + characterId));
 
-        if (!character.getStaff().getStaffId().equals(UUID.fromString(staffId))
-                && !"ADMIN".equalsIgnoreCase(staffRole)) {
+        if (!character.getCreatedBy().getUid().equals(UUID.fromString(userId))
+                && !"ADMIN".equalsIgnoreCase(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to update this character");
         }
@@ -149,15 +149,15 @@ public class CharacterService {
     }
 
     @Transactional
-    public void deleteCharacter(String characterId, String staffId, String staffRole) {
-        log.info("Deleting character: {} by staff: {}", characterId, staffId);
+    public void deleteCharacter(String characterId, String userId, String userRole) {
+        log.info("Deleting character: {} by user: {}", characterId, userId);
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Character not found with id: " + characterId));
 
-        if (!character.getStaff().getStaffId().equals(UUID.fromString(staffId))
-                && !"ADMIN".equalsIgnoreCase(staffRole)) {
+        if (!character.getCreatedBy().getUid().equals(UUID.fromString(userId))
+                && !"ADMIN".equalsIgnoreCase(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to delete this character");
         }
@@ -193,8 +193,8 @@ public class CharacterService {
                         .name(ctx.getName())
                         .build())
                 .createdBy(CharacterResponse.StaffInfo.builder()
-                        .staffId(character.getStaff().getStaffId().toString())
-                        .name(character.getStaff().getName())
+                        .uid(character.getCreatedBy().getUid().toString())
+                        .userName(character.getCreatedBy().getUserName())
                         .build())
                 .build();
     }

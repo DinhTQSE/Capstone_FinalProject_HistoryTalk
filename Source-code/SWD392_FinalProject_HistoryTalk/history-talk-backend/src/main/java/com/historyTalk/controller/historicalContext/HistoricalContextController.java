@@ -80,14 +80,14 @@ public class HistoricalContextController {
      * Create a new historical context (Staff only)
      */
     @PostMapping
-//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-//    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new historical context", description = "Create a new historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createContext(
             @Valid @RequestBody CreateHistoricalContextRequest request) {
         
         log.info("POST /v1/historical-contexts - Creating context: {}", request.getName());
-        String staffId = SecurityUtils.getStaffId();
+        String staffId = SecurityUtils.getUserId();
         var response = contextService.createContext(request, staffId);
         
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -101,15 +101,15 @@ public class HistoricalContextController {
      * Update an existing historical context
      */
     @PutMapping("/{contextId}")
-//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-//    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update a historical context", description = "Update an existing historical context (Creator/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateContext(
             @PathVariable String contextId,
             @Valid @RequestBody UpdateHistoricalContextRequest request) {
         
         log.info("PUT /v1/historical-contexts/{} - Updating context", contextId);
-        String staffId = SecurityUtils.getStaffId();
+        String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         var response = contextService.updateContext(contextId, request, staffId, staffRole);
         
@@ -124,14 +124,14 @@ public class HistoricalContextController {
          * Delete a historical context
          */
     @DeleteMapping("/{contextId}")
-//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-//    @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete a historical context", description = "Delete a historical context (Creator/Admin only)")
     public ResponseEntity<Void> deleteContext(
             @PathVariable String contextId) {
         
         log.info("DELETE /v1/historical-contexts/{} - Deleting context", contextId);
-        String staffId = SecurityUtils.getStaffId();
+        String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         contextService.deleteContext(contextId, staffId, staffRole);
         

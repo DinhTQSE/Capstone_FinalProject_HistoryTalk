@@ -39,7 +39,7 @@ public class CharacterController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "8") int limit) {
         log.info("GET /v1/characters - search: {}, era: {}, page: {}, limit: {}", search, era, page, limit);
-        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era.toString(), page, limit);
+        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era != null ? era.toString() : null, page, limit);
         return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
     }
 
@@ -60,40 +60,40 @@ public class CharacterController {
     }
 
     @PostMapping
-//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new character", description = "Create a new historical character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createCharacter(
             @Valid @RequestBody CreateCharacterRequest request) {
         log.info("POST /v1/characters - name: {}", request.getName());
-        String staffId = SecurityUtils.getStaffId();
+        String staffId = SecurityUtils.getUserId();
         CharacterResponse result = characterService.createCharacter(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(result, "Character created successfully"));
     }
 
     @PutMapping("/{characterId}")
-//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update a character", description = "Update character details (creator or Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(
             @PathVariable String characterId,
             @Valid @RequestBody UpdateCharacterRequest request) {
         log.info("PUT /v1/characters/{}", characterId);
-        String staffId = SecurityUtils.getStaffId();
+        String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         CharacterResponse result = characterService.updateCharacter(characterId, request, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(result, "Character updated successfully"));
     }
 
     @DeleteMapping("/{characterId}")
-//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete a character", description = "Delete a character (creator or Admin only)")
     public ResponseEntity<ApiResponse<?>> deleteCharacter(
             @PathVariable String characterId) {
         log.info("DELETE /v1/characters/{}", characterId);
-        String staffId = SecurityUtils.getStaffId();
+        String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         characterService.deleteCharacter(characterId, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(null, "Character deleted successfully"));

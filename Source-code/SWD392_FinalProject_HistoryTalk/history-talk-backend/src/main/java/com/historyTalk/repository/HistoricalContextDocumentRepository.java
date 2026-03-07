@@ -14,7 +14,7 @@ public interface HistoricalContextDocumentRepository extends JpaRepository<Histo
 
     List<HistoricalContextDocument> findByHistoricalContextContextIdOrderByUploadDateDesc(UUID contextId);
 
-    List<HistoricalContextDocument> findByStaffStaffIdOrderByUploadDateDesc(UUID staffId);
+    List<HistoricalContextDocument> findByCreatedByUidOrderByUploadDateDesc(UUID uid);
 
     @Query("""
             SELECT hcd FROM HistoricalContextDocument hcd

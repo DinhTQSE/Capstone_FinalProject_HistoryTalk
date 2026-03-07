@@ -30,7 +30,7 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Generate access token with extra claims (uid, userType, roleName).
+     * Generate access token with extra claims (uid, role).
      */
     public String generateAccessToken(String email, Map<String, Object> extraClaims) {
         return Jwts.builder()
