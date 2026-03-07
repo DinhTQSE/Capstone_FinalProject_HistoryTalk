@@ -58,7 +58,7 @@ public class CharacterController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new character", description = "Create a new historical character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createCharacter(
@@ -71,7 +71,7 @@ public class CharacterController {
     }
 
     @PutMapping("/{characterId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update a character", description = "Update character details (creator or Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(
@@ -85,7 +85,7 @@ public class CharacterController {
     }
 
     @DeleteMapping("/{characterId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete a character", description = "Delete a character (creator or Admin only)")
     public ResponseEntity<ApiResponse<?>> deleteCharacter(
