@@ -412,7 +412,7 @@ yearLabel = (year != null)
 
 | File | Mô tả |
 |------|-------|
-| `entity/enums/UserRole.java` | Enum: `USER \| STAFF \| ADMIN` |
+| `entity/enums/UserRole.java` | Enum: `CUSTOMER \| STAFF \| ADMIN` |
 
 ### ✏️ File Đã Sửa
 
@@ -435,7 +435,7 @@ yearLabel = (year != null)
 | `dto/historicalContext/HistoricalContextResponse.java` | `CreatedByInfo.staffId` → `uid`; `CreatedByInfo.name` → `userName` |
 | `dto/historicalContext/HistoricalContextDocumentResponse.java` | `staffId` → `uid`; `staffName` → `userName` |
 | `dto/character/CharacterResponse.java` | `StaffInfo.staffId` → `uid`; `StaffInfo.name` → `userName` |
-| `service/authentication/AuthServiceImpl.java` | Xóa inject `StaffRepository`, `RoleRepository`; `register` dùng `UserRole.USER`; `registerStaff` validate role enum, tạo `User` với role trực tiếp; JWT claims: `uid` + `role` |
+| `service/authentication/AuthServiceImpl.java` | Xóa inject `StaffRepository`, `RoleRepository`; `register` dùng `UserRole.CUSTOMER`; `registerStaff` validate role enum, tạo `User` với role trực tiếp; JWT claims: `uid` + `role` |
 | `service/historicalContext/HistoricalContextService.java` | Inject `UserRepository` thay `StaffRepository`; dùng `User createdBy`; ownership: `getCreatedBy().getUid()` |
 | `service/historicalContext/HistoricalContextDocumentService.java` | Như trên |
 | `service/character/CharacterService.java` | Inject `UserRepository`; `getCreatedBy().getUid()` |

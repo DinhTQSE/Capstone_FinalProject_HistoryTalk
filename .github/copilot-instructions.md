@@ -24,7 +24,7 @@ com.historyTalk
 │   └── ValidationErrorResponse.java
 ├── entity/
 │   ├── ContextStatus.java (enum – unused, kept for future)
-│   ├── enums/     # UserRole (enum: USER | STAFF | ADMIN)
+│   ├── enums/     # UserRole (enum: CUSTOMER | STAFF | ADMIN)
 │   ├── user/      # User (has UserRole role directly)
 │   ├── historicalContext/ # HistoricalContext, HistoricalContextDocument
 │   ├── character/ # Character, CharacterDocument
@@ -86,7 +86,7 @@ All exceptions extend `BaseException(message, errorCode, httpStatus)` except `Bu
   - Mutating verbs (`POST/PUT/DELETE /v1/**`) → require authenticated JWT
   - `@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")` on write endpoints
 - `UserPrincipal` wraps `User` entity for Spring Security; `uid` is stored as `String` (`.toString()` from UUID). Authority is a single `ROLE_<role>` derived from `UserRole`.
-- **JWT claims**: `sub` (email), `uid`, `role` (e.g. `"USER"`, `"STAFF"`, `"ADMIN"`).
+- **JWT claims**: `sub` (email), `uid`, `role` (e.g. `"CUSTOMER"`, `"STAFF"`, `"ADMIN"`).
 - **`AuthenticatedPrincipal`**: lightweight object set as the `Authentication` principal after JWT validation. Fields: `email`, `uid`, `role`. Populated directly from JWT claims — no DB call.
 - **`SecurityUtils`** (`utils/SecurityUtils.java`): use `SecurityUtils.getUserId()` and `SecurityUtils.getRoleName()` in controllers to get caller identity. **Never** read `X-Staff-Id` / `X-Staff-Role` headers in business logic — they can be spoofed.
 - `X-Staff-Id` / `X-Staff-Role` headers exist only as a fallback in `JwtAuthenticationFilter` for Swagger testing without a token. Do not add them as `@RequestHeader` parameters on any write endpoint.

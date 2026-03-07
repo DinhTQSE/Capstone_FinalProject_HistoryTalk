@@ -1,13 +1,18 @@
--- -- Seed default roles: ADMIN and STAFF
--- -- Flyway will only run this once (tracked in flyway_schema_history)
--- CREATE TABLE IF NOT EXISTS role (
---                                     role_id UUID PRIMARY KEY,
---                                     role_name VARCHAR(50) NOT NULL UNIQUE,
---     description VARCHAR(255)
---     );
---
--- INSERT INTO role (role_id, role_name, description)
--- VALUES
---     (gen_random_uuid(), 'ADMIN', 'Administrator with full access'),
---     (gen_random_uuid(), 'STAFF', 'Staff member with content management access')
--- ON CONFLICT (role_name) DO NOTHING;
+
+INSERT INTO "user" (uid, email, password, role, user_name)
+VALUES
+    (
+        gen_random_uuid(),
+        'customer@historytalk.com',
+        '$2a$10$dKXT/D53pTf3OjnpWwKtOuAf3HWkEL6qggrPVpRz3wuRa.unajzPy', -- Hash của chữ '123456789'
+        'CUSTOMER',
+        'CUSTOMER1'
+     ),
+    (
+        gen_random_uuid(),
+        'user@historytalk.com',
+        '$2a$10$dKXT/D53pTf3OjnpWwKtOuAf3HWkEL6qggrPVpRz3wuRa.unajzPy', -- Hash của chữ '123456789'
+        'STAFF',
+        'STAFF1'
+    )
+    ON CONFLICT (email) DO NOTHING;
