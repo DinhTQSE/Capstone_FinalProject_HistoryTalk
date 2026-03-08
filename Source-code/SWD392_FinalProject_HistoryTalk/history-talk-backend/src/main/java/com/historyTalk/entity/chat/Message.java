@@ -47,6 +47,9 @@ public class Message {
     @Column(name = "timestamp", nullable = false, updatable = false)
     private LocalDateTime timestamp;
 
+    @Column(name = "suggested_questions", columnDefinition = "TEXT")
+    private String suggestedQuestions;
+
     @PrePersist
     void ensureDefaults() {
         if (this.isFromAi == null) {

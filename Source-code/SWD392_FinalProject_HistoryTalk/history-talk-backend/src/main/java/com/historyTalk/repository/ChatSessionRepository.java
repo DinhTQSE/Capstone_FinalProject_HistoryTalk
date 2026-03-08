@@ -28,4 +28,13 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
             @Param("contextId") UUID contextId);
 
     Optional<ChatSession> findBySessionIdAndUserUid(UUID sessionId, UUID userId);
+
+    @Query("""
+            SELECT cs FROM ChatSession cs
+            JOIN FETCH cs.character c
+            JOIN FETCH c.historicalContext hc
+            WHERE cs.user.uid = :userId
+            ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
+            """)
+    List<ChatSession> findAllByUserUid(@Param("userId") UUID userId);
 }

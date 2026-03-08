@@ -1,7 +1,7 @@
 """Request and response models for the AI chat API."""
 
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.character import CharacterData
 from app.models.historical_context import HistoricalContextData
@@ -10,8 +10,19 @@ from app.models.historical_context import HistoricalContextData
 # ── Request ───────────────────────────────────────────────────────────────────
 
 class MessageHistoryItem(BaseModel):
+    """A single turn in the conversation history.
+
+    Java's MessageRole enum serializes as "USER" / "ASSISTANT" (uppercase).
+    We normalize to lowercase so LangChain mapping works regardless of source.
+    """
+
     role: Literal["user", "assistant"]
     content: str
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v: str) -> str:
+        return v.lower()
 
 
 class ChatRequest(BaseModel):

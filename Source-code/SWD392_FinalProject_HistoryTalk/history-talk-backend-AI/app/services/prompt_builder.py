@@ -44,6 +44,11 @@ Chỉ trả về tiêu đề, không thêm dấu ngoặc kép hay giải thích.
 """
 
 
+def _esc(value: str) -> str:
+    """Escape curly braces in user-supplied text so .format() won't misparse them."""
+    return value.replace("{", "{{").replace("}", "}}")
+
+
 def build_chat_system_prompt(
     character: CharacterData,
     context: HistoricalContextData,
@@ -53,18 +58,18 @@ def build_chat_system_prompt(
     year_label = _resolve_year_label(context)
 
     return _CHAT_SYSTEM_TEMPLATE.format(
-        name=character.name,
-        title_line=title_line,
-        title=character.title or "Không rõ",
-        background=character.background,
-        personality=character.personality or "Không rõ",
-        lifespan=character.lifespan or "Không rõ",
-        side=character.side or "Không rõ",
-        context_name=context.name,
-        context_description=context.description,
+        name=_esc(character.name),
+        title_line=_esc(title_line),
+        title=_esc(character.title or "Không rõ"),
+        background=_esc(character.background),
+        personality=_esc(character.personality or "Không rõ"),
+        lifespan=_esc(character.lifespan or "Không rõ"),
+        side=_esc(character.side or "Không rõ"),
+        context_name=_esc(context.name),
+        context_description=_esc(context.description),
         era=_translate_era(context.era),
-        year_label=year_label,
-        location=context.location or "Không rõ",
+        year_label=_esc(year_label),
+        location=_esc(context.location or "Không rõ"),
         category=_translate_category(context.category),
     )
 

@@ -5,17 +5,25 @@ import com.historyTalk.dto.chat.CreateChatSessionRequest;
 import com.historyTalk.entity.character.Character;
 import com.historyTalk.entity.chat.ChatSession;
 import com.historyTalk.entity.chat.Message;
+import com.historyTalk.entity.enums.MessageRole;
 import com.historyTalk.entity.user.User;
 import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.CharacterRepository;
 import com.historyTalk.repository.ChatSessionRepository;
+import com.historyTalk.repository.MessageRepository;
 import com.historyTalk.repository.UserRepository;
+import com.historyTalk.service.chat.AiServiceClient.AiChatResult;
+import com.historyTalk.service.chat.AiServiceClient.CharacterPayload;
+import com.historyTalk.service.chat.AiServiceClient.ContextPayload;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +36,9 @@ public class ChatSessionService {
     private final ChatSessionRepository chatSessionRepository;
     private final UserRepository userRepository;
     private final CharacterRepository characterRepository;
+    private final MessageRepository messageRepository;
+    private final AiServiceClient aiServiceClient;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> getSessions(String userId, String contextId, String characterId) {
@@ -66,6 +77,44 @@ public class ChatSessionService {
 
         ChatSession saved = chatSessionRepository.save(session);
         log.info("Chat session created with ID={}", saved.getSessionId());
+
+        // Send greeting message via AI
+        try {
+            CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
+            ContextPayload contextData = AiServiceClient.buildContextPayload(character.getHistoricalContext());
+
+            AiChatResult greeting = aiServiceClient.chat(
+                    character.getCharacterId().toString(),
+                    character.getHistoricalContext().getContextId().toString(),
+                    "Hãy chào và giới thiệu ngắn gọn về bản thân.",
+                    Collections.emptyList(),
+                    characterData,
+                    contextData);
+
+            String suggestedQuestionsJson = null;
+            if (greeting.suggestedQuestions() != null && !greeting.suggestedQuestions().isEmpty()) {
+                try {
+                    suggestedQuestionsJson = objectMapper.writeValueAsString(greeting.suggestedQuestions());
+                } catch (Exception ex) {
+                    log.warn("Failed to serialize greeting suggested questions: {}", ex.getMessage());
+                }
+            }
+
+            Message greetingMsg = Message.builder()
+                    .content(greeting.message())
+                    .role(MessageRole.ASSISTANT)
+                    .isFromAi(true)
+                    .suggestedQuestions(suggestedQuestionsJson)
+                    .chatSession(saved)
+                    .build();
+            messageRepository.save(greetingMsg);
+
+            saved.setLastMessageAt(LocalDateTime.now());
+            chatSessionRepository.save(saved);
+        } catch (Exception e) {
+            log.warn("Failed to generate greeting for session {}: {}", saved.getSessionId(), e.getMessage());
+        }
+
         return mapToResponse(saved);
     }
 

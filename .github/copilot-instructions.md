@@ -13,9 +13,15 @@ com.historyTalk
 ├── config/          # SecurityConfig, SpringSecurityConfig, OpenApiConfig, SwaggerConfig
 ├── controller/
 │   ├── authentication/   # AuthController
+│   ├── character/        # CharacterController
+│   ├── chat/             # ChatController
 │   └── historicalContext/ # HistoricalContextController, HistoricalContextDocumentController
 ├── dto/
 │   ├── authentication/   # LoginRequest/Response, RegisterRequest/Response, RefreshTokenResponse
+│   ├── chat/             # CreateChatSessionRequest, ChatSessionResponse,
+│   │                     # MessageResponse, GetMessagesResponse, SendMessageRequest,
+│   │                     # SendMessageResponse, ChatHistorySessionItem, ChatHistoryGroupResponse
+│   ├── character/        # Create/Update/Response DTOs for character
 │   ├── historicalContext/ # Create/Update/Response DTOs for context and document
 │   ├── exception/        # InvalidArgumentResponse
 │   ├── user/             # UserInformationResponse
@@ -40,11 +46,14 @@ com.historyTalk
 │   ├── BusinessRuleViolationException  → RuntimeException (uncategorized rule breaks)
 │   └── GlobalExceptionHandler.java
 ├── repository/    # HistoricalContextRepository, HistoricalContextDocumentRepository,
-│                  # UserRepository
+│                  # UserRepository, CharacterRepository, ChatSessionRepository,
+│                  # MessageRepository
 ├── security/      # JwtAuthenticationFilter, JwtTokenProvider, UserPrincipal, AuthenticatedPrincipal
 ├── service/
 │   ├── authentication/ # AuthService (interface), AuthServiceImpl, JwtService, JwtServiceImpl,
 │   │                   # CustomUserDetailsService
+│   ├── character/      # CharacterService
+│   ├── chat/           # ChatSessionService, MessageService, ChatHistoryService, AiServiceClient
 │   └── historicalContext/ # HistoricalContextService, HistoricalContextDocumentService
 ├── mapper/        # (character/, historicalContext/, user/ sub-packages)
 └── utils/
@@ -95,6 +104,8 @@ All exceptions extend `BaseException(message, errorCode, httpStatus)` except `Bu
 ## Repository Conventions
 - `HistoricalContextRepository`: `findAllSimple(search)` (list, ordered), `findAllWithSearch(search, pageable)` (paginated), `findByCreatedByUid(UUID, Pageable)`.
 - `HistoricalContextDocumentRepository`: `search(keyword)`, `findByHistoricalContextContextIdOrderByUploadDateDesc(UUID)`, `findByCreatedByUidOrderByUploadDateDesc(UUID)`.
+- `ChatSessionRepository`: `findByUserAndCharacterAndContext(userId, characterId, contextId)` (sorted by `lastMessageAt DESC NULLS LAST`); `findBySessionIdAndUserUid(sessionId, userId)` (ownership check); `findAllByUserUid(userId)` (for chat history).
+- `MessageRepository`: `findByChatSessionSessionIdOrderByTimestampAsc(UUID sessionId)`.
 - Use `ILIKE` (not `LOWER()`) for case-insensitive search in JPQL — Hibernate 6.3 rejects `LOWER()` on entity path expressions.
 - Normalize search input to lowercase in Java before passing to `ILIKE` queries.
 
@@ -104,11 +115,18 @@ All exceptions extend `BaseException(message, errorCode, httpStatus)` except `Bu
 - Ownership checks on mutating ops: get `userId` via `SecurityUtils.getUserId()` and `role` via `SecurityUtils.getRoleName()` — compare `entity.getCreatedBy().getUid()` with `UUID.fromString(userId)`; allow bypass if `role.equalsIgnoreCase("ADMIN")`.
 - `User.email` and `User.userName` must be unique (`unique = true` on `@Column`).
 - All content entities (`HistoricalContext`, `HistoricalContextDocument`, `Character`, `CharacterDocument`, `Quiz`) use `@ManyToOne User createdBy` with `@JoinColumn(name="created_by")` instead of a Staff FK.
+- **Chat session ownership**: `ChatSession` belongs to the `User` who created it. Users can only read/delete their own sessions — no admin override. Delete uses `findBySessionIdAndUserUid` (returns 404 if session not found **or** not owned by caller, to avoid leaking existence).
+- `ChatSession.title` defaults to `""`. `ChatSession.lastMessageAt` is updated after every saved message.
+- `Message.suggestedQuestions` (TEXT) stores a JSON array string (e.g. `["q1","q2","q3"]`) — only populated on `ASSISTANT` messages. Serialize/deserialize with `ObjectMapper`.
+- **AI integration**: `AiServiceClient` (Spring `RestClient`) calls BE-Python at `${AI_SERVICE_URL}`. Methods: `chat(...)` — sync; `generateTitleAsync(...)` — `@Async` fire-and-forget. Always pre-fill `characterData` + `contextData` in the request payload so BE-Python skips its own callback to BE-Java.
+- `@EnableAsync` on `HistoryTalkApplication`. Async method must be in a separate Spring bean (already satisfied: `AiServiceClient` is `@Service`).
+- **`AiServiceClient` constructor must inject `RestClient.Builder` bean** (Spring Boot 3.2 auto-configures it with the full `ObjectMapper`). Never use the static `RestClient.builder()` — it produces a bare-bones builder that fails to serialize Java records properly, causing 422 from BE-Python.
+- **Inner records in `AiServiceClient`**: all serialized/deserialized inner records must be **package-private** (no access modifier) or `public`. Using `private record` causes Jackson to silently produce a null body.
 
 ## Developer Workflow
 - **Build**: `mvn clean install` from `history-talk-backend/`
 - **Run**: `mvn spring-boot:run`
-- **Config**: env vars in `secretKey.properties` (gitignored) — `DB_URL`, `DB_USER`, `DB_PASSWORD`, `DB_SCHEMA`, `JWT_SECRET`, `JWT_EXPIRATION_MS`, `JWT_REFRESH_EXPIRATION_MS`.
+- **Config**: env vars in `secretKey.properties` (gitignored) — `DB_URL`, `DB_USER`, `DB_PASSWORD`, `DB_SCHEMA`, `JWT_SECRET`, `JWT_EXPIRATION_MS`, `JWT_REFRESH_EXPIRATION_MS`, `AI_SERVICE_URL` (default `http://localhost:8001`).
 - **Schema**: `DB_SCHEMA=historical_schema` (must exist in PostgreSQL before first run); `ddl-auto=update`.
 - **Shared files** (coordinate before editing): `SecurityConfig.java`, `SpringSecurityConfig.java`, `JwtAuthenticationFilter.java`, `JwtTokenProvider.java`, `GlobalExceptionHandler.java`, `application.properties`, `pom.xml`.
 
