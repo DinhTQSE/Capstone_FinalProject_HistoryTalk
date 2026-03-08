@@ -39,6 +39,13 @@ public class ChatSession {
     @JoinColumn(name = "character_id", nullable = false)
     private Character character;
 
+    @Builder.Default
+    @Column(name = "title", length = 255)
+    private String title = "";
+
+    @Column(name = "last_message_at")
+    private LocalDateTime lastMessageAt;
+
     @CreationTimestamp
     @Column(name = "create_date", nullable = false, updatable = false)
     private LocalDateTime createDate;

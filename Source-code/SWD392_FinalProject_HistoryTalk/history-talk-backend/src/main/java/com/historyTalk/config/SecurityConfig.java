@@ -121,6 +121,9 @@ public class SecurityConfig {
 //                        .requestMatchers(HttpMethod.PUT, "/v1/characters/**").authenticated()
 //                        .requestMatchers(HttpMethod.DELETE, "/v1/characters/**").authenticated()
 //
+//                        // Chat endpoints - all require authentication (user owns their sessions)
+//                        .requestMatchers("/v1/chat/**").authenticated()
+//
 //                        // All other endpoints require authentication
 //                        .anyRequest().authenticated()
 //                )
