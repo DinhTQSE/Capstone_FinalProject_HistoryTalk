@@ -451,7 +451,7 @@ yearLabel = (year != null)
 |-------|--------|
 | `sub` | email |
 | `uid` | User UUID (String) |
-| `role` | `"USER"` / `"STAFF"` / `"ADMIN"` |
+| `role` | `"CUSTOMER"` / `"STAFF"` / `"ADMIN"` |
 
 **Xóa bỏ:** `userType`, `staffId`, `roleName`
 
@@ -481,3 +481,68 @@ yearLabel = (year != null)
 - `getUserId()` trong `SecurityUtils` trả `uid` của `User` — **không phải** staffId cũ
 - `X-Staff-Id` / `X-Staff-Role` headers vẫn còn trong `JwtAuthenticationFilter` **chỉ cho Swagger testing** — không dùng trong business logic
 - `registerStaff` endpoint vẫn là `POST /v1/auth/register-staff`, yêu cầu `ROLE_ADMIN`; `role` field trong request nhận `"STAFF"` hoặc `"ADMIN"`
+
+---
+
+## Chat Sessions Module (March 8, 2026)
+
+**Build Status:** ✅ `mvn compile` – BUILD SUCCESS
+
+### Mục Tiêu
+
+Implement 3 API endpoints quản lý chat sessions: lấy danh sách, tạo mới, xóa. Sessions thuộc về user đang đăng nhập — không có admin override.
+
+### Flyway Migration
+
+`V3__add_chat_session_fields.sql` — thêm 2 column vào `chat_session`:
+```sql
+ALTER TABLE historical_schema.chat_session
+    ADD COLUMN IF NOT EXISTS title VARCHAR(255) DEFAULT '',
+    ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMP;
+```
+
+### 🆕 File Mới Tạo
+
+| File | Mô tả |
+|------|-------|
+| `entity/chat/ChatSession.java` | Thêm `title` (VARCHAR 255, default `""`), `lastMessageAt` (TIMESTAMP nullable) |
+| `repository/ChatSessionRepository.java` | `findByUserAndCharacterAndContext(userId, charId, ctxId)` — sorted by `lastMessageAt DESC NULLS LAST`; `findBySessionIdAndUserUid(sessionId, userId)` — ownership check |
+| `dto/chat/CreateChatSessionRequest.java` | `contextId`, `characterId` — cả hai `@NotBlank` |
+| `dto/chat/ChatSessionResponse.java` | `id`, `characterId`, `contextId`, `title`, `lastMessage`, `lastMessageAt`, `messageCount` |
+| `service/chat/ChatSessionService.java` | `getSessions`, `createSession`, `deleteSession` |
+| `controller/chat/ChatController.java` | 3 endpoints (xem bên dưới) |
+
+### API Endpoints
+
+| Method | Path | Query/Path | Auth | Response |
+|--------|------|-----------|------|---------|
+| GET | `/v1/chat/sessions` | `?contextId=&characterId=` | JWT bắt buộc | `ApiResponse<List<ChatSessionResponse>>` |
+| POST | `/v1/chat/sessions` | body: `{contextId, characterId}` | JWT bắt buộc | `ApiResponse<ChatSessionResponse>` 201 |
+| DELETE | `/v1/chat/sessions/{id}` | path: `sessionId` | JWT bắt buộc | 204 No Content |
+
+### Business Rules
+
+- `contextId` = `eventId` (tên gọi khác nhau, trỏ đến `HistoricalContext.contextId`)
+- `createSession`: validate `character.historicalContext.contextId == request.contextId` → `InvalidRequestException` nếu không khớp
+- `deleteSession`: dùng `findBySessionIdAndUserUid` — trả 404 nếu session không tồn tại **hoặc** không thuộc caller (tránh leak existence)
+- `lastMessage`: derive từ message có `timestamp` lớn nhất trong `session.getMessages()` — không query riêng
+- `messageCount`: `session.getMessages().size()`
+- `CascadeType.ALL + orphanRemoval=true` trên `messages` — delete session tự xóa toàn bộ messages
+
+### Response Shape
+
+```json
+{
+  "id": "uuid-string",
+  "characterId": "uuid-string",
+  "contextId": "uuid-string",
+  "title": "",
+  "lastMessage": null,
+  "lastMessageAt": null,
+  "messageCount": 0
+}
+```
+
+### SecurityConfig
+
+`/v1/chat/**` — tất cả require JWT authenticated (không có route public). Đã thêm comment vào khối `authorizeHttpRequests` trong `SecurityConfig.java`.
