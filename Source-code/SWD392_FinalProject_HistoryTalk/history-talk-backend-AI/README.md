@@ -1,28 +1,30 @@
 # HistoryTalk — AI Service
 
 FastAPI + LangChain service that powers the character roleplay chat feature.  
-It fetches **Character** and **HistoricalContext** data from the Java backend, builds a rich
-Vietnamese-language system prompt, and invokes an LLM to generate in-character responses.
+**Frontend không bao giờ gọi trực tiếp service này** — chỉ BE-Java mới gọi vào khi cần LLM.
 
 ---
 
 ## Architecture
 
 ```
-Frontend  ──POST /v1/ai/chat──►  AI Service (FastAPI)
-                                      │
-                    ┌─────────────────┼─────────────────┐
-                    ▼                 ▼                  ▼
-            GET /characters/{id}  GET /historical-       LLM (OpenAI / Gemini)
-            (Java backend)         contexts/{id}         via LangChain
-                                  (Java backend)
+Frontend  ──→  BE-Java (Spring Boot :8080)  ──→  AI Service (FastAPI :8001)
+                        │                                    │
+                        │  (pre-fills characterData         ▼
+                        │   + contextData để tránh       LLM API
+                        │   callback ngược lại)     (OpenAI / Gemini)
+                        │                           via LangChain
+                        ◄────────────────────────────────────
 ```
 
-1. Client sends a `POST /v1/ai/chat` with `characterId`, `contextId`, the new `userMessage`, and optional `messageHistory`.
-2. The AI service fetches the character and historical-context JSON from the Java backend **in parallel**.
-3. A detailed Vietnamese roleplay system prompt is constructed from that data.
-4. LangChain invokes the LLM with the full conversation history + new message.
-5. The LLM returns a structured JSON payload with the reply and 3 suggested follow-up questions.
+**BE-Java gọi AI Service ở 3 thời điểm:**
+1. `createSession` → `POST /v1/ai/chat` (greeting message đầu tiên)
+2. `sendMessage`   → `POST /v1/ai/chat` (mỗi tin nhắn người dùng gửi)
+3. `sendMessage` (tin đầu tiên) → `POST /v1/ai/generate-title` (async, tạo title session)
+
+**Để tránh callback vòng lặp**, BE-Java tự build `characterData` và `contextData` từ entity rồi truyền
+thẳng vào request body. AI Service chỉ gọi ngược về Java BE (qua `java_client.py`) khi hai field
+này là `null` — tức là khi dùng API trực tiếp để debug/test.
 
 ---
 
@@ -135,7 +137,7 @@ Use these to verify the AI service can reach the Java backend.
 ### `GET /health`
 
 ```jsonc
-{ "status": "ok", "llm_provider": "openai", "llm_model": "gpt-4o-mini" }
+{ "status": "ok", "llm_provider": "google", "llm_model": "gemini-2.5-flash-lite" }
 ```
 
 ---
@@ -173,7 +175,7 @@ All settings are loaded from `.env` (via `pydantic-settings`).
    ```
    LLM_PROVIDER=google
    GOOGLE_API_KEY=AIza...
-   LLM_MODEL=gemini-1.5-flash
+  LLM_MODEL=gemini-2.5-flash-lite
    ```
 
 ---

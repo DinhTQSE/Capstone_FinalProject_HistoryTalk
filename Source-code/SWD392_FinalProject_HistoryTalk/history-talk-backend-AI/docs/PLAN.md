@@ -8,30 +8,43 @@ Service nhận context tin nhắn + dữ liệu nhân vật/bối cảnh lịch 
 
 ## Kiến trúc tổng thể
 
+> **FE không bao giờ gọi trực tiếp AI Service.** Chỉ BE-Java mới gọi.
+
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Frontend (Next.js)                        │
-└──────────────┬───────────────────────────────────────────────────┘
-               │ POST /v1/ai/chat
-               ▼
-┌──────────────────────────────────────────────────────────────────┐
-│               AI Service  (FastAPI :8001)                        │
+┌─────────────────────────────────────────────────────────────────┐
+│                      Frontend (Next.js)                         │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ POST /v1/chat/messages  (BE-Java API)
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              BE-Java  (Spring Boot :8080)                        │
 │                                                                  │
-│  1. Nhận request (characterId, contextId, userMessage, history)  │
-│  2. Fetch Character + HistoricalContext song song từ Java BE      │
-│  3. Build system prompt tiếng Việt                               │
-│  4. Gọi LLM qua LangChain (structured output)                    │
-│  5. Trả về { message, suggestedQuestions[] }                     │
-└──────┬────────────────────────────────┬────────────────────────--┘
-       │ GET /api/v1/characters/{id}    │ LLM API
-       │ GET /api/v1/historical-        │ (OpenAI / Gemini)
-       │      contexts/{id}            │
-       ▼                               ▼
-┌─────────────────────┐     ┌────────────────────┐
-│  Java Spring Boot   │     │  OpenAI / Google   │
-│  backend (:8080)    │     │  Gemini API        │
-└─────────────────────┘     └────────────────────┘
+│  • Xác thực JWT, lưu Message vào DB                             │
+│  • Build characterData + contextData từ entity                  │
+│  • Gọi AI Service với data pre-filled                           │
+└──────────────────┬──────────────────────────────────────────────┘
+                   │ POST /v1/ai/chat  (internal gọi lúc cần LLM)
+                   ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              AI Service  (FastAPI :8001)                         │
+│                                                                  │
+│  1. Nhận request (characterId, contextId, userMessage, history) │
+│  2. Build system prompt tiếng Việt từ characterData/contextData  │
+│     (nếu null → tự fetch từ Java BE qua java_client.py)         │
+│  3. Gọi LLM qua LangChain (structured output)                   │
+│  4. Trả về { message, suggestedQuestions[] }                    │
+└──────────────────────────────────┬──────────────────────────────┘
+                                   │ LLM API
+                                   ▼
+                        ┌────────────────────┐
+                        │  OpenAI / Gemini   │
+                        └────────────────────┘
 ```
+
+**BE-Java gọi AI Service ở 3 thời điểm:**
+1. `createSession` → `POST /v1/ai/chat` — greeting mở đầu
+2. `sendMessage`   → `POST /v1/ai/chat` — mỗi tin nhắn
+3. `sendMessage` (tin đầu tiên) → `POST /v1/ai/generate-title` (async)
 
 ---
 

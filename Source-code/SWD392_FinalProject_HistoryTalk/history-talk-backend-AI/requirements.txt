@@ -16,4 +16,5 @@ langchain-core>=0.2.0
 
 # LLM providers — uncomment / install as needed
 langchain-openai>=0.1.0
-# langchain-google-genai>=1.0.0   # for Google Gemini
+langchain-google-genai>=1.0.0
+google-genai>=1.0.0

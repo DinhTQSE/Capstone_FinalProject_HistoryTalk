@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["openai", "google"] = "openai"
     OPENAI_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
-    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_MODEL: str = "gemini-2.5-flash-lite"
     LLM_TEMPERATURE: float = 0.7
     # Max tokens for character response (not counting the structured wrapper)
     LLM_MAX_TOKENS: int = 1024

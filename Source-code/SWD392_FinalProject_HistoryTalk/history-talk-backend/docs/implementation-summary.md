@@ -546,3 +546,170 @@ ALTER TABLE historical_schema.chat_session
 ### SecurityConfig
 
 `/v1/chat/**` — tất cả require JWT authenticated (không có route public). Đã thêm comment vào khối `authorizeHttpRequests` trong `SecurityConfig.java`.
+
+---
+
+## Chat Messages & History Module (March 8, 2026)
+
+**Build Status:** ✅ `mvn compile` – BUILD SUCCESS
+
+### Mục Tiêu
+
+Implement 3 API endpoints: lấy danh sách tin nhắn của session, gửi tin nhắn (gọi AI), lấy toàn bộ lịch sử chat gộp theo event. Tích hợp với BE-Python qua `AiServiceClient`.
+
+### Luồng Tích Hợp BE-Java ↔ BE-Python
+
+```
+FE → BE-Java → BE-Python (chỉ khi cần LLM)
+
+BE-Java gọi BE-Python ở 3 thời điểm:
+  1. createSession  → POST /v1/ai/chat (greeting message)
+  2. sendMessage    → POST /v1/ai/chat (user message)
+  3. sendMessage (tin đầu tiên) → POST /v1/ai/generate-title (async @EnableAsync)
+
+BE-Java pre-fill characterData + contextData trong request → BE-Python không callback lại BE-Java.
+```
+
+### Flyway Migration
+
+`V3__add_message_suggested_questions.sql`:
+```sql
+ALTER TABLE historical_schema.message
+    ADD COLUMN IF NOT EXISTS suggested_questions TEXT;
+```
+
+### 🆕 File Mới Tạo
+
+| File | Mô tả |
+|------|-------|
+| `repository/MessageRepository.java` | `findByChatSessionSessionIdOrderByTimestampAsc(UUID)` |
+| `service/chat/AiServiceClient.java` | Spring `RestClient` gọi BE-Python; `chat()` + `generateTitleAsync()` (@Async) + builder helpers |
+| `dto/chat/MessageResponse.java` | `id`, `sessionId`, `role`, `content`, `createdAt` |
+| `dto/chat/GetMessagesResponse.java` | `messages[]`, `suggestedQuestions[]` |
+| `dto/chat/SendMessageRequest.java` | `sessionId`, `content` (@NotBlank, @Size max 4000) |
+| `dto/chat/SendMessageResponse.java` | `userMessage`, `assistantMessage`, `suggestedQuestions[]` |
+| `dto/chat/ChatHistorySessionItem.java` | Một session trong history (character + context info + lastMessage) |
+| `dto/chat/ChatHistoryGroupResponse.java` | Group theo context: `contextId`, `contextName`, `sessions[]` |
+| `service/chat/MessageService.java` | `getMessages()` + `sendMessage()` với đầy đủ AI flow |
+| `service/chat/ChatHistoryService.java` | `getHistory()` — group by contextId, sort by lastMessageAt |
+
+### ✏️ File Đã Sửa
+
+| File | Thay đổi |
+|------|----------|
+| `entity/chat/Message.java` | Thêm `suggestedQuestions TEXT` — lưu JSON array string, chỉ có ở ASSISTANT message |
+| `repository/ChatSessionRepository.java` | Thêm `findAllByUserUid(UUID)` — dùng cho GET /chat/history |
+| `service/chat/ChatSessionService.java` | `createSession` gọi AI greeting sau khi save; thêm inject `AiServiceClient`, `MessageRepository`, `ObjectMapper` |
+| `controller/chat/ChatController.java` | Thêm 3 endpoint mới (xem bên dưới) |
+| `HistoryTalkApplication.java` | Thêm `@EnableAsync` |
+| `secretKey.properties` | Thêm `AI_SERVICE_URL=http://localhost:8001` |
+
+### API Endpoints (Đầy đủ sau khi update)
+
+| Method | Path | Auth | Response |
+|--------|------|------|----------|
+| GET | `/v1/chat/sessions?contextId=&characterId=` | JWT | `ApiResponse<List<ChatSessionResponse>>` |
+| POST | `/v1/chat/sessions` | JWT | `ApiResponse<ChatSessionResponse>` 201 |
+| DELETE | `/v1/chat/sessions/{id}` | JWT | 204 |
+| GET | `/v1/chat/sessions/{id}/messages` | JWT | `ApiResponse<GetMessagesResponse>` |
+| POST | `/v1/chat/messages` | JWT | `ApiResponse<SendMessageResponse>` 201 |
+| GET | `/v1/chat/history` | JWT | `ApiResponse<List<ChatHistoryGroupResponse>>` |
+
+### Business Rules
+
+- `sendMessage`: lưu userMessage trước → load history → gọi AI → lưu assistantMessage → update `lastMessageAt`
+- `suggestedQuestions`: lấy từ ASSISTANT message cuối cùng (parse JSON string), `[]` nếu không có
+- `isFirstUserMessage`: nếu là tin nhắn USER đầu tiên trong session → async generate-title
+- `createSession greeting`: gọi AI với `"Hãy chào và giới thiệu ngắn gọn về bản thân."`, lỗi AI không làm fail session creation (try-catch + log.warn)
+- `ChatHistoryService`: group sessions by contextId, sort sessions trong group by `lastMessageAt DESC NULLS LAST`, sort groups by max `lastMessageAt` của group
+- `SendMessageRequest` chỉ gửi `sessionId` + `content` — `characterId`/`contextId` lấy từ session trong DB
+
+### `AiServiceClient` Pre-fill Pattern
+
+`AiServiceClient.buildCharacterPayload(Character)` và `buildContextPayload(HistoricalContext)` convert entity → payload record gồm các field BE-Python cần để build prompt, truyền vào request để BE-Python không phải callback BE-Java.
+
+---
+
+## Hotfix – AiServiceClient 422 Unprocessable Entity (March 8, 2026)
+
+**Build Status:** ✅ `mvn clean compile` – BUILD SUCCESS
+
+**Lỗi runtime:**
+```
+com.historyTalk.exception.SystemException: AI service unavailable:
+  422 Unprocessable Entity: {"detail":[{"type":"missing","loc":["body"],"msg":"Field required","input":null}]}
+```
+
+**Nguyên nhân (2 vấn đề cộng hưởng):**
+
+| # | Vấn đề | Hậu quả |
+|---|--------|---------|
+| 1 | `private record ChatRequest/GenerateTitleRequest/...` — Jackson không thể introspect nested `private` class | Serialize thành `null` body thay vì JSON |
+| 2 | `RestClient.builder()` (static factory) — tạo builder với bare-bones `ObjectMapper` mặc định, không có full record support của Spring Boot | Request body không serialize đúng |
+
+**Fix trong `service/chat/AiServiceClient.java`:**
+
+1. **Inject `RestClient.Builder` bean** thay vì gọi static `RestClient.builder()`:
+
+```java
+// Trước (sai)
+public AiServiceClient(@Value("${AI_SERVICE_URL:...}") String url, ...) {
+    this.restClient = RestClient.builder().baseUrl(url).build();
+}
+
+// Sau (đúng)
+public AiServiceClient(
+        @Value("${AI_SERVICE_URL:http://localhost:8001}") String url,
+        ChatSessionRepository repo,
+        RestClient.Builder restClientBuilder) {   // ← inject Spring Boot auto-configured builder
+    this.restClient = restClientBuilder.baseUrl(url).build();
+}
+```
+
+2. **Đổi tất cả `private record` → `record`** (package-private) cho các inner record serialized/deserialized:
+   - `private record ChatRequest` → `record ChatRequest`
+   - `private record ChatResponseData` → `record ChatResponseData`
+   - `private record ChatApiResponse` → `record ChatApiResponse`
+   - `private record GenerateTitleRequest` → `record GenerateTitleRequest`
+   - `private record GenerateTitleData` → `record GenerateTitleData`
+   - `private record GenerateTitleApiResponse` → `record GenerateTitleApiResponse`
+
+**Lưu ý cho tương lai:** Khi khai báo inner record/class dùng để serialize HTTP body với Jackson trong Spring Boot, luôn dùng **package-private** (không có access modifier) hoặc `public`. Tránh dùng `private` cho outer Jackson-serialized types. Luôn inject `RestClient.Builder` bean thay vì gọi `RestClient.builder()` static.
+
+### Response Shape `GetMessagesResponse`
+
+```json
+{
+  "messages": [
+    { "id": "uuid", "sessionId": "uuid", "role": "USER", "content": "...", "createdAt": "..." },
+    { "id": "uuid", "sessionId": "uuid", "role": "ASSISTANT", "content": "...", "createdAt": "..." }
+  ],
+  "suggestedQuestions": ["Câu hỏi 1", "Câu hỏi 2", "Câu hỏi 3"]
+}
+```
+
+### Response Shape `ChatHistoryGroupResponse`
+
+```json
+[
+  {
+    "contextId": "uuid",
+    "contextName": "Trận Bạch Đằng",
+    "sessions": [
+      {
+        "id": "uuid",
+        "characterId": "uuid",
+        "characterName": "Ngô Quyền",
+        "characterTitle": "Vương",
+        "characterImage": "/images/ngo-quyen.jpg",
+        "contextId": "uuid",
+        "contextName": "Trận Bạch Đằng",
+        "sessionTitle": "Cuộc trò chuyện về chiến thuật",
+        "lastMessage": "Ta đã bày trận cọc...",
+        "lastMessageAt": "2026-03-08T10:00:00",
+        "messageCount": 12
+      }
+    ]
+  }
+]
+```

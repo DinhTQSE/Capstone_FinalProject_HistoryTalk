@@ -1,6 +1,6 @@
 """LangChain-based LLM service for character roleplay."""
 
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
@@ -58,10 +58,20 @@ def _build_llm() -> BaseChatModel:
     )
 
 
-# Build once at module import time so the model is reused across requests.
-_llm = _build_llm()
-_roleplay_llm = _llm.with_structured_output(_CharacterReply)
-_title_llm = _llm.with_structured_output(_SessionTitle)
+# Lazily initialized on first request so missing optional provider packages
+# (e.g. google-genai) don't crash the server at startup.
+_llm: BaseChatModel | None = None
+_roleplay_llm = None
+_title_llm = None
+
+
+def _get_llm():
+    global _llm, _roleplay_llm, _title_llm
+    if _llm is None:
+        _llm = _build_llm()
+        _roleplay_llm = _llm.with_structured_output(_CharacterReply)
+        _title_llm = _llm.with_structured_output(_SessionTitle)
+    return _roleplay_llm, _title_llm
 
 
 # ── Public service functions ──────────────────────────────────────────────────
@@ -78,6 +88,7 @@ async def generate_reply(
     Returns:
         (assistant_message, suggested_questions)
     """
+    roleplay_llm, _ = _get_llm()
     system_prompt = build_chat_system_prompt(character, context)
 
     messages: List[BaseMessage] = [SystemMessage(content=system_prompt)]
@@ -92,7 +103,7 @@ async def generate_reply(
     # Append the new user turn
     messages.append(HumanMessage(content=user_message))
 
-    result: _CharacterReply = await _roleplay_llm.ainvoke(messages)
+    result: _CharacterReply = await roleplay_llm.ainvoke(messages)
     return result.message, result.suggestedQuestions[:3]
 
 
@@ -102,6 +113,7 @@ async def generate_session_title(
     first_assistant_message: str,
 ) -> str:
     """Generate a short session title from the first exchange."""
+    _, title_llm = _get_llm()
     system_prompt = build_title_system_prompt(character)
     conversation_snippet = (
         f"Người dùng: {first_user_message}\n"
@@ -111,5 +123,5 @@ async def generate_session_title(
         SystemMessage(content=system_prompt),
         HumanMessage(content=conversation_snippet),
     ]
-    result: _SessionTitle = await _title_llm.ainvoke(messages)
+    result: _SessionTitle = await title_llm.ainvoke(messages)
     return result.title

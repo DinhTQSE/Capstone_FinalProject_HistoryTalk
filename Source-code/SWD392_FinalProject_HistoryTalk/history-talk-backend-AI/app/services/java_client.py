@@ -1,7 +1,6 @@
 """Async HTTP client that calls the Java Spring Boot backend."""
 
 import httpx
-from typing import Optional
 
 from app.config import settings
 from app.models.character import CharacterData
