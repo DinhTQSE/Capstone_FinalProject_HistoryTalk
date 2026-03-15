@@ -33,6 +33,9 @@ public class QuizResult {
     @Column(name = "score", nullable = false)
     private Integer score;
 
+    @Column(name = "duration_seconds", nullable = true)
+    private Integer durationSeconds;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uid", nullable = false)
     private User user;
