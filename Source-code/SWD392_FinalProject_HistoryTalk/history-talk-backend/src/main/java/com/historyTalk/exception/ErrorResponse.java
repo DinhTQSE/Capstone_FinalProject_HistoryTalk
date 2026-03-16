@@ -1,9 +1,11 @@
 package com.historyTalk.exception;
 
 import lombok.Builder;
+import lombok.Data;
 import org.springframework.http.HttpStatus;
 import java.time.LocalDateTime;
 @Builder
+@Data
 public class ErrorResponse {
     private final int errorCode;
     private final String message;
