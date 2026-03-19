@@ -54,6 +54,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException ex) {
         return buildErrorResponse(ex);
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .errorCode(HttpStatus.BAD_REQUEST.value())
+                .message("Invalid argument: " + ex.getMessage())
+                .status(HttpStatus.BAD_REQUEST)
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
     // Lỗi validate @NotNull, @Pattern, @Size
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<InvalidArgumentResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
