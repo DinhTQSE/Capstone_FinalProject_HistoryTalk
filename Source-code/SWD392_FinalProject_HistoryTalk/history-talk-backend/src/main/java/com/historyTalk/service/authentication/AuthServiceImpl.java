@@ -11,9 +11,12 @@ import com.historyTalk.entity.enums.UserRole;
 import com.historyTalk.entity.user.User;
 import com.historyTalk.exception.DataConflictException;
 import com.historyTalk.exception.InvalidRequestException;
+import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.exception.UnauthorizedException;
 import com.historyTalk.repository.UserRepository;
 import com.historyTalk.security.UserPrincipal;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,10 +27,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -38,6 +43,9 @@ public class AuthServiceImpl implements AuthService {
     /** In-memory blacklist for logged-out tokens. Replace with Redis in production. */
     public static final Set<String> BLACKLISTED_TOKENS =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -204,5 +212,59 @@ public class AuthServiceImpl implements AuthService {
         claims.put("uid", principal.getUid());
         claims.put("role", principal.getRole().name());
         return claims;
+    }
+
+    @Override
+    @Transactional
+    public void softDeleteUser(String targetUserId, String adminId) {
+        log.info("Soft deleting user {} requested by user {}", targetUserId, adminId);
+        
+        User requestUser = userRepository.findById(UUID.fromString(adminId))
+                .orElseThrow(() -> new ResourceNotFoundException("Requesting user not found"));
+                
+        if (!targetUserId.equals(adminId) && requestUser.getRole() != UserRole.ADMIN) {
+            throw new InvalidRequestException("Only an ADMIN can deactivate other user accounts.");
+        }
+        
+        User targetUser = userRepository.findById(UUID.fromString(targetUserId))
+                .orElseThrow(() -> new ResourceNotFoundException("Target user not found"));
+                
+        targetUser.setDeletedAt(LocalDateTime.now());
+        userRepository.save(targetUser);
+
+        // Cascade soft delete all user content
+        cascadeSoftDeleteContent(targetUser.getUid());
+        
+        log.info("User {} successfully deactivated and content cascading initiated.", targetUserId);
+    }
+
+    private void cascadeSoftDeleteContent(UUID userId) {
+        // Character & documents
+        entityManager.createQuery("UPDATE CharacterDocument cd SET cd.deletedAt = CURRENT_TIMESTAMP WHERE cd.character.createdBy.uid = :userId AND cd.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+        entityManager.createQuery("UPDATE Character c SET c.deletedAt = CURRENT_TIMESTAMP WHERE c.createdBy.uid = :userId AND c.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+
+        // HistoricalContext & documents
+        entityManager.createQuery("UPDATE HistoricalContextDocument hcd SET hcd.deletedAt = CURRENT_TIMESTAMP WHERE hcd.historicalContext.createdBy.uid = :userId AND hcd.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+        entityManager.createQuery("UPDATE HistoricalContext hc SET hc.deletedAt = CURRENT_TIMESTAMP WHERE hc.createdBy.uid = :userId AND hc.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+
+        // ChatSession & messages
+        entityManager.createQuery("UPDATE Message m SET m.deletedAt = CURRENT_TIMESTAMP WHERE m.chatSession.user.uid = :userId AND m.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+        entityManager.createQuery("UPDATE ChatSession cs SET cs.deletedAt = CURRENT_TIMESTAMP WHERE cs.user.uid = :userId AND cs.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+
+        // QuizSession
+        entityManager.createQuery("UPDATE QuizSession qs SET qs.deletedAt = CURRENT_TIMESTAMP WHERE qs.user.uid = :userId AND qs.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+
+        // QuizResult & answer details
+        entityManager.createQuery("UPDATE QuizAnswerDetail qd SET qd.deletedAt = CURRENT_TIMESTAMP WHERE qd.quizResult.user.uid = :userId AND qd.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
+        entityManager.createQuery("UPDATE QuizResult qr SET qr.deletedAt = CURRENT_TIMESTAMP WHERE qr.user.uid = :userId AND qr.deletedAt IS NULL")
+                .setParameter("userId", userId).executeUpdate();
     }
 }

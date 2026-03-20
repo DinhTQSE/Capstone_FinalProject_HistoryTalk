@@ -130,6 +130,25 @@ public class ChatSessionService {
         log.info("Chat session deleted: {}", sessionId);
     }
 
+    @Transactional
+    public void softDeleteSession(String sessionId, String userId) {
+        log.info("Soft deleting chat session={} for user={}", sessionId, userId);
+
+        ChatSession session = chatSessionRepository
+                .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        session.setDeletedAt(now);
+        chatSessionRepository.save(session);
+
+        if (session.getMessages() != null) {
+            session.getMessages().forEach(msg -> msg.setDeletedAt(now));
+        }
+
+        log.info("Chat session soft deleted: {}", sessionId);
+    }
+
     private ChatSessionResponse mapToResponse(ChatSession session) {
         List<Message> messages = session.getMessages();
         String lastMessage = null;

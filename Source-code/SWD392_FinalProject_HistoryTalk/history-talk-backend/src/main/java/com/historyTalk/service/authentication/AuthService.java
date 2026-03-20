@@ -19,4 +19,6 @@ public interface AuthService {
     RefreshTokenResponse refreshToken(String refreshToken);
 
     void logout(String authorizationHeader);
+
+    void softDeleteUser(String targetUserId, String adminId);
 }

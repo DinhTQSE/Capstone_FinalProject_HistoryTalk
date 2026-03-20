@@ -68,6 +68,17 @@ public class ChatController {
     }
 
     /**
+     * PATCH /v1/chat/sessions/{id}/soft-delete
+     * Soft deletes a session owned by the authenticated user.
+     */
+    @PatchMapping("/sessions/{id}/soft-delete")
+    public ResponseEntity<ApiResponse<?>> softDeleteSession(@PathVariable String id) {
+        String userId = SecurityUtils.getUserId();
+        chatSessionService.softDeleteSession(id, userId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Session soft-deleted successfully"));
+    }
+
+    /**
      * GET /v1/chat/sessions/{id}/messages
      * Returns all messages for a session owned by the authenticated user.
      */

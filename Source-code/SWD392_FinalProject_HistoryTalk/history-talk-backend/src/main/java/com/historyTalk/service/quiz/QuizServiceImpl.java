@@ -575,6 +575,47 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
+    @Transactional
+    @Override
+    public void softDeleteQuizResult(String resultId, String userId, String userRole) {
+        log.info("Soft deleting quiz result with ID: {} for user: {}", resultId, userId);
+        
+        QuizResult result = quizResultRepository.findById(UUID.fromString(resultId))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz result not found with ID: " + resultId));
+                
+        if (!result.getUser().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException("You do not have permission to delete this quiz result");
+        }
+        
+        LocalDateTime now = LocalDateTime.now();
+        result.setDeletedAt(now);
+        quizResultRepository.save(result);
+        
+        if (result.getAnswerDetails() != null) {
+            result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+        }
+        
+        log.info("Quiz result soft deleted successfully: {}", resultId);
+    }
+
+    @Transactional
+    @Override
+    public void softDeleteQuizSession(String sessionId, String userId) {
+        log.info("Soft deleting quiz session: {} for user: {}", sessionId, userId);
+        
+        QuizSession session = quizSessionRepository.findById(UUID.fromString(sessionId))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz session not found with ID: " + sessionId));
+                
+        if (!session.getUser().getUid().equals(UUID.fromString(userId))) {
+            throw new InvalidRequestException("You do not have permission to delete this quiz session");
+        }
+        
+        session.setDeletedAt(LocalDateTime.now());
+        quizSessionRepository.save(session);
+        
+        log.info("Quiz session soft deleted successfully: {}", sessionId);
+    }
+
     private void checkOwnershipOrAdmin(String createdByUid, String userId, String userRole) {
         if (!createdByUid.equals(userId) && !userRole.equalsIgnoreCase("ADMIN")) {
             throw new InvalidRequestException("You don't have permission to modify this quiz");

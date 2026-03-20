@@ -39,4 +39,8 @@ public interface QuizService {
 
     PaginatedResponse<QuizHistoryResponse> getQuizHistory(String userId, Pageable pageable);
 
+    void softDeleteQuizResult(String resultId, String userId, String userRole);
+
+    void softDeleteQuizSession(String sessionId, String userId);
+
 }

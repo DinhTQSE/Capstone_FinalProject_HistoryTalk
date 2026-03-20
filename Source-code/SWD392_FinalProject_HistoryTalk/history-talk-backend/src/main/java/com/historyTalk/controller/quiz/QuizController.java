@@ -101,4 +101,28 @@ public class QuizController {
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz history retrieved successfully"));
     }
 
+    @PatchMapping("/results/{resultId}/soft-delete")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Soft delete quiz result", description = "Soft delete a quiz result (owner or Admin only)")
+    public ResponseEntity<ApiResponse<?>> softDeleteQuizResult(
+            @PathVariable String resultId) {
+        log.info("PATCH /api/v1/quizzes/results/{}/soft-delete", resultId);
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        quizService.softDeleteQuizResult(resultId, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Quiz result soft-deleted successfully"));
+    }
+
+    @PatchMapping("/sessions/{sessionId}/soft-delete")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Soft delete quiz session", description = "Soft delete a quiz session (owner only)")
+    public ResponseEntity<ApiResponse<?>> softDeleteQuizSession(
+            @PathVariable String sessionId) {
+        log.info("PATCH /api/v1/quizzes/sessions/{}/soft-delete", sessionId);
+        String userId = SecurityUtils.getUserId();
+        quizService.softDeleteQuizSession(sessionId, userId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Quiz session soft-deleted successfully"));
+    }
 }

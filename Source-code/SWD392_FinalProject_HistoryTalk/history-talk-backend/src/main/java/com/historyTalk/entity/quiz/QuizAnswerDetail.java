@@ -7,6 +7,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
+import java.time.LocalDateTime;
 
 import java.util.UUID;
 
@@ -17,6 +21,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE quiz_answer_detail SET deleted_at = NOW() WHERE detail_id=?")
+@Where(clause = "deleted_at IS NULL")
 public class QuizAnswerDetail {
 
     @Id
@@ -38,6 +44,9 @@ public class QuizAnswerDetail {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
     private Question question;
+
+    @Column(name = "deleted_at", nullable = true)
+    private LocalDateTime deletedAt;
 
     @PrePersist
     void ensureDefaults() {
