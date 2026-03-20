@@ -15,7 +15,9 @@ import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -92,8 +94,8 @@ public class HistoricalContext {
     private List<HistoricalContextDocument> documents = new ArrayList<>();
 
     @Builder.Default
-    @OneToMany(mappedBy = "historicalContext", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Character> characters = new ArrayList<>();
+    @ManyToMany(mappedBy = "historicalContexts", fetch = FetchType.LAZY)
+    private Set<Character> characters = new HashSet<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "historicalContext", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

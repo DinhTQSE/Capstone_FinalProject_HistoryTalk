@@ -57,6 +57,20 @@ public class QuizServiceImpl implements QuizService {
 
     @Transactional(readOnly = true)
     @Override
+    public PaginatedResponse<QuizStaffResponse> getQuizzesByContextForStaff(
+            String contextId, String search, Integer grade, EventEra era, Pageable pageable) {
+        log.info("Fetching quizzes for staff by context: {}", contextId);
+
+        UUID ctx = UuidUtils.fromString(contextId, "contextId");
+        historicalContextRepository.findById(ctx)
+                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + contextId));
+
+        Page<Quiz> page = quizRepository.findAllByContextWithSearch(ctx, normalize(search), grade, era, pageable);
+        return mapPageToPaginatedResponse(page.map(this::mapToStaffResponse));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public List<QuizCustomerResponse> getAllQuizzesForCustomer(String search) {
         log.info("Fetching quizzes for customer with search: {}", search);
         

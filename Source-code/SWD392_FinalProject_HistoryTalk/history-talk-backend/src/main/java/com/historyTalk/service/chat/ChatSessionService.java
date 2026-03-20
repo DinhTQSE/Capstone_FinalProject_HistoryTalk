@@ -65,13 +65,15 @@ public class ChatSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
 
         UUID contextIdUUID = UUID.fromString(request.getContextId());
-        if (!character.getHistoricalContext().getContextId().equals(contextIdUUID)) {
-            throw new InvalidRequestException("Character does not belong to this context");
-        }
+        var selectedContext = character.getHistoricalContexts().stream()
+            .filter(ctx -> ctx.getContextId().equals(contextIdUUID))
+            .findFirst()
+            .orElseThrow(() -> new InvalidRequestException("Character does not belong to this context"));
 
         ChatSession session = ChatSession.builder()
                 .user(user)
                 .character(character)
+            .historicalContext(selectedContext)
                 .title("")
                 .build();
 
@@ -81,11 +83,11 @@ public class ChatSessionService {
         // Send greeting message via AI
         try {
             CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
-            ContextPayload contextData = AiServiceClient.buildContextPayload(character.getHistoricalContext());
+            ContextPayload contextData = AiServiceClient.buildContextPayload(selectedContext);
 
             AiChatResult greeting = aiServiceClient.chat(
                     character.getCharacterId().toString(),
-                    character.getHistoricalContext().getContextId().toString(),
+                    selectedContext.getContextId().toString(),
                     "Hãy chào và giới thiệu ngắn gọn về bản thân.",
                     Collections.emptyList(),
                     characterData,
@@ -162,7 +164,7 @@ public class ChatSessionService {
         return ChatSessionResponse.builder()
                 .id(session.getSessionId().toString())
                 .characterId(session.getCharacter().getCharacterId().toString())
-                .contextId(session.getCharacter().getHistoricalContext().getContextId().toString())
+            .contextId(session.getHistoricalContext().getContextId().toString())
                 .title(session.getTitle())
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
