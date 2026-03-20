@@ -32,6 +32,8 @@ public interface QuizService {
 
     void reorderQuestions(String quizId, List<String> questionIds, String userId, String userRole);
 
+    PaginatedResponse<QuizStaffResponse> getQuizzesByContextForStaff(String contextId, String search, Integer grade, EventEra era, Pageable pageable);
+
     // Customer operations
     QuizStartResponse startQuiz(String quizId, String userId);
 

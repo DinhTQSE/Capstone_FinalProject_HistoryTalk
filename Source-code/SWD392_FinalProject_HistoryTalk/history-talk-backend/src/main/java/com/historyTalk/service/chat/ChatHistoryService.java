@@ -33,7 +33,7 @@ public class ChatHistoryService {
         // Group by contextId
         Map<String, List<ChatSession>> grouped = sessions.stream()
                 .collect(Collectors.groupingBy(
-                        s -> s.getCharacter().getHistoricalContext().getContextId().toString()));
+                        s -> s.getHistoricalContext().getContextId().toString()));
 
         // Build response groups, sorted by max lastMessageAt DESC
         return grouped.entrySet().stream()
@@ -50,7 +50,7 @@ public class ChatHistoryService {
                             .toList();
 
                     String contextName = groupSessions.get(0)
-                            .getCharacter().getHistoricalContext().getName();
+                            .getHistoricalContext().getName();
 
                     return ChatHistoryGroupResponse.builder()
                             .contextId(contextId)
@@ -83,8 +83,8 @@ public class ChatHistoryService {
                 .characterName(session.getCharacter().getName())
                 .characterTitle(session.getCharacter().getTitle())
                 .characterImage(session.getCharacter().getImage())
-                .contextId(session.getCharacter().getHistoricalContext().getContextId().toString())
-                .contextName(session.getCharacter().getHistoricalContext().getName())
+                .contextId(session.getHistoricalContext().getContextId().toString())
+                .contextName(session.getHistoricalContext().getName())
                 .sessionTitle(session.getTitle())
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())

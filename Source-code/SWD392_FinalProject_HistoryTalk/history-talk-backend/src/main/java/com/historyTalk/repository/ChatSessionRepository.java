@@ -14,13 +14,13 @@ import java.util.UUID;
 public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> {
 
     @Query("""
-            SELECT cs FROM ChatSession cs
-            JOIN FETCH cs.character c
-            JOIN FETCH c.historicalContext hc
-            WHERE cs.user.uid = :userId
-              AND c.characterId = :characterId
-              AND hc.contextId = :contextId
-            ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
+                                                SELECT cs FROM ChatSession cs
+                                                JOIN FETCH cs.character c
+                                                JOIN FETCH cs.historicalContext hc
+                                                WHERE cs.user.uid = :userId
+                                                        AND c.characterId = :characterId
+                                                        AND hc.contextId = :contextId
+                                                ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
             """)
     List<ChatSession> findByUserAndCharacterAndContext(
             @Param("userId") UUID userId,
@@ -30,11 +30,11 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     Optional<ChatSession> findBySessionIdAndUserUid(UUID sessionId, UUID userId);
 
     @Query("""
-            SELECT cs FROM ChatSession cs
-            JOIN FETCH cs.character c
-            JOIN FETCH c.historicalContext hc
-            WHERE cs.user.uid = :userId
-            ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
+                        SELECT cs FROM ChatSession cs
+                        JOIN FETCH cs.character c
+                        JOIN FETCH cs.historicalContext hc
+                        WHERE cs.user.uid = :userId
+                        ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
             """)
     List<ChatSession> findAllByUserUid(@Param("userId") UUID userId);
 }

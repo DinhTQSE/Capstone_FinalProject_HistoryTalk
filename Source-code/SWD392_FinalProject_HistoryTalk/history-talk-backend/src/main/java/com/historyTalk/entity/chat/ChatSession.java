@@ -1,6 +1,7 @@
 package com.historyTalk.entity.chat;
 
 import com.historyTalk.entity.character.Character;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
 import com.historyTalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -38,6 +39,10 @@ public class ChatSession {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "character_id", nullable = false)
     private Character character;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "context_id", nullable = false)
+    private HistoricalContext historicalContext;
 
     @Builder.Default
     @Column(name = "title", length = 255)
