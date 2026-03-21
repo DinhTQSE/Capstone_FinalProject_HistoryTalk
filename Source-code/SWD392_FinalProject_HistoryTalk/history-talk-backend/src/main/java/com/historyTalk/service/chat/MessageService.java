@@ -106,12 +106,12 @@ public class MessageService {
         // Build payloads to pre-fill into AI request (avoids Python→Java callback)
         CharacterPayload characterData = AiServiceClient.buildCharacterPayload(session.getCharacter());
         ContextPayload contextData = AiServiceClient.buildContextPayload(
-                session.getCharacter().getHistoricalContext());
+                session.getHistoricalContext());
 
         // Call BE-Python
         AiChatResult aiResult = aiServiceClient.chat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getCharacter().getHistoricalContext().getContextId().toString(),
+                session.getHistoricalContext().getContextId().toString(),
                 request.getContent(),
                 history,
                 characterData,
@@ -139,7 +139,7 @@ public class MessageService {
             aiServiceClient.generateTitleAsync(
                     session.getSessionId().toString(),
                     session.getCharacter().getCharacterId().toString(),
-                    session.getCharacter().getHistoricalContext().getContextId().toString(),
+                    session.getHistoricalContext().getContextId().toString(),
                     request.getContent(),
                     aiResult.message(),
                     characterData,

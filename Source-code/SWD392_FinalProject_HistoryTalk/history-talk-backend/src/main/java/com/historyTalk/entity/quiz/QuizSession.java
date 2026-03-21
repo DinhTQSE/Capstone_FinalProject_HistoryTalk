@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -20,6 +22,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE quiz_session SET deleted_at = NOW() WHERE session_id=?")
+@Where(clause = "deleted_at IS NULL")
 public class QuizSession {
 
     @Id
@@ -46,5 +50,8 @@ public class QuizSession {
     @Builder.Default
     @Column(name = "is_submitted", nullable = false)
     private Boolean isSubmitted = false;
+
+    @Column(name = "deleted_at", nullable = true)
+    private LocalDateTime deletedAt;
 
 }

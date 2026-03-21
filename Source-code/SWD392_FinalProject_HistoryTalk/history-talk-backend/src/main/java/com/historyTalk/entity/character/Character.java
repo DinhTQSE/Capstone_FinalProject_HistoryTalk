@@ -3,16 +3,33 @@ package com.historyTalk.entity.character;
 import com.historyTalk.entity.chat.ChatSession;
 import com.historyTalk.entity.historicalContext.HistoricalContext;
 import com.historyTalk.entity.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -22,6 +39,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE \"character\" SET deleted_at = NOW() WHERE character_id=?")
+@Where(clause = "deleted_at IS NULL")
 public class Character {
 
     @Id
@@ -52,13 +71,21 @@ public class Character {
     @Column(name = "side", length = 100)
     private String side;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "context_id", nullable = false)
-    private HistoricalContext historicalContext;
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "character_historical_context",
+            joinColumns = @JoinColumn(name = "character_id"),
+            inverseJoinColumns = @JoinColumn(name = "context_id")
+    )
+    private Set<HistoricalContext> historicalContexts = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
+
+    @Column(name = "deleted_at", nullable = true)
+    private LocalDateTime deletedAt;
 
     @Builder.Default
     @OneToMany(mappedBy = "character", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

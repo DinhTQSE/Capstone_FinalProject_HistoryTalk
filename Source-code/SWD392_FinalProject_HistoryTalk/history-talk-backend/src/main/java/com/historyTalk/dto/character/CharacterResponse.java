@@ -48,6 +48,9 @@ public class CharacterResponse {
     @JsonProperty("context")
     private ContextInfo context;
 
+    @JsonProperty("contexts")
+    private List<ContextInfo> contexts;
+
     @JsonProperty("createdBy")
     private StaffInfo createdBy;
 

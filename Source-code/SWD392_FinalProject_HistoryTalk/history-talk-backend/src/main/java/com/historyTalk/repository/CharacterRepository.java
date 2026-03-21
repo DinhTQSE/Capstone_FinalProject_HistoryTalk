@@ -15,13 +15,19 @@ import java.util.UUID;
 @Repository
 public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
-    List<Character> findByHistoricalContextContextIdOrderByNameAsc(UUID contextId);
+    @Query("""
+           SELECT DISTINCT c FROM Character c
+           JOIN c.historicalContexts hc
+           WHERE hc.contextId = :contextId
+           ORDER BY c.name ASC
+           """)
+    List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId);
 
     List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
     @Query(value = """
-            SELECT c FROM Character c
-            JOIN FETCH c.historicalContext hc
+            SELECT DISTINCT c FROM Character c
+            JOIN c.historicalContexts hc
             JOIN FETCH c.createdBy u
             WHERE (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%')
@@ -30,8 +36,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             ORDER BY c.name ASC
             """,
             countQuery = """
-            SELECT COUNT(c) FROM Character c
-            JOIN c.historicalContext hc
+            SELECT COUNT(DISTINCT c) FROM Character c
+            JOIN c.historicalContexts hc
             WHERE (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))

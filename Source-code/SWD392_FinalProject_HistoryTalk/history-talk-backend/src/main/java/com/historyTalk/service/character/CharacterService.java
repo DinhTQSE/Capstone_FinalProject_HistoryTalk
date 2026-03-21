@@ -21,7 +21,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -71,7 +74,7 @@ public class CharacterService {
     @Transactional(readOnly = true)
     public List<CharacterResponse> getCharactersByContext(String contextId) {
         log.info("Fetching characters for context: {}", contextId);
-        return characterRepository.findByHistoricalContextContextIdOrderByNameAsc(UUID.fromString(contextId))
+        return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId))
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -81,9 +84,7 @@ public class CharacterService {
     public CharacterResponse createCharacter(CreateCharacterRequest request, String userId) {
         log.info("Creating character: {} by user: {}", request.getName(), userId);
 
-        HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Historical Context not found with id: " + request.getContextId()));
+        Set<HistoricalContext> contexts = resolveContexts(request);
 
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -97,7 +98,7 @@ public class CharacterService {
                 .personality(request.getPersonality())
                 .lifespan(request.getLifespan())
                 .side(request.getSide())
-                .historicalContext(context)
+                .historicalContexts(contexts)
                 .createdBy(user)
                 .build();
 
@@ -166,16 +167,56 @@ public class CharacterService {
         log.info("Character deleted: {}", characterId);
     }
 
+    @Transactional
+    public void softDeleteCharacter(String characterId, String userId, String userRole) {
+        log.info("Soft deleting character: {} by user: {}", characterId, userId);
+
+        Character character = characterRepository.findById(UUID.fromString(characterId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Character not found with id: " + characterId));
+
+        if (!character.getCreatedBy().getUid().equals(UUID.fromString(userId))
+                && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException(
+                    "You do not have permission to soft delete this character");
+        }
+
+        character.setDeletedAt(java.time.LocalDateTime.now());
+        characterRepository.save(character);
+
+        // Cascade soft-delete to documents
+        if (character.getDocuments() != null) {
+            character.getDocuments().forEach(doc -> doc.setDeletedAt(java.time.LocalDateTime.now()));
+        }
+
+        // Cascade soft-delete to chat sessions
+        if (character.getChatSessions() != null) {
+            character.getChatSessions().forEach(session -> {
+                session.setDeletedAt(java.time.LocalDateTime.now());
+                if (session.getMessages() != null) {
+                    session.getMessages().forEach(msg -> msg.setDeletedAt(java.time.LocalDateTime.now()));
+                }
+            });
+        }
+    }
+
     private CharacterResponse mapToResponse(Character character) {
-        HistoricalContext ctx = character.getHistoricalContext();
-        List<CharacterResponse.EventInfo> events = ctx.getDocuments().stream()
+        HistoricalContext ctx = resolvePrimaryContext(character);
+        List<CharacterResponse.EventInfo> events = ctx == null ? List.of() : ctx.getDocuments().stream()
                 .map(doc -> CharacterResponse.EventInfo.builder()
                         .id(doc.getDocId().toString())
                         .name(doc.getTitle())
-                        .era(ctx.getEra())
-                        .year(ctx.getYear())
+                .era(ctx.getEra())
+                .year(ctx.getYear())
                         .build())
                 .collect(Collectors.toList());
+
+        List<CharacterResponse.ContextInfo> contexts = character.getHistoricalContexts().stream()
+            .map(hc -> CharacterResponse.ContextInfo.builder()
+                .contextId(hc.getContextId().toString())
+                .name(hc.getName())
+                .build())
+            .toList();
 
         return CharacterResponse.builder()
                 .characterId(character.getCharacterId().toString())
@@ -186,12 +227,13 @@ public class CharacterService {
                 .personality(character.getPersonality())
                 .lifespan(character.getLifespan())
                 .side(character.getSide())
-                .era(ctx.getEra())
+            .era(ctx != null ? ctx.getEra() : null)
                 .events(events)
-                .context(CharacterResponse.ContextInfo.builder()
-                        .contextId(ctx.getContextId().toString())
-                        .name(ctx.getName())
-                        .build())
+            .context(ctx == null ? null : CharacterResponse.ContextInfo.builder()
+                .contextId(ctx.getContextId().toString())
+                .name(ctx.getName())
+                .build())
+            .contexts(contexts)
                 .createdBy(CharacterResponse.StaffInfo.builder()
                         .uid(character.getCreatedBy().getUid().toString())
                         .userName(character.getCreatedBy().getUserName())
@@ -201,5 +243,38 @@ public class CharacterService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private Set<HistoricalContext> resolveContexts(CreateCharacterRequest request) {
+        Set<String> ids = new HashSet<>();
+        if (request.getContextId() != null && !request.getContextId().isBlank()) {
+            ids.add(request.getContextId());
+        }
+        if (request.getContextIds() != null) {
+            request.getContextIds().stream()
+                    .filter(id -> id != null && !id.isBlank())
+                    .forEach(ids::add);
+        }
+
+        if (ids.isEmpty()) {
+            throw new InvalidRequestException("At least one contextId is required");
+        }
+
+        Set<HistoricalContext> contexts = new HashSet<>();
+        for (String id : ids) {
+            HistoricalContext ctx = contextRepository.findById(UUID.fromString(id))
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Historical Context not found with id: " + id));
+            contexts.add(ctx);
+        }
+        return contexts;
+    }
+
+    private HistoricalContext resolvePrimaryContext(Character character) {
+        return character.getHistoricalContexts()
+                .stream()
+                .sorted(Comparator.comparing(HistoricalContext::getContextId))
+                .findFirst()
+                .orElse(null);
     }
 }

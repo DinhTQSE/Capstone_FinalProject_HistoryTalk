@@ -32,11 +32,17 @@ public interface QuizService {
 
     void reorderQuestions(String quizId, List<String> questionIds, String userId, String userRole);
 
+    PaginatedResponse<QuizStaffResponse> getQuizzesByContextForStaff(String contextId, String search, Integer grade, EventEra era, Pageable pageable);
+
     // Customer operations
     QuizStartResponse startQuiz(String quizId, String userId);
 
     QuizSubmitResponse submitQuiz(QuizSubmitRequest request, String userId);
 
     PaginatedResponse<QuizHistoryResponse> getQuizHistory(String userId, Pageable pageable);
+
+    void softDeleteQuizResult(String resultId, String userId, String userRole);
+
+    void softDeleteQuizSession(String sessionId, String userId);
 
 }

@@ -98,4 +98,17 @@ public class CharacterController {
         characterService.deleteCharacter(characterId, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(null, "Character deleted successfully"));
     }
+
+    @PatchMapping("/{characterId}/soft-delete")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Soft delete a character", description = "Soft delete a character (creator or Admin only)")
+    public ResponseEntity<ApiResponse<?>> softDeleteCharacter(
+            @PathVariable String characterId) {
+        log.info("PATCH /v1/characters/{}/soft-delete", characterId);
+        String staffId = SecurityUtils.getUserId();
+        String staffRole = SecurityUtils.getRoleName();
+        characterService.softDeleteCharacter(characterId, staffId, staffRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Character soft-deleted successfully"));
+    }
 }

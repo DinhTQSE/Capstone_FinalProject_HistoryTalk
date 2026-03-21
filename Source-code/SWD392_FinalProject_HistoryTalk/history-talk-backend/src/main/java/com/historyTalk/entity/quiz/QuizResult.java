@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,6 +24,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE quiz_result SET deleted_at = NOW() WHERE result_id=?")
+@Where(clause = "deleted_at IS NULL")
 public class QuizResult {
 
     @Id
@@ -47,6 +51,9 @@ public class QuizResult {
     @CreationTimestamp
     @Column(name = "taken_date", nullable = false, updatable = false)
     private LocalDateTime takenDate;
+
+    @Column(name = "deleted_at", nullable = true)
+    private LocalDateTime deletedAt;
 
     @Builder.Default
     @OneToMany(mappedBy = "quizResult", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

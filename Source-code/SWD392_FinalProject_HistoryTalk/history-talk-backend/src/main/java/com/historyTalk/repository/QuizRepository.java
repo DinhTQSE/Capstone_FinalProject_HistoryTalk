@@ -37,6 +37,22 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
             Pageable pageable);
 
     @Query("""
+          SELECT q FROM Quiz q
+          WHERE q.historicalContext.contextId = :contextId
+            AND (:search IS NULL OR :search = ''
+                OR q.title ILIKE CONCAT('%', :search, '%')
+                OR q.description ILIKE CONCAT('%', :search, '%'))
+          AND (:grade IS NULL OR q.grade = :grade)
+          AND (:era IS NULL OR q.era = :era)
+          """)
+    Page<Quiz> findAllByContextWithSearch(
+           @Param("contextId") UUID contextId,
+           @Param("search") String search,
+           @Param("grade") Integer grade,
+           @Param("era") EventEra era,
+           Pageable pageable);
+
+    @Query("""
            SELECT q FROM Quiz q
            WHERE (:search IS NULL OR :search = ''
                   OR q.title ILIKE CONCAT('%', :search, '%')

@@ -1,4 +1,4 @@
-package java.com.historyTalk.dto.user;
+package com.historyTalk.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;

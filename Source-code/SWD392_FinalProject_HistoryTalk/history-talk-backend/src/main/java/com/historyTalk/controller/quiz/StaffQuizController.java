@@ -60,6 +60,35 @@ public class StaffQuizController {
         return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
     }
 
+    @GetMapping("/contexts/{contextId}")
+    @Operation(summary = "Get quizzes by context (paginated)", description = "Retrieve quizzes under a historical context with optional search, grade, and era filters")
+    public ResponseEntity<ApiResponse<PaginatedResponse<QuizStaffResponse>>> getQuizzesByContext(
+            @PathVariable String contextId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer grade,
+            @RequestParam(required = false) String era,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        log.info("GET /api/v1/staff/quizzes/contexts/{} - search: {}, grade: {}, era: {}, page: {}, size: {}",
+                contextId, search, grade, era, page, size);
+
+        EventEra eraEnum = null;
+        if (era != null && !era.isEmpty()) {
+            try {
+                eraEnum = EventEra.valueOf(era);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Invalid era value: " + era, "INVALID_ERA"));
+            }
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+        PaginatedResponse<QuizStaffResponse> data = quizService.getQuizzesByContextForStaff(contextId, search, grade, eraEnum, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
+    }
+
     @GetMapping("/{quizId}")
     @Operation(summary = "Get quiz by ID", description = "Retrieve a specific quiz with all questions")
     public ResponseEntity<ApiResponse<QuizStaffResponse>> getQuizById(

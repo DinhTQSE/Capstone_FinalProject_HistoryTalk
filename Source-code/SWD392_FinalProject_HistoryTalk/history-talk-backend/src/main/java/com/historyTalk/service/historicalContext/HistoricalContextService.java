@@ -204,6 +204,75 @@ public class HistoricalContextService {
     }
     
     /**
+     * Soft delete a historical context and trigger manual cascade to its children
+     */
+    @Transactional
+    public void softDeleteContext(String contextId, String userId, String userRole) {
+        log.info("Soft deleting historical context with ID: {}", contextId);
+        
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Not found with ID: " + contextId
+                ));
+        
+        if (!context.getCreatedBy().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException(
+                    "You do not have permission to soft delete this historical context"
+            );
+        }
+        
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        context.setDeletedAt(now);
+        contextRepository.save(context);
+
+        // Cascade to Documents
+        if (context.getDocuments() != null) {
+            context.getDocuments().forEach(doc -> doc.setDeletedAt(now));
+        }
+
+        // Cascade to Characters and their children
+        if (context.getCharacters() != null) {
+            context.getCharacters().forEach(character -> {
+                character.setDeletedAt(now);
+                if (character.getDocuments() != null) {
+                    character.getDocuments().forEach(doc -> doc.setDeletedAt(now));
+                }
+                if (character.getChatSessions() != null) {
+                    character.getChatSessions().forEach(session -> {
+                        session.setDeletedAt(now);
+                        if (session.getMessages() != null) {
+                            session.getMessages().forEach(msg -> msg.setDeletedAt(now));
+                        }
+                    });
+                }
+            });
+        }
+
+        // Cascade to Quizzes and their children
+        if (context.getQuizzes() != null) {
+            context.getQuizzes().forEach(quiz -> {
+                quiz.setDeletedAt(now);
+                if (quiz.getQuestions() != null) {
+                    quiz.getQuestions().forEach(q -> q.setDeletedAt(now));
+                }
+                if (quiz.getQuizResults() != null) {
+                    quiz.getQuizResults().forEach(result -> {
+                        result.setDeletedAt(now);
+                        if (result.getAnswerDetails() != null) {
+                            result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+                        }
+                    });
+                }
+                // Note: QuizSessions aren't directly fetched via Quiz mapping usually, 
+                // but handled in @Where or soft-deleted individually. 
+                // Currently Quiz entity does not map quizSessions.
+            });
+        }
+        
+        log.info("Historical context soft-deleted successfully with ID: {}", contextId);
+    }
+    
+    /**
      * Helper method to map entity to response DTO
      */
     private HistoricalContextResponse mapToResponse(HistoricalContext context) {
