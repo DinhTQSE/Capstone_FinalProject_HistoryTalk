@@ -1,3 +1,9 @@
+-- Disable statement/lock timeouts for this migration because some operations
+-- (backfills, ALTER TABLE on large tables) can take longer than the DB's
+-- default statement timeout. This will apply only to the current session.
+SET LOCAL statement_timeout = 0;
+SET LOCAL lock_timeout = 0;
+
 CREATE TABLE IF NOT EXISTS historical_schema.character_historical_context (
     character_id uuid NOT NULL,
     context_id uuid NOT NULL,
