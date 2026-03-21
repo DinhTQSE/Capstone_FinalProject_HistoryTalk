@@ -167,6 +167,39 @@ public class CharacterService {
         log.info("Character deleted: {}", characterId);
     }
 
+    @Transactional
+    public void softDeleteCharacter(String characterId, String userId, String userRole) {
+        log.info("Soft deleting character: {} by user: {}", characterId, userId);
+
+        Character character = characterRepository.findById(UUID.fromString(characterId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Character not found with id: " + characterId));
+
+        if (!character.getCreatedBy().getUid().equals(UUID.fromString(userId))
+                && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException(
+                    "You do not have permission to soft delete this character");
+        }
+
+        character.setDeletedAt(java.time.LocalDateTime.now());
+        characterRepository.save(character);
+
+        // Cascade soft-delete to documents
+        if (character.getDocuments() != null) {
+            character.getDocuments().forEach(doc -> doc.setDeletedAt(java.time.LocalDateTime.now()));
+        }
+
+        // Cascade soft-delete to chat sessions
+        if (character.getChatSessions() != null) {
+            character.getChatSessions().forEach(session -> {
+                session.setDeletedAt(java.time.LocalDateTime.now());
+                if (session.getMessages() != null) {
+                    session.getMessages().forEach(msg -> msg.setDeletedAt(java.time.LocalDateTime.now()));
+                }
+            });
+        }
+    }
+
     private CharacterResponse mapToResponse(Character character) {
         HistoricalContext ctx = resolvePrimaryContext(character);
         List<CharacterResponse.EventInfo> events = ctx == null ? List.of() : ctx.getDocuments().stream()
