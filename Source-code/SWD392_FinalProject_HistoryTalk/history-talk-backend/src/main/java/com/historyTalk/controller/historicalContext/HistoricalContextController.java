@@ -137,4 +137,24 @@ public class HistoricalContextController {
         
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * PATCH /v1/historical-contexts/{contextId}/soft-delete
+     * Soft-delete a historical context (marks as deleted, preserves data)
+     */
+    @PatchMapping("/{contextId}/soft-delete")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Soft-delete a historical context",
+               description = "Mark a historical context as deleted (data preserved). Cascades to documents, characters, and quizzes.")
+    public ResponseEntity<ApiResponse<?>> softDeleteContext(
+            @PathVariable String contextId) {
+
+        log.info("PATCH /v1/historical-contexts/{}/soft-delete", contextId);
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        contextService.softDeleteContext(contextId, userId, userRole);
+
+        return ResponseEntity.ok(ApiResponse.success(null, "Historical context soft-deleted successfully"));
+    }
 }

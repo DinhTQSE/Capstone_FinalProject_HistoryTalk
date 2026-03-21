@@ -104,6 +104,11 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
 
+        // Reject soft-deleted (deactivated) users
+        if (user.getDeletedAt() != null) {
+            throw new UnauthorizedException("Account has been deactivated");
+        }
+
         UserPrincipal principal = new UserPrincipal(user);
         Map<String, Object> claims = buildClaims(principal);
 
