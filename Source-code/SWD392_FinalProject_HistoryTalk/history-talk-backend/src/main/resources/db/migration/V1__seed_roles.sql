@@ -1,5 +1,19 @@
+-- Create schema if missing and a minimal "user" table so later migrations can add FKs/columns
+CREATE SCHEMA IF NOT EXISTS historical_schema;
 
-INSERT INTO "user" (uid, email, password, role, user_name)
+CREATE TABLE IF NOT EXISTS historical_schema."user" (
+    uid uuid PRIMARY KEY,
+    user_name varchar(100) NOT NULL UNIQUE,
+    email varchar(100) NOT NULL UNIQUE,
+    password varchar(255) NOT NULL,
+    role varchar(50) NOT NULL,
+    deleted_at TIMESTAMP NULL
+);
+
+-- Add an index on role for queries
+CREATE INDEX IF NOT EXISTS idx_user_role ON historical_schema."user" (role);
+
+INSERT INTO historical_schema."user" (uid, email, password, role, user_name)
 VALUES
     (
         gen_random_uuid(),
