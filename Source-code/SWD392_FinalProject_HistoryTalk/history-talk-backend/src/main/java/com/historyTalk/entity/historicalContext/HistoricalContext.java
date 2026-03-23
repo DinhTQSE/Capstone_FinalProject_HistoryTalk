@@ -74,6 +74,10 @@ public class HistoricalContext {
     @Column(name = "video_url", length = 500)
     private String videoUrl;
 
+    @Builder.Default
+    @Column(name = "is_draft", nullable = false)
+    private Boolean isDraft = true;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;

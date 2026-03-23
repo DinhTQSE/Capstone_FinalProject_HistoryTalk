@@ -48,7 +48,8 @@ public class HistoricalContextController {
                 search, era, category, page, limit);
         
         var pageable = PageRequest.of(Math.max(page - 1, 0), limit, Sort.by(Sort.Direction.DESC, "createdDate"));
-        var response = contextService.getAllContexts(search, era, category, pageable);
+        String role = SecurityUtils.getRoleName();
+        var response = contextService.getAllContexts(search, era, category, pageable, role);
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,
@@ -67,7 +68,8 @@ public class HistoricalContextController {
         
         log.info("GET /v1/historical-contexts/{} ", contextId);
         
-        var response = contextService.getContextById(contextId);
+        String role = SecurityUtils.getRoleName();
+        var response = contextService.getContextById(contextId, role);
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,

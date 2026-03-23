@@ -38,7 +38,7 @@ public class CharacterService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public PaginatedResponse<CharacterResponse> getAllCharacters(String search, String eraStr, int page, int limit) {
+    public PaginatedResponse<CharacterResponse> getAllCharacters(String search, String eraStr, int page, int limit, String role) {
         log.info("Fetching characters - search: {}, era: {}, page: {}, limit: {}", search, eraStr, page, limit);
         EventEra era = null;
         if (eraStr != null && !eraStr.isBlank()) {
@@ -50,7 +50,8 @@ public class CharacterService {
         }
         int pageSize = Math.min(limit, 20);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), pageSize);
-        Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, pageable);
+        boolean includeDraft = isStaffOrAdmin(role);
+        Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, pageable);
         return PaginatedResponse.<CharacterResponse>builder()
                 .content(result.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()))
                 .totalElements(result.getTotalElements())
@@ -63,18 +64,23 @@ public class CharacterService {
     }
 
     @Transactional(readOnly = true)
-    public CharacterResponse getCharacterById(String characterId) {
+    public CharacterResponse getCharacterById(String characterId, String role) {
         log.info("Fetching character with ID: {}", characterId);
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Character not found with id: " + characterId));
+
+        if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(character.getIsDraft())) {
+            throw new ResourceNotFoundException("Character not found with id: " + characterId);
+        }
         return mapToResponse(character);
     }
 
     @Transactional(readOnly = true)
-    public List<CharacterResponse> getCharactersByContext(String contextId) {
+    public List<CharacterResponse> getCharactersByContext(String contextId, String role) {
         log.info("Fetching characters for context: {}", contextId);
-        return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId))
+        boolean includeDraft = isStaffOrAdmin(role);
+        return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -98,6 +104,7 @@ public class CharacterService {
                 .personality(request.getPersonality())
                 .lifespan(request.getLifespan())
                 .side(request.getSide())
+            .isDraft(request.getIsDraft() != null ? request.getIsDraft() : true)
                 .historicalContexts(contexts)
                 .createdBy(user)
                 .build();
@@ -142,6 +149,9 @@ public class CharacterService {
         }
         if (request.getSide() != null) {
             character.setSide(request.getSide());
+        }
+        if (request.getIsDraft() != null) {
+            character.setIsDraft(request.getIsDraft());
         }
 
         Character updated = characterRepository.save(character);
@@ -200,6 +210,28 @@ public class CharacterService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<CharacterResponse> getDeletedCharacters() {
+        return characterRepository.findAllDeleted().stream()
+                .map(this::mapToResponseWithInactive)
+                .toList();
+    }
+
+    @Transactional
+    public void restoreCharacter(String characterId) {
+        int updated = characterRepository.restoreById(UUID.fromString(characterId));
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Character not found with id: " + characterId);
+        }
+    }
+
+    @Transactional
+    public void permanentDeleteCharacter(String characterId) {
+        UUID id = UUID.fromString(characterId);
+        // use deleteById to leverage cascading FKs; if entity not found, DataAccessException will bubble
+        characterRepository.deleteById(id);
+    }
+
     private CharacterResponse mapToResponse(Character character) {
         HistoricalContext ctx = resolvePrimaryContext(character);
         List<CharacterResponse.EventInfo> events = ctx == null ? List.of() : ctx.getDocuments().stream()
@@ -227,6 +259,8 @@ public class CharacterService {
                 .personality(character.getPersonality())
                 .lifespan(character.getLifespan())
                 .side(character.getSide())
+                .isDraft(character.getIsDraft())
+                .status(buildStatus(character.getIsDraft(), character.getDeletedAt()))
             .era(ctx != null ? ctx.getEra() : null)
                 .events(events)
             .context(ctx == null ? null : CharacterResponse.ContextInfo.builder()
@@ -239,6 +273,12 @@ public class CharacterService {
                         .userName(character.getCreatedBy().getUserName())
                         .build())
                 .build();
+    }
+
+    private CharacterResponse mapToResponseWithInactive(Character character) {
+        CharacterResponse response = mapToResponse(character);
+        response.setStatus(buildStatus(character.getIsDraft(), character.getDeletedAt()));
+        return response;
     }
 
     private String normalize(String value) {
@@ -276,5 +316,19 @@ public class CharacterService {
                 .sorted(Comparator.comparing(HistoricalContext::getContextId))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private boolean isStaffOrAdmin(String role) {
+        return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
+    }
+
+    private String buildStatus(Boolean isDraft, java.time.LocalDateTime deletedAt) {
+        if (deletedAt != null) {
+            return "INACTIVE";
+        }
+        if (Boolean.TRUE.equals(isDraft)) {
+            return "DRAFT";
+        }
+        return "ACTIVE";
     }
 }

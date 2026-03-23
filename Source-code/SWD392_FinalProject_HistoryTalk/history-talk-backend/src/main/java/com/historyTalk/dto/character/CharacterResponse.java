@@ -39,6 +39,12 @@ public class CharacterResponse {
     @JsonProperty("side")
     private String side;
 
+    @JsonProperty("isDraft")
+    private Boolean isDraft;
+
+    @JsonProperty("status")
+    private String status;
+
     @JsonProperty("era")
     private EventEra era;
 

@@ -72,6 +72,10 @@ public class Character {
     private String side;
 
     @Builder.Default
+    @Column(name = "is_draft", nullable = false)
+    private Boolean isDraft = true;
+
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "character_historical_context",

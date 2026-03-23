@@ -45,6 +45,9 @@ public class CreateCharacterRequest {
     @Size(max = 100, message = "Side must not exceed 100 characters")
     private String side;
 
+    @JsonProperty("isDraft")
+    private Boolean isDraft = true;
+
     @JsonProperty("contextId")
     private String contextId;
 

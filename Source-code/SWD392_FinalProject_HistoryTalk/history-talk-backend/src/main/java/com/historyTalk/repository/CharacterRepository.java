@@ -16,12 +16,14 @@ import java.util.UUID;
 public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query("""
-           SELECT DISTINCT c FROM Character c
-           JOIN c.historicalContexts hc
-           WHERE hc.contextId = :contextId
-           ORDER BY c.name ASC
+                                    SELECT DISTINCT c FROM Character c
+                                    JOIN c.historicalContexts hc
+                                    WHERE hc.contextId = :contextId
+                                           AND (:includeDraft = true OR c.isDraft = false)
+                                    ORDER BY c.name ASC
            """)
-    List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId);
+              List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId,
+                                                                                                                                                                               @Param("includeDraft") boolean includeDraft);
 
     List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
@@ -29,10 +31,11 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             SELECT DISTINCT c FROM Character c
             JOIN c.historicalContexts hc
             JOIN FETCH c.createdBy u
-            WHERE (:search IS NULL OR :search = ''
-                   OR c.name ILIKE CONCAT('%', :search, '%')
-                   OR c.background ILIKE CONCAT('%', :search, '%'))
-            AND (:era IS NULL OR hc.era = :era)
+           WHERE (:search IS NULL OR :search = ''
+                 OR c.name ILIKE CONCAT('%', :search, '%')
+                 OR c.background ILIKE CONCAT('%', :search, '%'))
+           AND (:era IS NULL OR hc.era = :era)
+           AND (:includeDraft = true OR c.isDraft = false)
             ORDER BY c.name ASC
             """,
             countQuery = """
@@ -41,9 +44,26 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             WHERE (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))
-            AND (:era IS NULL OR hc.era = :era)
+          AND (:era IS NULL OR hc.era = :era)
+          AND (:includeDraft = true OR c.isDraft = false)
             """)
     Page<Character> findAllWithFilter(@Param("search") String search,
-                                      @Param("era") EventEra era,
-                                      Pageable pageable);
+                                  @Param("era") EventEra era,
+                                  @Param("includeDraft") boolean includeDraft,
+                                  Pageable pageable);
+
+    @Query(value = """
+           SELECT * FROM historical_schema."character" c
+           WHERE c.deleted_at IS NOT NULL
+           ORDER BY c.name ASC
+           """, nativeQuery = true)
+    List<Character> findAllDeleted();
+
+    @Query(value = """
+           UPDATE historical_schema."character"
+           SET deleted_at = NULL
+           WHERE character_id = :characterId
+           """, nativeQuery = true)
+    @org.springframework.data.jpa.repository.Modifying
+    int restoreById(@Param("characterId") UUID characterId);
 }

@@ -57,6 +57,12 @@ public class HistoricalContextResponse {
     @JsonProperty("videoUrl")
     private String videoUrl;
 
+    @JsonProperty("isDraft")
+    private Boolean isDraft;
+
+    @JsonProperty("status")
+    private String status;
+
     @JsonProperty("createdBy")
     private CreatedByInfo createdBy;
     
