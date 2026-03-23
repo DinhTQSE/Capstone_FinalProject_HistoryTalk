@@ -32,7 +32,7 @@ public class Message {
     @Column(name = "message_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID messageId;
 
-    @Lob
+//    @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
