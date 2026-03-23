@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: history-talk-backend
+  
+  datasource:
+    # DATABASE CONFIG - Environment Variables for Team Collaboration
+    # Each developer can override with local values without committing
+    # Export in terminal: export DB_URL=... DB_USER=... DB_PASSWORD=...
+    # Or set in .env file (add to .gitignore)
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/history_talk_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+  
+  server:
+    port: 8080
+
+# JWT Configuration - SHARED FILE
+# ⚠️ HS512 requires minimum 256-bit secret
+# Production: Generate with -> openssl rand -base64 32
+# Override with env var: export JWT_SECRET=...
+jwt:
+  secret: ${JWT_SECRET:your_super_secret_key_change_this_in_production_make_it_at_least_256_bits_for_HS512}
+  expiration: 86400000 # 24 hours in milliseconds
+  refreshExpiration: 604800000 # 7 days in milliseconds
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.historyTalk: DEBUG
+    org.springframework.security: DEBUG
+
+# Springdoc OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
