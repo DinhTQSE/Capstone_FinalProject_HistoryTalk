@@ -1,26 +1,21 @@
 # =============================================================================
 # STAGE 1: BUILD
 # =============================================================================
-FROM eclipse-temurin:21-jdk-alpine AS builder
-
+# --- Build stage ---
+# --- Stage 1: Build stage (Dùng image có sẵn Maven) ---
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
 
-# --- Layer Caching Optimization ---
-# Copy ONLY the pom.xml first to download dependencies.
-# This layer is cached and won't re-run unless pom.xml changes.
+# 1. Chỉ copy pom.xml để cache dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B --no-transfer-progress
+RUN mvn dependency:go-offline -B
 
-# --- Build the application ---
-# Copy source code AFTER dependencies are cached.
+# 2. Copy source code và build file JAR
 COPY src ./src
-RUN mvn package -DskipTests -B --no-transfer-progress
+RUN mvn clean package -DskipTests
 
-# =============================================================================
-# STAGE 2: RUNTIME
-# =============================================================================
-FROM eclipse-temurin:21-jre-alpine AS runtime
-
+# --- Stage 2: Runtime stage (Giữ nguyên như cũ) ---
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # --- Security: Run as non-root user ---
