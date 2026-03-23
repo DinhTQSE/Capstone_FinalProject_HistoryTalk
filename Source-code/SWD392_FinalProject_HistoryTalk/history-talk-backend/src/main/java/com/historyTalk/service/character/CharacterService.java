@@ -51,7 +51,8 @@ public class CharacterService {
         int pageSize = Math.min(limit, 20);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), pageSize);
         boolean includeDraft = isStaffOrAdmin(role);
-        Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, pageable);
+        boolean includeDeleted = isStaffOrAdmin(role);
+        Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, includeDeleted, pageable);
         return PaginatedResponse.<CharacterResponse>builder()
                 .content(result.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()))
                 .totalElements(result.getTotalElements())
@@ -80,7 +81,8 @@ public class CharacterService {
     public List<CharacterResponse> getCharactersByContext(String contextId, String role) {
         log.info("Fetching characters for context: {}", contextId);
         boolean includeDraft = isStaffOrAdmin(role);
-        return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft)
+        boolean includeDeleted = isStaffOrAdmin(role);
+        return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -260,6 +262,7 @@ public class CharacterService {
                 .lifespan(character.getLifespan())
                 .side(character.getSide())
                 .isDraft(character.getIsDraft())
+                .deletedAt(character.getDeletedAt())
                 .status(buildStatus(character.getIsDraft(), character.getDeletedAt()))
             .era(ctx != null ? ctx.getEra() : null)
                 .events(events)

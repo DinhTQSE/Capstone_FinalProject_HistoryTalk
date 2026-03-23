@@ -28,10 +28,11 @@ public class ChatHistoryService {
     public List<ChatHistoryGroupResponse> getHistory(String userId) {
         log.info("Getting chat history for user={}", userId);
 
-        List<ChatSession> sessions = chatSessionRepository.findAllByUserUid(UUID.fromString(userId));
+        List<ChatSession> sessions = chatSessionRepository.findAllByUserUid(UUID.fromString(userId), false);
 
         // Group by contextId
         Map<String, List<ChatSession>> grouped = sessions.stream()
+                .filter(s -> s.getHistoricalContext() != null)
                 .collect(Collectors.groupingBy(
                         s -> s.getHistoricalContext().getContextId().toString()));
 
@@ -49,8 +50,9 @@ public class ChatHistoryService {
                             .map(this::mapToSessionItem)
                             .toList();
 
-                    String contextName = groupSessions.get(0)
-                            .getHistoricalContext().getName();
+                    String contextName = groupSessions.get(0).getHistoricalContext() != null 
+                            ? groupSessions.get(0).getHistoricalContext().getName() 
+                            : "[Deleted Context]";
 
                     return ChatHistoryGroupResponse.builder()
                             .contextId(contextId)
@@ -79,16 +81,58 @@ public class ChatHistoryService {
 
         return ChatHistorySessionItem.builder()
                 .id(session.getSessionId().toString())
-                .characterId(session.getCharacter().getCharacterId().toString())
-                .characterName(session.getCharacter().getName())
-                .characterTitle(session.getCharacter().getTitle())
-                .characterImage(session.getCharacter().getImage())
-                .contextId(session.getHistoricalContext().getContextId().toString())
-                .contextName(session.getHistoricalContext().getName())
+                .characterId(safeGetCharacterId(session))
+                .characterName(safeGetCharacterName(session))
+                .characterTitle(safeGetCharacterTitle(session))
+                .characterImage(safeGetCharacterImage(session))
+                .contextId(safeGetContextId(session))
+                .contextName(safeGetContextName(session))
                 .sessionTitle(session.getTitle())
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
                 .messageCount(messages.size())
                 .build();
+    }
+
+    private String safeGetCharacterId(ChatSession session) {
+        try {
+            var c = session.getCharacter();
+            return c != null ? c.getCharacterId().toString() : null;
+        } catch (Exception e) { return null; }
+    }
+
+    private String safeGetCharacterName(ChatSession session) {
+        try {
+            var c = session.getCharacter();
+            return c != null ? c.getName() : "[Deleted Character]";
+        } catch (Exception e) { return "[Deleted Character]"; }
+    }
+
+    private String safeGetCharacterTitle(ChatSession session) {
+        try {
+            var c = session.getCharacter();
+            return c != null ? c.getTitle() : null;
+        } catch (Exception e) { return null; }
+    }
+
+    private String safeGetCharacterImage(ChatSession session) {
+        try {
+            var c = session.getCharacter();
+            return c != null ? c.getImage() : null;
+        } catch (Exception e) { return null; }
+    }
+
+    private String safeGetContextId(ChatSession session) {
+        try {
+            var ctx = session.getHistoricalContext();
+            return ctx != null ? ctx.getContextId().toString() : null;
+        } catch (Exception e) { return null; }
+    }
+
+    private String safeGetContextName(ChatSession session) {
+        try {
+            var ctx = session.getHistoricalContext();
+            return ctx != null ? ctx.getName() : "[Deleted Context]";
+        } catch (Exception e) { return "[Deleted Context]"; }
     }
 }

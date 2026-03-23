@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 import java.util.UUID;
 
 @Data
@@ -19,4 +21,5 @@ public class UserInformationResponse {
     private String email;
     private String updatedBy;
     private String avatarUrl;
+    private LocalDateTime deletedAt;
 }

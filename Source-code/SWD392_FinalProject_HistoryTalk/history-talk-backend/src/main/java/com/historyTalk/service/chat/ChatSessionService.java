@@ -163,12 +163,30 @@ public class ChatSessionService {
 
         return ChatSessionResponse.builder()
                 .id(session.getSessionId().toString())
-                .characterId(session.getCharacter().getCharacterId().toString())
-            .contextId(session.getHistoricalContext().getContextId().toString())
+                .characterId(safeGetCharacterId(session))
+                .contextId(safeGetContextId(session))
                 .title(session.getTitle())
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
                 .messageCount(messages.size())
                 .build();
+    }
+
+    private String safeGetCharacterId(ChatSession session) {
+        try {
+            Character c = session.getCharacter();
+            return c != null ? c.getCharacterId().toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String safeGetContextId(ChatSession session) {
+        try {
+            var ctx = session.getHistoricalContext();
+            return ctx != null ? ctx.getContextId().toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

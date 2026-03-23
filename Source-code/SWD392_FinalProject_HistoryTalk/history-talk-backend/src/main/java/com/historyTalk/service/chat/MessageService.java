@@ -48,7 +48,7 @@ public class MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
 
         List<Message> messages = messageRepository
-                .findByChatSessionSessionIdOrderByTimestampAsc(UUID.fromString(sessionId));
+                .findByChatSessionSessionIdOrderByTimestampAsc(UUID.fromString(sessionId), false);
 
         List<MessageResponse> messageResponses = messages.stream()
                 .map(this::mapToMessageResponse)
@@ -80,7 +80,7 @@ public class MessageService {
 
         // Load existing history BEFORE saving new user message
         List<Message> existingMessages = messageRepository
-                .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
+                .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId(), false);
 
         long userMessageCount = existingMessages.stream()
                 .filter(m -> m.getRole() == MessageRole.USER)

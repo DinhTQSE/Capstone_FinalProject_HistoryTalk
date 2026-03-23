@@ -29,11 +29,13 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
                   OR q.description ILIKE CONCAT('%', :search, '%'))
            AND (:grade IS NULL OR q.grade = :grade)
            AND (:era IS NULL OR q.era = :era)
+           AND (:includeDeleted = true OR q.deletedAt IS NULL)
            """)
     Page<Quiz> findAllWithSearch(
             @Param("search") String search,
             @Param("grade") Integer grade,
             @Param("era") EventEra era,
+            @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 
     @Query("""
@@ -44,12 +46,14 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
                 OR q.description ILIKE CONCAT('%', :search, '%'))
           AND (:grade IS NULL OR q.grade = :grade)
           AND (:era IS NULL OR q.era = :era)
+          AND (:includeDeleted = true OR q.deletedAt IS NULL)
           """)
     Page<Quiz> findAllByContextWithSearch(
            @Param("contextId") UUID contextId,
            @Param("search") String search,
            @Param("grade") Integer grade,
            @Param("era") EventEra era,
+           @Param("includeDeleted") boolean includeDeleted,
            Pageable pageable);
 
     @Query("""
@@ -57,9 +61,13 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
            WHERE (:search IS NULL OR :search = ''
                   OR q.title ILIKE CONCAT('%', :search, '%')
                   OR q.description ILIKE CONCAT('%', :search, '%'))
-           AND q.deletedAt IS NULL
+           AND (:includeDeleted = true OR q.deletedAt IS NULL)
            ORDER BY q.playCount DESC
            """)
-    List<Quiz> findAllSimple(@Param("search") String search);
+    List<Quiz> findAllSimple(@Param("search") String search,
+                             @Param("includeDeleted") boolean includeDeleted);
+
+    @Query("SELECT q FROM Quiz q WHERE UPPER(q.title) = UPPER(:title) AND q.deletedAt IS NULL")
+    Optional<Quiz> findActiveByTitleIgnoreCase(@Param("title") String title);
 
 }

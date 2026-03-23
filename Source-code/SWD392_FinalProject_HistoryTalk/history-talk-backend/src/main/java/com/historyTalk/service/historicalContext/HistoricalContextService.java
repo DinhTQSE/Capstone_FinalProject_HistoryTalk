@@ -41,8 +41,9 @@ public class HistoricalContextService {
         log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
         boolean includeDraft = isStaffOrAdmin(role);
+        boolean includeDeleted = isStaffOrAdmin(role);
         Page<HistoricalContext> page = contextRepository
-            .findAllWithSearch(normalize(search), era, category, includeDraft, pageable);
+            .findAllWithSearch(normalize(search), era, category, includeDraft, includeDeleted, pageable);
         
         return mapPageToPaginatedResponse(page);
     }
@@ -54,8 +55,9 @@ public class HistoricalContextService {
     public List<HistoricalContextResponse> getAllContextsSimple(String search, String role) {
         log.info("Fetching all historical contexts with search: {}", search);
         boolean includeDraft = isStaffOrAdmin(role);
+        boolean includeDeleted = isStaffOrAdmin(role);
         return contextRepository
-                .findAllSimple(normalize(search), includeDraft)
+                .findAllSimple(normalize(search), includeDraft, includeDeleted)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -332,6 +334,7 @@ public class HistoricalContextService {
                         .build())
                 .createdDate(context.getCreatedDate())
                 .updatedDate(context.getUpdatedDate())
+                .deletedAt(context.getDeletedAt())
                 .build();
     }
 

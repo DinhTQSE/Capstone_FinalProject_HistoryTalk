@@ -23,4 +23,5 @@ public class HistoricalContextDocumentResponse {
     private String content;
     private LocalDateTime uploadDate;
     private LocalDateTime updatedDate;
+    private LocalDateTime deletedAt;
 }

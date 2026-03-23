@@ -31,12 +31,14 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                      AND (:era IS NULL OR hc.era = :era)
                      AND (:category IS NULL OR hc.category = :category)
                      AND (:includeDraft = true OR hc.isDraft = false)
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
                      """)
        Page<HistoricalContext> findAllWithSearch(
                      @Param("search") String search,
                      @Param("era") EventEra era,
                      @Param("category") EventCategory category,
                      @Param("includeDraft") boolean includeDraft,
+                     @Param("includeDeleted") boolean includeDeleted,
                      Pageable pageable);
 
        @Query("""
@@ -45,10 +47,12 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                             OR hc.name ILIKE CONCAT('%', :search, '%')
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
                      AND (:includeDraft = true OR hc.isDraft = false)
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
                      ORDER BY hc.createdDate DESC
                      """)
        List<HistoricalContext> findAllSimple(@Param("search") String search,
-                                             @Param("includeDraft") boolean includeDraft);
+                                             @Param("includeDraft") boolean includeDraft,
+                                             @Param("includeDeleted") boolean includeDeleted);
 
        @Query(value = """
                SELECT * FROM historical_schema.historical_context hc

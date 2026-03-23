@@ -46,7 +46,7 @@ public class HistoricalContextDocumentService {
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> getAllDocuments() {
         log.info("Fetching all historical context documents");
-        return documentRepository.findAllByOrderByUploadDateDesc()
+        return documentRepository.findAllActive(false)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -82,7 +82,7 @@ public class HistoricalContextDocumentService {
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> searchDocuments(String search) {
         log.info("Searching documents with keyword: {}", search);
-        return documentRepository.search(normalize(search))
+        return documentRepository.search(normalize(search), false)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -189,6 +189,7 @@ public class HistoricalContextDocumentService {
                 .content(doc.getContent())
                 .uploadDate(doc.getUploadDate())
                 .updatedDate(doc.getUpdatedDate())
+                .deletedAt(doc.getDeletedAt())
                 .build();
     }
 
