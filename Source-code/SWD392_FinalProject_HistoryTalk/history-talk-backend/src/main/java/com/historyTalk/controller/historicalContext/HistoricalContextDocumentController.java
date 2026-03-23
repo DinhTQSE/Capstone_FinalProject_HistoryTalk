@@ -121,8 +121,9 @@ public class HistoricalContextDocumentController {
             @Valid @RequestBody UpdateHistoricalContextDocumentRequest request) {
         
         String staffId = SecurityUtils.getUserId();
+        String staffRole = SecurityUtils.getRoleName();
         log.info("PUT /v1/historical-documents/{} - Update document by user: {}", docId, staffId);
-        HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId);
+        HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
     }
     
@@ -136,8 +137,9 @@ public class HistoricalContextDocumentController {
             @PathVariable String docId) {
         
         String staffId = SecurityUtils.getUserId();
+        String staffRole = SecurityUtils.getRoleName();
         log.info("DELETE /v1/historical-documents/{} - Delete document by user: {}", docId, staffId);
-        documentService.deleteDocument(docId, staffId);
+        documentService.deleteDocument(docId, staffId, staffRole);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

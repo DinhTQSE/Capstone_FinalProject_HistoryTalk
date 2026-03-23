@@ -105,7 +105,7 @@ public class HistoricalContextController {
     @PutMapping("/{contextId}")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Update a historical context", description = "Update an existing historical context (Creator/Admin only)")
+        @Operation(summary = "Update a historical context", description = "Update an existing historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateContext(
             @PathVariable String contextId,
             @Valid @RequestBody UpdateHistoricalContextRequest request) {
@@ -128,7 +128,7 @@ public class HistoricalContextController {
     @DeleteMapping("/{contextId}")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Delete a historical context", description = "Delete a historical context (Creator/Admin only)")
+        @Operation(summary = "Delete a historical context", description = "Delete a historical context (Staff/Admin only)")
     public ResponseEntity<Void> deleteContext(
             @PathVariable String contextId) {
         

@@ -137,16 +137,16 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Update document (replace content and/or title)
      */
     @Transactional
-    public HistoricalContextDocumentResponse updateDocument(String docId, UpdateHistoricalContextDocumentRequest request, String userId) {
+    public HistoricalContextDocumentResponse updateDocument(String docId, UpdateHistoricalContextDocumentRequest request, String userId, String userRole) {
         log.info("Updating document: {} by user: {}", docId, userId);
         
         HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
         
-        // Only creator or admin can update
-        if (!doc.getCreatedBy().getUid().equals(UUID.fromString(userId))) {
+        // Staff/Admin can update any document
+        if (!isStaffOrAdmin(userRole)) {
             log.warn("Unauthorized update attempt on document {} by user {}", docId, userId);
-            throw new InvalidRequestException("Only document creator can update this record");
+            throw new InvalidRequestException("You do not have permission to update this document");
         }
         
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
@@ -172,16 +172,16 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Delete document
      */
     @Transactional
-    public void deleteDocument(String docId, String userId) {
+    public void deleteDocument(String docId, String userId, String userRole) {
         log.info("Deleting document: {} by user: {}", docId, userId);
         
         HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
         
-        // Only creator or admin can delete
-        if (!doc.getCreatedBy().getUid().equals(UUID.fromString(userId))) {
+        // Staff/Admin can delete any document
+        if (!isStaffOrAdmin(userRole)) {
             log.warn("Unauthorized delete attempt on document {} by user {}", docId, userId);
-            throw new InvalidRequestException("Only document creator can delete this record");
+            throw new InvalidRequestException("You do not have permission to delete this document");
         }
 
         documentRepository.delete(doc);
@@ -208,5 +208,9 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isStaffOrAdmin(String role) {
+        return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
     }
 }

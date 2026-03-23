@@ -134,8 +134,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         "Historical context not found with ID: "+contextId
                 ));
         
-        // Check if user has permission to update (creator or admin)
-        if (!context.getCreatedBy().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
+        // Check if user has permission to update (staff/admin)
+        if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to update this historical context"
             );
@@ -203,8 +203,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         "Not found with ID: "+contextId
                 ));
         
-        // Check if user has permission to delete (creator or admin)
-        if (!context.getCreatedBy().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
+        // Check if user has permission to delete (staff/admin)
+        if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to delete this historical context"
             );
@@ -226,7 +226,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         "Not found with ID: " + contextId
                 ));
         
-        if (!context.getCreatedBy().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to soft delete this historical context"
             );
