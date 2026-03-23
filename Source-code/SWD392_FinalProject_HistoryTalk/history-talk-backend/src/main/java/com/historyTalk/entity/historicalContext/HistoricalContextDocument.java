@@ -1,12 +1,9 @@
 package com.historyTalk.entity.historicalContext;
 
+import com.historyTalk.entity.enums.DocumentType;
 import com.historyTalk.entity.user.User;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
@@ -35,9 +32,13 @@ public class HistoricalContextDocument {
     @Column(name = "title", length = 255, nullable = false)
     private String title;
 
-//    @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", length = 50, nullable = false)
+    @Builder.Default
+    private DocumentType documentType = DocumentType.TEXT;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "context_id", nullable = false)
