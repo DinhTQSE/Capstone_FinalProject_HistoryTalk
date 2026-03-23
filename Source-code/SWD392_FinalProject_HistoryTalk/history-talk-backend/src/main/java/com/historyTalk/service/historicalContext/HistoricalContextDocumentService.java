@@ -20,7 +20,7 @@ public interface HistoricalContextDocumentService {
 
     HistoricalContextDocumentResponse createDocument(CreateHistoricalContextDocumentRequest request, String userId);
 
-    HistoricalContextDocumentResponse updateDocument(String docId, UpdateHistoricalContextDocumentRequest request, String userId);
+    HistoricalContextDocumentResponse updateDocument(String docId, UpdateHistoricalContextDocumentRequest request, String userId, String userRole);
 
-    void deleteDocument(String docId, String userId);
+    void deleteDocument(String docId, String userId, String userRole);
 }

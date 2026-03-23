@@ -78,7 +78,7 @@ public class CharacterController {
     @PutMapping("/{characterId}")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Update a character", description = "Update character details (creator or Admin only)")
+    @Operation(summary = "Update a character", description = "Update character details (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(
             @PathVariable String characterId,
             @Valid @RequestBody UpdateCharacterRequest request) {
@@ -92,7 +92,7 @@ public class CharacterController {
     @DeleteMapping("/{characterId}")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Delete a character", description = "Delete a character (creator or Admin only)")
+    @Operation(summary = "Delete a character", description = "Delete a character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> deleteCharacter(
             @PathVariable String characterId) {
         log.info("DELETE /v1/characters/{}", characterId);
