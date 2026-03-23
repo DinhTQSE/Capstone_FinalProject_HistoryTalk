@@ -238,6 +238,44 @@ public class QuizServiceImpl implements QuizService {
 
     @Transactional
     @Override
+    public void softDeleteQuiz(String quizId, String userId, String userRole) {
+        log.info("Soft deleting quiz: {} by user: {}", quizId, userId);
+        
+        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
+
+        // Check ownership or staff/admin
+        checkOwnershipOrStaffOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        quiz.setDeletedAt(now);
+
+        // Cascade to Questions
+        if (quiz.getQuestions() != null) {
+            quiz.getQuestions().forEach(question -> {
+                question.setDeletedAt(now);
+                if (question.getAnswerDetails() != null) {
+                    question.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+                }
+            });
+        }
+
+        // Cascade to QuizResults
+        if (quiz.getQuizResults() != null) {
+            quiz.getQuizResults().forEach(result -> {
+                result.setDeletedAt(now);
+                if (result.getAnswerDetails() != null) {
+                    result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+                }
+            });
+        }
+
+        quizRepository.save(quiz);
+        log.info("Quiz soft-deleted successfully with ID: {}", quizId);
+    }
+
+    @Transactional
+    @Override
     public void addQuestion(String quizId, QuestionRequest request, String userId, String userRole) {
         log.info("Adding question to quiz: {} by user: {}", quizId, userId);
         
@@ -294,13 +332,39 @@ public class QuizServiceImpl implements QuizService {
         Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
 
+        // Check ownership or staff/admin
+        checkOwnershipOrStaffOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
+
+        Question question = questionRepository.findById(UuidUtils.fromString(questionId, "questionId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found with ID: " + questionId));
+
+        questionRepository.delete(question);
+    }
+
+    @Transactional
+    @Override
+    public void softDeleteQuestion(String quizId, String questionId, String userId, String userRole) {
+        log.info("Soft deleting question: {} from quiz: {} by user: {}", questionId, quizId, userId);
+        
+        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
+
         // Check ownership
         checkOwnershipOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
 
         Question question = questionRepository.findById(UuidUtils.fromString(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found with ID: " + questionId));
 
-        questionRepository.delete(question);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        question.setDeletedAt(now);
+
+        // Cascade to QuizAnswerDetails
+        if (question.getAnswerDetails() != null) {
+            question.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+        }
+
+        questionRepository.save(question);
+        log.info("Question soft-deleted successfully with ID: {}", questionId);
     }
 
     @Transactional
@@ -656,6 +720,12 @@ public class QuizServiceImpl implements QuizService {
     private void checkOwnershipOrAdmin(String createdByUid, String userId, String userRole) {
         if (!createdByUid.equals(userId) && !userRole.equalsIgnoreCase("ADMIN")) {
             throw new InvalidRequestException("You don't have permission to modify this quiz");
+        }
+    }
+
+    private void checkOwnershipOrStaffOrAdmin(String createdByUid, String userId, String userRole) {
+        if (!createdByUid.equals(userId) && !"ADMIN".equalsIgnoreCase(userRole) && !"STAFF".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException("You don't have permission to modify or delete this quiz");
         }
     }
 
