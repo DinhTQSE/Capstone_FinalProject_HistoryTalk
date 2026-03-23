@@ -40,7 +40,7 @@ public class HistoricalContext {
     @Column(name = "name", nullable = false, length = 100, unique = true)
     private String name;
 
-    @Lob
+//    @Lob
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 

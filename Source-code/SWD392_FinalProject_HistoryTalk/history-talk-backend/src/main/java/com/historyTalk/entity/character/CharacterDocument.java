@@ -35,7 +35,7 @@ public class CharacterDocument {
     @Column(name = "title", length = 255, nullable = false)
     private String title;
 
-    @Lob
+//    @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 

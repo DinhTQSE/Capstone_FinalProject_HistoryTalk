@@ -597,7 +597,7 @@ public class QuizServiceImpl implements QuizService {
         QuizResult result = quizResultRepository.findById(UUID.fromString(resultId))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz result not found with ID: " + resultId));
                 
-        if (!result.getUser().getUid().equals(UUID.fromString(userId)) && !"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!result.getUser().getUid().equals(UUID.fromString(userId)) && !"STAFF".equalsIgnoreCase(userRole)) {
             throw new InvalidRequestException("You do not have permission to delete this quiz result");
         }
         
@@ -627,6 +627,24 @@ public class QuizServiceImpl implements QuizService {
         session.setDeletedAt(LocalDateTime.now());
         quizSessionRepository.save(session);
         
+        log.info("Quiz session soft deleted successfully: {}", sessionId);
+    }
+
+    @Transactional
+    @Override
+    public void softDeleteQuizSessionStaff(String sessionId, String userId, String userRole) {
+        log.info("Soft deleting quiz session: {} for user: {}", sessionId, userId);
+
+        QuizSession session = quizSessionRepository.findById(UUID.fromString(sessionId))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz session not found with ID: " + sessionId));
+
+        if (!session.getUser().getUid().equals(UUID.fromString(userId)) && !"STAFF".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException("You do not have permission to delete this quiz session");
+        }
+
+        session.setDeletedAt(LocalDateTime.now());
+        quizSessionRepository.save(session);
+
         log.info("Quiz session soft deleted successfully: {}", sessionId);
     }
 

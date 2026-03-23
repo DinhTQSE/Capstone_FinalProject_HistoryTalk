@@ -94,14 +94,14 @@ public class AuthController {
     }
 
     @PatchMapping("/users/{userId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STAFF')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Deactivate user", description = "Soft delete a user account (Admin only)")
+    @Operation(summary = "Deactivate user", description = "Soft delete a user account (Staff only)")
     public ResponseEntity<ApiResponse<?>> deactivateUser(
             @PathVariable String userId) {
         log.info("PATCH /api/v1/auth/users/{}/deactivate", userId);
-        String adminId = SecurityUtils.getUserId();
-        authService.softDeleteUser(userId, adminId);
+        String staffId = SecurityUtils.getUserId();
+        authService.softDeleteUser(userId, staffId);
         return ResponseEntity.ok(ApiResponse.success(null, "User account deactivated successfully"));
     }
 

@@ -20,5 +20,5 @@ public interface AuthService {
 
     void logout(String authorizationHeader);
 
-    void softDeleteUser(String targetUserId, String adminId);
+    void softDeleteUser(String targetUserId, String staffId);
 }

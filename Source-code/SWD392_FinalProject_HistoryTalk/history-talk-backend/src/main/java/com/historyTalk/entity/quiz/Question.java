@@ -32,11 +32,11 @@ public class Question {
     @Column(name = "question_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID questionId;
 
-    @Lob
+//    @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    @Lob
+//    @Lob
     @Column(name = "options", columnDefinition = "TEXT", nullable = false)
     private String options;
 
@@ -46,7 +46,7 @@ public class Question {
     @Column(name = "order_index", nullable = true)
     private Integer orderIndex;
 
-    @Lob
+//    @Lob
     @Column(name = "explanation", columnDefinition = "TEXT", nullable = true)
     private String explanation;
 

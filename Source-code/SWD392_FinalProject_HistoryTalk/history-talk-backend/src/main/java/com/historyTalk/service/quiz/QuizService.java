@@ -45,4 +45,5 @@ public interface QuizService {
 
     void softDeleteQuizSession(String sessionId, String userId);
 
+    void softDeleteQuizSessionStaff(String sessionId, String userId, String userRole);
 }

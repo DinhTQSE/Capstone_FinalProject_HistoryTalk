@@ -55,7 +55,7 @@ public class Character {
     @Column(name = "title", length = 150)
     private String title;
 
-    @Lob
+//    @Lob
     @Column(name = "background", columnDefinition = "TEXT", nullable = false)
     private String background;
 

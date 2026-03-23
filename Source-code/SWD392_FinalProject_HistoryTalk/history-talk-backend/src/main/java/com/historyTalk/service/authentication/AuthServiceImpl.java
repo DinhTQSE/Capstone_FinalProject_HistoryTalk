@@ -221,14 +221,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public void softDeleteUser(String targetUserId, String adminId) {
-        log.info("Soft deleting user {} requested by user {}", targetUserId, adminId);
+    public void softDeleteUser(String targetUserId, String staffId) {
+        log.info("Soft deleting user {} requested by user {}", targetUserId, staffId);
         
-        User requestUser = userRepository.findById(UUID.fromString(adminId))
+        User requestUser = userRepository.findById(UUID.fromString(staffId))
                 .orElseThrow(() -> new ResourceNotFoundException("Requesting user not found"));
                 
-        if (!targetUserId.equals(adminId) && requestUser.getRole() != UserRole.ADMIN) {
-            throw new InvalidRequestException("Only an ADMIN can deactivate other user accounts.");
+        if (!targetUserId.equals(staffId) && requestUser.getRole() != UserRole.STAFF) {
+            throw new InvalidRequestException("Only an STAFF can deactivate other user accounts.");
         }
         
         User targetUser = userRepository.findById(UUID.fromString(targetUserId))

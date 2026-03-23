@@ -102,7 +102,7 @@ public class QuizController {
     }
 
     @PatchMapping("/results/{resultId}/soft-delete")
-    @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Soft delete quiz result", description = "Soft delete a quiz result (owner or Admin only)")
     public ResponseEntity<ApiResponse<?>> softDeleteQuizResult(
