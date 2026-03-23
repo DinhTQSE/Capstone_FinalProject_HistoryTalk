@@ -187,8 +187,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Character not found with id: " + characterId));
 
-        if (!character.getCreatedBy().getUid().equals(UUID.fromString(userId))
-                && !"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
                     "You do not have permission to soft delete this character");
         }
