@@ -30,11 +30,13 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
                      AND (:era IS NULL OR hc.era = :era)
                      AND (:category IS NULL OR hc.category = :category)
+                     AND (:includeDraft = true OR hc.isDraft = false)
                      """)
        Page<HistoricalContext> findAllWithSearch(
                      @Param("search") String search,
                      @Param("era") EventEra era,
                      @Param("category") EventCategory category,
+                     @Param("includeDraft") boolean includeDraft,
                      Pageable pageable);
 
        @Query("""
@@ -42,7 +44,24 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                      WHERE (:search IS NULL OR :search = ''
                             OR hc.name ILIKE CONCAT('%', :search, '%')
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
+                     AND (:includeDraft = true OR hc.isDraft = false)
                      ORDER BY hc.createdDate DESC
                      """)
-       List<HistoricalContext> findAllSimple(@Param("search") String search);
+       List<HistoricalContext> findAllSimple(@Param("search") String search,
+                                             @Param("includeDraft") boolean includeDraft);
+
+       @Query(value = """
+               SELECT * FROM historical_schema.historical_context hc
+               WHERE hc.deleted_at IS NOT NULL
+               ORDER BY hc.created_date DESC
+               """, nativeQuery = true)
+       List<HistoricalContext> findAllDeleted();
+
+       @Query(value = """
+               UPDATE historical_schema.historical_context
+               SET deleted_at = NULL
+               WHERE context_id = :contextId
+               """, nativeQuery = true)
+       @org.springframework.data.jpa.repository.Modifying
+       int restoreById(@Param("contextId") UUID contextId);
 }

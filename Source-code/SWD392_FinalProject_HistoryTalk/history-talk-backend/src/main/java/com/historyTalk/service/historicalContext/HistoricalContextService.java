@@ -35,13 +35,14 @@ public class HistoricalContextService {
      * Get all historical contexts with pagination and search
      */
     @Transactional(readOnly = true)
-    public PaginatedResponse<HistoricalContextResponse> getAllContexts(
-            String search, EventEra era, EventCategory category, Pageable pageable) {
+        public PaginatedResponse<HistoricalContextResponse> getAllContexts(
+            String search, EventEra era, EventCategory category, Pageable pageable, String role) {
         
         log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
+        boolean includeDraft = isStaffOrAdmin(role);
         Page<HistoricalContext> page = contextRepository
-                .findAllWithSearch(normalize(search), era, category, pageable);
+            .findAllWithSearch(normalize(search), era, category, includeDraft, pageable);
         
         return mapPageToPaginatedResponse(page);
     }
@@ -50,11 +51,11 @@ public class HistoricalContextService {
      * Get all historical contexts as simple list (no pagination)
      */
     @Transactional(readOnly = true)
-    public List<HistoricalContextResponse> getAllContextsSimple(String search) {
+    public List<HistoricalContextResponse> getAllContextsSimple(String search, String role) {
         log.info("Fetching all historical contexts with search: {}", search);
-        
+        boolean includeDraft = isStaffOrAdmin(role);
         return contextRepository
-                .findAllSimple(normalize(search))
+                .findAllSimple(normalize(search), includeDraft)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -64,11 +65,15 @@ public class HistoricalContextService {
      * Get a specific historical context by ID
      */
     @Transactional(readOnly = true)
-    public HistoricalContextResponse getContextById(String contextId) {
+    public HistoricalContextResponse getContextById(String contextId, String role) {
         log.info("Fetching historical context with ID: {}", contextId);
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: "+contextId));
+
+        if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(context.getIsDraft())) {
+            throw new ResourceNotFoundException("Historical context not found with ID: "+contextId);
+        }
         
         return mapToResponse(context);
     }
@@ -102,6 +107,7 @@ public class HistoricalContextService {
                 .location(request.getLocation())
                 .imageUrl(request.getImageUrl())
                 .videoUrl(request.getVideoUrl())
+            .isDraft(request.getIsDraft() != null ? request.getIsDraft() : true)
                 .createdBy(user)
                 .build();
 
@@ -173,6 +179,9 @@ public class HistoricalContextService {
         }
         if (request.getVideoUrl() != null) {
             context.setVideoUrl(request.getVideoUrl());
+        }
+        if (request.getIsDraft() != null) {
+            context.setIsDraft(request.getIsDraft());
         }
         HistoricalContext updatedContext = contextRepository.save(context);
         log.info("Historical context updated successfully with ID: {}", contextId);
@@ -271,6 +280,26 @@ public class HistoricalContextService {
         
         log.info("Historical context soft-deleted successfully with ID: {}", contextId);
     }
+
+    @Transactional(readOnly = true)
+    public List<HistoricalContextResponse> getDeletedContexts() {
+        return contextRepository.findAllDeleted().stream()
+                .map(this::mapToResponseWithInactive)
+                .toList();
+    }
+
+    @Transactional
+    public void restoreContext(String contextId) {
+        int updated = contextRepository.restoreById(UUID.fromString(contextId));
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
+        }
+    }
+
+    @Transactional
+    public void permanentDeleteContext(String contextId) {
+        contextRepository.deleteById(UUID.fromString(contextId));
+    }
     
     /**
      * Helper method to map entity to response DTO
@@ -295,6 +324,8 @@ public class HistoricalContextService {
                 .location(context.getLocation())
                 .imageUrl(context.getImageUrl())
                 .videoUrl(context.getVideoUrl())
+            .isDraft(context.getIsDraft())
+            .status(buildStatus(context.getIsDraft(), context.getDeletedAt()))
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
                         .uid(context.getCreatedBy().getUid().toString())
                         .userName(context.getCreatedBy().getUserName())
@@ -303,6 +334,12 @@ public class HistoricalContextService {
                 .updatedDate(context.getUpdatedDate())
                 .build();
     }
+
+        private HistoricalContextResponse mapToResponseWithInactive(HistoricalContext context) {
+        HistoricalContextResponse response = mapToResponse(context);
+        response.setStatus(buildStatus(context.getIsDraft(), context.getDeletedAt()));
+        return response;
+        }
     
     /**
      * Helper method to map page to paginated response
@@ -325,5 +362,19 @@ public class HistoricalContextService {
 
         private String normalize(String value) {
                 return value == null ? "" : value.trim().toLowerCase();
+        }
+
+        private boolean isStaffOrAdmin(String role) {
+            return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
+        }
+
+        private String buildStatus(Boolean isDraft, java.time.LocalDateTime deletedAt) {
+            if (deletedAt != null) {
+                return "INACTIVE";
+            }
+            if (Boolean.TRUE.equals(isDraft)) {
+                return "DRAFT";
+            }
+            return "ACTIVE";
         }
 }

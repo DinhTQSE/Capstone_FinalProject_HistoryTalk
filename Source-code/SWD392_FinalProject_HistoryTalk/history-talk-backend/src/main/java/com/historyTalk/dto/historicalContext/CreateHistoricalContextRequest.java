@@ -54,4 +54,7 @@ public class CreateHistoricalContextRequest {
     @JsonProperty("videoUrl")
     @Size(max = 500, message = "Video URL must be at most 500 characters")
     private String videoUrl;
+
+    @JsonProperty("isDraft")
+    private Boolean isDraft = true;
 }

@@ -39,7 +39,8 @@ public class CharacterController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "8") int limit) {
         log.info("GET /v1/characters - search: {}, era: {}, page: {}, limit: {}", search, era, page, limit);
-        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era != null ? era.toString() : null, page, limit);
+        String role = SecurityUtils.getRoleName();
+        PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era != null ? era.toString() : null, page, limit, role);
         return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
     }
 
@@ -47,7 +48,8 @@ public class CharacterController {
     @Operation(summary = "Get character by ID")
     public ResponseEntity<ApiResponse<?>> getCharacterById(@PathVariable String characterId) {
         log.info("GET /v1/characters/{}", characterId);
-        CharacterResponse result = characterService.getCharacterById(characterId);
+        String role = SecurityUtils.getRoleName();
+        CharacterResponse result = characterService.getCharacterById(characterId, role);
         return ResponseEntity.ok(ApiResponse.success(result, "Character retrieved successfully"));
     }
 
@@ -55,7 +57,8 @@ public class CharacterController {
     @Operation(summary = "Get characters by historical context")
     public ResponseEntity<ApiResponse<?>> getCharactersByContext(@PathVariable String contextId) {
         log.info("GET /v1/characters/context/{}", contextId);
-        List<CharacterResponse> result = characterService.getCharactersByContext(contextId);
+        String role = SecurityUtils.getRoleName();
+        List<CharacterResponse> result = characterService.getCharactersByContext(contextId, role);
         return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
     }
 
