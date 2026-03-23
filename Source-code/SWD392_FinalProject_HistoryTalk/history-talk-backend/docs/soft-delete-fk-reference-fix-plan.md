@@ -233,10 +233,15 @@ private boolean isStaffOrAdmin(String role) {
 
 **⚠️ `deleteQuiz()` (hard delete) — KHÔNG SỬA, giữ nguyên `quizRepository.delete(quiz)` → xóa vật lý**
 
-**Soft-delete methods — thêm cascade (xem Phase 4):**
-- `softDeleteQuizResult()` → thêm cascade tới `QuizAnswerDetail`
-- `softDeleteQuizSession()` → giữ nguyên (không có children)
-- Thêm `softDeleteQuiz()` method (nếu chưa có) → cascade tới Questions, QuizResults, QuizSessions
+**Controller Changes (`StaffQuizController.java`):**
+- Thêm endpoint `PATCH /api/v1/staff/quizzes/{quizId}/soft-delete` gọi `quizService.softDeleteQuiz()`
+- Thêm endpoint `PATCH /api/v1/staff/quizzes/{quizId}/questions/{questionId}/soft-delete` gọi `quizService.softDeleteQuestion()`
+
+**Soft-delete methods — thêm cascade (xem Phase 4) & Quyền STAFF:**
+- `softDeleteQuizResult()` → thêm cascade tới `QuizAnswerDetail` (đã có sẵn quyền STAFF)
+- `softDeleteQuizSessionStaff()` → giữ nguyên (đã có sẵn quyền STAFF)
+- Thêm/sửa `softDeleteQuiz()` method → cascade tới `Questions`, `QuizResults`, `QuizAnswerDetails`. Cấp quyền cho STAFF thông qua method helper `checkOwnershipOrStaffOrAdmin()`.
+- Thêm/sửa `softDeleteQuestion()` method → cascade tới `QuizAnswerDetails`. Cấp quyền cho STAFF thông qua `checkOwnershipOrStaffOrAdmin()`.
 
 **Null-safe mapping (Layer 3):**
 
@@ -411,9 +416,11 @@ public void softDeleteQuiz(String quizId, String userId, String userRole) {
 | 19 | `QuizResultRepository.java` | MODIFY | Thêm `includeDeleted` param |
 | 20 | `MessageRepository.java` | MODIFY | Thêm `includeDeleted` param |
 | 21 | `QuizSessionRepository.java` | MODIFY | Thêm `includeDeleted` param |
+| **Controller (1+ files)** | | | |
+| 22 | `StaffQuizController.java` | MODIFY | Thêm 2 endpoints PATCH cho soft delete Quiz và Question |
 | **Service (5+ files)** | | | |
-| 22 | `QuizServiceImpl.java` | MODIFY | Truyền `includeDeleted`, cascade soft-delete, null-safe mapping |
-| 23 | `CharacterService.java` | MODIFY | Truyền `includeDeleted`, cascade soft-delete |
+| 23 | `QuizServiceImpl.java` | MODIFY | Truyền `includeDeleted`, cascade soft-delete, null-safe mapping, cấp quyền STAFF cho soft delete qua `checkOwnershipOrStaffOrAdmin` |
+| 24 | `CharacterService.java` | MODIFY | Truyền `includeDeleted`, cascade soft-delete |
 | 24 | `ChatSessionService.java` | MODIFY | Truyền `includeDeleted`, null-safe mapping |
 | 25 | `HistoricalContextService.java` | MODIFY | Truyền `includeDeleted` |
 | 26 | `HistoricalContextDocumentService.java` | MODIFY | Truyền `includeDeleted` |
