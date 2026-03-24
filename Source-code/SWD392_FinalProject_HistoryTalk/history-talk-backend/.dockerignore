@@ -1,0 +1,35 @@
+# Build output - never include compiled artifacts
+target/
+
+# Version control
+.git/
+.gitignore
+
+# IDE & editor files
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Environment & secrets - CRITICAL to exclude
+.env
+.env.*
+# ⚠️ Exclude the old secrets file to prevent it from being baked into the image
+src/main/resources/secretKey.properties
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Maven wrapper cache
+.mvn/
+
+# Docker files themselves don't need to be in the build context
+Dockerfile
+.dockerignore
+
+# Docker Compose files (CI/local only)
+docker-compose*.yml
+
+# README / docs
+*.md
