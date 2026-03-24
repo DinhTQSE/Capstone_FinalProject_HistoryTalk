@@ -51,7 +51,8 @@ public class ChatController {
             @Valid @RequestBody CreateChatSessionRequest request) {
 
         String userId = SecurityUtils.getUserId();
-        ChatSessionResponse session = chatSessionService.createSession(userId, request);
+        String userRole = SecurityUtils.getRoleName();
+        ChatSessionResponse session = chatSessionService.createSession(userId, userRole, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(session, "Session created successfully"));
     }

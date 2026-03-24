@@ -31,7 +31,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query(value = """
             SELECT DISTINCT c FROM Character c
-            JOIN c.historicalContexts hc
+              LEFT JOIN c.historicalContexts hc
             JOIN FETCH c.createdBy u
            WHERE (:search IS NULL OR :search = ''
                  OR c.name ILIKE CONCAT('%', :search, '%')
@@ -43,7 +43,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             """,
             countQuery = """
             SELECT COUNT(DISTINCT c) FROM Character c
-            JOIN c.historicalContexts hc
+            LEFT JOIN c.historicalContexts hc
             WHERE (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))

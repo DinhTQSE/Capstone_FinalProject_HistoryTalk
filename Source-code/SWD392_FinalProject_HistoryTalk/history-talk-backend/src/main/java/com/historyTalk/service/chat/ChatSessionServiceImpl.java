@@ -6,11 +6,13 @@ import com.historyTalk.entity.character.Character;
 import com.historyTalk.entity.chat.ChatSession;
 import com.historyTalk.entity.chat.Message;
 import com.historyTalk.entity.enums.MessageRole;
+import com.historyTalk.entity.historicalContext.HistoricalContext;
 import com.historyTalk.entity.user.User;
 import com.historyTalk.exception.InvalidRequestException;
 import com.historyTalk.exception.ResourceNotFoundException;
 import com.historyTalk.repository.CharacterRepository;
 import com.historyTalk.repository.ChatSessionRepository;
+import com.historyTalk.repository.HistoricalContextRepository;
 import com.historyTalk.repository.MessageRepository;
 import com.historyTalk.repository.UserRepository;
 import com.historyTalk.service.chat.AiServiceClient.AiChatResult;
@@ -36,6 +38,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private final ChatSessionRepository chatSessionRepository;
     private final UserRepository userRepository;
     private final CharacterRepository characterRepository;
+    private final HistoricalContextRepository contextRepository;
     private final MessageRepository messageRepository;
     private final AiServiceClient aiServiceClient;
     private final ObjectMapper objectMapper;
@@ -55,7 +58,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     }
 
     @Transactional
-    public ChatSessionResponse createSession(String userId, CreateChatSessionRequest request) {
+    public ChatSessionResponse createSession(String userId, String userRole, CreateChatSessionRequest request) {
         log.info("Creating chat session for user={} context={} character={}", userId, request.getContextId(), request.getCharacterId());
 
         User user = userRepository.findById(UUID.fromString(userId))
@@ -63,6 +66,17 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
+
+        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(character.getIsDraft()) || character.getDeletedAt() != null)) {
+            throw new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId());
+        }
+
+        HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId()));
+
+        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(context.getIsDraft()) || context.getDeletedAt() != null)) {
+            throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
+        }
 
         UUID contextIdUUID = UUID.fromString(request.getContextId());
         var selectedContext = character.getHistoricalContexts().stream()
