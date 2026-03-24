@@ -24,11 +24,15 @@ public interface QuizService {
 
     void deleteQuiz(String quizId, String userId, String userRole);
 
+    void softDeleteQuiz(String quizId, String userId, String userRole);
+
     void addQuestion(String quizId, QuestionRequest request, String userId, String userRole);
 
     void updateQuestion(String quizId, String questionId, QuestionRequest request, String userId, String userRole);
 
     void deleteQuestion(String quizId, String questionId, String userId, String userRole);
+
+    void softDeleteQuestion(String quizId, String questionId, String userId, String userRole);
 
     void reorderQuestions(String quizId, List<String> questionIds, String userId, String userRole);
 

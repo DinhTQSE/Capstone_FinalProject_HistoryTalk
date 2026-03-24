@@ -20,6 +20,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
                                                 WHERE cs.user.uid = :userId
                                                         AND c.characterId = :characterId
                                                         AND hc.contextId = :contextId
+                                                        AND cs.deletedAt IS NULL
                                                 ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
             """)
     List<ChatSession> findByUserAndCharacterAndContext(
@@ -31,10 +32,12 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
 
     @Query("""
                         SELECT cs FROM ChatSession cs
-                        JOIN FETCH cs.character c
-                        JOIN FETCH cs.historicalContext hc
+                        LEFT JOIN FETCH cs.character c
+                        LEFT JOIN FETCH cs.historicalContext hc
                         WHERE cs.user.uid = :userId
+                        AND (:includeDeleted = true OR cs.deletedAt IS NULL)
                         ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createDate DESC
             """)
-    List<ChatSession> findAllByUserUid(@Param("userId") UUID userId);
+    List<ChatSession> findAllByUserUid(@Param("userId") UUID userId,
+                                       @Param("includeDeleted") boolean includeDeleted);
 }

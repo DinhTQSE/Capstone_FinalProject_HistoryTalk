@@ -44,6 +44,8 @@ public class QuizStaffResponse {
 
     private LocalDateTime updatedDate;
 
+    private LocalDateTime deletedAt;
+
     private List<QuestionResponse> questions;
 
 }

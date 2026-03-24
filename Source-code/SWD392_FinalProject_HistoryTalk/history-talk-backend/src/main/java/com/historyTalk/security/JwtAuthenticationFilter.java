@@ -69,25 +69,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 log.debug("JWT auth set for user: {}", email);
 
-            } else {
-                // Fallback: X-Staff-Id / X-Staff-Role headers (testing only)
-                String staffId   = request.getHeader("X-Staff-Id");
-                String staffRole = request.getHeader("X-Staff-Role");
-
-                if (StringUtils.hasText(staffId)) {
-                    if (!StringUtils.hasText(staffRole)) {
-                        staffRole = "STAFF";
-                    }
-                    List<SimpleGrantedAuthority> authorities = List.of(
-                            new SimpleGrantedAuthority("ROLE_" + staffRole.toUpperCase())
-                    );
-
-                    UsernamePasswordAuthenticationToken auth =
-                            new UsernamePasswordAuthenticationToken(staffId, null, authorities);
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    log.debug("Header-based auth set for staff: {}", staffId);
-                }
             }
         } catch (Exception ex) {
             log.error("Could not set authentication in security context", ex);

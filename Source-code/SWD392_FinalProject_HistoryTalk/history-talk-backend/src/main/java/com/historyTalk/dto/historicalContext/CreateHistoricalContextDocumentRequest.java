@@ -1,5 +1,6 @@
 package com.historyTalk.dto.historicalContext;
 
+import com.historyTalk.entity.enums.DocumentType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -26,4 +27,6 @@ public class CreateHistoricalContextDocumentRequest {
     @NotBlank(message = "Content is required")
     @Size(min = 10, message = "Content must be at least 10 characters")
     private String content;
+    
+    private DocumentType type;
 }

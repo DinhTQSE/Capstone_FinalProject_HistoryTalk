@@ -20,36 +20,41 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                                     JOIN c.historicalContexts hc
                                     WHERE hc.contextId = :contextId
                                            AND (:includeDraft = true OR c.isDraft = false)
+                                           AND (:includeDeleted = true OR c.deletedAt IS NULL)
                                     ORDER BY c.name ASC
            """)
               List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId,
-                                                                                                                                                                               @Param("includeDraft") boolean includeDraft);
+                                                                                                                                                                               @Param("includeDraft") boolean includeDraft,
+                                                                                                                                                                               @Param("includeDeleted") boolean includeDeleted);
 
     List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
     @Query(value = """
             SELECT DISTINCT c FROM Character c
-            JOIN c.historicalContexts hc
+              LEFT JOIN c.historicalContexts hc
             JOIN FETCH c.createdBy u
            WHERE (:search IS NULL OR :search = ''
                  OR c.name ILIKE CONCAT('%', :search, '%')
                  OR c.background ILIKE CONCAT('%', :search, '%'))
            AND (:era IS NULL OR hc.era = :era)
            AND (:includeDraft = true OR c.isDraft = false)
+           AND (:includeDeleted = true OR c.deletedAt IS NULL)
             ORDER BY c.name ASC
             """,
             countQuery = """
             SELECT COUNT(DISTINCT c) FROM Character c
-            JOIN c.historicalContexts hc
+            LEFT JOIN c.historicalContexts hc
             WHERE (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))
           AND (:era IS NULL OR hc.era = :era)
           AND (:includeDraft = true OR c.isDraft = false)
+          AND (:includeDeleted = true OR c.deletedAt IS NULL)
             """)
     Page<Character> findAllWithFilter(@Param("search") String search,
                                   @Param("era") EventEra era,
                                   @Param("includeDraft") boolean includeDraft,
+                                  @Param("includeDeleted") boolean includeDeleted,
                                   Pageable pageable);
 
     @Query(value = """

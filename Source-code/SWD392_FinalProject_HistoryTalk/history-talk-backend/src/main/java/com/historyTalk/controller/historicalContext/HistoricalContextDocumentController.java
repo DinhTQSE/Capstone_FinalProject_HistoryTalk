@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,7 +46,8 @@ public class HistoricalContextDocumentController {
     @Operation(summary = "Get all documents", description = "Retrieve list of all historical documents")
     public ResponseEntity<ApiResponse<?>> getAllDocuments() {
         log.info("GET /v1/historical-documents - Get all documents");
-        List<HistoricalContextDocumentResponse> documents = documentService.getAllDocuments();
+        String userRole = SecurityUtils.getRoleName();
+        List<HistoricalContextDocumentResponse> documents = documentService.getAllDocuments(userRole);
         return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
     }
     
@@ -56,7 +58,8 @@ public class HistoricalContextDocumentController {
     @Operation(summary = "Get documents by context", description = "Get all documents for a specific historical context")
     public ResponseEntity<ApiResponse<?>> getDocumentsByContext(@PathVariable String contextId) {
         log.info("GET /v1/historical-documents/context/{} - Get documents by context", contextId);
-        List<HistoricalContextDocumentResponse> documents = documentService.getDocumentsByContextId(contextId);
+        String userRole = SecurityUtils.getRoleName();
+        List<HistoricalContextDocumentResponse> documents = documentService.getDocumentsByContextId(contextId, userRole);
         return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
     }
     
@@ -67,7 +70,8 @@ public class HistoricalContextDocumentController {
     @Operation(summary = "Get documents by staff", description = "Get all documents uploaded by a specific staff member")
     public ResponseEntity<ApiResponse<?>> getDocumentsByStaff(@PathVariable String staffId) {
         log.info("GET /v1/historical-documents/staff/{} - Get documents by staff", staffId);
-        List<HistoricalContextDocumentResponse> documents = documentService.getDocumentsByStaffId(staffId);
+        String userRole = SecurityUtils.getRoleName();
+        List<HistoricalContextDocumentResponse> documents = documentService.getDocumentsByStaffId(staffId, userRole);
         return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
     }
     
@@ -79,7 +83,8 @@ public class HistoricalContextDocumentController {
     public ResponseEntity<ApiResponse<?>> searchDocuments(
             @RequestParam(required = false, defaultValue = "") String keyword) {
         log.info("GET /v1/historical-documents/search - Search documents with keyword: {}", keyword);
-        List<HistoricalContextDocumentResponse> documents = documentService.searchDocuments(keyword);
+        String userRole = SecurityUtils.getRoleName();
+        List<HistoricalContextDocumentResponse> documents = documentService.searchDocuments(keyword, userRole);
         return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
     }
     
@@ -90,7 +95,8 @@ public class HistoricalContextDocumentController {
     @Operation(summary = "Get document by ID", description = "Retrieve a specific historical document")
     public ResponseEntity<ApiResponse<?>> getDocumentById(@PathVariable String docId) {
         log.info("GET /v1/historical-documents/{} - Get document by ID", docId);
-        HistoricalContextDocumentResponse document = documentService.getDocumentById(docId);
+        String userRole = SecurityUtils.getRoleName();
+        HistoricalContextDocumentResponse document = documentService.getDocumentById(docId, userRole);
         return ResponseEntity.ok(ApiResponse.success(document, "Retrieved successfully"));
     }
     
@@ -98,6 +104,7 @@ public class HistoricalContextDocumentController {
      * Create/upload new document (Staff/Admin only)
      */
     @PostMapping
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload document", description = "Upload a new historical document (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createDocument(
@@ -114,6 +121,7 @@ public class HistoricalContextDocumentController {
      * Update document content/metadata (Staff/Admin only)
      */
     @PutMapping("/{docId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update document", description = "Update document content or metadata (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateDocument(
@@ -121,8 +129,9 @@ public class HistoricalContextDocumentController {
             @Valid @RequestBody UpdateHistoricalContextDocumentRequest request) {
         
         String staffId = SecurityUtils.getUserId();
+        String staffRole = SecurityUtils.getRoleName();
         log.info("PUT /v1/historical-documents/{} - Update document by user: {}", docId, staffId);
-        HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId);
+        HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
     }
     
@@ -130,14 +139,16 @@ public class HistoricalContextDocumentController {
      * Delete document
      */
     @DeleteMapping("/{docId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete document", description = "Delete a document")
     public ResponseEntity<ApiResponse<?>> deleteDocument(
             @PathVariable String docId) {
         
         String staffId = SecurityUtils.getUserId();
+        String staffRole = SecurityUtils.getRoleName();
         log.info("DELETE /v1/historical-documents/{} - Delete document by user: {}", docId, staffId);
-        documentService.deleteDocument(docId, staffId);
+        documentService.deleteDocument(docId, staffId, staffRole);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

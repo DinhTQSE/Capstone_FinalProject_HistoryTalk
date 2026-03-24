@@ -51,7 +51,8 @@ public class ChatController {
             @Valid @RequestBody CreateChatSessionRequest request) {
 
         String userId = SecurityUtils.getUserId();
-        ChatSessionResponse session = chatSessionService.createSession(userId, request);
+        String userRole = SecurityUtils.getRoleName();
+        ChatSessionResponse session = chatSessionService.createSession(userId, userRole, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(session, "Session created successfully"));
     }
@@ -63,7 +64,8 @@ public class ChatController {
     @DeleteMapping("/sessions/{id}")
     public ResponseEntity<Void> deleteSession(@PathVariable String id) {
         String userId = SecurityUtils.getUserId();
-        chatSessionService.deleteSession(id, userId);
+        String userRole = SecurityUtils.getRoleName();
+        chatSessionService.deleteSession(id, userId, userRole);
         return ResponseEntity.noContent().build();
     }
 
@@ -74,7 +76,8 @@ public class ChatController {
     @PatchMapping("/sessions/{id}/soft-delete")
     public ResponseEntity<ApiResponse<?>> softDeleteSession(@PathVariable String id) {
         String userId = SecurityUtils.getUserId();
-        chatSessionService.softDeleteSession(id, userId);
+        String userRole = SecurityUtils.getRoleName();
+        chatSessionService.softDeleteSession(id, userId, userRole);
         return ResponseEntity.ok(ApiResponse.success(null, "Session soft-deleted successfully"));
     }
 

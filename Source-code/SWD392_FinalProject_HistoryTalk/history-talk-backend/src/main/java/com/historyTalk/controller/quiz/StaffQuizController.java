@@ -131,7 +131,7 @@ public class StaffQuizController {
     }
 
     @DeleteMapping("/{quizId}")
-    @Operation(summary = "Delete quiz", description = "Soft delete a quiz")
+    @Operation(summary = "Delete quiz", description = "Hard delete a quiz")
     public ResponseEntity<ApiResponse<String>> deleteQuiz(
             @PathVariable String quizId) {
 
@@ -142,6 +142,20 @@ public class StaffQuizController {
         quizService.deleteQuiz(quizId, userId, userRole);
 
         return ResponseEntity.ok(ApiResponse.success("", "Quiz deleted successfully"));
+    }
+
+    @PatchMapping("/{quizId}/soft-delete")
+    @Operation(summary = "Soft delete quiz", description = "Soft delete a quiz")
+    public ResponseEntity<ApiResponse<String>> softDeleteQuiz(
+            @PathVariable String quizId) {
+
+        log.info("PATCH /api/v1/staff/quizzes/{}/soft-delete - soft delete quiz", quizId);
+
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        quizService.softDeleteQuiz(quizId, userId, userRole);
+
+        return ResponseEntity.ok(ApiResponse.success("", "Quiz soft-deleted successfully"));
     }
 
     @PostMapping("/{quizId}/questions")
@@ -177,7 +191,7 @@ public class StaffQuizController {
     }
 
     @DeleteMapping("/{quizId}/questions/{questionId}")
-    @Operation(summary = "Delete question", description = "Soft delete a question from a quiz")
+    @Operation(summary = "Delete question", description = "Hard delete a question from a quiz")
     public ResponseEntity<ApiResponse<String>> deleteQuestion(
             @PathVariable String quizId,
             @PathVariable String questionId) {
@@ -189,6 +203,21 @@ public class StaffQuizController {
         quizService.deleteQuestion(quizId, questionId, userId, userRole);
 
         return ResponseEntity.ok(ApiResponse.success("", "Question deleted successfully"));
+    }
+
+    @PatchMapping("/{quizId}/questions/{questionId}/soft-delete")
+    @Operation(summary = "Soft delete question", description = "Soft delete a question from a quiz")
+    public ResponseEntity<ApiResponse<String>> softDeleteQuestion(
+            @PathVariable String quizId,
+            @PathVariable String questionId) {
+
+        log.info("PATCH /api/v1/staff/quizzes/{}/questions/{}/soft-delete - soft delete question", quizId, questionId);
+
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        quizService.softDeleteQuestion(quizId, questionId, userId, userRole);
+
+        return ResponseEntity.ok(ApiResponse.success("", "Question soft-deleted successfully"));
     }
 
     @PutMapping("/{quizId}/questions/reorder")

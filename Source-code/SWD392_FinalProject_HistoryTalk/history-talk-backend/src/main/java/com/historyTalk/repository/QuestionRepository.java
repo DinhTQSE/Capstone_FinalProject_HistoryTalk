@@ -15,8 +15,10 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
     @Query("""
            SELECT q FROM Question q
            WHERE q.quiz.quizId = :quizId
+           AND (:includeDeleted = true OR q.deletedAt IS NULL)
            ORDER BY q.orderIndex ASC
            """)
-    List<Question> findByQuizIdOrderByOrderIndex(@Param("quizId") UUID quizId);
+    List<Question> findByQuizIdOrderByOrderIndex(@Param("quizId") UUID quizId,
+                                                  @Param("includeDeleted") boolean includeDeleted);
 
 }

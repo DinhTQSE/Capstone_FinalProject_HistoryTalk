@@ -19,7 +19,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.chrono.Era;
 import java.util.List;
 
 @RestController
@@ -78,7 +77,7 @@ public class CharacterController {
     @PutMapping("/{characterId}")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Update a character", description = "Update character details (creator or Admin only)")
+    @Operation(summary = "Update a character", description = "Update character details (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(
             @PathVariable String characterId,
             @Valid @RequestBody UpdateCharacterRequest request) {
@@ -92,7 +91,7 @@ public class CharacterController {
     @DeleteMapping("/{characterId}")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Delete a character", description = "Delete a character (creator or Admin only)")
+    @Operation(summary = "Delete a character", description = "Delete a character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> deleteCharacter(
             @PathVariable String characterId) {
         log.info("DELETE /v1/characters/{}", characterId);
@@ -105,7 +104,7 @@ public class CharacterController {
     @PatchMapping("/{characterId}/soft-delete")
     @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Soft delete a character", description = "Soft delete a character (creator or Admin only)")
+    @Operation(summary = "Soft delete a character", description = "Soft delete a character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> softDeleteCharacter(
             @PathVariable String characterId) {
         log.info("PATCH /v1/characters/{}/soft-delete", characterId);
@@ -113,5 +112,43 @@ public class CharacterController {
         String staffRole = SecurityUtils.getRoleName();
         characterService.softDeleteCharacter(characterId, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(null, "Character soft-deleted successfully"));
+    }
+
+    @PostMapping("/{characterId}/contexts/{contextId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Map context to character", description = "Create a character-context mapping (Staff/Admin only)")
+    public ResponseEntity<ApiResponse<?>> addContextToCharacter(
+            @PathVariable String characterId,
+            @PathVariable String contextId) {
+        log.info("POST /v1/characters/{}/contexts/{}", characterId, contextId);
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        characterService.addContextToCharacter(characterId, contextId, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Context mapped to character successfully"));
+    }
+
+    @DeleteMapping("/{characterId}/contexts/{contextId}")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Unmap context from character", description = "Remove a character-context mapping (Staff/Admin only)")
+    public ResponseEntity<ApiResponse<?>> removeContextFromCharacter(
+            @PathVariable String characterId,
+            @PathVariable String contextId) {
+        log.info("DELETE /v1/characters/{}/contexts/{}", characterId, contextId);
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        characterService.removeContextFromCharacter(characterId, contextId, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Context unmapped from character successfully"));
+    }
+
+    @GetMapping("/{characterId}/contexts")
+    @Operation(summary = "Get contexts of a character", description = "Retrieve all mapped contexts of a character")
+    public ResponseEntity<ApiResponse<List<CharacterResponse.ContextInfo>>> getContextsOfCharacter(
+            @PathVariable String characterId) {
+        log.info("GET /v1/characters/{}/contexts", characterId);
+        String role = SecurityUtils.getRoleName();
+        List<CharacterResponse.ContextInfo> contexts = characterService.getContextsOfCharacter(characterId, role);
+        return ResponseEntity.ok(ApiResponse.success(contexts, "Character contexts retrieved successfully"));
     }
 }

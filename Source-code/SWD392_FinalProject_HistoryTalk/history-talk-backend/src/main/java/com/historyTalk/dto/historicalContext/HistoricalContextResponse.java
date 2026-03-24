@@ -71,6 +71,9 @@ public class HistoricalContextResponse {
     
     @JsonProperty("updatedDate")
     private LocalDateTime updatedDate;
+
+    @JsonProperty("deletedAt")
+    private LocalDateTime deletedAt;
     
     @Data
     @NoArgsConstructor

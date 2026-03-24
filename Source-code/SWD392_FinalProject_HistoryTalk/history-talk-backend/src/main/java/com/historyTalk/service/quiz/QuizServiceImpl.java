@@ -48,7 +48,7 @@ public class QuizServiceImpl implements QuizService {
         
         log.info("Fetching quizzes for staff with search: {}, grade: {}, era: {}", search, grade, era);
         
-        Page<Quiz> page = quizRepository.findAllWithSearch(normalize(search), grade, era, pageable);
+        Page<Quiz> page = quizRepository.findAllWithSearch(normalize(search), grade, era, true, pageable);
         
         return mapPageToPaginatedResponse(
             page.map(this::mapToStaffResponse)
@@ -65,7 +65,7 @@ public class QuizServiceImpl implements QuizService {
         historicalContextRepository.findById(ctx)
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + contextId));
 
-        Page<Quiz> page = quizRepository.findAllByContextWithSearch(ctx, normalize(search), grade, era, pageable);
+        Page<Quiz> page = quizRepository.findAllByContextWithSearch(ctx, normalize(search), grade, era, true, pageable);
         return mapPageToPaginatedResponse(page.map(this::mapToStaffResponse));
     }
 
@@ -74,7 +74,7 @@ public class QuizServiceImpl implements QuizService {
     public List<QuizCustomerResponse> getAllQuizzesForCustomer(String search) {
         log.info("Fetching quizzes for customer with search: {}", search);
         
-        return quizRepository.findAllSimple(normalize(search))
+        return quizRepository.findAllSimple(normalize(search), false)
                 .stream()
                 .map(this::mapToCustomerResponse)
                 .collect(Collectors.toList());
@@ -114,7 +114,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizCustomerResponse getQuizByIdForCustomer(String quizId) {
         log.info("Fetching quiz by ID for customer: {}", quizId);
         
-        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+        Quiz quiz = quizRepository.findActiveById(UuidUtils.fromString(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
         
         return mapToCustomerResponse(quiz);
@@ -238,6 +238,44 @@ public class QuizServiceImpl implements QuizService {
 
     @Transactional
     @Override
+    public void softDeleteQuiz(String quizId, String userId, String userRole) {
+        log.info("Soft deleting quiz: {} by user: {}", quizId, userId);
+        
+        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
+
+        // Check ownership or staff/admin
+        checkOwnershipOrStaffOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        quiz.setDeletedAt(now);
+
+        // Cascade to Questions
+        if (quiz.getQuestions() != null) {
+            quiz.getQuestions().forEach(question -> {
+                question.setDeletedAt(now);
+                if (question.getAnswerDetails() != null) {
+                    question.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+                }
+            });
+        }
+
+        // Cascade to QuizResults
+        if (quiz.getQuizResults() != null) {
+            quiz.getQuizResults().forEach(result -> {
+                result.setDeletedAt(now);
+                if (result.getAnswerDetails() != null) {
+                    result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+                }
+            });
+        }
+
+        quizRepository.save(quiz);
+        log.info("Quiz soft-deleted successfully with ID: {}", quizId);
+    }
+
+    @Transactional
+    @Override
     public void addQuestion(String quizId, QuestionRequest request, String userId, String userRole) {
         log.info("Adding question to quiz: {} by user: {}", quizId, userId);
         
@@ -294,13 +332,39 @@ public class QuizServiceImpl implements QuizService {
         Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
 
+        // Check ownership or staff/admin
+        checkOwnershipOrStaffOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
+
+        Question question = questionRepository.findById(UuidUtils.fromString(questionId, "questionId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found with ID: " + questionId));
+
+        questionRepository.delete(question);
+    }
+
+    @Transactional
+    @Override
+    public void softDeleteQuestion(String quizId, String questionId, String userId, String userRole) {
+        log.info("Soft deleting question: {} from quiz: {} by user: {}", questionId, quizId, userId);
+        
+        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
+
         // Check ownership
         checkOwnershipOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
 
         Question question = questionRepository.findById(UuidUtils.fromString(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found with ID: " + questionId));
 
-        questionRepository.delete(question);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        question.setDeletedAt(now);
+
+        // Cascade to QuizAnswerDetails
+        if (question.getAnswerDetails() != null) {
+            question.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+        }
+
+        questionRepository.save(question);
+        log.info("Question soft-deleted successfully with ID: {}", questionId);
     }
 
     @Transactional
@@ -330,7 +394,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizStartResponse startQuiz(String quizId, String userId) {
         log.info("Starting quiz: {} for user: {}", quizId, userId);
         
-        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+        Quiz quiz = quizRepository.findActiveById(UuidUtils.fromString(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
 
         User user = userRepository.findById(UuidUtils.fromString(userId, "userId"))
@@ -352,7 +416,7 @@ public class QuizServiceImpl implements QuizService {
         session = quizSessionRepository.save(session);
 
         // Get questions
-        List<Question> questions = questionRepository.findByQuizIdOrderByOrderIndex(quiz.getQuizId());
+        List<Question> questions = questionRepository.findByQuizIdOrderByOrderIndex(quiz.getQuizId(), false);
 
         return QuizStartResponse.builder()
                 .sessionId(session.getSessionId().toString())
@@ -388,7 +452,7 @@ public class QuizServiceImpl implements QuizService {
 
         // Get quiz and questions
         Quiz quiz = session.getQuiz();
-        List<Question> questions = questionRepository.findByQuizIdOrderByOrderIndex(quiz.getQuizId());
+        List<Question> questions = questionRepository.findByQuizIdOrderByOrderIndex(quiz.getQuizId(), false);
 
         // Check if user exceeded duration limit
         if (quiz.getDurationSeconds() != null && request.getDurationSeconds() > quiz.getDurationSeconds()) {
@@ -472,7 +536,7 @@ public class QuizServiceImpl implements QuizService {
     public PaginatedResponse<QuizHistoryResponse> getQuizHistory(String userId, Pageable pageable) {
         log.info("Fetching quiz history for user: {}", userId);
         
-        Page<QuizResult> page = quizResultRepository.findByUserUid(UuidUtils.fromString(userId, "userId"), pageable);
+        Page<QuizResult> page = quizResultRepository.findByUserUid(UuidUtils.fromString(userId, "userId"), false, pageable);
         
         return mapPageToPaginatedResponse(
             page.map(this::mapToHistoryResponse)
@@ -511,7 +575,7 @@ public class QuizServiceImpl implements QuizService {
     }
 
     private QuizStaffResponse mapToStaffResponse(Quiz quiz) {
-        List<Question> questions = questionRepository.findByQuizIdOrderByOrderIndex(quiz.getQuizId());
+        List<Question> questions = questionRepository.findByQuizIdOrderByOrderIndex(quiz.getQuizId(), true);
         
         return QuizStaffResponse.builder()
                 .quizId(quiz.getQuizId().toString())
@@ -524,11 +588,12 @@ public class QuizServiceImpl implements QuizService {
                 .durationSeconds(quiz.getDurationSeconds())
                 .playCount(quiz.getPlayCount())
                 .rating(quiz.getRating())
-                .contextId(quiz.getHistoricalContext().getContextId().toString())
-                .contextTitle(quiz.getHistoricalContext().getName())
+                .contextId(safeGetContextId(quiz))
+                .contextTitle(safeGetContextName(quiz))
                 .createdBy(quiz.getCreatedBy().getUserName())
                 .createdDate(LocalDateTime.now()) // You may need to add createdDate to Quiz entity
                 .updatedDate(LocalDateTime.now()) // You may need to add updatedDate to Quiz entity
+                .deletedAt(quiz.getDeletedAt())
                 .questions(questions.stream()
                         .map(this::mapQuestionToResponse)
                         .collect(Collectors.toList()))
@@ -547,7 +612,8 @@ public class QuizServiceImpl implements QuizService {
                 .durationSeconds(quiz.getDurationSeconds())
                 .playCount(quiz.getPlayCount())
                 .rating(quiz.getRating())
-                .contextTitle(quiz.getHistoricalContext().getName())
+                .contextTitle(safeGetContextName(quiz))
+                .deletedAt(quiz.getDeletedAt())
                 .build();
     }
 
@@ -559,18 +625,22 @@ public class QuizServiceImpl implements QuizService {
                 .correctAnswer(question.getCorrectAnswer())
                 .orderIndex(question.getOrderIndex())
                 .explanation(question.getExplanation())
+                .deletedAt(question.getDeletedAt())
                 .build();
     }
 
     private QuizHistoryResponse mapToHistoryResponse(QuizResult result) {
-        double percentage = (double) result.getScore() / result.getQuiz().getQuestions().size() * 100;
+        String quizId = safeGetQuizId(result);
+        String quizTitle = safeGetQuizTitle(result);
+        int totalQuestions = safeGetQuizQuestionCount(result);
+        double percentage = totalQuestions > 0 ? (double) result.getScore() / totalQuestions * 100 : 0;
         
         return QuizHistoryResponse.builder()
                 .resultId(result.getResultId().toString())
-                .quizId(result.getQuiz().getQuizId().toString())
-                .quizTitle(result.getQuiz().getTitle())
+                .quizId(quizId)
+                .quizTitle(quizTitle)
                 .score(result.getScore())
-                .totalQuestions(result.getQuiz().getQuestions().size())
+                .totalQuestions(totalQuestions)
                 .percentage(percentage)
                 .durationSeconds(result.getDurationSeconds())
                 .completedAt(result.getTakenDate())
@@ -654,8 +724,62 @@ public class QuizServiceImpl implements QuizService {
         }
     }
 
+    private void checkOwnershipOrStaffOrAdmin(String createdByUid, String userId, String userRole) {
+        if (!createdByUid.equals(userId) && !"ADMIN".equalsIgnoreCase(userRole) && !"STAFF".equalsIgnoreCase(userRole)) {
+            throw new InvalidRequestException("You don't have permission to modify or delete this quiz");
+        }
+    }
+
     private String normalize(String search) {
         return (search == null || search.isBlank()) ? null : search.toLowerCase();
+    }
+
+    // ==================== Null-safe Helper Methods ====================
+
+    private String safeGetContextId(Quiz quiz) {
+        try {
+            HistoricalContext ctx = quiz.getHistoricalContext();
+            return ctx != null ? ctx.getContextId().toString() : null;
+        } catch (Exception e) {
+            log.warn("Failed to load context for quiz {}", quiz.getQuizId());
+            return null;
+        }
+    }
+
+    private String safeGetContextName(Quiz quiz) {
+        try {
+            HistoricalContext ctx = quiz.getHistoricalContext();
+            return ctx != null ? ctx.getName() : "[Deleted Context]";
+        } catch (Exception e) {
+            return "[Deleted Context]";
+        }
+    }
+
+    private String safeGetQuizTitle(QuizResult result) {
+        try {
+            Quiz quiz = result.getQuiz();
+            return quiz != null ? quiz.getTitle() : "[Deleted Quiz]";
+        } catch (Exception e) {
+            return "[Deleted Quiz]";
+        }
+    }
+
+    private String safeGetQuizId(QuizResult result) {
+        try {
+            Quiz quiz = result.getQuiz();
+            return quiz != null ? quiz.getQuizId().toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private int safeGetQuizQuestionCount(QuizResult result) {
+        try {
+            Quiz quiz = result.getQuiz();
+            return quiz != null && quiz.getQuestions() != null ? quiz.getQuestions().size() : 0;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
 }

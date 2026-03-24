@@ -10,18 +10,35 @@ import java.util.UUID;
 
 public interface HistoricalContextDocumentRepository extends JpaRepository<HistoricalContextDocument, UUID> {
 
-    List<HistoricalContextDocument> findAllByOrderByUploadDateDesc();
+        @Query("""
+            SELECT d FROM HistoricalContextDocument d
+            WHERE d.historicalContext.contextId = :contextId
+            AND (:includeDeleted = true OR d.deletedAt IS NULL)
+            ORDER BY d.uploadDate DESC
+            """)
+        List<HistoricalContextDocument> findByHistoricalContextContextIdOrderByUploadDateDesc(@Param("contextId") UUID contextId,
+                                                    @Param("includeDeleted") boolean includeDeleted);
 
-    List<HistoricalContextDocument> findByHistoricalContextContextIdOrderByUploadDateDesc(UUID contextId);
-
-    List<HistoricalContextDocument> findByCreatedByUidOrderByUploadDateDesc(UUID uid);
+        @Query("""
+            SELECT d FROM HistoricalContextDocument d
+            WHERE d.createdBy.uid = :uid
+            AND (:includeDeleted = true OR d.deletedAt IS NULL)
+            ORDER BY d.uploadDate DESC
+            """)
+        List<HistoricalContextDocument> findByCreatedByUidOrderByUploadDateDesc(@Param("uid") UUID uid,
+                                             @Param("includeDeleted") boolean includeDeleted);
 
     @Query("""
             SELECT hcd FROM HistoricalContextDocument hcd
             WHERE (:search IS NULL OR :search = '' OR
                    hcd.title ILIKE CONCAT('%', :search, '%') OR
                    hcd.content ILIKE CONCAT('%', :search, '%'))
+            AND (:includeDeleted = true OR hcd.deletedAt IS NULL)
             ORDER BY hcd.uploadDate DESC
             """)
-    List<HistoricalContextDocument> search(@Param("search") String search);
+    List<HistoricalContextDocument> search(@Param("search") String search,
+                                            @Param("includeDeleted") boolean includeDeleted);
+
+    @Query("SELECT d FROM HistoricalContextDocument d WHERE (:includeDeleted = true OR d.deletedAt IS NULL) ORDER BY d.uploadDate DESC")
+    List<HistoricalContextDocument> findAllActive(@Param("includeDeleted") boolean includeDeleted);
 }

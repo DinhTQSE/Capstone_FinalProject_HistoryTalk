@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -24,5 +25,7 @@ public class QuestionResponse {
     private Integer orderIndex;
 
     private String explanation;
+
+    private LocalDateTime deletedAt;
 
 }
