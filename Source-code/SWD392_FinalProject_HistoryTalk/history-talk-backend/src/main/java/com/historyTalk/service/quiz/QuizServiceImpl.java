@@ -394,7 +394,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizStartResponse startQuiz(String quizId, String userId) {
         log.info("Starting quiz: {} for user: {}", quizId, userId);
         
-        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+        Quiz quiz = quizRepository.findActiveById(UuidUtils.fromString(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
 
         User user = userRepository.findById(UuidUtils.fromString(userId, "userId"))
@@ -613,6 +613,7 @@ public class QuizServiceImpl implements QuizService {
                 .playCount(quiz.getPlayCount())
                 .rating(quiz.getRating())
                 .contextTitle(safeGetContextName(quiz))
+                .deletedAt(quiz.getDeletedAt())
                 .build();
     }
 

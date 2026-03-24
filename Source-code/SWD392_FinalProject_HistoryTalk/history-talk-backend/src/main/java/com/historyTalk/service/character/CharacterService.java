@@ -28,4 +28,10 @@ public interface CharacterService {
     void restoreCharacter(String characterId);
 
     void permanentDeleteCharacter(String characterId);
+
+    void addContextToCharacter(String characterId, String contextId, String userId, String userRole);
+
+    void removeContextFromCharacter(String characterId, String contextId, String userId, String userRole);
+
+    List<CharacterResponse.ContextInfo> getContextsOfCharacter(String characterId, String role);
 }

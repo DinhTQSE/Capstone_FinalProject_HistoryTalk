@@ -40,7 +40,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
-        boolean includeDraft = isStaffOrAdmin(role);
+        boolean includeDraft = true;
         boolean includeDeleted = isStaffOrAdmin(role);
         Page<HistoricalContext> page = contextRepository
             .findAllWithSearch(normalize(search), era, category, includeDraft, includeDeleted, pageable);
@@ -54,7 +54,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     @Transactional(readOnly = true)
     public List<HistoricalContextResponse> getAllContextsSimple(String search, String role) {
         log.info("Fetching all historical contexts with search: {}", search);
-        boolean includeDraft = isStaffOrAdmin(role);
+        boolean includeDraft = true;
         boolean includeDeleted = isStaffOrAdmin(role);
         return contextRepository
                 .findAllSimple(normalize(search), includeDraft, includeDeleted)
@@ -73,9 +73,6 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: "+contextId));
 
-        if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(context.getIsDraft())) {
-            throw new ResourceNotFoundException("Historical context not found with ID: "+contextId);
-        }
         if (!isStaffOrAdmin(role) && context.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
         }

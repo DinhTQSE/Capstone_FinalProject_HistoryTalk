@@ -74,6 +74,9 @@ public class CharacterServiceImpl implements CharacterService {
         if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(character.getIsDraft())) {
             throw new ResourceNotFoundException("Character not found with id: " + characterId);
         }
+        if (!isStaffOrAdmin(role) && character.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Character not found with id: " + characterId);
+        }
         return mapToResponse(character);
     }
 
@@ -231,6 +234,68 @@ public class CharacterServiceImpl implements CharacterService {
         characterRepository.deleteById(id);
     }
 
+    @Transactional
+    public void addContextToCharacter(String characterId, String contextId, String userId, String userRole) {
+        log.info("Adding context {} to character {} by user {}", contextId, characterId, userId);
+
+        if (!isStaffOrAdmin(userRole)) {
+            throw new InvalidRequestException("You do not have permission to modify character-context mapping");
+        }
+
+        Character character = characterRepository.findById(UUID.fromString(characterId))
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found with id: " + characterId));
+
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
+                .orElseThrow(() -> new ResourceNotFoundException("Historical Context not found with id: " + contextId));
+
+        if (character.getHistoricalContexts().contains(context)) {
+            return;
+        }
+
+        character.getHistoricalContexts().add(context);
+        characterRepository.save(character);
+    }
+
+    @Transactional
+    public void removeContextFromCharacter(String characterId, String contextId, String userId, String userRole) {
+        log.info("Removing context {} from character {} by user {}", contextId, characterId, userId);
+
+        if (!isStaffOrAdmin(userRole)) {
+            throw new InvalidRequestException("You do not have permission to modify character-context mapping");
+        }
+
+        Character character = characterRepository.findById(UUID.fromString(characterId))
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found with id: " + characterId));
+
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
+                .orElseThrow(() -> new ResourceNotFoundException("Historical Context not found with id: " + contextId));
+
+        if (!character.getHistoricalContexts().remove(context)) {
+            throw new ResourceNotFoundException("Character-context mapping not found");
+        }
+
+        characterRepository.save(character);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CharacterResponse.ContextInfo> getContextsOfCharacter(String characterId, String role) {
+        log.info("Getting contexts of character {}", characterId);
+
+        Character character = characterRepository.findById(UUID.fromString(characterId))
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found with id: " + characterId));
+
+        boolean includeDraftAndDeleted = isStaffOrAdmin(role);
+        return character.getHistoricalContexts().stream()
+                .filter(ctx -> includeDraftAndDeleted
+                        || (!Boolean.TRUE.equals(ctx.getIsDraft()) && ctx.getDeletedAt() == null))
+                .sorted(Comparator.comparing(HistoricalContext::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(hc -> CharacterResponse.ContextInfo.builder()
+                        .contextId(hc.getContextId().toString())
+                        .name(hc.getName())
+                        .build())
+                .toList();
+    }
+
     private CharacterResponse mapToResponse(Character character) {
         HistoricalContext ctx = resolvePrimaryContext(character);
         List<CharacterResponse.EventInfo> events = ctx == null ? List.of() : ctx.getDocuments().stream()
@@ -302,8 +367,10 @@ public class CharacterServiceImpl implements CharacterService {
         }
 
         if (ids.isEmpty()) {
-            throw new InvalidRequestException("At least one contextId is required");
+            return new HashSet<>();
         }
+
+        log.warn("Create character request still uses deprecated context mapping fields: contextId/contextIds");
 
         Set<HistoricalContext> contexts = new HashSet<>();
         for (String id : ids) {
