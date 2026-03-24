@@ -63,7 +63,8 @@ public class ChatController {
     @DeleteMapping("/sessions/{id}")
     public ResponseEntity<Void> deleteSession(@PathVariable String id) {
         String userId = SecurityUtils.getUserId();
-        chatSessionService.deleteSession(id, userId);
+        String userRole = SecurityUtils.getRoleName();
+        chatSessionService.deleteSession(id, userId, userRole);
         return ResponseEntity.noContent().build();
     }
 
@@ -74,7 +75,8 @@ public class ChatController {
     @PatchMapping("/sessions/{id}/soft-delete")
     public ResponseEntity<ApiResponse<?>> softDeleteSession(@PathVariable String id) {
         String userId = SecurityUtils.getUserId();
-        chatSessionService.softDeleteSession(id, userId);
+        String userRole = SecurityUtils.getRoleName();
+        chatSessionService.softDeleteSession(id, userId, userRole);
         return ResponseEntity.ok(ApiResponse.success(null, "Session soft-deleted successfully"));
     }
 

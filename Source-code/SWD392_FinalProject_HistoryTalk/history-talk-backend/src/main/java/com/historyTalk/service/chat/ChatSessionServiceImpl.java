@@ -121,24 +121,36 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     }
 
     @Transactional
-    public void deleteSession(String sessionId, String userId) {
+    public void deleteSession(String sessionId, String userId, String userRole) {
         log.info("Deleting chat session={} for user={}", sessionId, userId);
 
-        ChatSession session = chatSessionRepository
-                .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        ChatSession session;
+        if (isStaffOrAdmin(userRole)) {
+            session = chatSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        } else {
+            session = chatSessionRepository
+                    .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        }
 
         chatSessionRepository.delete(session);
         log.info("Chat session deleted: {}", sessionId);
     }
 
     @Transactional
-    public void softDeleteSession(String sessionId, String userId) {
+    public void softDeleteSession(String sessionId, String userId, String userRole) {
         log.info("Soft deleting chat session={} for user={}", sessionId, userId);
 
-        ChatSession session = chatSessionRepository
-                .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        ChatSession session;
+        if (isStaffOrAdmin(userRole)) {
+            session = chatSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        } else {
+            session = chatSessionRepository
+                    .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         session.setDeletedAt(now);
@@ -188,5 +200,9 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private boolean isStaffOrAdmin(String role) {
+        return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
     }
 }

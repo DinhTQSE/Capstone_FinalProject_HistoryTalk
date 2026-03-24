@@ -114,7 +114,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizCustomerResponse getQuizByIdForCustomer(String quizId) {
         log.info("Fetching quiz by ID for customer: {}", quizId);
         
-        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+        Quiz quiz = quizRepository.findActiveById(UuidUtils.fromString(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
         
         return mapToCustomerResponse(quiz);
