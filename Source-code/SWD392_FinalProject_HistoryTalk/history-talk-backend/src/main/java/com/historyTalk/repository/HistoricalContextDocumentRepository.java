@@ -10,9 +10,23 @@ import java.util.UUID;
 
 public interface HistoricalContextDocumentRepository extends JpaRepository<HistoricalContextDocument, UUID> {
 
-    List<HistoricalContextDocument> findByHistoricalContextContextIdOrderByUploadDateDesc(UUID contextId);
+        @Query("""
+            SELECT d FROM HistoricalContextDocument d
+            WHERE d.historicalContext.contextId = :contextId
+            AND (:includeDeleted = true OR d.deletedAt IS NULL)
+            ORDER BY d.uploadDate DESC
+            """)
+        List<HistoricalContextDocument> findByHistoricalContextContextIdOrderByUploadDateDesc(@Param("contextId") UUID contextId,
+                                                    @Param("includeDeleted") boolean includeDeleted);
 
-    List<HistoricalContextDocument> findByCreatedByUidOrderByUploadDateDesc(UUID uid);
+        @Query("""
+            SELECT d FROM HistoricalContextDocument d
+            WHERE d.createdBy.uid = :uid
+            AND (:includeDeleted = true OR d.deletedAt IS NULL)
+            ORDER BY d.uploadDate DESC
+            """)
+        List<HistoricalContextDocument> findByCreatedByUidOrderByUploadDateDesc(@Param("uid") UUID uid,
+                                             @Param("includeDeleted") boolean includeDeleted);
 
     @Query("""
             SELECT hcd FROM HistoricalContextDocument hcd

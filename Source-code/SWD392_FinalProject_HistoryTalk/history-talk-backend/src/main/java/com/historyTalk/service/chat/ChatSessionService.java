@@ -7,6 +7,6 @@ import java.util.List;
 public interface ChatSessionService {
     List<ChatSessionResponse> getSessions(String userId, String contextId, String characterId);
     ChatSessionResponse createSession(String userId, CreateChatSessionRequest request);
-    void deleteSession(String sessionId, String userId);
-    void softDeleteSession(String sessionId, String userId);
+    void deleteSession(String sessionId, String userId, String userRole);
+    void softDeleteSession(String sessionId, String userId, String userRole);
 }

@@ -16,6 +16,9 @@ import java.util.UUID;
 @Repository
 public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
+       @Query("SELECT q FROM Quiz q WHERE q.quizId = :quizId AND q.deletedAt IS NULL")
+       Optional<Quiz> findActiveById(@Param("quizId") UUID quizId);
+
     Optional<Quiz> findByTitleIgnoreCase(String title);
 
     boolean existsByTitleIgnoreCaseAndQuizIdNot(String title, UUID quizId);

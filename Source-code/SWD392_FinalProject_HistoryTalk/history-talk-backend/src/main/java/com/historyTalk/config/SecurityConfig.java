@@ -78,10 +78,22 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").hasAnyRole("STAFF", "CUSTOMER", "ADMIN")
-                        .anyRequest().permitAll()
-            )
-            .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
+                        .requestMatchers("/api/v1/api-docs/**", "/api/v1/swagger-ui/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/historical-documents/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/quizzes/**").permitAll()
+
+                        .requestMatchers("/api/v1/chat/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/quizzes/**").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/quizzes/**").authenticated()
+
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

@@ -48,9 +48,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Get all documents
      */
     @Transactional(readOnly = true)
-    public List<HistoricalContextDocumentResponse> getAllDocuments() {
+    public List<HistoricalContextDocumentResponse> getAllDocuments(String userRole) {
         log.info("Fetching all historical context documents");
-        return documentRepository.findAllActive(false)
+        boolean includeDeleted = isStaffOrAdmin(userRole);
+        return documentRepository.findAllActive(includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -60,9 +61,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Get all documents by context ID
      */
     @Transactional(readOnly = true)
-    public List<HistoricalContextDocumentResponse> getDocumentsByContextId(String contextId) {
+    public List<HistoricalContextDocumentResponse> getDocumentsByContextId(String contextId, String userRole) {
         log.info("Fetching documents for context: {}", contextId);
-        return documentRepository.findByHistoricalContextContextIdOrderByUploadDateDesc(UUID.fromString(contextId))
+        boolean includeDeleted = isStaffOrAdmin(userRole);
+        return documentRepository.findByHistoricalContextContextIdOrderByUploadDateDesc(UUID.fromString(contextId), includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -72,9 +74,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Get all documents by creator user ID (audit trail)
      */
     @Transactional(readOnly = true)
-    public List<HistoricalContextDocumentResponse> getDocumentsByStaffId(String userId) {
+    public List<HistoricalContextDocumentResponse> getDocumentsByStaffId(String userId, String userRole) {
         log.info("Fetching documents uploaded by user: {}", userId);
-        return documentRepository.findByCreatedByUidOrderByUploadDateDesc(UUID.fromString(userId))
+        boolean includeDeleted = isStaffOrAdmin(userRole);
+        return documentRepository.findByCreatedByUidOrderByUploadDateDesc(UUID.fromString(userId), includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -84,9 +87,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Search documents by title or content
      */
     @Transactional(readOnly = true)
-    public List<HistoricalContextDocumentResponse> searchDocuments(String search) {
+    public List<HistoricalContextDocumentResponse> searchDocuments(String search, String userRole) {
         log.info("Searching documents with keyword: {}", search);
-        return documentRepository.search(normalize(search), false)
+        boolean includeDeleted = isStaffOrAdmin(userRole);
+        return documentRepository.search(normalize(search), includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -96,10 +100,15 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
      * Get single document by ID
      */
     @Transactional(readOnly = true)
-    public HistoricalContextDocumentResponse getDocumentById(String docId) {
+    public HistoricalContextDocumentResponse getDocumentById(String docId, String userRole) {
         log.info("Fetching document: {}", docId);
         HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+
+        if (!isStaffOrAdmin(userRole) && doc.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Document not found: " + docId);
+        }
+
         return mapToResponse(doc);
     }
     

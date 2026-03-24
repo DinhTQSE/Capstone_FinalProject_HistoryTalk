@@ -286,6 +286,11 @@ public class CharacterServiceImpl implements CharacterService {
     }
 
     private Set<HistoricalContext> resolveContexts(CreateCharacterRequest request) {
+        if (request.getContextId() != null && !request.getContextId().isBlank()
+                && request.getContextIds() != null && !request.getContextIds().isEmpty()) {
+            throw new InvalidRequestException("Provide either contextId or contextIds, not both");
+        }
+
         Set<String> ids = new HashSet<>();
         if (request.getContextId() != null && !request.getContextId().isBlank()) {
             ids.add(request.getContextId());

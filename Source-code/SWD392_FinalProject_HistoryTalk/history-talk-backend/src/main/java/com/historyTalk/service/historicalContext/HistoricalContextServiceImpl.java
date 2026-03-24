@@ -76,6 +76,9 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(context.getIsDraft())) {
             throw new ResourceNotFoundException("Historical context not found with ID: "+contextId);
         }
+        if (!isStaffOrAdmin(role) && context.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
+        }
         
         return mapToResponse(context);
     }
