@@ -1,6 +1,6 @@
 package com.historytalk.presentation.authentication.controller;
 
-import com.historytalk.dto.ApiResponse;
+import com.historytalk.presentation.common.dto.ApiResponse;
 import com.historytalk.presentation.authentication.dto.LoginRequest;
 import com.historytalk.presentation.authentication.dto.LoginResponse;
 import com.historytalk.presentation.authentication.dto.LogoutResponse;

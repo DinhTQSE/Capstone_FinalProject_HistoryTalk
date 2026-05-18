@@ -1,6 +1,6 @@
 package com.historytalk.application.character.service;
 
-import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.presentation.common.dto.PaginatedResponse;
 import com.historytalk.presentation.character.dto.CharacterResponse;
 import com.historytalk.presentation.character.dto.CreateCharacterRequest;
 import com.historytalk.presentation.character.dto.UpdateCharacterRequest;

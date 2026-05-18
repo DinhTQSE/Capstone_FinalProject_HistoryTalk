@@ -1,0 +1,223 @@
+package com.historytalk.application.chat.service;
+
+import com.historytalk.presentation.chat.dto.ChatSessionResponse;
+import com.historytalk.presentation.chat.dto.CreateChatSessionRequest;
+import com.historytalk.dataaccess.character.entity.Character;
+import com.historytalk.dataaccess.chat.entity.ChatSession;
+import com.historytalk.dataaccess.chat.entity.Message;
+import com.historytalk.dataaccess.shared.entity.enums.MessageRole;
+import com.historytalk.dataaccess.historical_context.entity.HistoricalContext;
+import com.historytalk.dataaccess.user.entity.User;
+import com.historytalk.common.exception.InvalidRequestException;
+import com.historytalk.common.exception.ResourceNotFoundException;
+import com.historytalk.dataaccess.character.repository.CharacterRepository;
+import com.historytalk.dataaccess.chat.repository.ChatSessionRepository;
+import com.historytalk.dataaccess.historical_context.repository.HistoricalContextRepository;
+import com.historytalk.dataaccess.chat.repository.MessageRepository;
+import com.historytalk.dataaccess.user.repository.UserRepository;
+import com.historytalk.common.integration.ai.AiServiceClient;
+import com.historytalk.common.integration.ai.AiServiceClient.AiChatResult;
+import com.historytalk.common.integration.ai.AiServiceClient.CharacterPayload;
+import com.historytalk.common.integration.ai.AiServiceClient.ContextPayload;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ChatSessionServiceImpl implements ChatSessionService {
+
+    private final ChatSessionRepository chatSessionRepository;
+    private final UserRepository userRepository;
+    private final CharacterRepository characterRepository;
+    private final HistoricalContextRepository contextRepository;
+    private final MessageRepository messageRepository;
+    private final AiServiceClient aiServiceClient;
+    private final ObjectMapper objectMapper;
+
+    @Transactional(readOnly = true)
+    public List<ChatSessionResponse> getSessions(String userId, String contextId, String characterId) {
+        log.info("Getting chat sessions for user={} context={} character={}", userId, contextId, characterId);
+
+        List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacterAndContext(
+                UUID.fromString(userId),
+                UUID.fromString(characterId),
+                UUID.fromString(contextId));
+
+        return sessions.stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Transactional
+    public ChatSessionResponse createSession(String userId, String userRole, CreateChatSessionRequest request) {
+        log.info("Creating chat session for user={} context={} character={}", userId, request.getContextId(), request.getCharacterId());
+
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
+
+        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(character.getIsDraft()) || character.getDeletedAt() != null)) {
+            throw new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId());
+        }
+
+        HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId()));
+
+        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(context.getIsDraft()) || context.getDeletedAt() != null)) {
+            throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
+        }
+
+        UUID contextIdUUID = UUID.fromString(request.getContextId());
+        var selectedContext = character.getHistoricalContexts().stream()
+            .filter(ctx -> ctx.getContextId().equals(contextIdUUID))
+            .findFirst()
+            .orElseThrow(() -> new InvalidRequestException("Character does not belong to this context"));
+
+        ChatSession session = ChatSession.builder()
+                .user(user)
+                .character(character)
+            .historicalContext(selectedContext)
+                .title("")
+                .build();
+
+        ChatSession saved = chatSessionRepository.save(session);
+        log.info("Chat session created with ID={}", saved.getSessionId());
+
+        // Send greeting message via AI
+        try {
+            CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
+            ContextPayload contextData = AiServiceClient.buildContextPayload(selectedContext);
+
+            AiChatResult greeting = aiServiceClient.chat(
+                    character.getCharacterId().toString(),
+                    selectedContext.getContextId().toString(),
+                    "Hãy chào và giới thiệu ngắn gọn về bản thân.",
+                    Collections.emptyList(),
+                    characterData,
+                    contextData);
+
+            String suggestedQuestionsJson = null;
+            if (greeting.suggestedQuestions() != null && !greeting.suggestedQuestions().isEmpty()) {
+                try {
+                    suggestedQuestionsJson = objectMapper.writeValueAsString(greeting.suggestedQuestions());
+                } catch (Exception ex) {
+                    log.warn("Failed to serialize greeting suggested questions: {}", ex.getMessage());
+                }
+            }
+
+            Message greetingMsg = Message.builder()
+                    .content(greeting.message())
+                    .role(MessageRole.ASSISTANT)
+                    .isFromAi(true)
+                    .suggestedQuestions(suggestedQuestionsJson)
+                    .chatSession(saved)
+                    .build();
+            messageRepository.save(greetingMsg);
+
+            saved.setLastMessageAt(LocalDateTime.now());
+            chatSessionRepository.save(saved);
+        } catch (Exception e) {
+            log.warn("Failed to generate greeting for session {}: {}", saved.getSessionId(), e.getMessage());
+        }
+
+        return mapToResponse(saved);
+    }
+
+    @Transactional
+    public void deleteSession(String sessionId, String userId, String userRole) {
+        log.info("Deleting chat session={} for user={}", sessionId, userId);
+
+        ChatSession session;
+        if (isStaffOrAdmin(userRole)) {
+            session = chatSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        } else {
+            session = chatSessionRepository
+                    .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        }
+
+        chatSessionRepository.delete(session);
+        log.info("Chat session deleted: {}", sessionId);
+    }
+
+    @Transactional
+    public void softDeleteSession(String sessionId, String userId, String userRole) {
+        log.info("Soft deleting chat session={} for user={}", sessionId, userId);
+
+        ChatSession session;
+        if (isStaffOrAdmin(userRole)) {
+            session = chatSessionRepository.findById(UUID.fromString(sessionId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        } else {
+            session = chatSessionRepository
+                    .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        session.setDeletedAt(now);
+        chatSessionRepository.save(session);
+
+        if (session.getMessages() != null) {
+            session.getMessages().forEach(msg -> msg.setDeletedAt(now));
+        }
+
+        log.info("Chat session soft deleted: {}", sessionId);
+    }
+
+    private ChatSessionResponse mapToResponse(ChatSession session) {
+        List<Message> messages = session.getMessages();
+        String lastMessage = null;
+        if (!messages.isEmpty()) {
+            lastMessage = messages.stream()
+                    .max(Comparator.comparing(Message::getTimestamp))
+                    .map(Message::getContent)
+                    .orElse(null);
+        }
+
+        return ChatSessionResponse.builder()
+                .id(session.getSessionId().toString())
+                .characterId(safeGetCharacterId(session))
+                .contextId(safeGetContextId(session))
+                .title(session.getTitle())
+                .lastMessage(lastMessage)
+                .lastMessageAt(session.getLastMessageAt())
+                .messageCount(messages.size())
+                .build();
+    }
+
+    private String safeGetCharacterId(ChatSession session) {
+        try {
+            Character c = session.getCharacter();
+            return c != null ? c.getCharacterId().toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String safeGetContextId(ChatSession session) {
+        try {
+            var ctx = session.getHistoricalContext();
+            return ctx != null ? ctx.getContextId().toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isStaffOrAdmin(String role) {
+        return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
+    }
+}

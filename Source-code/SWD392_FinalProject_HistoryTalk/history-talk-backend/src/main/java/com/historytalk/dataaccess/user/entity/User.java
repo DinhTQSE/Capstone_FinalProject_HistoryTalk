@@ -1,8 +1,8 @@
 package com.historytalk.dataaccess.user.entity;
 
-import com.historytalk.entity.chat.ChatSession;
-import com.historytalk.entity.enums.UserRole;
-import com.historytalk.entity.quiz.QuizResult;
+import com.historytalk.dataaccess.chat.entity.ChatSession;
+import com.historytalk.dataaccess.shared.entity.enums.UserRole;
+import com.historytalk.dataaccess.quiz.entity.QuizResult;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

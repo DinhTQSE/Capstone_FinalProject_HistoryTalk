@@ -1,7 +1,7 @@
 package com.historytalk.presentation.character.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.historytalk.entity.enums.EventEra;
+import com.historytalk.dataaccess.shared.entity.enums.EventEra;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

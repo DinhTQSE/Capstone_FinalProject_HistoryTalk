@@ -1,7 +1,7 @@
 package com.historytalk.dataaccess.character.repository;
 
 import com.historytalk.dataaccess.character.entity.Character;
-import com.historytalk.entity.enums.EventEra;
+import com.historytalk.dataaccess.shared.entity.enums.EventEra;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

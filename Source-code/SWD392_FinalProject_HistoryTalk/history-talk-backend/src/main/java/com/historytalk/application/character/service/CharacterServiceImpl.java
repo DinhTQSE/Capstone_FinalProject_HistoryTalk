@@ -1,17 +1,17 @@
 package com.historytalk.application.character.service;
 
-import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.presentation.common.dto.PaginatedResponse;
 import com.historytalk.presentation.character.dto.CharacterResponse;
 import com.historytalk.presentation.character.dto.CreateCharacterRequest;
 import com.historytalk.presentation.character.dto.UpdateCharacterRequest;
 import com.historytalk.dataaccess.character.entity.Character;
-import com.historytalk.entity.enums.EventEra;
-import com.historytalk.entity.historicalContext.HistoricalContext;
+import com.historytalk.dataaccess.shared.entity.enums.EventEra;
+import com.historytalk.dataaccess.historical_context.entity.HistoricalContext;
 import com.historytalk.dataaccess.user.entity.User;
 import com.historytalk.common.exception.InvalidRequestException;
 import com.historytalk.common.exception.ResourceNotFoundException;
 import com.historytalk.dataaccess.character.repository.CharacterRepository;
-import com.historytalk.repository.HistoricalContextRepository;
+import com.historytalk.dataaccess.historical_context.repository.HistoricalContextRepository;
 import com.historytalk.dataaccess.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,7 +1,7 @@
 package com.historytalk.dataaccess.character.entity;
 
-import com.historytalk.entity.chat.ChatSession;
-import com.historytalk.entity.historicalContext.HistoricalContext;
+import com.historytalk.dataaccess.chat.entity.ChatSession;
+import com.historytalk.dataaccess.historical_context.entity.HistoricalContext;
 import com.historytalk.dataaccess.user.entity.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;

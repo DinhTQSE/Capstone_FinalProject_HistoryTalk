@@ -2,7 +2,7 @@ package com.historytalk.common.integration.ai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.historytalk.common.exception.SystemException;
-import com.historytalk.repository.ChatSessionRepository;
+import com.historytalk.dataaccess.chat.repository.ChatSessionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -181,7 +181,7 @@ public class AiServiceClient {
     /**
      * Build ContextPayload from a HistoricalContext entity.
      */
-    public static ContextPayload buildContextPayload(com.historytalk.entity.historicalContext.HistoricalContext ctx) {
+    public static ContextPayload buildContextPayload(com.historytalk.dataaccess.historical_context.entity.HistoricalContext ctx) {
         return new ContextPayload(
                 ctx.getContextId().toString(),
                 ctx.getName(),

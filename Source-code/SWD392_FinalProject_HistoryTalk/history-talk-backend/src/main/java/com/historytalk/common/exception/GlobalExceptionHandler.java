@@ -2,9 +2,9 @@ package com.historytalk.common.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.historytalk.dto.ApiResponse;
-import com.historytalk.dto.ValidationErrorResponse;
-import com.historytalk.dto.exception.InvalidArgumentResponse;
+import com.historytalk.presentation.common.dto.ApiResponse;
+import com.historytalk.presentation.common.dto.ValidationErrorResponse;
+import com.historytalk.presentation.common.dto.InvalidArgumentResponse;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,11 +1,11 @@
 package com.historytalk.presentation.character.controller;
 
-import com.historytalk.dto.ApiResponse;
-import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.presentation.common.dto.ApiResponse;
+import com.historytalk.presentation.common.dto.PaginatedResponse;
 import com.historytalk.presentation.character.dto.CharacterResponse;
 import com.historytalk.presentation.character.dto.CreateCharacterRequest;
 import com.historytalk.presentation.character.dto.UpdateCharacterRequest;
-import com.historytalk.entity.enums.EventEra;
+import com.historytalk.dataaccess.shared.entity.enums.EventEra;
 import com.historytalk.application.character.service.CharacterService;
 import com.historytalk.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;

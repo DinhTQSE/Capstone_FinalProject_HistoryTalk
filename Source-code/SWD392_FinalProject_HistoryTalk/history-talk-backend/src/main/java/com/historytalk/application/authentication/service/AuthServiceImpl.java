@@ -7,7 +7,7 @@ import com.historytalk.presentation.authentication.dto.RegisterRequest;
 import com.historytalk.presentation.authentication.dto.RegisterResponse;
 import com.historytalk.presentation.authentication.dto.RegisterStaffRequest;
 import com.historytalk.presentation.authentication.dto.RegisterStaffResponse;
-import com.historytalk.entity.enums.UserRole;
+import com.historytalk.dataaccess.shared.entity.enums.UserRole;
 import com.historytalk.dataaccess.user.entity.User;
 import com.historytalk.common.exception.DataConflictException;
 import com.historytalk.common.exception.InvalidRequestException;
