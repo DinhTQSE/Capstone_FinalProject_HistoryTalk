@@ -1,7 +1,7 @@
 package com.historytalk.common.security;
 
 import com.historytalk.entity.enums.UserRole;
-import com.historytalk.entity.user.User;
+import com.historytalk.dataaccess.user.entity.User;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

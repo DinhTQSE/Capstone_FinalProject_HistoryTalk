@@ -1,6 +1,6 @@
 package com.historytalk.entity.quiz;
 
-import com.historytalk.entity.user.User;
+import com.historytalk.dataaccess.user.entity.User;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.enums.EventEra;
 import jakarta.persistence.*;

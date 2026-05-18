@@ -167,7 +167,7 @@ public class AiServiceClient {
     /**
      * Build CharacterPayload from a Character entity.
      */
-    public static CharacterPayload buildCharacterPayload(com.historytalk.entity.character.Character c) {
+    public static CharacterPayload buildCharacterPayload(com.historytalk.dataaccess.character.entity.Character c) {
         return new CharacterPayload(
                 c.getCharacterId().toString(),
                 c.getName(),

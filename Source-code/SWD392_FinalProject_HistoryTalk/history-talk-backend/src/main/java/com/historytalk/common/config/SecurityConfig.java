@@ -2,7 +2,7 @@ package com.historytalk.common.config;
 
 import com.historytalk.common.security.JwtAuthenticationFilter;
 import com.historytalk.common.security.JwtTokenProvider;
-import com.historytalk.service.authentication.CustomUserDetailsService;
+import com.historytalk.application.authentication.service.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

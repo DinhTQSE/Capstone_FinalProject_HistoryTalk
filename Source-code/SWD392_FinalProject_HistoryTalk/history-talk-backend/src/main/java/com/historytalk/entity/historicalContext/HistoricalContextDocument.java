@@ -1,7 +1,7 @@
 package com.historytalk.entity.historicalContext;
 
 import com.historytalk.entity.enums.DocumentType;
-import com.historytalk.entity.user.User;
+import com.historytalk.dataaccess.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
