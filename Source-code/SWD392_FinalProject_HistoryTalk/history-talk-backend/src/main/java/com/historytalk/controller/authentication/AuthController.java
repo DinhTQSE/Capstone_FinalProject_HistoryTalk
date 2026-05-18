@@ -11,7 +11,7 @@ import com.historytalk.dto.authentication.RegisterResponse;
 import com.historytalk.dto.authentication.RegisterStaffRequest;
 import com.historytalk.dto.authentication.RegisterStaffResponse;
 import com.historytalk.service.authentication.AuthService;
-import com.historytalk.utils.SecurityUtils;
+import com.historytalk.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

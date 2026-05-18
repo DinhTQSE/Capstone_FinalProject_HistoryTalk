@@ -8,7 +8,7 @@ import com.historytalk.dto.historicalContext.UpdateHistoricalContextRequest;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.service.historicalContext.HistoricalContextService;
-import com.historytalk.utils.SecurityUtils;
+import com.historytalk.common.util.SecurityUtils;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import io.swagger.v3.oas.annotations.Operation;

@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  * Simplified JWT operations wrapper used by the Auth service layer.
- * Delegates to {@link com.historytalk.security.JwtTokenProvider}.
+ * Delegates to {@link com.historytalk.common.security.JwtTokenProvider}.
  */
 public interface JwtService {
 

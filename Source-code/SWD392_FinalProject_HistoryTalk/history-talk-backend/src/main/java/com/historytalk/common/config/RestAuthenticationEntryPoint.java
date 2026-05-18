@@ -1,4 +1,4 @@
-package com.historytalk.config;
+package com.historytalk.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;

@@ -1,6 +1,6 @@
-package com.historytalk.utils;
+package com.historytalk.common.util;
 
-import com.historytalk.exception.InvalidRequestException;
+import com.historytalk.common.exception.InvalidRequestException;
 
 import java.util.UUID;
 

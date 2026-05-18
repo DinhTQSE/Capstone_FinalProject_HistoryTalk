@@ -1,4 +1,4 @@
-package com.historytalk.security;
+package com.historytalk.common.security;
 
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;

@@ -5,7 +5,7 @@ import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequ
 import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historytalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
 import com.historytalk.service.historicalContext.HistoricalContextDocumentService;
-import com.historytalk.utils.SecurityUtils;
+import com.historytalk.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

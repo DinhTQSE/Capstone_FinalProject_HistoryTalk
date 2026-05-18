@@ -1,4 +1,4 @@
-package com.historytalk.security;
+package com.historytalk.common.security;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

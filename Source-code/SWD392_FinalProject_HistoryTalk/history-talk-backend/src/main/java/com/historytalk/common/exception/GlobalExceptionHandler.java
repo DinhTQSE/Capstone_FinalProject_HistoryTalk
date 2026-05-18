@@ -1,4 +1,4 @@
-package com.historytalk.exception;
+package com.historytalk.common.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;

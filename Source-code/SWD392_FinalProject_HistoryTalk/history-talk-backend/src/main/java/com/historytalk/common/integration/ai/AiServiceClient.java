@@ -1,7 +1,7 @@
-package com.historytalk.service.chat;
+package com.historytalk.common.integration.ai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.historytalk.exception.SystemException;
+import com.historytalk.common.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

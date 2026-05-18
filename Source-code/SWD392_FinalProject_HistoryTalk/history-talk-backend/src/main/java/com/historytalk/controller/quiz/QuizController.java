@@ -4,7 +4,7 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.quiz.*;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.service.quiz.QuizService;
-import com.historytalk.utils.SecurityUtils;
+import com.historytalk.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

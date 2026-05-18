@@ -7,7 +7,7 @@ import com.historytalk.dto.character.CreateCharacterRequest;
 import com.historytalk.dto.character.UpdateCharacterRequest;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.service.character.CharacterService;
-import com.historytalk.utils.SecurityUtils;
+import com.historytalk.common.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

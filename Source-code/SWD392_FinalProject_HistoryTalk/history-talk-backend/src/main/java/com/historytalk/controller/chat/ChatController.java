@@ -10,7 +10,7 @@ import com.historytalk.dto.chat.SendMessageResponse;
 import com.historytalk.service.chat.ChatHistoryService;
 import com.historytalk.service.chat.ChatSessionService;
 import com.historytalk.service.chat.MessageService;
-import com.historytalk.utils.SecurityUtils;
+import com.historytalk.common.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

@@ -1,4 +1,4 @@
-package com.historytalk.exception;
+package com.historytalk.common.exception;
 
 import lombok.Builder;
 import lombok.Data;

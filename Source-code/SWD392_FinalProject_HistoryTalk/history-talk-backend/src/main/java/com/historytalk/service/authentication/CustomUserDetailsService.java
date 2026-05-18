@@ -2,7 +2,7 @@ package com.historytalk.service.authentication;
 
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.UserRepository;
-import com.historytalk.security.UserPrincipal;
+import com.historytalk.common.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;

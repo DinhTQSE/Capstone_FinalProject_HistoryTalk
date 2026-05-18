@@ -1,4 +1,4 @@
-package com.historytalk.security;
+package com.historytalk.common.security;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -13,7 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import com.historytalk.security.AuthenticatedPrincipal;
+import com.historytalk.common.security.AuthenticatedPrincipal;
 
 import java.io.IOException;
 import java.util.List;

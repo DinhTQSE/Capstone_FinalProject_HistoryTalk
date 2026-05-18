@@ -1,6 +1,6 @@
-package com.historytalk.utils;
+package com.historytalk.common.util;
 
-import com.historytalk.security.AuthenticatedPrincipal;
+import com.historytalk.common.security.AuthenticatedPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 

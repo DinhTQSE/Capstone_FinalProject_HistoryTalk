@@ -1,6 +1,6 @@
 package com.historytalk.service.authentication;
 
-import com.historytalk.security.JwtTokenProvider;
+import com.historytalk.common.security.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
