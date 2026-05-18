@@ -82,4 +82,3 @@ public class Quiz {
     private List<QuizResult> quizResults = new ArrayList<>();
 
 }
-

@@ -15,4 +15,3 @@ public interface DocumentProcessorStrategy {
      */
     String processContent(String content);
 }
-

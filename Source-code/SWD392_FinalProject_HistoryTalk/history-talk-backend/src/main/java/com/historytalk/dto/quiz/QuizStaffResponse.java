@@ -49,4 +49,3 @@ public class QuizStaffResponse {
     private List<QuestionResponse> questions;
 
 }
-

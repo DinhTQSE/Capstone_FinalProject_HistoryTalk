@@ -19,4 +19,3 @@ public interface QuizResultRepository extends JpaRepository<QuizResult, UUID> {
                                     Pageable pageable);
 
 }
-

@@ -10,4 +10,3 @@ public interface ChatSessionService {
     void deleteSession(String sessionId, String userId, String userRole);
     void softDeleteSession(String sessionId, String userId, String userRole);
 }
-

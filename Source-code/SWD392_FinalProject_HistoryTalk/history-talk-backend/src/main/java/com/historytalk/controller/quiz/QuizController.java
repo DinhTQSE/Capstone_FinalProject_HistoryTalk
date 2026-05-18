@@ -126,4 +126,3 @@ public class QuizController {
         return ResponseEntity.ok(ApiResponse.success(null, "Quiz session soft-deleted successfully"));
     }
 }
-

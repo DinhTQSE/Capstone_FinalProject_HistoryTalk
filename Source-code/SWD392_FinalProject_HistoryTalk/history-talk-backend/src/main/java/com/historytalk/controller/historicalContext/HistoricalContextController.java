@@ -160,4 +160,3 @@ public class HistoricalContextController {
         return ResponseEntity.ok(ApiResponse.success(null, "Historical context soft-deleted successfully"));
     }
 }
-

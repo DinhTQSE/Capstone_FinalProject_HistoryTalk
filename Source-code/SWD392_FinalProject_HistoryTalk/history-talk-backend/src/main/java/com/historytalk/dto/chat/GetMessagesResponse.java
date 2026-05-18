@@ -16,4 +16,3 @@ public class GetMessagesResponse {
     @JsonProperty("suggestedQuestions")
     private List<String> suggestedQuestions;
 }
-

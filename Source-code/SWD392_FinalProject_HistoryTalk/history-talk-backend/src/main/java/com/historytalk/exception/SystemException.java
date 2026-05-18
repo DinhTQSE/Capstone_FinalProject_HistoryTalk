@@ -8,4 +8,3 @@ public class SystemException extends BaseException{
         super(message, HttpStatus.INTERNAL_SERVER_ERROR.value(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
-

@@ -87,24 +87,24 @@ public class QuizServiceImpl implements QuizService {
         
         try {
             UUID quizUuid = UUID.fromString(quizId);
-            log.debug("âœ“ Converted string ID to UUID: {}", quizUuid);
+            log.debug("✓ Converted string ID to UUID: {}", quizUuid);
             
             Quiz quiz = quizRepository.findById(quizUuid)
                     .orElseThrow(() -> {
-                        log.warn("âŒ Quiz not found in database (or soft deleted) for ID: {}", quizId);
+                        log.warn("❌ Quiz not found in database (or soft deleted) for ID: {}", quizId);
                         return new ResourceNotFoundException("Quiz not found with ID: " + quizId);
                     });
             
-            log.info("âœ“ Quiz found successfully: {} | Title: {}", quizId, quiz.getTitle());
+            log.info("✓ Quiz found successfully: {} | Title: {}", quizId, quiz.getTitle());
             return mapToStaffResponse(quiz);
         } catch (IllegalArgumentException e) {
-            log.error("âŒ Invalid UUID format: {}", quizId, e);
+            log.error("❌ Invalid UUID format: {}", quizId, e);
             throw new InvalidRequestException("Invalid quiz ID format: " + quizId);
         } catch (ResourceNotFoundException e) {
-            log.error("âŒ ResourceNotFoundException thrown: {}", e.getMessage());
+            log.error("❌ ResourceNotFoundException thrown: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            log.error("âŒ Unexpected error in getQuizByIdForStaff: {}", quizId, e);
+            log.error("❌ Unexpected error in getQuizByIdForStaff: {}", quizId, e);
             throw e;
         }
     }
@@ -783,4 +783,3 @@ public class QuizServiceImpl implements QuizService {
     }
 
 }
-

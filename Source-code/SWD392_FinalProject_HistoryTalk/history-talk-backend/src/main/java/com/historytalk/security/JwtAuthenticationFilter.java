@@ -19,20 +19,20 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * âš ï¸ SHARED FILE â€“ Team Coordination Required
+ * ⚠️ SHARED FILE – Team Coordination Required
  *
  * Extracts JWT from Authorization header and populates SecurityContext.
  *
  * JWT Claim Reading:
- *   - sub   â†’ email (username / principal name)
- *   - uid   â†’ user UUID
- *   - role  â†’ "USER", "STAFF", or "ADMIN"
+ *   - sub   → email (username / principal name)
+ *   - uid   → user UUID
+ *   - role  → "USER", "STAFF", or "ADMIN"
  *
  * Authorities built:
  *   - ROLE_<role>  (single authority matching the role claim)
  *
  * Fallback (for Swagger / manual testing):
- *   Header X-Staff-Id + X-Staff-Role supplied â†’ simulate staff authentication.
+ *   Header X-Staff-Id + X-Staff-Role supplied → simulate staff authentication.
  *   Only used when no JWT is present. Remove in production if desired.
  */
 @Slf4j
@@ -85,4 +85,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 }
-

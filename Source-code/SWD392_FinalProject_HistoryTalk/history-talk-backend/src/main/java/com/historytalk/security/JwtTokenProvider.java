@@ -89,4 +89,3 @@ public class JwtTokenProvider {
         return jwtExpirationInMs;
     }
 }
-

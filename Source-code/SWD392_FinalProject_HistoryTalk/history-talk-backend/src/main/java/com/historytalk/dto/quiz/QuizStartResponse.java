@@ -24,4 +24,3 @@ public class QuizStartResponse {
     private List<QuestionResponse> questions;
 
 }
-

@@ -8,4 +8,3 @@ public class DataConflictException extends BaseException{
         super(message, HttpStatus.CONFLICT.value(), HttpStatus.CONFLICT);
     }
 }
-

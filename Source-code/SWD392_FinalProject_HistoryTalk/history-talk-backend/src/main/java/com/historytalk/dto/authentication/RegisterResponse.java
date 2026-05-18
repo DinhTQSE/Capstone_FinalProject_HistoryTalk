@@ -17,4 +17,3 @@ public class RegisterResponse {
     private String role;
     private String message;
 }
-

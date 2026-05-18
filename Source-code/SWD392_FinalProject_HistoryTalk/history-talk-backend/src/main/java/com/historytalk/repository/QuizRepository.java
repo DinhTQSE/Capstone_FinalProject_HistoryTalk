@@ -74,4 +74,3 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     Optional<Quiz> findActiveByTitleIgnoreCase(@Param("title") String title);
 
 }
-

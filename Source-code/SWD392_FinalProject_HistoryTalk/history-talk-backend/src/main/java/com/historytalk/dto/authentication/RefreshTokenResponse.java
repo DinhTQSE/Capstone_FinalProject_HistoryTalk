@@ -16,4 +16,3 @@ public class RefreshTokenResponse {
     private String tokenType;
     private long expiresIn;
 }
-

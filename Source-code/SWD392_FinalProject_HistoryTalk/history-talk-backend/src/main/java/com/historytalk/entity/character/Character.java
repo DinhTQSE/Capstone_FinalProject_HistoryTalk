@@ -96,4 +96,3 @@ public class Character {
     private List<ChatSession> chatSessions = new ArrayList<>();
 
 }
-

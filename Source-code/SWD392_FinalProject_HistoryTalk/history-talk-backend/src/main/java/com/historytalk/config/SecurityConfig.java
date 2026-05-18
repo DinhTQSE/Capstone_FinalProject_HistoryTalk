@@ -28,17 +28,17 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * âš ï¸ SHARED FILE - Team Coordination Required
+ * ⚠️ SHARED FILE - Team Coordination Required
  *
  * This file manages API security for ALL modules.
  * When adding new modules, coordinate before modifying this file.
  *
  * ENDPOINT CONVENTION:
- * - /v1/historical-contexts/**  â†’ Historical Context Module
- * - /v1/historical-documents/** â†’ Historical Context Document Module
- * - /api/v1/auth/**             â†’ Auth Module (public)
- * - /swagger-ui/**              â†’ Public (Swagger)
- * - /v3/api-docs/**             â†’ Public (OpenAPI spec)
+ * - /v1/historical-contexts/**  → Historical Context Module
+ * - /v1/historical-documents/** → Historical Context Document Module
+ * - /api/v1/auth/**             → Auth Module (public)
+ * - /swagger-ui/**              → Public (Swagger)
+ * - /v3/api-docs/**             → Public (OpenAPI spec)
  */
 @Configuration
 @EnableWebSecurity
@@ -189,4 +189,3 @@ public class SecurityConfig {
         return source;
     }
 }
-

@@ -4,4 +4,3 @@ public enum DocumentType {
     TEXT,
     MARKDOWN
 }
-

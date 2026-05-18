@@ -19,4 +19,3 @@ public class AnswerDetailRequest {
     private Integer selectedAnswer;
 
 }
-

@@ -404,4 +404,3 @@ public class CharacterServiceImpl implements CharacterService {
         return "ACTIVE";
     }
 }
-

@@ -18,4 +18,3 @@ public class JwtProperties {
     @Value("${JWT_REFRESH_EXPIRATION_MS}")
     private long jwtRefreshTokenExpirationMs;
 }
-

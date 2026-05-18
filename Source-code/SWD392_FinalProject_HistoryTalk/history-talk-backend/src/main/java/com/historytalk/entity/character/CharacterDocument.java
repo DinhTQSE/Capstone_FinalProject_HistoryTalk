@@ -51,4 +51,3 @@ public class CharacterDocument {
     private LocalDateTime deletedAt;
 
 }
-

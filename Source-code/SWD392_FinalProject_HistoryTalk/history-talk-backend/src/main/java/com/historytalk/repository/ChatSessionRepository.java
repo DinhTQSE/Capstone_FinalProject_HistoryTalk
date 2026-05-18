@@ -41,4 +41,3 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     List<ChatSession> findAllByUserUid(@Param("userId") UUID userId,
                                        @Param("includeDeleted") boolean includeDeleted);
 }
-

@@ -19,4 +19,3 @@ public class SendMessageResponse {
     @JsonProperty("suggestedQuestions")
     private List<String> suggestedQuestions;
 }
-

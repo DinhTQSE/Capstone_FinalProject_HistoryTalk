@@ -15,7 +15,7 @@ public class SecurityUtils {
 
     /**
      * Returns the uid of the currently authenticated user.
-     * Extracted from the JWT claim â€” cannot be spoofed by the client.
+     * Extracted from the JWT claim — cannot be spoofed by the client.
      */
     public static String getUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -24,13 +24,13 @@ public class SecurityUtils {
         if (principal instanceof AuthenticatedPrincipal ap) {
             return ap.getUid();
         }
-        // Fallback: header-based testing â€” principal stored as staffId String
+        // Fallback: header-based testing — principal stored as staffId String
         return auth.getName();
     }
 
     /**
      * Returns the role (e.g. "ADMIN", "STAFF", "USER") of the currently authenticated user.
-     * Extracted from the JWT claim â€” cannot be spoofed by the client.
+     * Extracted from the JWT claim — cannot be spoofed by the client.
      */
     public static String getRoleName() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -48,4 +48,3 @@ public class SecurityUtils {
                 .orElse("USER");
     }
 }
-

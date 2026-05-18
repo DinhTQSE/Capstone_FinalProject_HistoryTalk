@@ -36,4 +36,3 @@ public class OpenApiConfig {
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 }
-

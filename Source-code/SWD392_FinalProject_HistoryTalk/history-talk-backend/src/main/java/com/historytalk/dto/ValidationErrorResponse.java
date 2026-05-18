@@ -34,4 +34,3 @@ public class ValidationErrorResponse {
         private String message;
     }
 }
-

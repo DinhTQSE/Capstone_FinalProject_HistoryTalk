@@ -1,11 +1,10 @@
 package com.historytalk.entity.enums;
 
 public enum EventCategory {
-    WAR,        // Chiáº¿n tranh
-    POLITICS,   // ChÃ­nh trá»‹
-    CULTURE,    // VÄƒn hoÃ¡
-    SCIENCE,    // Khoa há»c
-    RELIGION,   // TÃ´n giÃ¡o
-    OTHER       // KhÃ¡c
+    WAR,        // Chiến tranh
+    POLITICS,   // Chính trị
+    CULTURE,    // Văn hoá
+    SCIENCE,    // Khoa học
+    RELIGION,   // Tôn giáo
+    OTHER       // Khác
 }
-

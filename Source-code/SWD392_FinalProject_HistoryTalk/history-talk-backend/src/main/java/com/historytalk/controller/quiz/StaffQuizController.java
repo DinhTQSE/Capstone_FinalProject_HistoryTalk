@@ -261,4 +261,3 @@ public class StaffQuizController {
         return ResponseEntity.ok(ApiResponse.success(null, "Quiz result soft-deleted successfully"));
     }
 }
-

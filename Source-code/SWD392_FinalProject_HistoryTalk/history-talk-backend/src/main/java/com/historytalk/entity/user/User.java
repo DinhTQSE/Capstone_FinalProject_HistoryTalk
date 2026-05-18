@@ -57,4 +57,3 @@ public class User {
     private List<QuizResult> quizResults = new ArrayList<>();
 
 }
-

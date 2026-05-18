@@ -43,4 +43,3 @@ public class UpdateCharacterRequest {
     @JsonProperty("isDraft")
     private Boolean isDraft;
 }
-

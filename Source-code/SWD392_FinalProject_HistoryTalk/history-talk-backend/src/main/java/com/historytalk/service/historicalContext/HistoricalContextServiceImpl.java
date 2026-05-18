@@ -381,4 +381,3 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             return "ACTIVE";
         }
 }
-

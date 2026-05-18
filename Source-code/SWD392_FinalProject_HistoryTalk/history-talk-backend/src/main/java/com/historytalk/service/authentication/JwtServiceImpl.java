@@ -43,4 +43,3 @@ public class JwtServiceImpl implements JwtService {
         return jwtTokenProvider.getJwtExpirationInMs();
     }
 }
-

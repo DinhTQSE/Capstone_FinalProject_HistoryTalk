@@ -116,4 +116,3 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null, "Account deactivated successfully"));
     }
 }
-

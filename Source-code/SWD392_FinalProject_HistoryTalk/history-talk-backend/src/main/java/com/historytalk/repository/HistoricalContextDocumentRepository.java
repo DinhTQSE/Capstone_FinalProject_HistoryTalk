@@ -42,4 +42,3 @@ public interface HistoricalContextDocumentRepository extends JpaRepository<Histo
     @Query("SELECT d FROM HistoricalContextDocument d WHERE (:includeDeleted = true OR d.deletedAt IS NULL) ORDER BY d.uploadDate DESC")
     List<HistoricalContextDocument> findAllActive(@Param("includeDeleted") boolean includeDeleted);
 }
-

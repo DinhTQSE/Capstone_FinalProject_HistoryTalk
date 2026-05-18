@@ -66,7 +66,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
-    // Lá»—i validate @NotNull, @Pattern, @Size
+    // Lỗi validate @NotNull, @Pattern, @Size
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<InvalidArgumentResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = ex.getBindingResult()
@@ -75,7 +75,7 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.toMap(
                         fieldError -> fieldError.getField(),
                         DefaultMessageSourceResolvable::getDefaultMessage,
-                        (existing, replacement) -> existing // náº¿u cÃ³ trÃ¹ng field thÃ¬ giá»¯ lá»—i Ä‘áº§u tiÃªn
+                        (existing, replacement) -> existing // nếu có trùng field thì giữ lỗi đầu tiên
                 ));
 
         InvalidArgumentResponse errorResponse = new InvalidArgumentResponse(
@@ -90,12 +90,12 @@ public class GlobalExceptionHandler {
                 .body(errorResponse);
     }
 
-    // Lá»—i sai kiá»ƒu dá»¯ liá»‡u JSON khi mapping request sang DTO
+    // Lỗi sai kiểu dữ liệu JSON khi mapping request sang DTO
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<InvalidArgumentResponse> handleInvalidFormat(HttpMessageNotReadableException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
 
-        // Náº¿u lá»—i lÃ  InvalidFormatException
+        // Nếu lỗi là InvalidFormatException
         if (ex.getCause() instanceof InvalidFormatException ife) {
             String fieldName = ife.getPath().stream()
                     .map(JsonMappingException.Reference::getFieldName)
@@ -118,4 +118,3 @@ public class GlobalExceptionHandler {
     }
 
 }
-

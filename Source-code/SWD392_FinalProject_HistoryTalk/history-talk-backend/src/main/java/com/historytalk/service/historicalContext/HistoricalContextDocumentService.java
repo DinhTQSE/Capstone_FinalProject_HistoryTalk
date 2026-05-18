@@ -24,4 +24,3 @@ public interface HistoricalContextDocumentService {
 
     void deleteDocument(String docId, String userId, String userRole);
 }
-

@@ -106,4 +106,3 @@ public class CharacterResponse {
         private String userName;
     }
 }
-

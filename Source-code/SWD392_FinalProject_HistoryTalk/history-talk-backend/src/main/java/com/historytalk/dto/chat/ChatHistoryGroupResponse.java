@@ -19,4 +19,3 @@ public class ChatHistoryGroupResponse {
     @JsonProperty("sessions")
     private List<ChatHistorySessionItem> sessions;
 }
-

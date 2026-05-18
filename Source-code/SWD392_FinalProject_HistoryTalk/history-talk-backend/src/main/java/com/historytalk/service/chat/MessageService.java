@@ -8,4 +8,3 @@ public interface MessageService {
     GetMessagesResponse getMessages(String sessionId, String userId);
     SendMessageResponse sendMessage(String userId, SendMessageRequest request);
 }
-

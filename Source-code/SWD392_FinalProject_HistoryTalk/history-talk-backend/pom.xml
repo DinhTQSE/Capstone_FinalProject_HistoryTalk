@@ -38,7 +38,7 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- Security (náº¿u dÃ¹ng) -->
+        <!-- Security (nếu dùng) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -82,7 +82,7 @@
             <artifactId>flyway-core</artifactId>
         </dependency>
 
-        <!-- Lombok (FIX CHÃNH) -->
+        <!-- Lombok (FIX CHÍNH) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -129,7 +129,7 @@
     <build>
         <plugins>
 
-            <!-- Compiler (QUAN TRá»ŒNG) -->
+            <!-- Compiler (QUAN TRỌNG) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

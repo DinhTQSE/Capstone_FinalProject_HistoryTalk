@@ -18,4 +18,3 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByUserNameIgnoreCase(String userName);
 }
-

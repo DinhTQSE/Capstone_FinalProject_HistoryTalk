@@ -58,4 +58,3 @@ public class Question {
     private List<QuizAnswerDetail> answerDetails = new ArrayList<>();
 
 }
-

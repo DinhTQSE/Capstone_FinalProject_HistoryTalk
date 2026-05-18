@@ -152,4 +152,3 @@ public class CharacterController {
         return ResponseEntity.ok(ApiResponse.success(contexts, "Character contexts retrieved successfully"));
     }
 }
-

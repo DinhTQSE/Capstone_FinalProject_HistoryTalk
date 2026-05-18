@@ -30,4 +30,3 @@ public class MarkdownProcessorStrategy implements DocumentProcessorStrategy {
         return sanitized.trim();
     }
 }
-

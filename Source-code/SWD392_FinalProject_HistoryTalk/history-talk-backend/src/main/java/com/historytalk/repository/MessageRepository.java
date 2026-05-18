@@ -16,4 +16,3 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     List<Message> findByChatSessionSessionIdOrderByTimestampAsc(@Param("sessionId") UUID sessionId,
                                                                 @Param("includeDeleted") boolean includeDeleted);
 }
-

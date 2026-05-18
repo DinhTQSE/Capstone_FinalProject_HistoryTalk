@@ -25,4 +25,3 @@ public class QuizSubmitRequest {
     private Integer durationSeconds;
 
 }
-

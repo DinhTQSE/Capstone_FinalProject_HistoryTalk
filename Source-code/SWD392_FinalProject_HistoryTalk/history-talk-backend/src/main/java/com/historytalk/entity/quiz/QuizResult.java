@@ -56,4 +56,3 @@ public class QuizResult {
     private List<QuizAnswerDetail> answerDetails = new ArrayList<>();
 
 }
-

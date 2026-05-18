@@ -34,4 +34,3 @@ public class PaginatedResponse<T> {
     @JsonProperty("hasPrevious")
     private Boolean hasPrevious;
 }
-

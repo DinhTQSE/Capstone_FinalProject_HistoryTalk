@@ -17,4 +17,3 @@ public class CreateChatSessionRequest {
     @JsonProperty("characterId")
     private String characterId;
 }
-

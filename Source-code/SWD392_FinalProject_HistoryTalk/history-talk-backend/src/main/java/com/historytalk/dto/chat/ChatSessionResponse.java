@@ -31,4 +31,3 @@ public class ChatSessionResponse {
     @JsonProperty("messageCount")
     private int messageCount;
 }
-

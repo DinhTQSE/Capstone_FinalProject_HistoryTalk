@@ -27,4 +27,3 @@ public class HistoricalContextDocumentResponse {
     private LocalDateTime updatedDate;
     private LocalDateTime deletedAt;
 }
-

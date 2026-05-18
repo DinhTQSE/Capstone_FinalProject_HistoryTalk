@@ -15,4 +15,3 @@ public class InvalidArgumentResponse {
     private HttpStatus status;
     private LocalDateTime timestamp;
 }
-

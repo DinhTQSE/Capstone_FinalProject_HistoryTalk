@@ -32,4 +32,3 @@ public interface HistoricalContextService {
 
     void permanentDeleteContext(String contextId);
 }
-

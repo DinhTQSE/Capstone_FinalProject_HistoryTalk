@@ -37,7 +37,7 @@ public class MessageServiceImpl implements MessageService {
     private final AiServiceClient aiServiceClient;
     private final ObjectMapper objectMapper;
 
-    // â”€â”€ GET /chat/sessions/{id}/messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
     @Transactional(readOnly = true)
     public GetMessagesResponse getMessages(String sessionId, String userId) {
@@ -67,7 +67,7 @@ public class MessageServiceImpl implements MessageService {
                 .build();
     }
 
-    // â”€â”€ POST /chat/messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── POST /chat/messages ────────────────────────────────────────────────
 
     @Transactional
     public SendMessageResponse sendMessage(String userId, SendMessageRequest request) {
@@ -103,7 +103,7 @@ public class MessageServiceImpl implements MessageService {
                         m.getContent()))
                 .toList();
 
-        // Build payloads to pre-fill into AI request (avoids Pythonâ†’Java callback)
+        // Build payloads to pre-fill into AI request (avoids Python→Java callback)
         CharacterPayload characterData = AiServiceClient.buildCharacterPayload(session.getCharacter());
         ContextPayload contextData = AiServiceClient.buildContextPayload(
                 session.getHistoricalContext());
@@ -153,7 +153,7 @@ public class MessageServiceImpl implements MessageService {
                 .build();
     }
 
-    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Helpers ────────────────────────────────────────────────────────────
 
     private MessageResponse mapToMessageResponse(Message message) {
         return MessageResponse.builder()
@@ -185,4 +185,3 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 }
-

@@ -43,4 +43,3 @@ public class ChatHistorySessionItem {
     @JsonProperty("messageCount")
     private int messageCount;
 }
-

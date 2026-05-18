@@ -51,4 +51,3 @@ public class QuizSession {
     private LocalDateTime deletedAt;
 
 }
-

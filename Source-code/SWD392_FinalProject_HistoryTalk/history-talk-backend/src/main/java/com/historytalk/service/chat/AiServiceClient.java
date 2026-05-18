@@ -32,7 +32,7 @@ public class AiServiceClient {
         this.chatSessionRepository = chatSessionRepository;
     }
 
-    // â”€â”€ Inner payload types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Inner payload types ────────────────────────────────────────────────
 
     public record CharacterPayload(
             @JsonProperty("characterId") String characterId,
@@ -57,7 +57,7 @@ public class AiServiceClient {
 
     public record AiChatResult(String message, List<String> suggestedQuestions) {}
 
-    // â”€â”€ Internal request / response records â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Internal request / response records ───────────────────────────────
 
     record ChatRequest(
             @JsonProperty("characterId") String characterId,
@@ -90,11 +90,11 @@ public class AiServiceClient {
             @JsonProperty("success") boolean success,
             @JsonProperty("data") GenerateTitleData data) {}
 
-    // â”€â”€ Public methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Public methods ────────────────────────────────────────────────────
 
     /**
      * Calls BE-Python POST /v1/ai/chat.
-     * Passes characterData and contextData to skip the Pythonâ†’Java callback.
+     * Passes characterData and contextData to skip the Python→Java callback.
      */
     public AiChatResult chat(
             String characterId,
@@ -191,4 +191,3 @@ public class AiServiceClient {
                 ctx.getLocation());
     }
 }
-

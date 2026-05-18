@@ -32,4 +32,3 @@ public class UserInformationRequest {
             message = "Invalid email! please enter with the correct format of google mail. ")
     private String email;
 }
-

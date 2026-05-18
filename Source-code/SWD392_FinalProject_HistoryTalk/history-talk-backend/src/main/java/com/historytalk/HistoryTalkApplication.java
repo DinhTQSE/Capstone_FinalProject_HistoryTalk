@@ -12,4 +12,3 @@ public class HistoryTalkApplication {
         SpringApplication.run(HistoryTalkApplication.class, args);
     }
 }
-

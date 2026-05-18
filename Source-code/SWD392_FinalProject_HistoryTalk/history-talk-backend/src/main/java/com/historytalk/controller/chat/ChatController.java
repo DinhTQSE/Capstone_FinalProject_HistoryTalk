@@ -117,4 +117,3 @@ public class ChatController {
         return ResponseEntity.ok(ApiResponse.success(history, "Chat history retrieved successfully"));
     }
 }
-

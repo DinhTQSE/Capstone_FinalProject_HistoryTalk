@@ -27,4 +27,3 @@ public class TextProcessorStrategy implements DocumentProcessorStrategy {
         return content.trim();
     }
 }
-

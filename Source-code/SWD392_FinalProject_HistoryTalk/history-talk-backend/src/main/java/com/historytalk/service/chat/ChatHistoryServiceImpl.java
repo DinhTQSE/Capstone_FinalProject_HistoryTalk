@@ -136,4 +136,3 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
         } catch (Exception e) { return "[Deleted Context]"; }
     }
 }
-

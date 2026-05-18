@@ -69,4 +69,3 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
        @org.springframework.data.jpa.repository.Modifying
        int restoreById(@Param("contextId") UUID contextId);
 }
-

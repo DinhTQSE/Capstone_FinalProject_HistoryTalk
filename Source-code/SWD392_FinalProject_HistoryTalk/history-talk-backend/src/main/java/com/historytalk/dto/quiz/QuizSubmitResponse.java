@@ -26,4 +26,3 @@ public class QuizSubmitResponse {
     private List<Integer> wrongAnswers;
 
 }
-

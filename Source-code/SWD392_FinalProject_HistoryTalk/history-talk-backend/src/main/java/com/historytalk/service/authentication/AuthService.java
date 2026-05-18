@@ -22,4 +22,3 @@ public interface AuthService {
 
     void softDeleteUser(String targetUserId, String staffId);
 }
-

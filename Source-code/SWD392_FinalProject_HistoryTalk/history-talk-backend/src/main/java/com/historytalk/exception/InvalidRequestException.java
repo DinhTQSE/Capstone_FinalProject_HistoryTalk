@@ -8,4 +8,3 @@ public class InvalidRequestException extends BaseException {
         super(message, HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST);
     }
 }
-

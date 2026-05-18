@@ -72,4 +72,3 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
     @org.springframework.data.jpa.repository.Modifying
     int restoreById(@Param("characterId") UUID characterId);
 }
-

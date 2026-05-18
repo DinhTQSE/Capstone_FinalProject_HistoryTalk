@@ -273,4 +273,3 @@ public class AuthServiceImpl implements AuthService {
                 .setParameter("userId", userId).executeUpdate();
     }
 }
-

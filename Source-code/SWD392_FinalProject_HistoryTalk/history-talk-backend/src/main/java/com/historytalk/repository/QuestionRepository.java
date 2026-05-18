@@ -22,4 +22,3 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
                                                   @Param("includeDeleted") boolean includeDeleted);
 
 }
-

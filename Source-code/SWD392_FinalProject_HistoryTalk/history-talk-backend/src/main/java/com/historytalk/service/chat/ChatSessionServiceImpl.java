@@ -102,7 +102,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             AiChatResult greeting = aiServiceClient.chat(
                     character.getCharacterId().toString(),
                     selectedContext.getContextId().toString(),
-                    "HÃ£y chÃ o vÃ  giá»›i thiá»‡u ngáº¯n gá»n vá» báº£n thÃ¢n.",
+                    "Hãy chào và giới thiệu ngắn gọn về bản thân.",
                     Collections.emptyList(),
                     characterData,
                     contextData);
@@ -220,4 +220,3 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
     }
 }
-

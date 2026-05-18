@@ -223,4 +223,3 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
         return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
     }
 }
-

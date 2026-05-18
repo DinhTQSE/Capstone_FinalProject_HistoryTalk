@@ -57,4 +57,3 @@ public class CreateCharacterRequest {
     @Schema(deprecated = true, description = "Deprecated: use mapping APIs to link character with historical contexts")
     private List<String> contextIds;
 }
-

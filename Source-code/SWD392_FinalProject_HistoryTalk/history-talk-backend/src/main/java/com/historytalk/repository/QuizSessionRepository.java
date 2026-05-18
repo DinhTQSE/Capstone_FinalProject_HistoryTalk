@@ -13,4 +13,3 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     Optional<QuizSession> findBySessionId(UUID sessionId);
 
 }
-

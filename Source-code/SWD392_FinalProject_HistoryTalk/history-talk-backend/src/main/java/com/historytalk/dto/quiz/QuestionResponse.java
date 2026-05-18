@@ -29,4 +29,3 @@ public class QuestionResponse {
     private LocalDateTime deletedAt;
 
 }
-

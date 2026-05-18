@@ -63,4 +63,3 @@ public class ChatSession {
     private List<Message> messages = new ArrayList<>();
 
 }
-

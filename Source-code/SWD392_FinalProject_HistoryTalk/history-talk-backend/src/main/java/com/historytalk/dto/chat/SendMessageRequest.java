@@ -19,4 +19,3 @@ public class SendMessageRequest {
     @JsonProperty("content")
     private String content;
 }
-

@@ -24,4 +24,3 @@ public class UpdateHistoricalContextDocumentRequest {
     
     private DocumentType type;
 }
-

@@ -25,4 +25,3 @@ public class MessageResponse {
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;
 }
-

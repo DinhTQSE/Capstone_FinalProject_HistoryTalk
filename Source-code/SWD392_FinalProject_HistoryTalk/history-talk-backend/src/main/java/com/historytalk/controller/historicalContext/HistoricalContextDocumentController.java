@@ -152,4 +152,3 @@ public class HistoricalContextDocumentController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
-

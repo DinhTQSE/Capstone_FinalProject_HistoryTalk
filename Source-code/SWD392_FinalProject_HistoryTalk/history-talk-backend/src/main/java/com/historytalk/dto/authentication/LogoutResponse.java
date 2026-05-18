@@ -13,4 +13,3 @@ public class LogoutResponse {
 
     private String message;
 }
-

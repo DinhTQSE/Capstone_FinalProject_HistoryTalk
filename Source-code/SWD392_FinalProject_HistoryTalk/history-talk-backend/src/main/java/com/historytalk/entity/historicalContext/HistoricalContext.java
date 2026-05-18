@@ -102,4 +102,3 @@ public class HistoricalContext {
     private List<Quiz> quizzes = new ArrayList<>();
 
 }
-

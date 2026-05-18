@@ -30,4 +30,3 @@ public class QuizHistoryResponse {
     private LocalDateTime completedAt;
 
 }
-

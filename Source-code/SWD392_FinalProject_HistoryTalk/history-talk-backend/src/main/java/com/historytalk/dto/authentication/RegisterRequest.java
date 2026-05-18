@@ -29,4 +29,3 @@ public class RegisterRequest {
     @NotBlank(message = "Confirmation password is required")
     private String confirmPassword;
 }
-

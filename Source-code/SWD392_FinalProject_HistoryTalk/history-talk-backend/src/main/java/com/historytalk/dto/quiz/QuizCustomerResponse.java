@@ -38,4 +38,3 @@ public class QuizCustomerResponse {
     private LocalDateTime deletedAt;
 
 }
-

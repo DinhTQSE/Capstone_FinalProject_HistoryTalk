@@ -23,4 +23,3 @@ public class UserInformationResponse {
     private String avatarUrl;
     private LocalDateTime deletedAt;
 }
-

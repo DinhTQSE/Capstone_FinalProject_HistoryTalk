@@ -6,4 +6,3 @@ import java.util.List;
 public interface ChatHistoryService {
     List<ChatHistoryGroupResponse> getHistory(String userId);
 }
-

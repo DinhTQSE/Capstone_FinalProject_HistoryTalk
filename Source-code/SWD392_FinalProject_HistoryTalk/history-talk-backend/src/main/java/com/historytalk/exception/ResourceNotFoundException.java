@@ -7,4 +7,3 @@ public class ResourceNotFoundException extends BaseException{
         super(message, HttpStatus.NOT_FOUND.value(), HttpStatus.NOT_FOUND);
     }
 }
-

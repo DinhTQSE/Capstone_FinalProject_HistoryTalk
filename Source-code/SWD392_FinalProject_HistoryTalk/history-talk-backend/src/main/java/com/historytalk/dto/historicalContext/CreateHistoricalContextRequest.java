@@ -58,4 +58,3 @@ public class CreateHistoricalContextRequest {
     @JsonProperty("isDraft")
     private Boolean isDraft = true;
 }
-

@@ -26,4 +26,3 @@ public class UpdateQuizRequest {
     private Integer durationSeconds;
 
 }
-

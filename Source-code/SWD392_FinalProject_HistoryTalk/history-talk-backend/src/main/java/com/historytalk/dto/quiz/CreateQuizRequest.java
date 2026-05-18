@@ -38,4 +38,3 @@ public class CreateQuizRequest {
     private List<QuestionRequest> questions;
 
 }
-
