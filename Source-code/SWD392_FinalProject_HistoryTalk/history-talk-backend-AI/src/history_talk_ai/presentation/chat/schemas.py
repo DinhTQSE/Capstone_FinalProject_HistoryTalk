@@ -3,8 +3,8 @@
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.character import CharacterData
-from app.models.historical_context import HistoricalContextData
+from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
+from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
 
 # ── Request ───────────────────────────────────────────────────────────────────

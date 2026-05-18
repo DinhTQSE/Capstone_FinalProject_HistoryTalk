@@ -3,7 +3,7 @@
 import asyncio
 from fastapi import APIRouter, HTTPException, status
 
-from app.models.chat import (
+from history_talk_ai.presentation.chat.schemas import (
     ChatRequest,
     ChatResponse,
     ChatResponseData,
@@ -11,10 +11,11 @@ from app.models.chat import (
     GenerateTitleResponse,
     GenerateTitleResponseData,
 )
-from app.models.character import CharacterData
-from app.models.historical_context import HistoricalContextData
-from app.services import java_client, llm_service
-from app.services.java_client import JavaClientNotFoundError, JavaBackendError
+from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
+from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
+from history_talk_ai.dataaccess.java_backend import client as java_client
+from history_talk_ai.application.chat import service as llm_service
+from history_talk_ai.dataaccess.java_backend.client import JavaClientNotFoundError, JavaBackendError
 
 router = APIRouter(prefix="/v1/ai", tags=["AI Chat"])
 

@@ -3,8 +3,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.routers import chat
+from history_talk_ai.common.config.settings import settings
+from history_talk_ai.presentation.chat import router as chat_router
 
 app = FastAPI(
     title="HistoryTalk AI Service",
@@ -19,7 +19,6 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Allow all origins in development; restrict in production via environment variable.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat.router)
+app.include_router(chat_router.router)
 
 
 @app.get("/health", tags=["Health"])

@@ -2,9 +2,9 @@
 
 import httpx
 
-from app.config import settings
-from app.models.character import CharacterData
-from app.models.historical_context import HistoricalContextData
+from history_talk_ai.common.config.settings import settings
+from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
+from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
 
 class JavaBackendError(Exception):

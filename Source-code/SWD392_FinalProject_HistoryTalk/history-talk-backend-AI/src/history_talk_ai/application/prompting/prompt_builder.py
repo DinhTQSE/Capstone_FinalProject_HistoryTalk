@@ -1,7 +1,7 @@
 """Builds system prompts from character and historical-context data."""
 
-from app.models.character import CharacterData
-from app.models.historical_context import HistoricalContextData
+from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
+from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
 _CHAT_SYSTEM_TEMPLATE = """\
 Bạn đang nhập vai **{name}**, {title_line}một nhân vật trong lịch sử Việt Nam.

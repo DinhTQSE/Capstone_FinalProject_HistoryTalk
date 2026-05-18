@@ -6,11 +6,14 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
 from langchain_core.language_models import BaseChatModel
 
-from app.config import settings
-from app.models.character import CharacterData
-from app.models.historical_context import HistoricalContextData
-from app.models.chat import MessageHistoryItem
-from app.services.prompt_builder import build_chat_system_prompt, build_title_system_prompt
+from history_talk_ai.common.config.settings import settings
+from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
+from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
+from history_talk_ai.presentation.chat.schemas import MessageHistoryItem
+from history_talk_ai.application.prompting.prompt_builder import (
+    build_chat_system_prompt,
+    build_title_system_prompt,
+)
 
 
 # ── Structured output schemas ─────────────────────────────────────────────────

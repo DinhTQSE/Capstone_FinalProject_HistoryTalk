@@ -54,7 +54,7 @@ pip install -r requirements.txt
 ```bash
 python main.py
 # or
-uvicorn app.main:app --reload --port 8001
+uvicorn history_talk_ai.main:app --reload --port 8001 --app-dir src
 ```
 
 Swagger UI → [http://localhost:8001/docs](http://localhost:8001/docs)
