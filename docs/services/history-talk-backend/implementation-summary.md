@@ -87,7 +87,7 @@ but argument is of type 'java.lang.String'
 
 **Nguyên nhân:** Hibernate 6.3.1 có regression bug — `lower()` trong HQL bị reject ngay cả khi áp dụng lên entity path (`hc.name`), không chỉ riêng parameters.
 
-**Fix trong [HistoricalContextRepository.java](../src/main/java/com/historyTalk/repository/HistoricalContextRepository.java):**
+**Fix trong [HistoricalContextRepository.java](../../../Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/repository/HistoricalContextRepository.java):**
 - Thay `LOWER(hc.name) LIKE CONCAT('%', :search, '%')` bằng `hc.name ILIKE CONCAT('%', :search, '%')`
 - Hibernate 6 hỗ trợ `ILIKE` keyword trong HQL natively, dịch sang `ILIKE` trên PostgreSQL
 - Không cần `LOWER()` nữa — `ILIKE` đã xử lý case-insensitive matching
