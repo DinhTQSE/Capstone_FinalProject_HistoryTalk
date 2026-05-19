@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-19
 
-This document is the starting point for a new developer joining the HistoryTalk backend work. It summarizes repository state, service architecture, local setup, important modules, operational commands, and current caveats.
+This document summarizes repository state, service architecture, local setup, important modules, operational commands, and caveats. For the business-domain and durable technical transfer guide, read `docs/DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md`.
 
 ## 1. Repository Overview
 
@@ -30,7 +30,7 @@ docs/superpowers/
 
 The Java backend was restored to the conventional Spring Boot package structure on 2026-05-19. Do not reintroduce `presentation`, `application`, or `dataaccess` package roots for Java.
 
-## 2. Git And Push Status
+## 2. Git Working Rules
 
 Remote:
 
@@ -44,19 +44,27 @@ Current branch:
 main
 ```
 
-After fetching from `origin`, local `HEAD` and `origin/main` are both at:
+Use `git status -sb` before staging and pushing. Stage only intended files, and do not stage unrelated local edits.
+
+Do not commit new local-only or generated files:
 
 ```text
-5b8d70e docs: add repository contributor guidelines
+.env
+secretKey.properties
+API keys
+database passwords
+.codex/
+.idea/
+target/ build output
 ```
 
-There are no committed local commits waiting to push. There are uncommitted working-tree changes, so nothing new can be pushed until those changes are staged and committed.
+Some legacy `target/` artifacts may already be tracked. Do not stage new build output during normal work; cleanup of existing tracked artifacts should be a separate deliberate change.
 
-Important current working-tree caveat:
+The active Java backend directory is:
 
-- Tracked files under `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/` show as deleted.
-- The current Java service exists under `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/` and is currently untracked.
-- Treat this as an intended directory rename only if the team confirms it. Stage carefully with `git add` / `git mv` and do not include `.codex/`.
+```text
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
+```
 
 ## 3. System Architecture
 
@@ -294,7 +302,7 @@ src/main/resources/secretKey.properties
 
 This file is intentionally ignored by git through `**/secretKey.properties`.
 
-Note: `.env.example` in the Java service currently lists only some required values. New developers should verify all properties required by `application.properties`, especially `DB_SCHEMA`, `JWT_EXPIRATION_MS`, and `JWT_REFRESH_EXPIRATION_MS`.
+Note: `.env.example` in the Java service lists the expected local database, JWT, and AI service variables. Runtime loading still depends on the team's chosen local launch method.
 
 ## 6. Java Security Rules
 
@@ -583,9 +591,8 @@ git log --oneline HEAD..origin/main
 
 Git/worktree:
 
-- The current Java service is under `history-talk-backend-Java`, while many tracked deleted files still point to the old `history-talk-backend` path.
-- Before committing, decide whether the directory rename is intentional and stage it explicitly.
-- Do not stage `.codex/`.
+- Keep local-only files and generated output out of commits.
+- Do not stage `.codex/`, `.idea/`, service `.env` files, `secretKey.properties`, or new build output.
 
 Java environment:
 
@@ -601,6 +608,7 @@ Python:
 
 - The AI service has no `.env.example`.
 - Legacy empty `app/` folders remain after the `src/history_talk_ai` migration.
+- The AI Dockerfile still references the old `app.main:app` module path. Update it before relying on Docker for the AI service.
 
 Encoding:
 
@@ -609,16 +617,15 @@ Encoding:
 ## 13. Recommended First Day For A New Developer
 
 1. Pull latest `main`.
-2. Confirm the intended Java directory name with the team.
-3. Create local Java secret config with database/JWT values.
-4. Create AI `.env` with LLM and Java backend values.
-5. Run Java compile.
-6. Run Python import smoke check.
-7. Start PostgreSQL and verify database schema.
-8. Start Java backend on port 8080.
-9. Start AI backend on port 8001.
-10. Open Java Swagger and AI Swagger.
-11. Test auth login, a public content endpoint, and chat session flow.
+2. Create local Java secret config with database/JWT values.
+3. Create AI `.env` with LLM and Java backend values.
+4. Run Java compile or tests.
+5. Run Python import smoke check.
+6. Start PostgreSQL and verify database schema.
+7. Start Java backend on port 8080.
+8. Start AI backend on port 8001.
+9. Open Java Swagger and AI Swagger.
+10. Test auth login, a public content endpoint, and chat session flow.
 
 ## 14. Change Guidelines
 
