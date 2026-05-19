@@ -1,5 +1,7 @@
 # 3-Layer Architecture Refactor Implementation Plan
 
+> **Superseded on 2026-05-19:** Do not use this plan for the Java backend. The Java package structure has been restored to the Spring Boot convention documented in `docs/superpowers/specs/2026-05-18-3layer-architecture-restructure-design.md`: `controller`, `service`, `repository`, plus top-level supporting packages. This file is retained only as historical record of the rejected refactor.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Restructure both backend services into strict 3-layer architecture, normalize naming (`com.historytalk`, `history_talk_ai`), and centralize markdown documentation under root `docs/services` without behavior changes.

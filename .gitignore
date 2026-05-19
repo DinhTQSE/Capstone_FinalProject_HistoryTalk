@@ -3,8 +3,12 @@
 
 # Maven build directory
 Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/target/
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/target/
 !.mvn/wrapper/maven-wrapper.jar
 !.mvn/wrapper/maven-wrapper.properties
+
+# Local Codex agent state
+.codex/
 
 # IDE
 .idea/
