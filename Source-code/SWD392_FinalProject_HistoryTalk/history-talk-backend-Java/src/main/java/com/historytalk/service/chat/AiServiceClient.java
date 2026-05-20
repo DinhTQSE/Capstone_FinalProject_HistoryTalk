@@ -21,15 +21,18 @@ public class AiServiceClient {
 
     private final RestClient restClient;
     private final ChatSessionRepository chatSessionRepository;
+    private final AiMetricsService aiMetricsService;
 
     public AiServiceClient(
             @Value("${AI_SERVICE_URL:http://localhost:8001}") String aiServiceUrl,
             ChatSessionRepository chatSessionRepository,
+            AiMetricsService aiMetricsService,
             RestClient.Builder restClientBuilder) {
         this.restClient = restClientBuilder
                 .baseUrl(aiServiceUrl)
                 .build();
         this.chatSessionRepository = chatSessionRepository;
+        this.aiMetricsService = aiMetricsService;
     }
 
     // ── Inner payload types ────────────────────────────────────────────────
@@ -69,7 +72,8 @@ public class AiServiceClient {
 
     record ChatResponseData(
             @JsonProperty("message") String message,
-            @JsonProperty("suggestedQuestions") List<String> suggestedQuestions) {}
+            @JsonProperty("suggestedQuestions") List<String> suggestedQuestions,
+            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {}
 
     record ChatApiResponse(
             @JsonProperty("success") boolean success,
@@ -84,7 +88,8 @@ public class AiServiceClient {
             @JsonProperty("contextData") ContextPayload contextData) {}
 
     record GenerateTitleData(
-            @JsonProperty("title") String title) {}
+            @JsonProperty("title") String title,
+            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {}
 
     record GenerateTitleApiResponse(
             @JsonProperty("success") boolean success,
@@ -117,8 +122,11 @@ public class AiServiceClient {
             if (response == null || response.data() == null) {
                 throw new SystemException("Empty response from AI service");
             }
+            aiMetricsService.recordRequest("chat", "success");
+            aiMetricsService.recordTokens(response.data().tokenUsage());
             return new AiChatResult(response.data().message(), response.data().suggestedQuestions());
         } catch (RestClientException e) {
+            aiMetricsService.recordRequest("chat", "failure");
             log.error("AI service /chat call failed: {}", e.getMessage());
             throw new SystemException("AI service unavailable: " + e.getMessage());
         }
@@ -152,6 +160,8 @@ public class AiServiceClient {
                     .body(GenerateTitleApiResponse.class);
 
             if (response != null && response.data() != null) {
+                aiMetricsService.recordRequest("generate_title", "success");
+                aiMetricsService.recordTokens(response.data().tokenUsage());
                 String title = response.data().title();
                 chatSessionRepository.findById(UUID.fromString(sessionId)).ifPresent(session -> {
                     session.setTitle(title);
@@ -160,6 +170,7 @@ public class AiServiceClient {
                 });
             }
         } catch (Exception e) {
+            aiMetricsService.recordRequest("generate_title", "failure");
             log.warn("Failed to generate title for session {}: {}", sessionId, e.getMessage());
         }
     }

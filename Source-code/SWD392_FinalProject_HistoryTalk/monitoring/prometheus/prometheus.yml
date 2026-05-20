@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "historytalk-java-backend"
+    metrics_path: "/Historical-tell/actuator/prometheus"
+    static_configs:
+      - targets:
+          - "host.docker.internal:8080"
+        labels:
+          service: "history-talk-backend-java"
+
+  # Add this after the Python AI service exposes Prometheus metrics.
+  # - job_name: "historytalk-ai-backend"
+  #   metrics_path: "/metrics"
+  #   static_configs:
+  #     - targets:
+  #         - "host.docker.internal:8001"
+  #       labels:
+  #         service: "history-talk-backend-ai"
