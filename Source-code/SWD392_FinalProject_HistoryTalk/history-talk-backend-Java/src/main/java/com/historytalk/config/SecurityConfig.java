@@ -3,12 +3,16 @@ package com.historytalk.config;
 import com.historytalk.security.JwtAuthenticationFilter;
 import com.historytalk.security.JwtTokenProvider;
 import com.historytalk.service.authentication.CustomUserDetailsService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,6 +20,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -23,9 +28,9 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.http.HttpMethod;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * ⚠️ SHARED FILE - Team Coordination Required
@@ -49,6 +54,9 @@ public class SecurityConfig {
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
 
+    @Value("${monitoring.allowed-ips:127.0.0.1,0:0:0:0:0:0:0:1}")
+    private String monitoringAllowedIps;
+
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter(jwtTokenProvider);
@@ -70,7 +78,26 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
+
     @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/actuator/**")
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/prometheus")
+                        .access((authentication, context) ->
+                                new AuthorizationDecision(isMonitoringIpAllowed(context.getRequest())))
+                        .anyRequest().denyAll()
+                );
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -95,6 +122,31 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    private boolean isMonitoringIpAllowed(HttpServletRequest request) {
+        Set<String> allowedIps = List.of(monitoringAllowedIps.split(","))
+                .stream()
+                .map(String::trim)
+                .filter(ip -> !ip.isBlank())
+                .collect(Collectors.toSet());
+
+        String remoteAddr = request.getRemoteAddr();
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String firstForwardedIp = forwardedFor == null || forwardedFor.isBlank()
+                ? null
+                : forwardedFor.split(",")[0].trim();
+
+        return isIpInAllowedList(remoteAddr, allowedIps)
+                || (firstForwardedIp != null && isIpInAllowedList(firstForwardedIp, allowedIps));
+    }
+
+    private boolean isIpInAllowedList(String candidateIp, Set<String> allowedIps) {
+        if (candidateIp == null || candidateIp.isBlank()) {
+            return false;
+        }
+        return allowedIps.stream()
+                .anyMatch(allowed -> new IpAddressMatcher(allowed).matches(candidateIp));
     }
 
 //    @Bean
