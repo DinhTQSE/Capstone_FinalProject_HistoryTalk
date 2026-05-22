@@ -14,4 +14,4 @@ CREATE INDEX IF NOT EXISTS idx_character_publish_filter
     ON historical_schema."character" (deleted_at, is_draft, name);
 
 CREATE INDEX IF NOT EXISTS idx_context_publish_filter
-    ON historical_schema.historical_context (deleted_at, is_draft, created_date);
+    ON historical_schema.historical_context (deleted_at, is_draft, created_at);

@@ -19,7 +19,7 @@ public class QuizStartResponse {
 
     private String title;
 
-    private Integer durationSeconds;
+    private Integer limitedTime;
 
     private List<QuestionResponse> questions;
 

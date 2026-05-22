@@ -4,12 +4,14 @@ import com.historytalk.dto.historicalContext.CreateHistoricalContextRequest;
 import com.historytalk.dto.historicalContext.HistoricalContextResponse;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.historicalContext.UpdateHistoricalContextRequest;
+import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
+import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
         private final HistoricalContextRepository contextRepository;
         private final UserRepository userRepository;
+        private final DocumentRepository documentRepository;
     
     /**
      * Get all historical contexts with pagination and search
@@ -237,17 +240,17 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         contextRepository.save(context);
 
         // Cascade to Documents
-        if (context.getDocuments() != null) {
-            context.getDocuments().forEach(doc -> doc.setDeletedAt(now));
-        }
+        documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
+                context.getContextId(), EntityType.CONTEXT, true)
+            .forEach(doc -> doc.setDeletedAt(now));
 
         // Cascade to Characters and their children
         if (context.getCharacters() != null) {
             context.getCharacters().forEach(character -> {
                 character.setDeletedAt(now);
-                if (character.getDocuments() != null) {
-                    character.getDocuments().forEach(doc -> doc.setDeletedAt(now));
-                }
+                documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
+                                character.getCharacterId(), EntityType.CHARACTER, true)
+                        .forEach(doc -> doc.setDeletedAt(now));
                 if (character.getChatSessions() != null) {
                     character.getChatSessions().forEach(session -> {
                         session.setDeletedAt(now);
@@ -265,14 +268,6 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 quiz.setDeletedAt(now);
                 if (quiz.getQuestions() != null) {
                     quiz.getQuestions().forEach(q -> q.setDeletedAt(now));
-                }
-                if (quiz.getQuizResults() != null) {
-                    quiz.getQuizResults().forEach(result -> {
-                        result.setDeletedAt(now);
-                        if (result.getAnswerDetails() != null) {
-                            result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
-                        }
-                    });
                 }
                 // Note: QuizSessions aren't directly fetched via Quiz mapping usually, 
                 // but handled in @Where or soft-deleted individually. 

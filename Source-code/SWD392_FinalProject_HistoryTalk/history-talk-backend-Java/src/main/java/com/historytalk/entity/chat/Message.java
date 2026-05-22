@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -44,8 +45,12 @@ public class Message {
     private ChatSession chatSession;
 
     @CreationTimestamp
-    @Column(name = "timestamp", nullable = false, updatable = false)
-    private LocalDateTime timestamp;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Column(name = "suggested_questions", columnDefinition = "TEXT")
     private String suggestedQuestions;

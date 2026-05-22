@@ -13,20 +13,22 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class QuizHistoryResponse {
 
-    private String resultId;
+    private String sessionId;
 
     private String quizId;
 
     private String quizTitle;
 
-    private Integer score;
+    private Double score;
 
     private Integer totalQuestions;
 
     private Double percentage;
 
-    private Integer durationSeconds;
+    private Integer timeSpentSeconds;
 
-    private LocalDateTime completedAt;
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
 
 }

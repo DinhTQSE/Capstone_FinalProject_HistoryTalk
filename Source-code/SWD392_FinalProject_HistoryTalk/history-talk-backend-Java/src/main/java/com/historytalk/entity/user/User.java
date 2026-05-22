@@ -2,7 +2,6 @@ package com.historytalk.entity.user;
 
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.enums.UserRole;
-import com.historytalk.entity.quiz.QuizResult;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,15 +44,24 @@ public class User {
     @Column(name = "role", length = 50, nullable = false)
     private UserRole role;
 
+    @Builder.Default
+    @Transient
+    private Integer token = 0;
+
+    @Transient
+    private LocalDateTime lastActiveDate;
+
+    @Transient
+    private LocalDateTime createdDate;
+
+    @Transient
+    private LocalDateTime updatedDate;
+
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
 
     @Builder.Default
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<ChatSession> chatSessions = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    private List<QuizResult> quizResults = new ArrayList<>();
 
 }

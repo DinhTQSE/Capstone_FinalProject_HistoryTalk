@@ -162,7 +162,7 @@ public class MessageServiceImpl implements MessageService {
                 .sessionId(message.getChatSession().getSessionId().toString())
                 .role(message.getRole().name())
                 .content(message.getContent())
-                .createdAt(message.getTimestamp())
+                                .createdAt(message.getCreatedAt())
                 .build();
     }
 
