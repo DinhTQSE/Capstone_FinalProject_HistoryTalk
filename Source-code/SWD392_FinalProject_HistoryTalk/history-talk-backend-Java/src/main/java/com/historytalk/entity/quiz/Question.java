@@ -35,10 +35,10 @@ public class Question {
     private String content;
 
 //    @Lob
-    @Column(name = "options", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "options", columnDefinition = "TEXT", nullable = true)
     private String options;
 
-    @Column(name = "correct_answer", nullable = false)
+    @Column(name = "correct_answer", nullable = true)
     private Integer correctAnswer;
 
     @Column(name = "order_index", nullable = true)
@@ -52,7 +52,7 @@ public class Question {
     private LocalDateTime deletedAt;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdDate;
 
     @UpdateTimestamp

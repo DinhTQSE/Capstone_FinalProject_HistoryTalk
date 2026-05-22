@@ -57,15 +57,15 @@ public class Quiz {
     private Integer durationSeconds;
 
     @Builder.Default
-    @Column(name = "play_count", nullable = false)
+    @Column(name = "play_count", nullable = true)
     private Integer playCount = 0;
 
     @Builder.Default
-    @Column(name = "rating", nullable = false)
+    @Column(name = "rating", nullable = true)
     private Double rating = 0.0;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdDate;
 
     @UpdateTimestamp

@@ -47,7 +47,7 @@ public class QuizAnswerDetail {
     private LocalDateTime deletedAt;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdDate;
 
     @UpdateTimestamp

@@ -185,14 +185,14 @@ VALUES
     (
         gen_random_uuid(),
         'customer@historytalk.com',
-        '$2a$10$dKXT/D53pTf3OjnpWwKtOuAf3HWkEL6qggrPVpRz3wuRa.unajzPy',
+        '$2a$10$8pvPMT2jfy33l7sab.9yUOg8eR/nhwNt4Gom2k9UHk1ml8VomXY8C',
         'CUSTOMER',
         'CUSTOMER1'
      ),
     (
         gen_random_uuid(),
         'user@historytalk.com',
-        '$2a$10$dKXT/D53pTf3OjnpWwKtOuAf3HWkEL6qggrPVpRz3wuRa.unajzPy',
+        '$2a$10$8pvPMT2jfy33l7sab.9yUOg8eR/nhwNt4Gom2k9UHk1ml8VomXY8C',
         'STAFF',
         'STAFF1'
     )

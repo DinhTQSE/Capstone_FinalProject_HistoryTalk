@@ -27,10 +27,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "document", indexes = {
-        @Index(name = "idx_document_entity", columnList = "entity_id, entity_type"),
-        @Index(name = "idx_document_uploaded_by", columnList = "uploaded_by")
-})
+@Table(name = "document")
 @Getter
 @Setter
 @NoArgsConstructor

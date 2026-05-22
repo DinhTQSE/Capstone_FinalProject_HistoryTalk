@@ -39,7 +39,7 @@ public class QuizSession {
     @JoinColumn(name = "uid", nullable = false)
     private User user;
 
-    @Column(name = "start_time", nullable = false)
+    @Column(name = "start_time", nullable = true)
     private LocalDateTime startTime;
 
     @Column(name = "end_time")
@@ -52,11 +52,11 @@ public class QuizSession {
     private Double score;
 
     @Builder.Default
-    @Column(name = "is_submitted", nullable = false)
+    @Column(name = "is_submitted", nullable = true)
     private Boolean isSubmitted = false;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdDate;
 
     @UpdateTimestamp

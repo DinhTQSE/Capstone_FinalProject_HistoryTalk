@@ -8,8 +8,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -47,18 +45,16 @@ public class User {
     private UserRole role;
 
     @Builder.Default
-    @Column(name = "token", nullable = false)
+    @Transient
     private Integer token = 0;
 
-    @Column(name = "last_active_date")
+    @Transient
     private LocalDateTime lastActiveDate;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Transient
     private LocalDateTime createdDate;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Transient
     private LocalDateTime updatedDate;
 
     @Column(name = "deleted_at", nullable = true)
