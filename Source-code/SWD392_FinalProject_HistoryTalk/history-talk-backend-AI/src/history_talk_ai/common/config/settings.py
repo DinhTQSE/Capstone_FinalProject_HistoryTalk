@@ -10,11 +10,11 @@ class Settings(BaseSettings):
     # Request timeout in seconds when calling the Java backend
     JAVA_CLIENT_TIMEOUT: float = 10.0
 
-    # ── LLM ───────────────────────────────────────────────────────────────────
-    LLM_PROVIDER: Literal["openai", "google"] = "openai"
-    OPENAI_API_KEY: str = ""
-    GOOGLE_API_KEY: str = ""
-    LLM_MODEL: str = "gemini-2.5-flash-lite"
+    # ── LLM (Ollama) ──────────────────────────────────────────────────────────
+    OLLAMA_BASE_URL: str = "http://109.237.69.169/api/chat"
+    OLLAMA_USERNAME: str = "mtn_ai"
+    OLLAMA_PASSWORD: str = "130205"
+    LLM_MODEL: str = "qwen2.5:14b"
     LLM_TEMPERATURE: float = 0.7
     # Max tokens for character response (not counting the structured wrapper)
     LLM_MAX_TOKENS: int = 1024
