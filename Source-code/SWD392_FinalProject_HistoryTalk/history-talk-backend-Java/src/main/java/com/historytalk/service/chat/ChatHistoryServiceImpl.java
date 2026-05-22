@@ -75,7 +75,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
         List<Message> messages = session.getMessages();
 
         String lastMessage = messages.stream()
-                .max(Comparator.comparing(Message::getTimestamp))
+            .max(Comparator.comparing(Message::getCreatedAt))
                 .map(Message::getContent)
                 .orElse(null);
 
@@ -118,7 +118,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
     private String safeGetCharacterImage(ChatSession session) {
         try {
             var c = session.getCharacter();
-            return c != null ? c.getImage() : null;
+            return c != null ? c.getImageUrl() : null;
         } catch (Exception e) { return null; }
     }
 

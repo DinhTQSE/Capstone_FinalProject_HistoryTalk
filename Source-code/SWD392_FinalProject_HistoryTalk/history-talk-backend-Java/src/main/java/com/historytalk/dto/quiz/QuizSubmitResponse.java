@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class QuizSubmitResponse {
 
-    private String resultId;
+    private String sessionId;
 
     private Integer score;
 

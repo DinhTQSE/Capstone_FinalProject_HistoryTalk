@@ -30,7 +30,7 @@ ON CONFLICT (email) DO NOTHING;
 -- ============================================================
 INSERT INTO historical_context
     (context_id, name, description, era, category, year, start_year, end_year,
-     before_tcn, location, image_url, video_url, created_by, created_date, updated_date)
+     before_tcn, location, image_url, video_url, created_by, created_at, updated_at, is_draft)
 VALUES
     -- Nhà Trần & Kháng chiến chống Nguyên Mông
     ('b0000000-0000-0000-0000-000000000001'::uuid,
@@ -38,8 +38,8 @@ VALUES
      'Ba lần kháng chiến chống quân Nguyên Mông (1258, 1285, 1288) dưới triều đại nhà Trần là một trong những trang sử hào hùng nhất của dân tộc Việt Nam.',
      'MEDIEVAL', 'WAR', 1258, 1258, 1288, false,
      'Đại Việt', NULL, NULL,
-     'a0000000-0000-0000-0000-000000000002'::uuid,
-     NOW(), NOW()),
+    'a0000000-0000-0000-0000-000000000002'::uuid,
+    NOW(), NOW(), false),
 
     -- Chiến thắng Điện Biên Phủ
     ('b0000000-0000-0000-0000-000000000002'::uuid,
@@ -47,8 +47,8 @@ VALUES
      'Chiến dịch Điện Biên Phủ (13/3 – 7/5/1954) là trận đánh quyết định kết thúc cuộc kháng chiến chống thực dân Pháp, mở ra kỷ nguyên mới cho dân tộc Việt Nam.',
      'CONTEMPORARY', 'WAR', 1954, 1954, 1954, false,
      'Điện Biên Phủ, Tây Bắc Việt Nam', NULL, NULL,
-     'a0000000-0000-0000-0000-000000000002'::uuid,
-     NOW(), NOW()),
+    'a0000000-0000-0000-0000-000000000002'::uuid,
+    NOW(), NOW(), false),
 
     -- Hai Bà Trưng
     ('b0000000-0000-0000-0000-000000000003'::uuid,
@@ -56,35 +56,41 @@ VALUES
      'Cuộc khởi nghĩa của Hai Bà Trưng (năm 40) là cuộc khởi nghĩa đầu tiên trong lịch sử Việt Nam chống lại ách đô hộ của nhà Hán, giành lại độc lập trong 3 năm.',
      'ANCIENT', 'WAR', 40, 40, 43, false,
      'Mê Linh, Giao Chỉ', NULL, NULL,
-     'a0000000-0000-0000-0000-000000000001'::uuid,
-     NOW(), NOW())
+    'a0000000-0000-0000-0000-000000000001'::uuid,
+    NOW(), NOW(), false)
 ON CONFLICT (name) DO NOTHING;
 
 -- ============================================================
 -- 3. HISTORICAL CONTEXT DOCUMENTS (3 docs)
 -- ============================================================
-INSERT INTO historical_context_document
-    (doc_id, title, content, context_id, created_by, upload_date, updated_date)
+INSERT INTO document
+    (doc_id, entity_id, entity_type, title, content, document_type, uploaded_by, uploaded_date, updated_date)
 VALUES
     ('c0000000-0000-0000-0000-000000000001'::uuid,
+     'b0000000-0000-0000-0000-000000000001'::uuid,
+     'CONTEXT',
      'Diễn biến trận Bạch Đằng 1288',
      'Tháng 4 năm 1288, Hưng Đạo Vương Trần Quốc Tuấn đã bố trí trận địa cọc ngầm trên sông Bạch Đằng, đánh tan đoàn thuyền chiến của Ô Mã Nhi...',
-     'b0000000-0000-0000-0000-000000000001'::uuid,
+     'TEXT',
      'a0000000-0000-0000-0000-000000000002'::uuid,
      NOW(), NOW()),
 
     ('c0000000-0000-0000-0000-000000000002'::uuid,
+        'b0000000-0000-0000-0000-000000000002'::uuid,
+        'CONTEXT',
      'Chiến dịch Điện Biên Phủ – 56 ngày đêm',
      'Chiến dịch diễn ra trong 56 ngày đêm, chia làm 3 đợt tấn công. Đợt 1 (13-17/3): tiêu diệt cứ điểm Him Lam và Độc Lập...',
-     'b0000000-0000-0000-0000-000000000002'::uuid,
-     'a0000000-0000-0000-0000-000000000002'::uuid,
+        'TEXT',
+        'a0000000-0000-0000-0000-000000000002'::uuid,
      NOW(), NOW()),
 
     ('c0000000-0000-0000-0000-000000000003'::uuid,
+        'b0000000-0000-0000-0000-000000000003'::uuid,
+        'CONTEXT',
      'Hai Bà Trưng – Nữ vương đầu tiên',
      'Trưng Trắc và Trưng Nhị là hai chị em, con gái Lạc tướng huyện Mê Linh. Năm 40, hai bà phất cờ khởi nghĩa tại cửa sông Hát...',
-     'b0000000-0000-0000-0000-000000000003'::uuid,
-     'a0000000-0000-0000-0000-000000000001'::uuid,
+        'TEXT',
+        'a0000000-0000-0000-0000-000000000001'::uuid,
      NOW(), NOW())
 ON CONFLICT (doc_id) DO NOTHING;
 
@@ -92,35 +98,35 @@ ON CONFLICT (doc_id) DO NOTHING;
 -- 4. CHARACTERS (4 nhân vật lịch sử)
 -- ============================================================
 INSERT INTO "character"
-    (character_id, name, title, background, image, personality, lifespan, side, created_by)
+    (character_id, name, title, background, image_url, personality, born_date, death_date, created_by, is_draft, created_at, updated_at)
 VALUES
     ('d0000000-0000-0000-0000-000000000001'::uuid,
      'Trần Hưng Đạo',
      'Quốc công Tiết chế',
      'Trần Quốc Tuấn (1228–1300), tước Hưng Đạo Vương, là vị tướng tài ba đã ba lần đánh bại quân Nguyên-Mông xâm lược Đại Việt.',
-     NULL, 'Cương nghị, mưu lược, yêu nước, khoan dung', '1228–1300', 'Nhà Trần',
-     'a0000000-0000-0000-0000-000000000002'::uuid),
+     NULL, 'Cương nghị, mưu lược, yêu nước, khoan dung', '1228-01-01', '1300-01-01',
+     'a0000000-0000-0000-0000-000000000002'::uuid, false, NOW(), NOW()),
 
     ('d0000000-0000-0000-0000-000000000002'::uuid,
      'Trần Quốc Toản',
      'Hoài Văn Hầu',
      'Trần Quốc Toản (1267–1285) là một thiếu niên anh hùng trong cuộc kháng chiến chống Nguyên lần thứ hai, nổi tiếng với lá cờ "Phá cường địch, báo hoàng ân".',
-     NULL, 'Dũng cảm, nhiệt huyết, trung thành', '1267–1285', 'Nhà Trần',
-     'a0000000-0000-0000-0000-000000000002'::uuid),
+    NULL, 'Dũng cảm, nhiệt huyết, trung thành', '1267-01-01', '1285-01-01',
+    'a0000000-0000-0000-0000-000000000002'::uuid, false, NOW(), NOW()),
 
     ('d0000000-0000-0000-0000-000000000003'::uuid,
      'Võ Nguyên Giáp',
      'Đại tướng',
      'Đại tướng Võ Nguyên Giáp (1911–2013) là vị tướng huyền thoại, Tổng tư lệnh Quân đội Nhân dân Việt Nam, chỉ huy chiến thắng Điện Biên Phủ 1954.',
-     NULL, 'Thông minh, bình tĩnh, quyết đoán, nhân hậu', '1911–2013', 'Việt Nam Dân chủ Cộng hòa',
-     'a0000000-0000-0000-0000-000000000002'::uuid),
+    NULL, 'Thông minh, bình tĩnh, quyết đoán, nhân hậu', '1911-01-01', '2013-01-01',
+    'a0000000-0000-0000-0000-000000000002'::uuid, false, NOW(), NOW()),
 
     ('d0000000-0000-0000-0000-000000000004'::uuid,
      'Trưng Trắc',
      'Trưng Nữ Vương',
      'Trưng Trắc (?–43) là nữ vương đầu tiên trong lịch sử Việt Nam, lãnh đạo cuộc khởi nghĩa chống nhà Hán năm 40, xưng vương và đóng đô tại Mê Linh.',
-     NULL, 'Kiên cường, quả cảm, yêu nước, trọng nghĩa', '? – 43', 'Lạc Việt',
-     'a0000000-0000-0000-0000-000000000001'::uuid)
+    NULL, 'Kiên cường, quả cảm, yêu nước, trọng nghĩa', NULL, NULL,
+    'a0000000-0000-0000-0000-000000000001'::uuid, false, NOW(), NOW())
 ON CONFLICT (character_id) DO NOTHING;
 
 -- Liên kết Character ↔ HistoricalContext (many-to-many)
@@ -135,21 +141,25 @@ ON CONFLICT DO NOTHING;
 -- ============================================================
 -- 5. CHARACTER DOCUMENTS (2 docs)
 -- ============================================================
-INSERT INTO character_document
-    (doc_id, title, content, character_id, created_by, upload_date)
+INSERT INTO document
+    (doc_id, entity_id, entity_type, title, content, document_type, uploaded_by, uploaded_date)
 VALUES
     ('e0000000-0000-0000-0000-000000000001'::uuid,
+     'd0000000-0000-0000-0000-000000000001'::uuid,
+     'CHARACTER',
      'Hịch tướng sĩ – Trần Hưng Đạo',
      'Ta thường tới bữa quên ăn, nửa đêm vỗ gối; ruột đau như cắt, nước mắt đầm đìa; chỉ căm tức chưa xả thịt lột da, nuốt gan uống máu quân thù...',
-     'd0000000-0000-0000-0000-000000000001'::uuid,
+     'TEXT',
      'a0000000-0000-0000-0000-000000000002'::uuid,
      NOW()),
 
     ('e0000000-0000-0000-0000-000000000002'::uuid,
+        'd0000000-0000-0000-0000-000000000003'::uuid,
+        'CHARACTER',
      'Tiểu sử Đại tướng Võ Nguyên Giáp',
      'Võ Nguyên Giáp sinh ngày 25 tháng 8 năm 1911 tại làng An Xá, huyện Lệ Thủy, tỉnh Quảng Bình. Ông là một trong những vị tướng lỗi lạc nhất thế kỷ 20...',
-     'd0000000-0000-0000-0000-000000000003'::uuid,
-     'a0000000-0000-0000-0000-000000000002'::uuid,
+        'TEXT',
+        'a0000000-0000-0000-0000-000000000002'::uuid,
      NOW())
 ON CONFLICT (doc_id) DO NOTHING;
 
@@ -218,7 +228,7 @@ ON CONFLICT (question_id) DO NOTHING;
 -- 8. CHAT SESSIONS (2 sessions)
 -- ============================================================
 INSERT INTO chat_session
-    (session_id, uid, character_id, context_id, title, last_message_at, create_date)
+    (session_id, uid, character_id, context_id, title, last_message_at, created_at)
 VALUES
     ('10000000-0000-0000-0000-000000000001'::uuid,
      'a0000000-0000-0000-0000-000000000003'::uuid,
@@ -239,7 +249,7 @@ ON CONFLICT (session_id) DO NOTHING;
 -- 9. MESSAGES (4 messages, mỗi session 2 tin)
 -- ============================================================
 INSERT INTO message
-    (message_id, content, is_from_ai, role, session_id, "timestamp", suggested_questions)
+    (message_id, content, is_from_ai, role, session_id, created_at, suggested_questions)
 VALUES
     -- Session 1: User hỏi Trần Hưng Đạo
     ('11000000-0000-0000-0000-000000000001'::uuid,
@@ -271,68 +281,49 @@ VALUES
 ON CONFLICT (message_id) DO NOTHING;
 
 -- ============================================================
--- 10. QUIZ RESULTS (2 results: Customer làm 2 quiz)
--- ============================================================
-INSERT INTO quiz_result
-    (result_id, score, duration_seconds, uid, quiz_id, taken_date)
-VALUES
-    ('12000000-0000-0000-0000-000000000001'::uuid,
-     2, 180,
-     'a0000000-0000-0000-0000-000000000003'::uuid,
-     'f0000000-0000-0000-0000-000000000001'::uuid,
-     NOW()),
-
-    ('12000000-0000-0000-0000-000000000002'::uuid,
-     1, 420,
-     'a0000000-0000-0000-0000-000000000003'::uuid,
-     'f0000000-0000-0000-0000-000000000002'::uuid,
-     NOW())
-ON CONFLICT (result_id) DO NOTHING;
-
--- ============================================================
--- 11. QUIZ ANSWER DETAILS (4 answers)
--- ============================================================
-INSERT INTO quiz_answer_detail
-    (detail_id, selected_option, is_correct, result_id, question_id)
-VALUES
-    -- Result 1: Quiz Nguyên Mông – 2/2 đúng
-    ('13000000-0000-0000-0000-000000000001'::uuid,
-     'Trần Hưng Đạo', true,
-     '12000000-0000-0000-0000-000000000001'::uuid,
-     'f1000000-0000-0000-0000-000000000001'::uuid),
-
-    ('13000000-0000-0000-0000-000000000002'::uuid,
-     'Cọc ngầm trên sông', true,
-     '12000000-0000-0000-0000-000000000001'::uuid,
-     'f1000000-0000-0000-0000-000000000002'::uuid),
-
-    -- Result 2: Quiz ĐBP – 1/2 đúng
-    ('13000000-0000-0000-0000-000000000003'::uuid,
-     '56 ngày đêm', true,
-     '12000000-0000-0000-0000-000000000002'::uuid,
-     'f1000000-0000-0000-0000-000000000003'::uuid),
-
-    ('13000000-0000-0000-0000-000000000004'::uuid,
-     'Hồ Chí Minh', false,
-     '12000000-0000-0000-0000-000000000002'::uuid,
-     'f1000000-0000-0000-0000-000000000004'::uuid)
-ON CONFLICT (detail_id) DO NOTHING;
-
--- ============================================================
--- 12. QUIZ SESSIONS (2 sessions: 1 submitted, 1 in-progress)
+-- 10. QUIZ SESSIONS (2 sessions: 1 submitted, 1 in-progress)
 -- ============================================================
 INSERT INTO quiz_session
-    (session_id, quiz_id, uid, started_at, expires_at, is_submitted)
+    (session_id, quiz_id, uid, start_time, end_time, limited_time, score, is_submitted, created_at, updated_at)
 VALUES
     -- Session đã submit
     ('14000000-0000-0000-0000-000000000001'::uuid,
      'f0000000-0000-0000-0000-000000000001'::uuid,
      'a0000000-0000-0000-0000-000000000003'::uuid,
-     NOW() - INTERVAL '1 hour', NOW() - INTERVAL '50 minutes', true),
+     NOW() - INTERVAL '1 hour', NOW() - INTERVAL '50 minutes', 600, 2, true, NOW(), NOW()),
 
-    -- Session đang làm (chưa hết hạn)
+    -- Session đang làm (chưa nộp)
     ('14000000-0000-0000-0000-000000000002'::uuid,
      'f0000000-0000-0000-0000-000000000002'::uuid,
      'a0000000-0000-0000-0000-000000000003'::uuid,
-     NOW(), NOW() + INTERVAL '15 minutes', false)
+     NOW(), NULL, 900, NULL, false, NOW(), NOW())
 ON CONFLICT (session_id) DO NOTHING;
+
+-- ============================================================
+-- 11. QUIZ ANSWER DETAILS (4 answers)
+-- ============================================================
+INSERT INTO quiz_answer_detail
+    (detail_id, selected_option, is_correct, session_id, question_id)
+VALUES
+    -- Session 1: Quiz Nguyên Mông – 2/2 đúng
+    ('13000000-0000-0000-0000-000000000001'::uuid,
+     1, true,
+     '14000000-0000-0000-0000-000000000001'::uuid,
+     'f1000000-0000-0000-0000-000000000001'::uuid),
+
+    ('13000000-0000-0000-0000-000000000002'::uuid,
+     1, true,
+     '14000000-0000-0000-0000-000000000001'::uuid,
+     'f1000000-0000-0000-0000-000000000002'::uuid),
+
+    -- Session 1: Quiz ĐBP – 1/2 đúng (sample)
+    ('13000000-0000-0000-0000-000000000003'::uuid,
+     1, true,
+     '14000000-0000-0000-0000-000000000001'::uuid,
+     'f1000000-0000-0000-0000-000000000003'::uuid),
+
+    ('13000000-0000-0000-0000-000000000004'::uuid,
+     0, false,
+     '14000000-0000-0000-0000-000000000001'::uuid,
+     'f1000000-0000-0000-0000-000000000004'::uuid)
+ON CONFLICT (detail_id) DO NOTHING;

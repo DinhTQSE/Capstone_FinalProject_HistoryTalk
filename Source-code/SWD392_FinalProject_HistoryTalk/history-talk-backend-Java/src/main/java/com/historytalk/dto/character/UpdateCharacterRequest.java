@@ -24,21 +24,19 @@ public class UpdateCharacterRequest {
     @JsonProperty("background")
     private String background;
 
-    @JsonProperty("image")
+    @JsonProperty("imageUrl")
     @Size(max = 255, message = "Image URL must not exceed 255 characters")
-    private String image;
+    private String imageUrl;
 
     @JsonProperty("personality")
     @Size(max = 500, message = "Personality must not exceed 500 characters")
     private String personality;
 
-    @JsonProperty("lifespan")
-    @Size(max = 50, message = "Lifespan must not exceed 50 characters")
-    private String lifespan;
+    @JsonProperty("bornDate")
+    private java.time.LocalDate bornDate;
 
-    @JsonProperty("side")
-    @Size(max = 100, message = "Side must not exceed 100 characters")
-    private String side;
+    @JsonProperty("deathDate")
+    private java.time.LocalDate deathDate;
 
     @JsonProperty("isDraft")
     private Boolean isDraft;
