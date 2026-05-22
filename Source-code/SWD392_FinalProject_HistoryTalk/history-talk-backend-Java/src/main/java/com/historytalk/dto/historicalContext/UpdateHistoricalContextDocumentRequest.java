@@ -21,6 +21,9 @@ public class UpdateHistoricalContextDocumentRequest {
     
     @Size(min = 10, message = "Content must be at least 10 characters")
     private String content;
+
+    @Size(max = 500, message = "File URL must be at most 500 characters")
+    private String fileUrl;
     
     private DocumentType type;
 }

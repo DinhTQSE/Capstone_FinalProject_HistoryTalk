@@ -179,14 +179,20 @@ public class AiServiceClient {
      * Build CharacterPayload from a Character entity.
      */
     public static CharacterPayload buildCharacterPayload(com.historytalk.entity.character.Character c) {
+                String lifespan = null;
+                if (c.getBornDate() != null || c.getDeathDate() != null) {
+                        String born = c.getBornDate() != null ? c.getBornDate().toString() : "";
+                        String died = c.getDeathDate() != null ? c.getDeathDate().toString() : "";
+                        lifespan = (born + " - " + died).trim();
+                }
         return new CharacterPayload(
                 c.getCharacterId().toString(),
                 c.getName(),
                 c.getTitle(),
                 c.getBackground(),
                 c.getPersonality(),
-                c.getLifespan(),
-                c.getSide());
+                                lifespan,
+                                null);
     }
 
     /**

@@ -4,12 +4,13 @@ import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequ
 import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historytalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
 import com.historytalk.entity.historicalContext.HistoricalContext;
-import com.historytalk.entity.historicalContext.HistoricalContextDocument;
+import com.historytalk.entity.document.Document;
 import com.historytalk.entity.user.User;
 import com.historytalk.entity.enums.DocumentType;
+import com.historytalk.entity.enums.EntityType;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
-import com.historytalk.repository.HistoricalContextDocumentRepository;
+import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.service.historicalContext.strategy.DocumentProcessorFactory;
@@ -39,7 +40,7 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
 
     private static final long MAX_CONTENT_BYTES = 10 * 1024 * 1024; // 10MB
 
-    private final HistoricalContextDocumentRepository documentRepository;
+    private final DocumentRepository documentRepository;
     private final HistoricalContextRepository contextRepository;
     private final UserRepository userRepository;
     private final DocumentProcessorFactory documentProcessorFactory;
@@ -51,7 +52,7 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     public List<HistoricalContextDocumentResponse> getAllDocuments(String userRole) {
         log.info("Fetching all historical context documents");
         boolean includeDeleted = isStaffOrAdmin(userRole);
-        return documentRepository.findAllActive(includeDeleted)
+        return documentRepository.findAllActive(EntityType.CONTEXT, includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -64,7 +65,8 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     public List<HistoricalContextDocumentResponse> getDocumentsByContextId(String contextId, String userRole) {
         log.info("Fetching documents for context: {}", contextId);
         boolean includeDeleted = isStaffOrAdmin(userRole);
-        return documentRepository.findByHistoricalContextContextIdOrderByUploadDateDesc(UUID.fromString(contextId), includeDeleted)
+        return documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
+            UUID.fromString(contextId), EntityType.CONTEXT, includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -77,7 +79,8 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     public List<HistoricalContextDocumentResponse> getDocumentsByStaffId(String userId, String userRole) {
         log.info("Fetching documents uploaded by user: {}", userId);
         boolean includeDeleted = isStaffOrAdmin(userRole);
-        return documentRepository.findByCreatedByUidOrderByUploadDateDesc(UUID.fromString(userId), includeDeleted)
+        return documentRepository.findByUploadedByUidAndEntityTypeOrderByUploadDateDesc(
+            UUID.fromString(userId), EntityType.CONTEXT, includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -90,7 +93,7 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     public List<HistoricalContextDocumentResponse> searchDocuments(String search, String userRole) {
         log.info("Searching documents with keyword: {}", search);
         boolean includeDeleted = isStaffOrAdmin(userRole);
-        return documentRepository.search(normalize(search), includeDeleted)
+        return documentRepository.search(normalize(search), EntityType.CONTEXT, includeDeleted)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -102,8 +105,12 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     @Transactional(readOnly = true)
     public HistoricalContextDocumentResponse getDocumentById(String docId, String userRole) {
         log.info("Fetching document: {}", docId);
-        HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
+        Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+
+        if (doc.getEntityType() != EntityType.CONTEXT) {
+            throw new ResourceNotFoundException("Document not found: " + docId);
+        }
 
         if (!isStaffOrAdmin(userRole) && doc.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Document not found: " + docId);
@@ -129,15 +136,17 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
         DocumentProcessorStrategy processor = documentProcessorFactory.getStrategy(type);
         String processedContent = processor.processContent(request.getContent());
 
-        HistoricalContextDocument doc = HistoricalContextDocument.builder()
-            .historicalContext(context)
+        Document doc = Document.builder()
+            .entityId(context.getContextId())
+            .entityType(EntityType.CONTEXT)
             .createdBy(user)
             .title(request.getTitle())
+            .fileUrl(request.getFileUrl())
             .content(processedContent)
             .documentType(type)
             .build();
 
-        HistoricalContextDocument saved = documentRepository.save(doc);
+        Document saved = documentRepository.save(doc);
         log.info("Document created: {} with ID: {}", request.getTitle(), saved.getDocId());
         return mapToResponse(saved);
     }
@@ -149,8 +158,12 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     public HistoricalContextDocumentResponse updateDocument(String docId, UpdateHistoricalContextDocumentRequest request, String userId, String userRole) {
         log.info("Updating document: {} by user: {}", docId, userId);
         
-        HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
+        Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+
+        if (doc.getEntityType() != EntityType.CONTEXT) {
+            throw new ResourceNotFoundException("Document not found: " + docId);
+        }
         
         // Staff/Admin can update any document
         if (!isStaffOrAdmin(userRole)) {
@@ -160,6 +173,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
         
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             doc.setTitle(request.getTitle());
+        }
+
+        if (request.getFileUrl() != null) {
+            doc.setFileUrl(request.getFileUrl());
         }
         
         if (request.getType() != null) {
@@ -172,7 +189,7 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
             doc.setContent(processedContent);
         }
 
-        HistoricalContextDocument updated = documentRepository.save(doc);
+        Document updated = documentRepository.save(doc);
         log.info("Document updated: {}", docId);
         return mapToResponse(updated);
     }
@@ -184,8 +201,12 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     public void deleteDocument(String docId, String userId, String userRole) {
         log.info("Deleting document: {} by user: {}", docId, userId);
         
-        HistoricalContextDocument doc = documentRepository.findById(UUID.fromString(docId))
+        Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+
+        if (doc.getEntityType() != EntityType.CONTEXT) {
+            throw new ResourceNotFoundException("Document not found: " + docId);
+        }
         
         // Staff/Admin can delete any document
         if (!isStaffOrAdmin(userRole)) {
@@ -200,14 +221,15 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     /**
      * Map entity to response DTO
      */
-    private HistoricalContextDocumentResponse mapToResponse(HistoricalContextDocument doc) {
+    private HistoricalContextDocumentResponse mapToResponse(Document doc) {
         return HistoricalContextDocumentResponse.builder()
                 .docId(doc.getDocId().toString())
-                .contextId(doc.getHistoricalContext().getContextId().toString())
+                .contextId(doc.getEntityId().toString())
                 .uid(doc.getCreatedBy().getUid().toString())
                 .userName(doc.getCreatedBy().getUserName())
                 .title(doc.getTitle())
                 .content(doc.getContent())
+                .fileUrl(doc.getFileUrl())
                 .type(doc.getDocumentType())
                 .uploadDate(doc.getUploadDate())
                 .updatedDate(doc.getUpdatedDate())

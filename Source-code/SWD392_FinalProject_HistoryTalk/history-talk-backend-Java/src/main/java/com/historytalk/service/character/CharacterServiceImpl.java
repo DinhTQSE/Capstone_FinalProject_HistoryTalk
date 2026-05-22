@@ -5,12 +5,15 @@ import com.historytalk.dto.character.CharacterResponse;
 import com.historytalk.dto.character.CreateCharacterRequest;
 import com.historytalk.dto.character.UpdateCharacterRequest;
 import com.historytalk.entity.character.Character;
+import com.historytalk.entity.document.Document;
+import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.CharacterRepository;
+import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +39,7 @@ public class CharacterServiceImpl implements CharacterService {
     private final CharacterRepository characterRepository;
     private final HistoricalContextRepository contextRepository;
     private final UserRepository userRepository;
+    private final DocumentRepository documentRepository;
 
     @Transactional(readOnly = true)
     public PaginatedResponse<CharacterResponse> getAllCharacters(String search, String eraStr, int page, int limit, String role) {
@@ -105,10 +109,10 @@ public class CharacterServiceImpl implements CharacterService {
                 .name(request.getName())
                 .title(request.getTitle())
                 .background(request.getBackground())
-                .image(request.getImage())
+                .imageUrl(request.getImageUrl())
                 .personality(request.getPersonality())
-                .lifespan(request.getLifespan())
-                .side(request.getSide())
+                .bornDate(request.getBornDate())
+                .deathDate(request.getDeathDate())
             .isDraft(request.getIsDraft() != null ? request.getIsDraft() : true)
                 .historicalContexts(contexts)
                 .createdBy(user)
@@ -142,17 +146,17 @@ public class CharacterServiceImpl implements CharacterService {
         if (request.getBackground() != null && !request.getBackground().isBlank()) {
             character.setBackground(request.getBackground());
         }
-        if (request.getImage() != null) {
-            character.setImage(request.getImage());
+        if (request.getImageUrl() != null) {
+            character.setImageUrl(request.getImageUrl());
         }
         if (request.getPersonality() != null) {
             character.setPersonality(request.getPersonality());
         }
-        if (request.getLifespan() != null) {
-            character.setLifespan(request.getLifespan());
+        if (request.getBornDate() != null) {
+            character.setBornDate(request.getBornDate());
         }
-        if (request.getSide() != null) {
-            character.setSide(request.getSide());
+        if (request.getDeathDate() != null) {
+            character.setDeathDate(request.getDeathDate());
         }
         if (request.getIsDraft() != null) {
             character.setIsDraft(request.getIsDraft());
@@ -197,9 +201,9 @@ public class CharacterServiceImpl implements CharacterService {
         characterRepository.save(character);
 
         // Cascade soft-delete to documents
-        if (character.getDocuments() != null) {
-            character.getDocuments().forEach(doc -> doc.setDeletedAt(java.time.LocalDateTime.now()));
-        }
+        documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
+                character.getCharacterId(), EntityType.CHARACTER, true)
+            .forEach(doc -> doc.setDeletedAt(java.time.LocalDateTime.now()));
 
         // Cascade soft-delete to chat sessions
         if (character.getChatSessions() != null) {
@@ -298,14 +302,16 @@ public class CharacterServiceImpl implements CharacterService {
 
     private CharacterResponse mapToResponse(Character character) {
         HistoricalContext ctx = resolvePrimaryContext(character);
-        List<CharacterResponse.EventInfo> events = ctx == null ? List.of() : ctx.getDocuments().stream()
-                .map(doc -> CharacterResponse.EventInfo.builder()
-                        .id(doc.getDocId().toString())
-                        .name(doc.getTitle())
+        List<Document> contextDocs = ctx == null ? List.of() : documentRepository
+            .findByEntityIdAndEntityTypeOrderByUploadDateDesc(ctx.getContextId(), EntityType.CONTEXT, false);
+        List<CharacterResponse.EventInfo> events = contextDocs.stream()
+            .map(doc -> CharacterResponse.EventInfo.builder()
+                .id(doc.getDocId().toString())
+                .name(doc.getTitle())
                 .era(ctx.getEra())
                 .year(ctx.getYear())
-                        .build())
-                .collect(Collectors.toList());
+                .build())
+            .collect(Collectors.toList());
 
         List<CharacterResponse.ContextInfo> contexts = character.getHistoricalContexts().stream()
             .map(hc -> CharacterResponse.ContextInfo.builder()
@@ -319,10 +325,10 @@ public class CharacterServiceImpl implements CharacterService {
                 .name(character.getName())
                 .title(character.getTitle())
                 .background(character.getBackground())
-                .image(character.getImage())
+                .imageUrl(character.getImageUrl())
                 .personality(character.getPersonality())
-                .lifespan(character.getLifespan())
-                .side(character.getSide())
+                .bornDate(character.getBornDate())
+                .deathDate(character.getDeathDate())
                 .isDraft(character.getIsDraft())
                 .deletedAt(character.getDeletedAt())
                 .status(buildStatus(character.getIsDraft(), character.getDeletedAt()))
@@ -337,6 +343,8 @@ public class CharacterServiceImpl implements CharacterService {
                         .uid(character.getCreatedBy().getUid().toString())
                         .userName(character.getCreatedBy().getUserName())
                         .build())
+                .createdDate(character.getCreatedDate())
+                .updatedDate(character.getUpdatedDate())
                 .build();
     }
 

@@ -28,17 +28,17 @@ public class CharacterResponse {
     @JsonProperty("background")
     private String background;
 
-    @JsonProperty("image")
-    private String image;
+    @JsonProperty("imageUrl")
+    private String imageUrl;
 
     @JsonProperty("personality")
     private String personality;
 
-    @JsonProperty("lifespan")
-    private String lifespan;
+    @JsonProperty("bornDate")
+    private java.time.LocalDate bornDate;
 
-    @JsonProperty("side")
-    private String side;
+    @JsonProperty("deathDate")
+    private java.time.LocalDate deathDate;
 
     @JsonProperty("isDraft")
     private Boolean isDraft;
@@ -63,6 +63,12 @@ public class CharacterResponse {
 
     @JsonProperty("deletedAt")
     private LocalDateTime deletedAt;
+
+    @JsonProperty("createdDate")
+    private LocalDateTime createdDate;
+
+    @JsonProperty("updatedDate")
+    private LocalDateTime updatedDate;
 
     @Data
     @NoArgsConstructor

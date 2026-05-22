@@ -1,121 +1,198 @@
-# History Talk Backend – AI Guide
+# History Talk Backend - Agent Guide
 
-## Project Overview
-- **Stack**: Spring Boot 3.2 / Java 21 / PostgreSQL / Hibernate 6.3 / Maven
-- **Root**: `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend`
-- **Context path**: `/Historical-tell` — all API paths are `/Historical-tell/v1/...`
-- **Swagger UI**: `http://localhost:8080/Historical-tell/api/v1/swagger-ui`
-- **Layer order**: Controller → Service → Repository, with DTOs between every layer boundary
+This file is the single source of truth for rules, architecture, and conventions in the history-talk-backend-Java codebase. Keep it accurate and aligned with the code. If behavior in code differs from this guide, update this guide to match the code.
 
-## Package Structure
-```
-com.historyTalk
-├── config/          # SecurityConfig, SpringSecurityConfig, OpenApiConfig, SwaggerConfig
-├── controller/
-│   ├── authentication/   # AuthController
-│   └── historicalContext/ # HistoricalContextController, HistoricalContextDocumentController
-├── dto/
-│   ├── authentication/   # LoginRequest/Response, RegisterRequest/Response, RefreshTokenResponse
-│   ├── historicalContext/ # Create/Update/Response DTOs for context and document
-│   ├── exception/        # InvalidArgumentResponse
-│   ├── user/             # UserInformationResponse
-│   ├── ApiResponse.java
-│   ├── PaginatedResponse.java
-│   └── ValidationErrorResponse.java
-├── entity/
-│   ├── ContextStatus.java (enum – unused, kept for future)
-│   ├── enums/     # UserRole (enum: CUSTOMER | STAFF | ADMIN)
-│   ├── user/      # User (has UserRole role directly)
-│   ├── historicalContext/ # HistoricalContext, HistoricalContextDocument
-│   ├── character/ # Character, CharacterDocument
-│   ├── chat/      # ChatSession, Message
-│   └── quiz/      # Quiz, Question, QuizResult, QuizAnswerDetail
-├── exception/
-│   ├── BaseException.java (abstract, holds errorCode + HttpStatus)
-│   ├── ResourceNotFoundException.java  → 404
-│   ├── DataConflictException.java      → 409
-│   ├── InvalidRequestException.java    → 400
-│   ├── UnauthorizedException.java      → 401
-│   ├── SystemException.java            → 500
-│   ├── BusinessRuleViolationException  → RuntimeException (uncategorized rule breaks)
-│   └── GlobalExceptionHandler.java
-├── repository/    # HistoricalContextRepository, HistoricalContextDocumentRepository,
-│                  # UserRepository
-├── security/      # JwtAuthenticationFilter, JwtTokenProvider, UserPrincipal, AuthenticatedPrincipal
-├── service/
-│   ├── authentication/ # AuthService (interface), AuthServiceImpl, JwtService, JwtServiceImpl,
-│   │                   # CustomUserDetailsService
-│   └── historicalContext/ # HistoricalContextService, HistoricalContextDocumentService
-├── mapper/        # (character/, historicalContext/, user/ sub-packages)
-└── utils/
-    ├── authentication/
-    └── SecurityUtils.java  # getUserId(), getRoleName() from SecurityContext
+## Quick Facts
+- Stack: Spring Boot 3.2, Java 21, PostgreSQL, Hibernate 6.x, Maven.
+- Root: Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java.
+- Context path: /Historical-tell, all API paths are /Historical-tell/api/v1/....
+- Swagger UI: http://localhost:8080/Historical-tell/api/v1/swagger-ui.
+- Layer order: Controller -> Service -> Repository, with DTOs between every layer boundary.
+
+## Architecture Overview
+Request flow:
+1) Controller validates input DTOs with @Valid and extracts user identity from SecurityUtils.
+2) Service handles authorization, ownership checks, business rules, and mapping to DTOs.
+3) Repository performs persistence and search queries.
+4) GlobalExceptionHandler maps BaseException to ErrorResponse.
+
+Mermaid sequence of a typical request:
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Controller
+  participant Service
+  participant Repository
+  participant DB
+  Client->>Controller: HTTP request
+  Controller->>Service: Validate + map input
+  Service->>Repository: Domain query/update
+  Repository->>DB: SQL
+  DB-->>Repository: Result
+  Repository-->>Service: Entity
+  Service-->>Controller: DTO
+  Controller-->>Client: ApiResponse or ErrorResponse
 ```
 
-## Entity & ID Conventions
-- **All primary keys are `UUID` type** with `@GeneratedValue + @UuidGenerator` — Hibernate auto-generates, stored as PostgreSQL native `uuid` column (16 bytes).
-- **No `@PrePersist` for ID generation** — only use `@PrePersist` for setting non-null default values (e.g. `isFromAi = false`).
-- FK relations use `@ManyToOne` / `@OneToMany(mappedBy=...)` with `FetchType.LAZY`.
-- When a service receives an ID from a controller `@PathVariable` (String), convert with `UUID.fromString(id)` before calling repository.
-- When mapping entity → DTO, call `.toString()` on UUID fields.
+## Package Map
+Base package: com.historytalk
 
-## Exception Hierarchy — Use These, Never Create Ad-hoc
-| Class | HTTP | When to use |
-|---|---|---|
-| `ResourceNotFoundException` | 404 | Entity not found by ID / name |
-| `DataConflictException` | 409 | Duplicate name, unique constraint violation |
-| `InvalidRequestException` | 400 | Business rule validation failures |
-| `UnauthorizedException` | 401 | Bad credentials, invalid/expired token |
-| `SystemException` | 500 | Unexpected infrastructure errors |
-| `BusinessRuleViolationException` | — (RuntimeException) | Misc rule violations not covered above |
+- config: SecurityConfig and related security/Swagger setup.
+- controller: REST endpoints grouped by module.
+  - authentication: AuthController
+  - character: CharacterController
+  - chat: ChatController
+  - historicalContext: HistoricalContextController, HistoricalContextDocumentController
+  - quiz: QuizController
+- dto: Request/response contracts plus ApiResponse and PaginatedResponse.
+- entity: JPA entities, enums, and shared entity types.
+- exception: BaseException hierarchy and GlobalExceptionHandler.
+- repository: Spring Data JPA repositories.
+- security: JWT filter/provider and security principals.
+- service: Business logic, module subpackages.
+- utils: SecurityUtils and helper utilities.
 
-All exceptions extend `BaseException(message, errorCode, httpStatus)` except `BusinessRuleViolationException` which extends `RuntimeException` directly.  
-`GlobalExceptionHandler` catches `BaseException` subclasses and returns `ErrorResponse` with `errorCode`, `message`, `status`, `timestamp`. Do NOT return `ApiResponse` for exceptions — use `ErrorResponse`.
+## API Base Paths
+Controllers are under /api/v1 and are prefixed by /Historical-tell from spring.mvc.servlet.path.
+Examples:
+- /Historical-tell/api/v1/auth
+- /Historical-tell/api/v1/characters
+- /Historical-tell/api/v1/historical-contexts
+- /Historical-tell/api/v1/historical-documents
+- /Historical-tell/api/v1/chat
+- /Historical-tell/api/v1/quizzes
 
-## Request/Response Patterns
-- All **successful** HTTP responses wrap payloads: `ApiResponse.success(data, "message")` or `ApiResponse.error(message, errorCode)`.
-- Paginated list endpoints return `PaginatedResponse<T>` (fields: `content`, `totalElements`, `totalPages`, `currentPage`, `pageSize`, `hasNext`, `hasPrevious`).
-- Simple list endpoints (no pagination) return `List<T>` wrapped in `ApiResponse.success(...)`.
-- `@Valid` on request DTOs — validation errors flow through `GlobalExceptionHandler.handleMethodArgumentNotValid` → returns `ValidationErrorResponse` with list of `{field, message}`.
+## Module Responsibilities and Rules
 
-## Security & Authentication
-- Auth module: `POST /v1/auth/register`, `POST /v1/auth/login`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`.
-- JWT stored as Bearer token; `JwtTokenProvider` signs with HS512; `JwtAuthenticationFilter` validates on each request.
-- `SecurityConfig` — **shared file, coordinate before editing**:
-  - `GET /Historical-tell/v1/**` → public
-  - Mutating verbs (`POST/PUT/DELETE /v1/**`) → require authenticated JWT
-  - `@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")` on write endpoints
-- `UserPrincipal` wraps `User` entity for Spring Security; `uid` is stored as `String` (`.toString()` from UUID). Authority is a single `ROLE_<role>` derived from `UserRole`.
-- **JWT claims**: `sub` (email), `uid`, `role` (e.g. `"CUSTOMER"`, `"STAFF"`, `"ADMIN"`).
-- **`AuthenticatedPrincipal`**: lightweight object set as the `Authentication` principal after JWT validation. Fields: `email`, `uid`, `role`. Populated directly from JWT claims — no DB call.
-- **`SecurityUtils`** (`utils/SecurityUtils.java`): use `SecurityUtils.getUserId()` and `SecurityUtils.getRoleName()` in controllers to get caller identity. **Never** read `X-Staff-Id` / `X-Staff-Role` headers in business logic — they can be spoofed.
-- `X-Staff-Id` / `X-Staff-Role` headers exist only as a fallback in `JwtAuthenticationFilter` for Swagger testing without a token. Do not add them as `@RequestHeader` parameters on any write endpoint.
-- CORS is wide-open (`allowedOrigins = "*"`) with stateless sessions.
+### Authentication Module
+- Endpoints: register, login, refresh-token, logout, user deactivation.
+- Controller uses AuthService and returns ApiResponse wrappers.
+- staff/admin registration endpoint is currently commented out in controller; do not enable without coordinating security rules.
 
-## Repository Conventions
-- `HistoricalContextRepository`: `findAllSimple(search)` (list, ordered), `findAllWithSearch(search, pageable)` (paginated), `findByCreatedByUid(UUID, Pageable)`.
-- `HistoricalContextDocumentRepository`: `search(keyword)`, `findByHistoricalContextContextIdOrderByUploadDateDesc(UUID)`, `findByCreatedByUidOrderByUploadDateDesc(UUID)`.
-- Use `ILIKE` (not `LOWER()`) for case-insensitive search in JPQL — Hibernate 6.3 rejects `LOWER()` on entity path expressions.
-- Normalize search input to lowercase in Java before passing to `ILIKE` queries.
+Rules:
+- Use JWT in Authorization: Bearer <token>.
+- AuthService is the only place for auth business logic; controllers are thin.
 
-## Data & Validation Rules
-- `HistoricalContext.name` must be unique (case-insensitive). Use `DataConflictException` for duplicates.
-- `HistoricalContextDocument.content` is capped at **10 MB** (validated via UTF-8 byte length). Follow this pattern for any large text fields.
-- Ownership checks on mutating ops: get `userId` via `SecurityUtils.getUserId()` and `role` via `SecurityUtils.getRoleName()` — compare `entity.getCreatedBy().getUid()` with `UUID.fromString(userId)`; allow bypass if `role.equalsIgnoreCase("ADMIN")`.
-- `User.email` and `User.userName` must be unique (`unique = true` on `@Column`).
-- All content entities (`HistoricalContext`, `HistoricalContextDocument`, `Character`, `CharacterDocument`, `Quiz`) use `@ManyToOne User createdBy` with `@JoinColumn(name="created_by")` instead of a Staff FK.
+### Character Module
+- CharacterController provides CRUD and context mapping endpoints.
+- Role gating: create/update/delete/soft-delete and mapping endpoints require STAFF or ADMIN.
+
+Rules:
+- Include role-based visibility for draft/deleted entities in service logic.
+- Mapping between characters and contexts uses dedicated service methods; validate ownership and role before mutating.
+
+### Historical Context Module
+- HistoricalContextController provides list, detail, create, update, delete, and soft delete.
+- Uses pagination and sorting in controller; service enforces role rules for draft/deleted visibility.
+
+Rules:
+- Search filters: search, era, category, includeDraft, includeDeleted.
+- Soft delete cascades to related entities (documents, characters, quizzes) in service layer.
+
+### Historical Context Document Module
+- HistoricalContextDocumentController provides list, search, detail, create, update, and delete.
+- Create/update/delete require STAFF or ADMIN.
+
+Rules:
+- Content size caps must be enforced in service (large text fields).
+- For public reads, respect draft/deleted rules based on role.
+
+### Chat Module
+- ChatController manages sessions, messages, and chat history.
+- Sessions are created per user, character, and context.
+
+Rules:
+- Ownership: non-staff users only operate on their own sessions.
+- Staff/admin can delete any session (service checks role before choosing repo query).
+- A greeting message is generated by AI on session creation.
+- Suggested questions are stored as JSON in Message.suggestedQuestions.
+
+### Quiz Module
+- QuizController exposes customer-focused quiz endpoints and results.
+
+Rules:
+- Start/submit/history endpoints require CUSTOMER role.
+- Soft delete for results/sessions must enforce ownership rules in service.
+
+## Security Model
+- JWT is the primary auth mechanism; JwtAuthenticationFilter validates and sets AuthenticatedPrincipal.
+- SecurityConfig defines public and protected endpoints.
+- SecurityUtils.getUserId() and SecurityUtils.getRoleName() must be used to get identity/role.
+- Do not add X-Staff-Id or X-Staff-Role headers to controller method signatures.
+
+SecurityConfig default rules (current behavior):
+- Swagger and OpenAPI endpoints are public.
+- /api/v1/auth/** is public.
+- GET for characters, historical contexts, documents, and quizzes is public.
+- /api/v1/chat/** is authenticated.
+- POST/PATCH for quizzes is authenticated.
+
+## Response and Error Handling
+
+### Success Responses
+- Always wrap payloads in ApiResponse.success(data, message).
+- For paginated endpoints, use PaginatedResponse<T> within ApiResponse.
+- Return empty body with 204 only when controller explicitly uses ResponseEntity.noContent().
+
+### Error Responses
+- Use BaseException subclasses for expected errors:
+  - ResourceNotFoundException (404)
+  - DataConflictException (409)
+  - InvalidRequestException (400)
+  - UnauthorizedException (401)
+  - SystemException (500)
+  - BusinessRuleViolationException for misc rule breaks (RuntimeException)
+- GlobalExceptionHandler builds ErrorResponse for BaseException types.
+- Validation errors from @Valid return InvalidArgumentResponse with field error map.
+
+## DTO and Validation Conventions
+- Controllers accept request DTOs with @Valid.
+- Services map entities to response DTOs and never return entities directly.
+- When mapping UUID to DTO, convert to String with .toString().
+- Keep response types stable; add fields only if required by frontend.
+
+## Entity and Persistence Conventions
+- Primary keys are UUID with @GeneratedValue + @UuidGenerator.
+- Use @ManyToOne/@OneToMany with FetchType.LAZY.
+- Soft delete is represented by deletedAt timestamp; includeDeleted toggles in queries.
+- Draft items use isDraft flag; includeDraft toggles in queries.
+- createdBy is a User reference on content entities.
+
+Repository query rules:
+- Use ILIKE for case-insensitive search in JPQL.
+- Do not use LOWER() on entity path expressions (Hibernate 6.x restriction).
+
+## AI Integration (Chat)
+- AiServiceClient uses RestClient.Builder injected by Spring Boot; do not replace with RestClient.builder().
+- /v1/ai/chat is synchronous; /v1/ai/generate-title is asynchronous.
+- Always send characterData and contextData in AI payloads to avoid cross-service callbacks.
+- Inner records used for payloads must be package-private or public for Jackson to serialize.
+
+## Database and Migrations
+- DB settings are injected via secretKey.properties and env vars.
+- Schema name is DB_SCHEMA and must exist before the first run.
+- Flyway is disabled in application.properties for this module; migrations live in src/main/resources/db/migration.
+- Keep ddl-auto = none unless explicitly approved.
 
 ## Developer Workflow
-- **Build**: `mvn clean install` from `history-talk-backend/`
-- **Run**: `mvn spring-boot:run`
-- **Config**: env vars in `secretKey.properties` (gitignored) — `DB_URL`, `DB_USER`, `DB_PASSWORD`, `DB_SCHEMA`, `JWT_SECRET`, `JWT_EXPIRATION_MS`, `JWT_REFRESH_EXPIRATION_MS`.
-- **Schema**: `DB_SCHEMA=historical_schema` (must exist in PostgreSQL before first run); `ddl-auto=update`.
-- **Shared files** (coordinate before editing): `SecurityConfig.java`, `SpringSecurityConfig.java`, `JwtAuthenticationFilter.java`, `JwtTokenProvider.java`, `GlobalExceptionHandler.java`, `application.properties`, `pom.xml`.
+- Build: mvn clean install
+- Run: mvn spring-boot:run
+- Default port: 8080
 
 ## Adding a New Module
-Follow this order: entity → repository → service → controller → DTOs → register route in `SecurityConfig`.
-- Entity: use `UUID` PK with `@GeneratedValue + @UuidGenerator`, `FetchType.LAZY` for all relations.
-- Repository: extend `JpaRepository<Entity, UUID>`.
-- Service: inject repository, throw typed `BaseException` subclasses, map to DTO with `.toString()` on UUIDs.
-- Controller: `@RequestMapping("/v1/...")`, accept IDs as `String @PathVariable`, convert to `UUID` before service call.
-- Routes: register in `SecurityConfig.authorizeHttpRequests()` following existing GET-public / mutate-authenticated pattern.
+Follow this order: entity -> repository -> service -> controller -> DTOs -> SecurityConfig updates.
+
+Checklist:
+1) Entity: UUID PK, proper relations, createdBy, deletedAt, isDraft if applicable.
+2) Repository: JpaRepository<Entity, UUID> plus search methods using ILIKE.
+3) Service: enforce role/ownership, map to DTO, throw BaseException subclasses.
+4) Controller: @RequestMapping under /api/v1, @Valid requests, ApiResponse wrappers.
+5) SecurityConfig: add endpoint rules if needed; coordinate before editing.
+
+## Shared Files - Coordinate Before Editing
+- SecurityConfig.java
+- JwtAuthenticationFilter.java
+- JwtTokenProvider.java
+- GlobalExceptionHandler.java
+- application.properties
+- pom.xml

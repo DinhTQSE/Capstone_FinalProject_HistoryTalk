@@ -183,7 +183,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         String lastMessage = null;
         if (!messages.isEmpty()) {
             lastMessage = messages.stream()
-                    .max(Comparator.comparing(Message::getTimestamp))
+                    .max(Comparator.comparing(Message::getCreatedAt))
                     .map(Message::getContent)
                     .orElse(null);
         }

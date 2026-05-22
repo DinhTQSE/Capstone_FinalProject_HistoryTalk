@@ -22,6 +22,7 @@ public class HistoricalContextDocumentResponse {
     private String userName;
     private String title;
     private String content;
+    private String fileUrl;
     private DocumentType type;
     private LocalDateTime uploadDate;
     private LocalDateTime updatedDate;

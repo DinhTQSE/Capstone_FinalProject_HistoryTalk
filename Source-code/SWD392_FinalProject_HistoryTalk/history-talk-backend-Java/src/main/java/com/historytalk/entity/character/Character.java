@@ -21,8 +21,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -55,17 +58,17 @@ public class Character {
     @Column(name = "background", columnDefinition = "TEXT", nullable = false)
     private String background;
 
-    @Column(name = "image", length = 255)
-    private String image;
+    @Column(name = "image_url", length = 255)
+    private String imageUrl;
 
     @Column(name = "personality", length = 500)
     private String personality;
 
-    @Column(name = "lifespan", length = 50)
-    private String lifespan;
+    @Column(name = "born_date")
+    private LocalDate bornDate;
 
-    @Column(name = "side", length = 100)
-    private String side;
+    @Column(name = "death_date")
+    private LocalDate deathDate;
 
     @Builder.Default
     @Column(name = "is_draft", nullable = false)
@@ -84,12 +87,16 @@ public class Character {
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdDate;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedDate;
+
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
-
-    @Builder.Default
-    @OneToMany(mappedBy = "character", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CharacterDocument> documents = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "character", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

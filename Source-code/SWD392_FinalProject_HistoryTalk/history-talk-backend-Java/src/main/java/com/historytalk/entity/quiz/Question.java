@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -33,10 +35,10 @@ public class Question {
     private String content;
 
 //    @Lob
-    @Column(name = "options", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "options", columnDefinition = "TEXT", nullable = true)
     private String options;
 
-    @Column(name = "correct_answer", nullable = false)
+    @Column(name = "correct_answer", nullable = true)
     private Integer correctAnswer;
 
     @Column(name = "order_index", nullable = true)
@@ -48,6 +50,14 @@ public class Question {
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = true, updatable = false)
+    private LocalDateTime createdDate;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quiz_id", nullable = false)

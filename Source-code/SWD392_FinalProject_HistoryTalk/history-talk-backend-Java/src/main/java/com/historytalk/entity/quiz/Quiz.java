@@ -9,6 +9,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -55,12 +57,20 @@ public class Quiz {
     private Integer durationSeconds;
 
     @Builder.Default
-    @Column(name = "play_count", nullable = false)
+    @Column(name = "play_count", nullable = true)
     private Integer playCount = 0;
 
     @Builder.Default
-    @Column(name = "rating", nullable = false)
+    @Column(name = "rating", nullable = true)
     private Double rating = 0.0;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = true, updatable = false)
+    private LocalDateTime createdDate;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedDate;
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
@@ -76,9 +86,5 @@ public class Quiz {
     @Builder.Default
     @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Question> questions = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<QuizResult> quizResults = new ArrayList<>();
 
 }

@@ -14,7 +14,6 @@ import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizRepository;
-import com.historytalk.repository.QuizResultRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.utils.SecurityUtils;
 import com.historytalk.utils.UuidUtils;
@@ -37,7 +36,6 @@ public class QuizServiceImpl implements QuizService {
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
     private final QuizSessionRepository quizSessionRepository;
-    private final QuizResultRepository quizResultRepository;
     private final UserRepository userRepository;
     private final HistoricalContextRepository historicalContextRepository;
     private final ObjectMapper objectMapper;
@@ -265,16 +263,6 @@ public class QuizServiceImpl implements QuizService {
             });
         }
 
-        // Cascade to QuizResults
-        if (quiz.getQuizResults() != null) {
-            quiz.getQuizResults().forEach(result -> {
-                result.setDeletedAt(now);
-                if (result.getAnswerDetails() != null) {
-                    result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
-                }
-            });
-        }
-
         quizRepository.save(quiz);
         log.info("Quiz soft-deleted successfully with ID: {}", quizId);
     }
@@ -410,13 +398,14 @@ public class QuizServiceImpl implements QuizService {
         quizRepository.save(quiz);
 
         // Create session
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(SESSION_EXPIRATION_MINUTES);
+        LocalDateTime startTime = LocalDateTime.now();
         QuizSession session = QuizSession.builder()
-                .quiz(quiz)
-                .user(user)
-                .expiresAt(expiresAt)
-                .isSubmitted(false)
-                .build();
+            .quiz(quiz)
+            .user(user)
+            .startTime(startTime)
+            .limitedTime(quiz.getDurationSeconds())
+            .isSubmitted(false)
+            .build();
 
         session = quizSessionRepository.save(session);
 
@@ -427,7 +416,7 @@ public class QuizServiceImpl implements QuizService {
                 .sessionId(session.getSessionId().toString())
                 .quizId(quiz.getQuizId().toString())
                 .title(quiz.getTitle())
-                .durationSeconds(quiz.getDurationSeconds())
+            .limitedTime(quiz.getDurationSeconds())
                 .questions(questions.stream()
                         .map(this::mapQuestionToResponse)
                         .collect(Collectors.toList()))
@@ -447,8 +436,11 @@ public class QuizServiceImpl implements QuizService {
             throw new InvalidRequestException("Quiz already submitted");
         }
 
-        if (LocalDateTime.now().isAfter(session.getExpiresAt())) {
-            throw new InvalidRequestException("Quiz session has expired");
+        if (session.getLimitedTime() != null && session.getStartTime() != null) {
+            LocalDateTime deadline = session.getStartTime().plusSeconds(session.getLimitedTime());
+            if (LocalDateTime.now().isAfter(deadline)) {
+                throw new InvalidRequestException("Quiz session has expired");
+            }
         }
 
         if (!session.getUser().getUid().toString().equals(userId)) {
@@ -461,10 +453,10 @@ public class QuizServiceImpl implements QuizService {
 
         // Check if user exceeded duration limit
         if (quiz.getDurationSeconds() != null && request.getDurationSeconds() > quiz.getDurationSeconds()) {
-            log.warn("User {} exceeded time limit. Duration: {} seconds, Limit: {} seconds", 
-                     userId, request.getDurationSeconds(), quiz.getDurationSeconds());
-            throw new InvalidRequestException("Time limit exceeded. You took " + request.getDurationSeconds() + 
-                    " seconds but the limit is " + quiz.getDurationSeconds() + " seconds");
+            log.warn("User {} exceeded time limit. Duration: {} seconds, Limit: {} seconds",
+                userId, request.getDurationSeconds(), quiz.getDurationSeconds());
+            throw new InvalidRequestException("Time limit exceeded. You took " + request.getDurationSeconds() +
+                " seconds but the limit is " + quiz.getDurationSeconds() + " seconds");
         }
 
         // Calculate score
@@ -487,19 +479,6 @@ public class QuizServiceImpl implements QuizService {
             }
         }
 
-        // Save quiz result
-        User user = userRepository.findById(UuidUtils.fromString(userId, "userId"))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
-
-        QuizResult result = QuizResult.builder()
-                .score(score)
-                .durationSeconds(request.getDurationSeconds())
-                .user(user)
-                .quiz(quiz)
-                .build();
-
-        result = quizResultRepository.save(result);
-
         // Save answer details
         List<QuizAnswerDetail> answerDetails = new ArrayList<>();
         for (AnswerDetailRequest answerReq : request.getAnswers()) {
@@ -510,24 +489,25 @@ public class QuizServiceImpl implements QuizService {
 
             boolean isCorrect = question.getCorrectAnswer().equals(answerReq.getSelectedAnswer());
             QuizAnswerDetail detail = QuizAnswerDetail.builder()
-                    .selectedOption(answerReq.getSelectedAnswer().toString())
+                    .selectedOption(answerReq.getSelectedAnswer())
                     .isCorrect(isCorrect)
-                    .quizResult(result)
+                    .quizSession(session)
                     .question(question)
                     .build();
             answerDetails.add(detail);
         }
-        result.setAnswerDetails(answerDetails);
-        quizResultRepository.save(result);
+        session.setAnswerDetails(answerDetails);
 
-        // Mark session as submitted
+        // Mark session as submitted + score/timing
         session.setIsSubmitted(true);
+        session.setScore((double) score);
+        session.setEndTime(LocalDateTime.now());
         quizSessionRepository.save(session);
 
         double percentage = (double) score / questions.size() * 100;
 
         return QuizSubmitResponse.builder()
-                .resultId(result.getResultId().toString())
+            .sessionId(session.getSessionId().toString())
                 .score(score)
                 .totalQuestions(questions.size())
                 .percentage(percentage)
@@ -540,12 +520,11 @@ public class QuizServiceImpl implements QuizService {
     @Override
     public PaginatedResponse<QuizHistoryResponse> getQuizHistory(String userId, Pageable pageable) {
         log.info("Fetching quiz history for user: {}", userId);
-        
-        Page<QuizResult> page = quizResultRepository.findByUserUid(UuidUtils.fromString(userId, "userId"), false, pageable);
-        
-        return mapPageToPaginatedResponse(
-            page.map(this::mapToHistoryResponse)
-        );
+
+        Page<QuizSession> page = quizSessionRepository.findByUserUid(
+                UuidUtils.fromString(userId, "userId"), false, pageable);
+
+        return mapPageToPaginatedResponse(page.map(this::mapToHistoryResponse));
     }
 
     // ==================== Helper Methods ====================
@@ -634,21 +613,28 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
-    private QuizHistoryResponse mapToHistoryResponse(QuizResult result) {
-        String quizId = safeGetQuizId(result);
-        String quizTitle = safeGetQuizTitle(result);
-        int totalQuestions = safeGetQuizQuestionCount(result);
-        double percentage = totalQuestions > 0 ? (double) result.getScore() / totalQuestions * 100 : 0;
-        
+    private QuizHistoryResponse mapToHistoryResponse(QuizSession session) {
+        String quizId = safeGetQuizId(session);
+        String quizTitle = safeGetQuizTitle(session);
+        int totalQuestions = safeGetQuizQuestionCount(session);
+        double score = session.getScore() != null ? session.getScore() : 0.0;
+        double percentage = totalQuestions > 0 ? score / totalQuestions * 100 : 0;
+
+        Integer timeSpentSeconds = null;
+        if (session.getStartTime() != null && session.getEndTime() != null) {
+            timeSpentSeconds = Math.toIntExact(java.time.Duration.between(session.getStartTime(), session.getEndTime()).getSeconds());
+        }
+
         return QuizHistoryResponse.builder()
-                .resultId(result.getResultId().toString())
+                .sessionId(session.getSessionId().toString())
                 .quizId(quizId)
                 .quizTitle(quizTitle)
-                .score(result.getScore())
+                .score(session.getScore())
                 .totalQuestions(totalQuestions)
                 .percentage(percentage)
-                .durationSeconds(result.getDurationSeconds())
-                .completedAt(result.getTakenDate())
+                .timeSpentSeconds(timeSpentSeconds)
+                .startTime(session.getStartTime())
+                .endTime(session.getEndTime())
                 .build();
     }
 
@@ -666,29 +652,6 @@ public class QuizServiceImpl implements QuizService {
 
     @Transactional
     @Override
-    public void softDeleteQuizResult(String resultId, String userId, String userRole) {
-        log.info("Soft deleting quiz result with ID: {} for user: {}", resultId, userId);
-        
-        QuizResult result = quizResultRepository.findById(UUID.fromString(resultId))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz result not found with ID: " + resultId));
-                
-        if (!result.getUser().getUid().equals(UUID.fromString(userId)) && !"STAFF".equalsIgnoreCase(userRole)) {
-            throw new InvalidRequestException("You do not have permission to delete this quiz result");
-        }
-        
-        LocalDateTime now = LocalDateTime.now();
-        result.setDeletedAt(now);
-        quizResultRepository.save(result);
-        
-        if (result.getAnswerDetails() != null) {
-            result.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
-        }
-        
-        log.info("Quiz result soft deleted successfully: {}", resultId);
-    }
-
-    @Transactional
-    @Override
     public void softDeleteQuizSession(String sessionId, String userId) {
         log.info("Soft deleting quiz session: {} for user: {}", sessionId, userId);
         
@@ -699,7 +662,11 @@ public class QuizServiceImpl implements QuizService {
             throw new InvalidRequestException("You do not have permission to delete this quiz session");
         }
         
-        session.setDeletedAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        session.setDeletedAt(now);
+        if (session.getAnswerDetails() != null) {
+            session.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+        }
         quizSessionRepository.save(session);
         
         log.info("Quiz session soft deleted successfully: {}", sessionId);
@@ -717,7 +684,11 @@ public class QuizServiceImpl implements QuizService {
             throw new InvalidRequestException("You do not have permission to delete this quiz session");
         }
 
-        session.setDeletedAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        session.setDeletedAt(now);
+        if (session.getAnswerDetails() != null) {
+            session.getAnswerDetails().forEach(detail -> detail.setDeletedAt(now));
+        }
         quizSessionRepository.save(session);
 
         log.info("Quiz session soft deleted successfully: {}", sessionId);
@@ -760,27 +731,27 @@ public class QuizServiceImpl implements QuizService {
         }
     }
 
-    private String safeGetQuizTitle(QuizResult result) {
+    private String safeGetQuizTitle(QuizSession session) {
         try {
-            Quiz quiz = result.getQuiz();
+            Quiz quiz = session.getQuiz();
             return quiz != null ? quiz.getTitle() : "[Deleted Quiz]";
         } catch (Exception e) {
             return "[Deleted Quiz]";
         }
     }
 
-    private String safeGetQuizId(QuizResult result) {
+    private String safeGetQuizId(QuizSession session) {
         try {
-            Quiz quiz = result.getQuiz();
+            Quiz quiz = session.getQuiz();
             return quiz != null ? quiz.getQuizId().toString() : null;
         } catch (Exception e) {
             return null;
         }
     }
 
-    private int safeGetQuizQuestionCount(QuizResult result) {
+    private int safeGetQuizQuestionCount(QuizSession session) {
         try {
-            Quiz quiz = result.getQuiz();
+            Quiz quiz = session.getQuiz();
             return quiz != null && quiz.getQuestions() != null ? quiz.getQuestions().size() : 0;
         } catch (Exception e) {
             return 0;
