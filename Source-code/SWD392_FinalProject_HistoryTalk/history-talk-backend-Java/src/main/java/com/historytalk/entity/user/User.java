@@ -45,20 +45,29 @@ public class User {
     private UserRole role;
 
     @Builder.Default
-    @Transient
+    @Column(name = "token", columnDefinition = "int default 0")
     private Integer token = 0;
 
-    @Transient
+    @Column(name = "last_active_date")
     private LocalDateTime lastActiveDate;
 
-    @Transient
+    @CreationTimestamp
+    @Column(name = "created_date", nullable = false, updatable = false)
     private LocalDateTime createdDate;
 
-    @Transient
+    @UpdateTimestamp
+    @Column(name = "updated_date")
     private LocalDateTime updatedDate;
 
-    @Column(name = "deleted_at", nullable = true)
+    @Column(name = "deleted_date", nullable = true)
     private LocalDateTime deletedAt;
+
+    @Column(name = "tier_id", length = 100)
+    private String tierId;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @Builder.Default
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)

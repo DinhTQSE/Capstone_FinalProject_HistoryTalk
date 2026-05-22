@@ -68,14 +68,14 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
 
-        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(character.getIsDraft()) || character.getDeletedAt() != null)) {
+        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(character.getIsPublished()) || character.getDeletedAt() != null)) {
             throw new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId());
         }
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId()));
 
-        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(context.getIsDraft()) || context.getDeletedAt() != null)) {
+        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
             throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
         }
 

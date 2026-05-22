@@ -247,13 +247,13 @@ public class AuthServiceImpl implements AuthService {
         // Character & documents
         entityManager.createQuery("UPDATE CharacterDocument cd SET cd.deletedAt = CURRENT_TIMESTAMP WHERE cd.character.createdBy.uid = :userId AND cd.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
-        entityManager.createQuery("UPDATE Character c SET c.deletedAt = CURRENT_TIMESTAMP WHERE c.createdBy.uid = :userId AND c.deletedAt IS NULL")
+        entityManager.createQuery("UPDATE Character c SET c.deletedAt = CURRENT_TIMESTAMP, c.isActive = false WHERE c.createdBy.uid = :userId AND c.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
 
         // HistoricalContext & documents
         entityManager.createQuery("UPDATE HistoricalContextDocument hcd SET hcd.deletedAt = CURRENT_TIMESTAMP WHERE hcd.historicalContext.createdBy.uid = :userId AND hcd.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
-        entityManager.createQuery("UPDATE HistoricalContext hc SET hc.deletedAt = CURRENT_TIMESTAMP WHERE hc.createdBy.uid = :userId AND hc.deletedAt IS NULL")
+        entityManager.createQuery("UPDATE HistoricalContext hc SET hc.deletedAt = CURRENT_TIMESTAMP, hc.isActive = false WHERE hc.createdBy.uid = :userId AND hc.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
 
         // ChatSession & messages

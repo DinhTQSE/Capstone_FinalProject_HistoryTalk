@@ -58,8 +58,8 @@ public class HistoricalContext {
     private Integer endYear;
 
     @Builder.Default
-    @Column(name = "before_tcn", columnDefinition = "boolean not null default false")
-    private Boolean beforeTCN = false;
+    @Column(name = "is_bc", columnDefinition = "boolean not null default false")
+    private Boolean isBC = false;
 
     @Column(name = "location", length = 255)
     private String location;
@@ -71,8 +71,12 @@ public class HistoricalContext {
     private String videoUrl;
 
     @Builder.Default
-    @Column(name = "is_draft", nullable = false)
-    private Boolean isDraft = true;
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)

@@ -38,6 +38,6 @@ public class UpdateCharacterRequest {
     @JsonProperty("deathDate")
     private java.time.LocalDate deathDate;
 
-    @JsonProperty("isDraft")
-    private Boolean isDraft;
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 }

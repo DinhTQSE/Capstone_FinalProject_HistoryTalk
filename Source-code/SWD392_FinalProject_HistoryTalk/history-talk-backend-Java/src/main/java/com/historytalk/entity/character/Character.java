@@ -71,8 +71,12 @@ public class Character {
     private LocalDate deathDate;
 
     @Builder.Default
-    @Column(name = "is_draft", nullable = false)
-    private Boolean isDraft = true;
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)

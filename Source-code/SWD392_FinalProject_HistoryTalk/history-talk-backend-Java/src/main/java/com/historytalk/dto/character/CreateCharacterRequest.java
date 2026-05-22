@@ -44,8 +44,8 @@ public class CreateCharacterRequest {
     @JsonProperty("deathDate")
     private java.time.LocalDate deathDate;
 
-    @JsonProperty("isDraft")
-    private Boolean isDraft = true;
+    @JsonProperty("isPublished")
+    private Boolean isPublished = false;
 
     @JsonProperty("contextId")
     @Schema(deprecated = true, description = "Deprecated: use mapping APIs to link character with historical contexts")

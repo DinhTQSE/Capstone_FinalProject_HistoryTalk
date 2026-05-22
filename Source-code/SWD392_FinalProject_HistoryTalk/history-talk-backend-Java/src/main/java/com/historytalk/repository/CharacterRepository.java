@@ -19,8 +19,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                                     SELECT DISTINCT c FROM Character c
                                     JOIN c.historicalContexts hc
                                     WHERE hc.contextId = :contextId
-                                           AND (:includeDraft = true OR c.isDraft = false)
-                                           AND (:includeDeleted = true OR c.deletedAt IS NULL)
+                                           AND (:includeDraft = true OR c.isPublished = true)
+                                           AND (:includeDeleted = true OR c.isActive = true)
                                     ORDER BY c.name ASC
            """)
               List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId,
@@ -37,8 +37,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                  OR c.name ILIKE CONCAT('%', :search, '%')
                  OR c.background ILIKE CONCAT('%', :search, '%'))
            AND (:era IS NULL OR hc.era = :era)
-           AND (:includeDraft = true OR c.isDraft = false)
-           AND (:includeDeleted = true OR c.deletedAt IS NULL)
+           AND (:includeDraft = true OR c.isPublished = true)
+           AND (:includeDeleted = true OR c.isActive = true)
             ORDER BY c.name ASC
             """,
             countQuery = """
@@ -48,8 +48,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))
           AND (:era IS NULL OR hc.era = :era)
-          AND (:includeDraft = true OR c.isDraft = false)
-          AND (:includeDeleted = true OR c.deletedAt IS NULL)
+          AND (:includeDraft = true OR c.isPublished = true)
+          AND (:includeDeleted = true OR c.isActive = true)
             """)
     Page<Character> findAllWithFilter(@Param("search") String search,
                                   @Param("era") EventEra era,
@@ -59,14 +59,14 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query(value = """
            SELECT * FROM historical_schema."character" c
-           WHERE c.deleted_at IS NOT NULL
+           WHERE c.is_active = false
            ORDER BY c.name ASC
            """, nativeQuery = true)
     List<Character> findAllDeleted();
 
     @Query(value = """
            UPDATE historical_schema."character"
-           SET deleted_at = NULL
+           SET deleted_at = NULL, is_active = true
            WHERE character_id = :characterId
            """, nativeQuery = true)
     @org.springframework.data.jpa.repository.Modifying

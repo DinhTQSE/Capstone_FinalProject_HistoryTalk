@@ -38,8 +38,8 @@ public class UpdateHistoricalContextRequest {
     @JsonProperty("endYear")
     private Integer endYear;
 
-    @JsonProperty("beforeTCN")
-    private Boolean beforeTCN;
+    @JsonProperty("isBC")
+    private Boolean isBC;
 
     @JsonProperty("location")
     @Size(max = 255, message = "Location must be at most 255 characters")
@@ -53,6 +53,6 @@ public class UpdateHistoricalContextRequest {
     @Size(max = 500, message = "Video URL must be at most 500 characters")
     private String videoUrl;
 
-    @JsonProperty("isDraft")
-    private Boolean isDraft;
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 }

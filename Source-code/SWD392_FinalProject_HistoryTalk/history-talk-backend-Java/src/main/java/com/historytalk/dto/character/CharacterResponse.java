@@ -40,8 +40,8 @@ public class CharacterResponse {
     @JsonProperty("deathDate")
     private java.time.LocalDate deathDate;
 
-    @JsonProperty("isDraft")
-    private Boolean isDraft;
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 
     @JsonProperty("status")
     private String status;
