@@ -1,332 +1,747 @@
 # System Dashboard Backend Plan
 
-This document defines the proposed backend implementation plan for the HistoryTalk System Dashboard module.
+This plan is based on the current target ERD and actor definition provided by the team.
 
-No code should be implemented from this plan until the team reviews and approves the scope.
+The System Dashboard is a **System Admin** feature.
 
-## 1. Goal
+For implementation, build the dashboard functions first. Authorization will be added after the APIs and data shape are stable.
 
-Build an in-app System Dashboard for Admin/Staff users in HistoryTalk.
+## 1. Target Actors
 
-The dashboard should support:
+The target actor model has four actors:
 
-- User statistics
-- Reported users
-- Token usage
-- Revenue
-- AI usage and cost
-- System health summary
-- Activity trends
-
-Grafana remains a technical monitoring tool for developers or technical admins. It should not be used as the main business dashboard for Staff/Admin users.
-
-## 2. Design Direction
-
-The project should separate two dashboard concerns:
-
-| Area | Tool | Audience | Purpose |
-| --- | --- | --- | --- |
-| Technical monitoring | Grafana + Prometheus | Developers, technical admins | JVM, HTTP latency, backend health, AI technical metrics |
-| Business dashboard | HistoryTalk Web App + Java REST APIs | Admin, Staff | Users, revenue, reports, token usage, activity summaries |
-
-This avoids:
-
-- Heavy Grafana SQL queries on production business tables
-- Complicated Grafana iframe authentication
-- Mixing DevOps monitoring with business workflows
-- Performance issues caused by dashboard queries against raw tables
-
-## 3. Phase 1: Review Data Sources
-
-Review the current Java backend source code to identify which data already exists and which data is missing.
-
-Areas to review:
-
-- User/account
-- Role
-- Chat session/message
-- Payment/transaction/subscription
-- Quiz/activity
-- Report user/moderation
-- AI call/token usage
-
-Expected output:
-
-```text
-Dashboard metric -> source table -> query logic -> missing data
-```
-
-Example:
-
-```text
-Total users -> users table -> count all active users -> available
-Daily new users -> users.created_at -> group by day -> available if created_at exists
-Revenue -> payments table -> sum successful payments -> depends on payment table
-Reported users -> user_reports table -> count pending/resolved reports -> depends on report module
-AI tokens -> ai_token_usage table -> sum tokens by day/model/user -> table may need to be added
-```
-
-## 4. Phase 2: Define API Contract
-
-Design REST APIs before implementation so the frontend can develop against a stable contract.
-
-Proposed endpoints:
-
-```text
-GET /api/v1/admin/dashboard/overview
-GET /api/v1/admin/dashboard/users
-GET /api/v1/admin/dashboard/revenue
-GET /api/v1/admin/dashboard/tokens
-GET /api/v1/admin/dashboard/reports
-GET /api/v1/admin/dashboard/system-health
-```
-
-Common query parameters:
-
-```text
-from=2026-05-01
-to=2026-05-20
-granularity=day|week|month
-```
-
-API responses should be frontend-friendly. The backend should return data that can be rendered directly as cards, tables, and charts.
-
-The frontend should not need to perform complex calculations.
-
-## 5. Phase 3: Database Design For Analytics
-
-Avoid querying raw production tables every time the dashboard is opened.
-
-Recommended approach:
-
-- Store raw/audit events where necessary.
-- Aggregate data into daily summary tables.
-- Let dashboard APIs read from summary tables.
-
-Proposed tables:
-
-```text
-ai_token_usage
-daily_user_stats
-daily_revenue_stats
-daily_report_stats
-daily_ai_usage_stats
-system_usage_summary
-```
-
-### Table Purpose
-
-| Table | Purpose |
+| Actor | Responsibility |
 | --- | --- |
-| `ai_token_usage` | Raw AI token usage record for each AI call |
-| `daily_user_stats` | Daily user totals, new users, active users |
-| `daily_revenue_stats` | Daily revenue and payment summary |
-| `daily_report_stats` | Daily report user/moderation summary |
-| `daily_ai_usage_stats` | Daily AI requests, token totals, estimated cost |
-| `system_usage_summary` | General dashboard summary data |
+| Guest | Can view public account tiers/pricing and register a new account. |
+| Customer | Uses learning features: history list, character chat/voice/talk, map interaction, quiz, and personal progress. Limited by daily token quota and can upgrade to premium. |
+| Content Admin | Internal content operator. Manages core historical data such as Historical Context, Character, Location/Map data, and Quiz. |
+| System Admin | Platform-level administrator. Manages identity, login/logout policy, overall platform analytics, user analytics, and revenue reports from tiers. |
 
-### Business Rules
+System Dashboard belongs to:
 
-- Aggregation jobs must be idempotent.
-- Running the same aggregation twice must not duplicate data.
-- Revenue only counts successful payments.
-- Token usage should store:
-  - provider
-  - model
-  - prompt tokens
-  - completion tokens
-  - total tokens
-  - estimated cost
-- Dashboard date range should be limited, for example 90 or 180 days.
-- Admin-only data such as revenue and cost should be protected more strictly than general stats.
+```text
+System Admin
+```
 
-## 6. Phase 4: Token Usage Pipeline
+## 2. Current Dashboard Decision
 
-Java backend already has Micrometer metrics prepared for AI request and token tracking.
+The first version of System Dashboard should be split into two groups:
 
-The next backend work should persist token usage into the database.
+- **Plan A - Do Now**
+- **Plan B - Do Later**
 
-### Expected Python AI Response
+This is necessary because several ERD areas are not implemented or not stable yet.
 
-The Python AI service should return token usage with chat/title responses:
+## 3. Plan A - Do Now
+
+Plan A includes only features that can be built now without waiting for payment, package, token-cost, AI-cost, or quiz refactor work.
+
+### Plan A Includes
+
+- User analytics
+- Account status summary
+- Role distribution
+- Content inventory summary
+- Chat activity summary
+- Basic system health summary
+- Dashboard REST APIs for frontend
+
+### Plan A Excludes
+
+- Revenue
+- Payment statistics
+- Tier/package purchase analytics
+- Token usage
+- AI usage and cost
+- Quiz analytics
+
+## 4. Plan B - Do Later
+
+Plan B includes features that depend on unfinished or unstable business modules.
+
+### Plan B Includes
+
+- Revenue dashboard
+- Tier/package analytics
+- Order/transaction analytics
+- Token usage analytics
+- AI usage and cost
+- Quiz analytics
+
+## 5. Why These Features Are Deferred
+
+### Revenue
+
+Revenue is deferred because:
+
+- Payment function is not implemented yet.
+- Tier/package purchase workflow is not ready.
+- Order/transaction status rules are not finalized.
+
+### Token Usage
+
+Token usage is deferred because:
+
+- Token counting algorithm is not finalized.
+- Token deduction rules are not finalized.
+- User daily quota and tier quota behavior need confirmation.
+
+### AI Usage And Cost
+
+AI cost is deferred because:
+
+- Token usage is not finalized.
+- Provider/model pricing is not finalized.
+- Cost estimation formula is not finalized.
+
+### Quiz Analytics
+
+Quiz analytics is deferred because:
+
+- Quiz business logic is being refactored.
+- Building analytics now may create throwaway code.
+
+## 6. Role And Authorization Direction
+
+Target dashboard access:
+
+```text
+System Admin only
+```
+
+However, authorization will be added later.
+
+### Current Implementation Rule
+
+For the first implementation pass:
+
+- Build dashboard APIs and data logic first.
+- Do not block implementation on authorization.
+- Add `@PreAuthorize` after the role model is finalized in backend.
+
+### Future Authorization Rule
+
+When authorization is added:
+
+```java
+@PreAuthorize("hasRole('SYSTEM_ADMIN')")
+```
+
+Current backend role mismatch to resolve later:
+
+| Target ERD/API Role | Current Backend Role |
+| --- | --- |
+| `CUSTOMER` | `CUSTOMER` |
+| `CONTENT_ADMIN` | currently similar to `STAFF` |
+| `SYSTEM_ADMIN` | currently similar to `ADMIN` |
+
+This role mapping must be finalized before adding real authorization.
+
+## 7. ERD Alignment Notes
+
+The target ERD contains these dashboard-relevant entities:
+
+- `User`
+- `Tier`
+- `Order`
+- `Transaction`
+- `HistoricalContext`
+- `Character`
+- `Document`
+- `ChatSession`
+- `Message`
+- `Quiz`
+- `QuizSession`
+- `Question`
+- `AnswerDetail`
+
+For Plan A, use only stable areas:
+
+- `User`
+- `HistoricalContext`
+- `Character`
+- `Document`
+- `ChatSession`
+- `Message`
+
+For Plan B, use later areas:
+
+- `Tier`
+- `Order`
+- `Transaction`
+- Token fields/cost logic
+- Quiz-related tables
+
+## 8. Plan A Dashboard Metrics
+
+### 8.1 User Analytics
+
+Metrics:
+
+```text
+totalUsers
+activeUsers
+inactiveUsers
+deletedUsers
+customers
+contentAdmins
+systemAdmins
+newUsersToday
+newUsersThisMonth
+```
+
+Source:
+
+```text
+User
+```
+
+Target ERD fields:
+
+```text
+uid
+role
+is_active
+created_date
+updated_date
+deleted_date
+last_active_date
+```
+
+Current backend note:
+
+- Existing backend may still use older fields such as `deleted_at`.
+- Before implementation, verify current table columns in Supabase.
+- If needed, create migration to align the user table with the target ERD.
+
+### 8.2 Role Distribution
+
+Metrics:
+
+```text
+usersByRole
+```
+
+Expected roles:
+
+```text
+CUSTOMER
+CONTENT_ADMIN
+SYSTEM_ADMIN
+```
+
+Temporary backend mapping if needed:
+
+```text
+CUSTOMER -> CUSTOMER
+STAFF -> CONTENT_ADMIN
+ADMIN -> SYSTEM_ADMIN
+```
+
+### 8.3 Account Status Summary
+
+Metrics:
+
+```text
+activeAccounts
+inactiveAccounts
+deletedAccounts
+recentlyActiveUsers
+```
+
+Source:
+
+```text
+User.is_active
+User.deleted_date
+User.last_active_date
+```
+
+Current backend note:
+
+- If `last_active_date` is not implemented yet, skip recently active users in the first API version or return `0`.
+
+### 8.4 Content Inventory Summary
+
+Metrics:
+
+```text
+totalHistoricalContexts
+publishedHistoricalContexts
+activeHistoricalContexts
+totalCharacters
+publishedCharacters
+activeCharacters
+totalDocuments
+activeDocuments
+```
+
+Sources:
+
+```text
+HistoricalContext
+Character
+Document
+```
+
+Target ERD fields:
+
+```text
+is_published
+is_active
+created_date
+updated_date
+deleted_date
+```
+
+Current backend note:
+
+- The current backend may still use `HistoricalContextDocument` and `CharacterDocument` instead of a single ERD `Document` table.
+- For Plan A, count documents using the current implemented document tables.
+
+### 8.5 Chat Activity Summary
+
+Metrics:
+
+```text
+totalChatSessions
+activeChatSessions
+totalMessages
+userMessages
+aiMessages
+chatSessionsToday
+messagesToday
+```
+
+Sources:
+
+```text
+ChatSession
+Message
+```
+
+Target ERD fields:
+
+```text
+ChatSession.created_date
+ChatSession.is_active
+ChatSession.deleted_date
+Message.created_date
+Message.is_from_ai
+Message.is_active
+Message.deleted_date
+```
+
+Current backend note:
+
+- Existing message entity may use `timestamp` instead of `created_date`.
+- Use existing fields first, then align later if the team approves ERD migration.
+
+### 8.6 Basic System Health Summary
+
+Metrics:
+
+```text
+backendStatus
+uptime
+jvmMemoryUsed
+jvmMemoryMax
+httpRequestCount
+httpErrorCount
+lastCheckedAt
+```
+
+Source:
+
+```text
+Spring Boot Actuator / Micrometer
+```
+
+Notes:
+
+- Grafana remains the detailed technical monitoring tool.
+- The in-app System Dashboard only needs a simple health summary.
+
+## 9. Plan A API Proposal
+
+All endpoints follow the API contract response wrapper:
 
 ```json
 {
-  "tokenUsage": {
-    "provider": "openai",
-    "model": "gpt-4o-mini",
-    "promptTokens": 100,
-    "completionTokens": 50,
-    "totalTokens": 150
-  }
+  "success": true,
+  "message": "string",
+  "data": {},
+  "timestamp": "ISO8601"
 }
 ```
 
-### Pipeline
+Recommended endpoint prefix:
 
 ```text
-Python AI service returns tokenUsage
-        ↓
-Java AiServiceClient receives response
-        ↓
-Java records Micrometer metrics
-        ↓
-Java stores raw token record in ai_token_usage
-        ↓
-Scheduled job aggregates into daily_ai_usage_stats
-        ↓
-Dashboard API returns token charts/cards
+/api/v1/system-admin/dashboard
 ```
 
-## 7. Phase 5: Scheduled Aggregation Jobs
-
-Add scheduled jobs to summarize dashboard data.
-
-Proposed jobs:
+If frontend prefers the previous naming, use:
 
 ```text
-UserStatsAggregationJob
-RevenueStatsAggregationJob
-ReportStatsAggregationJob
-AiUsageStatsAggregationJob
-SystemUsageSummaryJob
+/api/v1/admin/dashboard
 ```
 
-Recommended schedule:
+The team should choose one before implementation.
+
+### 9.1 Overview API
 
 ```text
-Daily at midnight
-```
-
-Optional development/admin endpoint:
-
-```text
-POST /api/v1/admin/dashboard/aggregation/backfill
+GET /api/v1/system-admin/dashboard/overview
 ```
 
 Purpose:
 
-- Rebuild dashboard summary data for a date range.
-- Useful after adding new aggregate tables.
-- Useful for local development and testing.
+- Return first-screen dashboard cards.
 
-Security:
+Suggested response:
 
-- Backfill endpoint should be Admin-only.
+```json
+{
+  "users": {
+    "total": 0,
+    "active": 0,
+    "inactive": 0,
+    "deleted": 0,
+    "newToday": 0,
+    "newThisMonth": 0
+  },
+  "roles": {
+    "customers": 0,
+    "contentAdmins": 0,
+    "systemAdmins": 0
+  },
+  "content": {
+    "historicalContexts": 0,
+    "publishedHistoricalContexts": 0,
+    "characters": 0,
+    "publishedCharacters": 0,
+    "documents": 0
+  },
+  "chat": {
+    "sessions": 0,
+    "messages": 0,
+    "messagesToday": 0
+  },
+  "systemHealth": {
+    "status": "UP",
+    "lastCheckedAt": "2026-05-22T10:00:00Z"
+  }
+}
+```
 
-## 8. Phase 6: Dashboard Services And APIs
+### 9.2 User Analytics API
+
+```text
+GET /api/v1/system-admin/dashboard/users
+```
+
+Query params:
+
+```text
+from=2026-05-01
+to=2026-05-22
+granularity=day|week|month
+```
+
+Suggested response:
+
+```json
+{
+  "summary": {
+    "total": 0,
+    "active": 0,
+    "inactive": 0,
+    "deleted": 0
+  },
+  "byRole": [
+    { "role": "CUSTOMER", "count": 0 },
+    { "role": "CONTENT_ADMIN", "count": 0 },
+    { "role": "SYSTEM_ADMIN", "count": 0 }
+  ],
+  "trend": [
+    { "date": "2026-05-22", "newUsers": 0, "activeUsers": 0 }
+  ]
+}
+```
+
+### 9.3 Content Summary API
+
+```text
+GET /api/v1/system-admin/dashboard/content
+```
+
+Suggested response:
+
+```json
+{
+  "historicalContexts": {
+    "total": 0,
+    "published": 0,
+    "active": 0
+  },
+  "characters": {
+    "total": 0,
+    "published": 0,
+    "active": 0
+  },
+  "documents": {
+    "total": 0,
+    "active": 0
+  }
+}
+```
+
+### 9.4 Chat Activity API
+
+```text
+GET /api/v1/system-admin/dashboard/chat-activity
+```
+
+Query params:
+
+```text
+from=2026-05-01
+to=2026-05-22
+granularity=day|week|month
+```
+
+Suggested response:
+
+```json
+{
+  "summary": {
+    "sessions": 0,
+    "messages": 0,
+    "userMessages": 0,
+    "aiMessages": 0
+  },
+  "trend": [
+    { "date": "2026-05-22", "sessions": 0, "messages": 0 }
+  ]
+}
+```
+
+### 9.5 System Health API
+
+```text
+GET /api/v1/system-admin/dashboard/system-health
+```
+
+Suggested response:
+
+```json
+{
+  "status": "UP",
+  "uptime": "string",
+  "jvmMemoryUsed": 0,
+  "jvmMemoryMax": 0,
+  "httpRequestCount": 0,
+  "httpErrorCount": 0,
+  "lastCheckedAt": "2026-05-22T10:00:00Z"
+}
+```
+
+## 10. Plan A Backend Structure
 
 Follow the current backend package style.
 
-Recommended structure:
+Suggested structure:
 
 ```text
 controller/dashboard
 service/dashboard
 dto/dashboard
-repository/analytics
-entity/analytics
+repository/dashboard
 ```
 
-Business logic should be placed in services, not controllers.
-
-### Proposed Services
+Suggested classes:
 
 ```text
+DashboardController
 DashboardOverviewService
-DashboardUserStatsService
-DashboardRevenueService
-DashboardTokenUsageService
-DashboardReportService
+DashboardUserAnalyticsService
+DashboardContentService
+DashboardChatActivityService
 DashboardSystemHealthService
 ```
 
-### Security Rules
-
-General dashboard APIs:
-
-```java
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-```
-
-Sensitive APIs such as revenue/cost:
-
-```java
-@PreAuthorize("hasRole('ADMIN')")
-```
-
-Exact role names should be verified against the current project role model before implementation.
-
-## 9. Phase 7: Testing And Verification
-
-Minimum validation before merging:
-
-- Unit tests for aggregation logic
-- Repository query tests for complex queries
-- Security tests for Admin/Staff/User access
-- Swagger/manual verification for all dashboard endpoints
-- Verify Grafana still scrapes:
+Suggested DTO files:
 
 ```text
-/Historical-tell/actuator/prometheus
+DashboardOverviewResponse
+DashboardUserAnalyticsResponse
+DashboardContentSummaryResponse
+DashboardChatActivityResponse
+DashboardSystemHealthResponse
+DashboardTrendPoint
+DashboardRoleCount
 ```
 
-Recommended manual checks:
+## 11. Plan A Database Work
+
+Plan A should avoid new tables unless the current schema is missing required ERD fields.
+
+### 11.1 Required Schema Check
+
+Before implementation, verify Supabase/current DB columns for:
 
 ```text
-Admin can access all dashboard APIs
-Staff can access allowed dashboard APIs
-Normal user cannot access admin dashboard APIs
-Invalid date range returns validation error
-Large date range is rejected or capped
-Aggregation jobs can run twice without duplicating data
+User.created_date
+User.updated_date
+User.deleted_date
+User.is_active
+User.last_active_date
+HistoricalContext.is_active
+HistoricalContext.is_published
+Character.is_active
+Character.is_published
+ChatSession.created_date
+Message.created_date or Message.timestamp
 ```
 
-## 10. Recommended Implementation Order
+### 11.2 Possible Migration
 
-1. Review current entities and repositories.
-2. Map each dashboard metric to a source table.
-3. Identify missing tables and missing fields.
-4. Design DTO/API responses.
-5. Add `ai_token_usage`.
-6. Implement token usage persistence.
-7. Add daily aggregate tables.
-8. Implement scheduled aggregation jobs.
-9. Implement dashboard REST APIs.
-10. Add tests.
-11. Update Swagger/docs.
-12. Verify Grafana still works.
-
-## 11. First Step After Approval
-
-The first implementation step should be:
+If the current DB does not match the target ERD, create migration:
 
 ```text
-Review the current backend source code and map every dashboard metric to the exact table, entity, repository, and query strategy.
+V10__align_dashboard_required_columns.sql
 ```
 
-This should produce a metric mapping document before writing feature code.
+Only add fields needed for Plan A.
 
-Suggested output:
+Do not add payment/token/quiz analytics tables in Plan A.
+
+## 12. Plan A Implementation Order
+
+1. Finalize endpoint prefix with frontend:
 
 ```text
-Metric Name
-Business Meaning
-Source Table/Entity
-Required Query
-API Response Field
-Missing Data
-Implementation Notes
+/api/v1/system-admin/dashboard
 ```
 
-## 12. Open Questions For Review
+or
 
-The team should confirm these before implementation:
+```text
+/api/v1/admin/dashboard
+```
 
-1. Which roles can access the dashboard?
-2. Should Staff see revenue and AI cost, or only Admin?
-3. Which payment table/status represents completed revenue?
-4. Does the current report-user module exist, or must it be built first?
-5. Does the AI service already know token usage, or do we need to add provider-specific token tracking?
-6. What maximum date range should dashboard APIs allow?
-7. Should dashboard data be real-time, daily aggregated, or both?
+2. Inspect current Supabase schema and current JPA entities.
+3. Add minimal migration only if required for dashboard fields.
+4. Create dashboard DTOs.
+5. Create dashboard repository queries or repository projection methods.
+6. Implement user analytics service.
+7. Implement content summary service.
+8. Implement chat activity service.
+9. Implement system health service.
+10. Implement dashboard controller.
+11. Return all responses through `ApiResponse`.
+12. Test APIs through Swagger.
+13. Add authorization later after role mapping is finalized.
+
+## 13. Plan B Details
+
+### 13.1 Revenue Dashboard
+
+Wait until these ERD modules are implemented:
+
+```text
+Tier
+Order
+Transaction
+```
+
+Future metrics:
+
+```text
+totalRevenue
+revenueToday
+revenueThisMonth
+ordersByStatus
+transactionsByStatus
+revenueByTier
+```
+
+### 13.2 Tier And Package Analytics
+
+Wait until tier purchase and upgrade flow is stable.
+
+Future metrics:
+
+```text
+usersByTier
+activeTierCount
+mostPurchasedTier
+freeToPaidConversion
+```
+
+### 13.3 Token Usage
+
+Wait until token rules are finalized.
+
+Future metrics:
+
+```text
+tokensUsedToday
+tokensUsedThisMonth
+tokensByUser
+tokensByTier
+remainingTokenDistribution
+```
+
+### 13.4 AI Usage And Cost
+
+Wait until token usage and model pricing are finalized.
+
+Future metrics:
+
+```text
+aiRequests
+aiFailures
+promptTokens
+completionTokens
+estimatedCost
+costByModel
+```
+
+### 13.5 Quiz Analytics
+
+Wait until quiz refactor is complete.
+
+Future metrics:
+
+```text
+quizSessions
+quizCompletionRate
+averageScore
+popularQuizzes
+questionWrongRate
+```
+
+## 14. Plan B Implementation Order
+
+1. Finish Tier, Order, Transaction modules.
+2. Implement revenue dashboard.
+3. Finalize token algorithm.
+4. Implement token usage tracking.
+5. Finalize AI cost formula.
+6. Implement AI usage and cost dashboard.
+7. Finish quiz refactor.
+8. Implement quiz analytics.
+
+## 15. Review Checklist
+
+Before starting implementation, confirm:
+
+- Which endpoint prefix should frontend use?
+- Should Plan A use target roles in response: `CUSTOMER`, `CONTENT_ADMIN`, `SYSTEM_ADMIN`?
+- Should current backend roles be mapped temporarily from `STAFF` and `ADMIN`?
+- Which user status field is the source of truth: `is_active`, `deleted_date`, or current `deleted_at`?
+- Does the current DB already have `created_date` for User, ChatSession, and Message?
+- Should system health use Micrometer/MeterRegistry in Plan A or return a simpler health response first?
+- Is authorization definitely postponed until after functional APIs are finished?
