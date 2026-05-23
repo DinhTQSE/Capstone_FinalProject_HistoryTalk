@@ -1,7 +1,7 @@
 # OpenAPI Gap Fix Tracker
 
 Source contract: `docs/openapi.json`  
-Backend checked: `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java` -----
+Backend checked: `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java` 
 
 ## Fixed in this pass
 
