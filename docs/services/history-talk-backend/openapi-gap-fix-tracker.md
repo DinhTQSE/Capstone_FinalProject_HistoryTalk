@@ -3,7 +3,7 @@
 Source contract: `docs/openapi.json`  
 Backend checked: `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java` 
 
-## Fixed in this pass
+## Fixed in this pass--
 
 | Gap | Contract endpoint/config | Backend change | Status |
 | --- | --- | --- | --- |
