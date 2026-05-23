@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -44,18 +46,27 @@ public class User {
     @Column(name = "role", length = 50, nullable = false)
     private UserRole role;
 
+    @Column(name = "tier_id", columnDefinition = "uuid")
+    private UUID tierId;
+
     @Builder.Default
-    @Transient
+    @Column(name = "token", nullable = false)
     private Integer token = 0;
 
-    @Transient
+    @Column(name = "last_active_date")
     private LocalDateTime lastActiveDate;
 
-    @Transient
-    private LocalDateTime createdDate;
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
-    @Transient
-    private LocalDateTime updatedDate;
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;

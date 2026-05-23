@@ -51,10 +51,10 @@ public class AuthController {
     }
 
 //    @PostMapping("/register-staff")
-//    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
 //    @SecurityRequirement(name = "bearerAuth")
 //    @Operation(summary = "Register staff/admin account",
-//               description = "Creates a new STAFF or ADMIN account. Requires ADMIN role.")
+//               description = "Creates a new CONTENT_ADMIN or SYSTEM_ADMIN account. Requires SYSTEM_ADMIN role.")
 //    public ResponseEntity<ApiResponse<RegisterStaffResponse>> registerStaff(
 //            @Valid @RequestBody RegisterStaffRequest request) {
 //
@@ -94,9 +94,9 @@ public class AuthController {
     }
 
     @PatchMapping("/users/{userId}/deactivate")
-    @PreAuthorize("hasRole('STAFF')")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Deactivate user", description = "Soft delete a user account (Staff only)")
+    @Operation(summary = "Deactivate user", description = "Soft delete a user account (System Admin only)")
     public ResponseEntity<ApiResponse<?>> deactivateUser(
             @PathVariable String userId) {
         log.info("PATCH /api/v1/auth/users/{}/deactivate", userId);
@@ -106,7 +106,7 @@ public class AuthController {
     }
 
     @PatchMapping("/me/deactivate")
-    @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Deactivate my account", description = "Deactivate the currently logged in user account")
     public ResponseEntity<ApiResponse<?>> deactivateMe() {

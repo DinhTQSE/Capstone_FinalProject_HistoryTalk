@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @RequestMapping("/api/v1/staff/quizzes")
-@PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+@PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Quizzes (Staff)", description = "Endpoints for staff/admin to manage quizzes")
 public class StaffQuizController {

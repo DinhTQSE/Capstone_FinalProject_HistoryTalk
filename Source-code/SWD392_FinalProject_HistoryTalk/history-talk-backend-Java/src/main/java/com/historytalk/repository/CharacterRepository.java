@@ -19,7 +19,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                                     SELECT DISTINCT c FROM Character c
                                     JOIN c.historicalContexts hc
                                     WHERE hc.contextId = :contextId
-                                           AND (:includeDraft = true OR c.isDraft = false)
+                                           AND (:includeDraft = true OR c.isPublished = true)
                                            AND (:includeDeleted = true OR c.deletedAt IS NULL)
                                     ORDER BY c.name ASC
            """)
@@ -37,7 +37,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                  OR c.name ILIKE CONCAT('%', :search, '%')
                  OR c.background ILIKE CONCAT('%', :search, '%'))
            AND (:era IS NULL OR hc.era = :era)
-           AND (:includeDraft = true OR c.isDraft = false)
+           AND (:includeDraft = true OR c.isPublished = true)
            AND (:includeDeleted = true OR c.deletedAt IS NULL)
             ORDER BY c.name ASC
             """,
@@ -48,7 +48,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))
           AND (:era IS NULL OR hc.era = :era)
-          AND (:includeDraft = true OR c.isDraft = false)
+          AND (:includeDraft = true OR c.isPublished = true)
           AND (:includeDeleted = true OR c.deletedAt IS NULL)
             """)
     Page<Character> findAllWithFilter(@Param("search") String search,

@@ -680,7 +680,7 @@ public class QuizServiceImpl implements QuizService {
         QuizSession session = quizSessionRepository.findById(UUID.fromString(sessionId))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz session not found with ID: " + sessionId));
 
-        if (!session.getUser().getUid().equals(UUID.fromString(userId)) && !"STAFF".equalsIgnoreCase(userRole)) {
+        if (!session.getUser().getUid().equals(UUID.fromString(userId)) && !isContentOrSystemAdmin(userRole)) {
             throw new InvalidRequestException("You do not have permission to delete this quiz session");
         }
 
@@ -695,13 +695,13 @@ public class QuizServiceImpl implements QuizService {
     }
 
     private void checkOwnershipOrAdmin(String createdByUid, String userId, String userRole) {
-        if (!createdByUid.equals(userId) && !userRole.equalsIgnoreCase("ADMIN")) {
+        if (!createdByUid.equals(userId) && !isSystemAdmin(userRole)) {
             throw new InvalidRequestException("You don't have permission to modify this quiz");
         }
     }
 
     private void checkOwnershipOrStaffOrAdmin(String createdByUid, String userId, String userRole) {
-        if (!createdByUid.equals(userId) && !"ADMIN".equalsIgnoreCase(userRole) && !"STAFF".equalsIgnoreCase(userRole)) {
+        if (!createdByUid.equals(userId) && !isContentOrSystemAdmin(userRole)) {
             throw new InvalidRequestException("You don't have permission to modify or delete this quiz");
         }
     }
@@ -756,6 +756,22 @@ public class QuizServiceImpl implements QuizService {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    private boolean isSystemAdmin(String role) {
+        return role != null && (
+                "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "ADMIN".equalsIgnoreCase(role)
+        );
+    }
+
+    private boolean isContentOrSystemAdmin(String role) {
+        return role != null && (
+                "CONTENT_ADMIN".equalsIgnoreCase(role)
+                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "STAFF".equalsIgnoreCase(role)
+                        || "ADMIN".equalsIgnoreCase(role)
+        );
     }
 
 }

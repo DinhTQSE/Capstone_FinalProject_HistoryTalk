@@ -47,7 +47,7 @@ public class HistoricalContextController {
         log.info("GET /v1/historical-contexts - search: {}, era: {}, category: {}, page: {}, limit: {}",
                 search, era, category, page, limit);
         
-        var pageable = PageRequest.of(Math.max(page - 1, 0), limit, Sort.by(Sort.Direction.DESC, "createdDate"));
+        var pageable = PageRequest.of(Math.max(page - 1, 0), limit, Sort.by(Sort.Direction.DESC, "createdAt"));
         String role = SecurityUtils.getRoleName();
         var response = contextService.getAllContexts(search, era, category, pageable, role);
         
@@ -82,7 +82,7 @@ public class HistoricalContextController {
      * Create a new historical context (Staff only)
      */
     @PostMapping
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new historical context", description = "Create a new historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createContext(
@@ -103,7 +103,7 @@ public class HistoricalContextController {
      * Update an existing historical context
      */
     @PutMapping("/{contextId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
         @Operation(summary = "Update a historical context", description = "Update an existing historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateContext(
@@ -126,7 +126,7 @@ public class HistoricalContextController {
          * Delete a historical context
          */
     @DeleteMapping("/{contextId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
         @Operation(summary = "Delete a historical context", description = "Delete a historical context (Staff/Admin only)")
     public ResponseEntity<Void> deleteContext(
@@ -145,7 +145,7 @@ public class HistoricalContextController {
      * Soft-delete a historical context (marks as deleted, preserves data)
      */
     @PatchMapping("/{contextId}/soft-delete")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Soft-delete a historical context",
                description = "Mark a historical context as deleted (data preserved). Cascades to documents, characters, and quizzes.")

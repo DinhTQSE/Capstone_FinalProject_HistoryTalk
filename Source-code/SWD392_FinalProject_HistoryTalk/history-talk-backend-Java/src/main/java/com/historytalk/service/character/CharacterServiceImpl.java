@@ -113,7 +113,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .personality(request.getPersonality())
                 .bornDate(request.getBornDate())
                 .deathDate(request.getDeathDate())
-            .isDraft(request.getIsDraft() != null ? request.getIsDraft() : true)
+                .isPublished(!Boolean.TRUE.equals(request.getIsDraft() != null ? request.getIsDraft() : true))
                 .historicalContexts(contexts)
                 .createdBy(user)
                 .build();
@@ -399,7 +399,12 @@ public class CharacterServiceImpl implements CharacterService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
+        return role != null && (
+                "CONTENT_ADMIN".equalsIgnoreCase(role)
+                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "STAFF".equalsIgnoreCase(role)
+                        || "ADMIN".equalsIgnoreCase(role)
+        );
     }
 
     private String buildStatus(Boolean isDraft, java.time.LocalDateTime deletedAt) {

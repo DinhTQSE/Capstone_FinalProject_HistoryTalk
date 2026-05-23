@@ -112,7 +112,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .location(request.getLocation())
                 .imageUrl(request.getImageUrl())
                 .videoUrl(request.getVideoUrl())
-            .isDraft(request.getIsDraft() != null ? request.getIsDraft() : true)
+                .isPublished(!Boolean.TRUE.equals(request.getIsDraft() != null ? request.getIsDraft() : true))
                 .createdBy(user)
                 .build();
 
@@ -363,7 +363,12 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         }
 
         private boolean isStaffOrAdmin(String role) {
-            return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
+            return role != null && (
+                    "CONTENT_ADMIN".equalsIgnoreCase(role)
+                            || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                            || "STAFF".equalsIgnoreCase(role)
+                            || "ADMIN".equalsIgnoreCase(role)
+            );
         }
 
         private String buildStatus(Boolean isDraft, java.time.LocalDateTime deletedAt) {

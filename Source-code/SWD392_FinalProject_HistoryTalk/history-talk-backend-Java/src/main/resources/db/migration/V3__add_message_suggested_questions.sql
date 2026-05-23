@@ -1,2 +1,2 @@
-ALTER TABLE historical_schema.message
-    ADD COLUMN IF NOT EXISTS suggested_questions TEXT;
+-- Superseded by V1 clean baseline.
+SELECT 1;

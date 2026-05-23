@@ -184,13 +184,9 @@ public class AuthServiceImpl implements AuthService {
         }
 
         UserRole role;
-        try {
-            role = UserRole.valueOf(request.getRole().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid role: " + request.getRole() + ". Must be STAFF or ADMIN");
-        }
+        role = parsePrivilegedRole(request.getRole());
         if (role == UserRole.CUSTOMER) {
-            throw new InvalidRequestException("Cannot register a privileged account with role USER. Use the public register endpoint instead.");
+            throw new InvalidRequestException("Cannot register a privileged account with role CUSTOMER. Use the public register endpoint instead.");
         }
 
         User user = User.builder()
@@ -227,8 +223,8 @@ public class AuthServiceImpl implements AuthService {
         User requestUser = userRepository.findById(UUID.fromString(staffId))
                 .orElseThrow(() -> new ResourceNotFoundException("Requesting user not found"));
                 
-        if (!targetUserId.equals(staffId) && requestUser.getRole() != UserRole.STAFF) {
-            throw new InvalidRequestException("Only an STAFF can deactivate other user accounts.");
+        if (!targetUserId.equals(staffId) && requestUser.getRole() != UserRole.SYSTEM_ADMIN) {
+            throw new InvalidRequestException("Only a SYSTEM_ADMIN can deactivate other user accounts.");
         }
         
         User targetUser = userRepository.findById(UUID.fromString(targetUserId))
@@ -245,14 +241,12 @@ public class AuthServiceImpl implements AuthService {
 
     private void cascadeSoftDeleteContent(UUID userId) {
         // Character & documents
-        entityManager.createQuery("UPDATE CharacterDocument cd SET cd.deletedAt = CURRENT_TIMESTAMP WHERE cd.character.createdBy.uid = :userId AND cd.deletedAt IS NULL")
+        entityManager.createQuery("UPDATE Document d SET d.deletedAt = CURRENT_TIMESTAMP WHERE d.createdBy.uid = :userId AND d.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
         entityManager.createQuery("UPDATE Character c SET c.deletedAt = CURRENT_TIMESTAMP WHERE c.createdBy.uid = :userId AND c.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
 
         // HistoricalContext & documents
-        entityManager.createQuery("UPDATE HistoricalContextDocument hcd SET hcd.deletedAt = CURRENT_TIMESTAMP WHERE hcd.historicalContext.createdBy.uid = :userId AND hcd.deletedAt IS NULL")
-                .setParameter("userId", userId).executeUpdate();
         entityManager.createQuery("UPDATE HistoricalContext hc SET hc.deletedAt = CURRENT_TIMESTAMP WHERE hc.createdBy.uid = :userId AND hc.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
 
@@ -266,10 +260,22 @@ public class AuthServiceImpl implements AuthService {
         entityManager.createQuery("UPDATE QuizSession qs SET qs.deletedAt = CURRENT_TIMESTAMP WHERE qs.user.uid = :userId AND qs.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
 
-        // QuizResult & answer details
-        entityManager.createQuery("UPDATE QuizAnswerDetail qd SET qd.deletedAt = CURRENT_TIMESTAMP WHERE qd.quizResult.user.uid = :userId AND qd.deletedAt IS NULL")
-                .setParameter("userId", userId).executeUpdate();
-        entityManager.createQuery("UPDATE QuizResult qr SET qr.deletedAt = CURRENT_TIMESTAMP WHERE qr.user.uid = :userId AND qr.deletedAt IS NULL")
-                .setParameter("userId", userId).executeUpdate();
+    }
+
+    private UserRole parsePrivilegedRole(String roleValue) {
+        if (!StringUtils.hasText(roleValue)) {
+            throw new InvalidRequestException("Role is required. Must be CONTENT_ADMIN or SYSTEM_ADMIN");
+        }
+        String normalized = roleValue.trim().toUpperCase();
+        if ("STAFF".equals(normalized)) {
+            normalized = "CONTENT_ADMIN";
+        } else if ("ADMIN".equals(normalized)) {
+            normalized = "SYSTEM_ADMIN";
+        }
+        try {
+            return UserRole.valueOf(normalized);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException("Invalid role: " + roleValue + ". Must be CONTENT_ADMIN or SYSTEM_ADMIN");
+        }
     }
 }

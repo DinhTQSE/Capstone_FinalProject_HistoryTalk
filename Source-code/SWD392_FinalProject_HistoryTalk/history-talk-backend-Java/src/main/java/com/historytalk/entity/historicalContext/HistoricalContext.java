@@ -58,7 +58,7 @@ public class HistoricalContext {
     private Integer endYear;
 
     @Builder.Default
-    @Column(name = "before_tcn", columnDefinition = "boolean not null default false")
+    @Column(name = "is_bc", columnDefinition = "boolean not null default false")
     private Boolean beforeTCN = false;
 
     @Column(name = "location", length = 255)
@@ -71,8 +71,12 @@ public class HistoricalContext {
     private String videoUrl;
 
     @Builder.Default
-    @Column(name = "is_draft", nullable = false)
-    private Boolean isDraft = true;
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
@@ -80,11 +84,11 @@ public class HistoricalContext {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdDate;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private LocalDateTime updatedDate;
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
@@ -96,5 +100,31 @@ public class HistoricalContext {
     @Builder.Default
     @OneToMany(mappedBy = "historicalContext", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Quiz> quizzes = new ArrayList<>();
+
+    public Boolean getIsDraft() {
+        return !Boolean.TRUE.equals(isPublished);
+    }
+
+    public void setIsDraft(Boolean isDraft) {
+        if (isDraft != null) {
+            this.isPublished = !Boolean.TRUE.equals(isDraft);
+        }
+    }
+
+    public LocalDateTime getCreatedDate() {
+        return createdAt;
+    }
+
+    public void setCreatedDate(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedDate() {
+        return updatedAt;
+    }
+
+    public void setUpdatedDate(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
 }

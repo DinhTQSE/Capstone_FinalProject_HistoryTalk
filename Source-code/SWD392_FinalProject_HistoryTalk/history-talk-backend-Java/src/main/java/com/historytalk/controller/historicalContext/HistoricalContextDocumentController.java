@@ -104,7 +104,7 @@ public class HistoricalContextDocumentController {
      * Create/upload new document (Staff/Admin only)
      */
     @PostMapping
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload document", description = "Upload a new historical document (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createDocument(
@@ -121,7 +121,7 @@ public class HistoricalContextDocumentController {
      * Update document content/metadata (Staff/Admin only)
      */
     @PutMapping("/{docId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update document", description = "Update document content or metadata (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateDocument(
@@ -139,7 +139,7 @@ public class HistoricalContextDocumentController {
      * Delete document
      */
     @DeleteMapping("/{docId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete document", description = "Delete a document")
     public ResponseEntity<ApiResponse<?>> deleteDocument(

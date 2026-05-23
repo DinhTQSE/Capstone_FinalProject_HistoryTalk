@@ -16,7 +16,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             WHERE d.entityId = :entityId
               AND d.entityType = :entityType
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
-            ORDER BY d.uploadDate DESC
+            ORDER BY d.uploadedAt DESC
             """)
     List<Document> findByEntityIdAndEntityTypeOrderByUploadDateDesc(
             @Param("entityId") UUID entityId,
@@ -27,7 +27,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             SELECT d FROM Document d
             WHERE d.createdBy.uid = :uid
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
-            ORDER BY d.uploadDate DESC
+            ORDER BY d.uploadedAt DESC
             """)
     List<Document> findByUploadedByUidOrderByUploadDateDesc(
             @Param("uid") UUID uid,
@@ -38,7 +38,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             WHERE d.createdBy.uid = :uid
               AND d.entityType = :entityType
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
-            ORDER BY d.uploadDate DESC
+            ORDER BY d.uploadedAt DESC
             """)
     List<Document> findByUploadedByUidAndEntityTypeOrderByUploadDateDesc(
             @Param("uid") UUID uid,
@@ -52,7 +52,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
                    OR d.title ILIKE CONCAT('%', :search, '%')
                    OR d.content ILIKE CONCAT('%', :search, '%'))
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
-            ORDER BY d.uploadDate DESC
+            ORDER BY d.uploadedAt DESC
             """)
     List<Document> search(
             @Param("search") String search,
@@ -63,7 +63,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             SELECT d FROM Document d
             WHERE d.entityType = :entityType
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
-            ORDER BY d.uploadDate DESC
+            ORDER BY d.uploadedAt DESC
             """)
     List<Document> findAllActive(
             @Param("entityType") EntityType entityType,

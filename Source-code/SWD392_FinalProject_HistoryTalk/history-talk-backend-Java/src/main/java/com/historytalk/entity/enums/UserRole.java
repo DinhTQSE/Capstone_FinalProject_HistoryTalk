@@ -2,6 +2,6 @@ package com.historytalk.entity.enums;
 
 public enum UserRole {
     CUSTOMER,
-    STAFF,
-    ADMIN
+    CONTENT_ADMIN,
+    SYSTEM_ADMIN
 }

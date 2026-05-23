@@ -66,14 +66,34 @@ public class Document {
     @JoinColumn(name = "uploaded_by", nullable = false)
     private User createdBy;
 
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
     @CreationTimestamp
-    @Column(name = "uploaded_date", nullable = false, updatable = false)
-    private LocalDateTime uploadDate;
+    @Column(name = "uploaded_at", nullable = false, updatable = false)
+    private LocalDateTime uploadedAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_date")
-    private LocalDateTime updatedDate;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    public LocalDateTime getUploadDate() {
+        return uploadedAt;
+    }
+
+    public void setUploadDate(LocalDateTime uploadedAt) {
+        this.uploadedAt = uploadedAt;
+    }
+
+    public LocalDateTime getUpdatedDate() {
+        return updatedAt;
+    }
+
+    public void setUpdatedDate(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }
