@@ -57,4 +57,8 @@ public class CreateHistoricalContextRequest {
 
     @JsonProperty("isPublished")
     private Boolean isPublished = false;
+
+    public Boolean getIsDraft() {
+        return isPublished == null ? null : !isPublished;
+    }
 }
