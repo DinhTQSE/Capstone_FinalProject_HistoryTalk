@@ -108,7 +108,7 @@ def _translate_category(category: str | None) -> str:
 def _resolve_year_label(context: HistoricalContextData) -> str:
     if context.yearLabel:
         return context.yearLabel
-    suffix = " TCN" if context.beforeTCN else ""
+    suffix = " TCN" if context.isBC else ""
     if context.startYear and context.endYear:
         return f"{context.startYear}–{context.endYear}{suffix}"
     if context.year:

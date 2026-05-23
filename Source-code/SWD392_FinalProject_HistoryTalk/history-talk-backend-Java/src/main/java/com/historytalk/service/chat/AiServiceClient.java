@@ -52,6 +52,9 @@ public class AiServiceClient {
             @JsonProperty("description") String description,
             @JsonProperty("era") String era,
             @JsonProperty("year") Integer year,
+            @JsonProperty("startYear") Integer startYear,
+            @JsonProperty("endYear") Integer endYear,
+            @JsonProperty("isBC") Boolean isBC,
             @JsonProperty("location") String location) {}
 
     public record MessageHistoryItem(
@@ -205,6 +208,9 @@ public class AiServiceClient {
                 ctx.getDescription(),
                 ctx.getEra() != null ? ctx.getEra().name() : null,
                 ctx.getYear(),
+                ctx.getStartYear(),
+                ctx.getEndYear(),
+                ctx.getIsBC(),
                 ctx.getLocation());
     }
 }

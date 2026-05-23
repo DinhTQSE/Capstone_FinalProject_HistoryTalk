@@ -22,7 +22,7 @@ class HistoricalContextData(BaseModel):
     endYear: Optional[int] = None
     period: Optional[str] = None
     yearLabel: Optional[str] = None
-    beforeTCN: Optional[bool] = None
+    isBC: Optional[bool] = None
     location: Optional[str] = None
     imageUrl: Optional[str] = None
     videoUrl: Optional[str] = None
