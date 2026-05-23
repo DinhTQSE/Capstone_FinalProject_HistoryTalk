@@ -62,7 +62,7 @@ public class CharacterController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new character", description = "Create a new historical character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createCharacter(
@@ -75,7 +75,7 @@ public class CharacterController {
     }
 
     @PutMapping("/{characterId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update a character", description = "Update character details (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(
@@ -89,7 +89,7 @@ public class CharacterController {
     }
 
     @DeleteMapping("/{characterId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete a character", description = "Delete a character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> deleteCharacter(
@@ -102,7 +102,7 @@ public class CharacterController {
     }
 
     @PatchMapping("/{characterId}/soft-delete")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Soft delete a character", description = "Soft delete a character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> softDeleteCharacter(
@@ -115,7 +115,7 @@ public class CharacterController {
     }
 
     @PostMapping("/{characterId}/contexts/{contextId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Map context to character", description = "Create a character-context mapping (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> addContextToCharacter(
@@ -129,7 +129,7 @@ public class CharacterController {
     }
 
     @DeleteMapping("/{characterId}/contexts/{contextId}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Unmap context from character", description = "Remove a character-context mapping (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> removeContextFromCharacter(

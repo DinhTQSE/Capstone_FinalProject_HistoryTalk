@@ -81,7 +81,7 @@ public class Character {
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-            name = "character_historical_context",
+            name = "context_character_mapping",
             joinColumns = @JoinColumn(name = "character_id"),
             inverseJoinColumns = @JoinColumn(name = "context_id")
     )
@@ -93,11 +93,11 @@ public class Character {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdDate;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private LocalDateTime updatedDate;
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
@@ -105,5 +105,31 @@ public class Character {
     @Builder.Default
     @OneToMany(mappedBy = "character", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChatSession> chatSessions = new ArrayList<>();
+
+    public Boolean getIsDraft() {
+        return !Boolean.TRUE.equals(isPublished);
+    }
+
+    public void setIsDraft(Boolean isDraft) {
+        if (isDraft != null) {
+            this.isPublished = !Boolean.TRUE.equals(isDraft);
+        }
+    }
+
+    public LocalDateTime getCreatedDate() {
+        return createdAt;
+    }
+
+    public void setCreatedDate(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedDate() {
+        return updatedAt;
+    }
+
+    public void setUpdatedDate(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
 }

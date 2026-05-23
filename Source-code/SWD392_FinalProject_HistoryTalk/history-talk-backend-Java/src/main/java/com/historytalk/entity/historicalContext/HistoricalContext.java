@@ -84,11 +84,11 @@ public class HistoricalContext {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdDate;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private LocalDateTime updatedDate;
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
@@ -100,5 +100,31 @@ public class HistoricalContext {
     @Builder.Default
     @OneToMany(mappedBy = "historicalContext", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Quiz> quizzes = new ArrayList<>();
+
+    public Boolean getIsDraft() {
+        return !Boolean.TRUE.equals(isPublished);
+    }
+
+    public void setIsDraft(Boolean isDraft) {
+        if (isDraft != null) {
+            this.isPublished = !Boolean.TRUE.equals(isDraft);
+        }
+    }
+
+    public LocalDateTime getCreatedDate() {
+        return createdAt;
+    }
+
+    public void setCreatedDate(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedDate() {
+        return updatedAt;
+    }
+
+    public void setUpdatedDate(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
 }

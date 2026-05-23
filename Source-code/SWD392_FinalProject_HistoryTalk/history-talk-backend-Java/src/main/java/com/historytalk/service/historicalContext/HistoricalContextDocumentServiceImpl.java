@@ -242,6 +242,11 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && ("STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role));
+        return role != null && (
+                "CONTENT_ADMIN".equalsIgnoreCase(role)
+                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "STAFF".equalsIgnoreCase(role)
+                        || "ADMIN".equalsIgnoreCase(role)
+        );
     }
 }

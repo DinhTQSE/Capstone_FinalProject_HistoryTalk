@@ -31,7 +31,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                      AND (:era IS NULL OR hc.era = :era)
                      AND (:category IS NULL OR hc.category = :category)
                      AND (:includeDraft = true OR hc.isPublished = true)
-                     AND (:includeDeleted = true OR hc.isActive = true)
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
                      """)
        Page<HistoricalContext> findAllWithSearch(
                      @Param("search") String search,
@@ -47,8 +47,8 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                             OR hc.name ILIKE CONCAT('%', :search, '%')
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
                      AND (:includeDraft = true OR hc.isPublished = true)
-                     AND (:includeDeleted = true OR hc.isActive = true)
-                     ORDER BY hc.createdDate DESC
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
+                     ORDER BY hc.createdAt DESC
                      """)
        List<HistoricalContext> findAllSimple(@Param("search") String search,
                                              @Param("includeDraft") boolean includeDraft,
@@ -56,8 +56,8 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        @Query(value = """
                SELECT * FROM historical_schema.historical_context hc
-               WHERE hc.is_active = false
-               ORDER BY hc.created_date DESC
+               WHERE hc.deleted_at IS NOT NULL
+               ORDER BY hc.created_at DESC
                """, nativeQuery = true)
        List<HistoricalContext> findAllDeleted();
 

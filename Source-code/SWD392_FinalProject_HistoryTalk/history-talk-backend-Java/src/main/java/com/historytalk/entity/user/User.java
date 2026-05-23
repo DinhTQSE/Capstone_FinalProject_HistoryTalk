@@ -47,20 +47,27 @@ public class User {
     @Column(name = "role", length = 50, nullable = false)
     private UserRole role;
 
+    @Column(name = "tier_id", columnDefinition = "uuid")
+    private UUID tierId;
+
     @Builder.Default
-    @Column(name = "token", columnDefinition = "int default 0")
+    @Column(name = "token", nullable = false)
     private Integer token = 0;
 
     @Column(name = "last_active_date")
     private LocalDateTime lastActiveDate;
 
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
     @CreationTimestamp
-    @Column(name = "created_date", nullable = false, updatable = false)
-    private LocalDateTime createdDate;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_date")
-    private LocalDateTime updatedDate;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_date", nullable = true)
     private LocalDateTime deletedAt;
