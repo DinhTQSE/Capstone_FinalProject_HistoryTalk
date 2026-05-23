@@ -71,4 +71,13 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
            """, nativeQuery = true)
     @org.springframework.data.jpa.repository.Modifying
     int restoreById(@Param("characterId") UUID characterId);
+
+    @Query("SELECT COUNT(c) FROM Character c")
+    long countCurrent();
+
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.isPublished = true")
+    long countPublished();
+
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.deletedAt IS NULL AND c.isActive = true")
+    long countActive();
 }

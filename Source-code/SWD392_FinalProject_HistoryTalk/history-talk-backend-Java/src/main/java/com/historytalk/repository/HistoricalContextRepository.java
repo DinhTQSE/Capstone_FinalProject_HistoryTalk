@@ -68,4 +68,13 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                """, nativeQuery = true)
        @org.springframework.data.jpa.repository.Modifying
        int restoreById(@Param("contextId") UUID contextId);
+
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc")
+       long countCurrent();
+
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.isPublished = true")
+       long countPublished();
+
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.deletedAt IS NULL AND hc.isActive = true")
+       long countActive();
 }
