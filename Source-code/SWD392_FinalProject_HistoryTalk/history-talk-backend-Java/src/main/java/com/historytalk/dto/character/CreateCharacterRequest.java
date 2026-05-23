@@ -54,4 +54,8 @@ public class CreateCharacterRequest {
     @JsonProperty("contextIds")
     @Schema(deprecated = true, description = "Deprecated: use mapping APIs to link character with historical contexts")
     private List<String> contextIds;
+
+    public Boolean getIsDraft() {
+        return isPublished == null ? null : !isPublished;
+    }
 }
