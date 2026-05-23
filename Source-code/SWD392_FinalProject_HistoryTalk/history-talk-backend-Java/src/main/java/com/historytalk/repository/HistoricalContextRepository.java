@@ -63,7 +63,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        @Query(value = """
                UPDATE historical_schema.historical_context
-               SET deleted_at = NULL
+               SET deleted_at = NULL, is_active = true
                WHERE context_id = :contextId
                """, nativeQuery = true)
        @org.springframework.data.jpa.repository.Modifying

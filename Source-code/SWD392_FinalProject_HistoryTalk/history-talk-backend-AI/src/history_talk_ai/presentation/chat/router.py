@@ -10,6 +10,7 @@ from history_talk_ai.presentation.chat.schemas import (
     GenerateTitleRequest,
     GenerateTitleResponse,
     GenerateTitleResponseData,
+    ProcessDocumentRequest,
 )
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
@@ -74,7 +75,7 @@ async def _resolve_character_and_context(
     description=(
         "Accepts a user message together with conversation history. "
         "Internally fetches the character and historical-context data from the Java backend "
-        "(unless pre-provided), builds a roleplay system prompt, and invokes the LLM via LangChain."
+        "(unless pre-provided), builds a roleplay system prompt with RAG context, and invokes the LLM."
     ),
 )
 async def chat(body: ChatRequest) -> ChatResponse:
@@ -133,6 +134,27 @@ async def generate_title(body: GenerateTitleRequest) -> GenerateTitleResponse:
         )
 
     return GenerateTitleResponse(data=GenerateTitleResponseData(title=title))
+
+
+# ── POST /v1/ai/documents/process ───────────────────────────────────────────
+
+@router.post(
+    "/documents/process",
+    summary="Process and index a document into VectorChunk (Supabase)",
+    description=(
+        "Chunk the given document content, generate embeddings via Ollama (nomic-embed-text), "
+        "and store the resulting VectorChunks in Supabase for future RAG retrieval."
+    ),
+)
+async def process_document(body: ProcessDocumentRequest):
+    try:
+        await llm_service.process_document(body)
+        return {"success": True, "message": f"Document {body.doc_id} processed successfully."}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Document processing error: {exc}",
+        )
 
 
 # ── GET /v1/ai/character/{id} — diagnostic ────────────────────────────────────

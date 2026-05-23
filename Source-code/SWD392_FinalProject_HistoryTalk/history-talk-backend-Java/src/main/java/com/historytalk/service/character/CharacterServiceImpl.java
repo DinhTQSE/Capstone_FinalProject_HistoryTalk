@@ -75,10 +75,10 @@ public class CharacterServiceImpl implements CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Character not found with id: " + characterId));
 
-        if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(character.getIsDraft())) {
+        if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(character.getIsPublished())) {
             throw new ResourceNotFoundException("Character not found with id: " + characterId);
         }
-        if (!isStaffOrAdmin(role) && character.getDeletedAt() != null) {
+        if (!isStaffOrAdmin(role) && Boolean.FALSE.equals(character.getIsActive())) {
             throw new ResourceNotFoundException("Character not found with id: " + characterId);
         }
         return mapToResponse(character);
@@ -158,8 +158,8 @@ public class CharacterServiceImpl implements CharacterService {
         if (request.getDeathDate() != null) {
             character.setDeathDate(request.getDeathDate());
         }
-        if (request.getIsDraft() != null) {
-            character.setIsDraft(request.getIsDraft());
+        if (request.getIsPublished() != null) {
+            character.setIsPublished(request.getIsPublished());
         }
 
         Character updated = characterRepository.save(character);
@@ -198,6 +198,7 @@ public class CharacterServiceImpl implements CharacterService {
         }
 
         character.setDeletedAt(java.time.LocalDateTime.now());
+        character.setIsActive(false);
         characterRepository.save(character);
 
         // Cascade soft-delete to documents
@@ -291,7 +292,7 @@ public class CharacterServiceImpl implements CharacterService {
         boolean includeDraftAndDeleted = isStaffOrAdmin(role);
         return character.getHistoricalContexts().stream()
                 .filter(ctx -> includeDraftAndDeleted
-                        || (!Boolean.TRUE.equals(ctx.getIsDraft()) && ctx.getDeletedAt() == null))
+                        || (!Boolean.TRUE.equals(ctx.getIsPublished()) && Boolean.TRUE.equals(ctx.getIsActive())))
                 .sorted(Comparator.comparing(HistoricalContext::getName, String.CASE_INSENSITIVE_ORDER))
                 .map(hc -> CharacterResponse.ContextInfo.builder()
                         .contextId(hc.getContextId().toString())
@@ -329,9 +330,9 @@ public class CharacterServiceImpl implements CharacterService {
                 .personality(character.getPersonality())
                 .bornDate(character.getBornDate())
                 .deathDate(character.getDeathDate())
-                .isDraft(character.getIsDraft())
+                .isPublished(character.getIsPublished())
                 .deletedAt(character.getDeletedAt())
-                .status(buildStatus(character.getIsDraft(), character.getDeletedAt()))
+                .status(buildStatus(character.getIsPublished(), character.getDeletedAt(), character.getIsActive()))
             .era(ctx != null ? ctx.getEra() : null)
                 .events(events)
             .context(ctx == null ? null : CharacterResponse.ContextInfo.builder()
@@ -350,7 +351,7 @@ public class CharacterServiceImpl implements CharacterService {
 
     private CharacterResponse mapToResponseWithInactive(Character character) {
         CharacterResponse response = mapToResponse(character);
-        response.setStatus(buildStatus(character.getIsDraft(), character.getDeletedAt()));
+        response.setStatus(buildStatus(character.getIsPublished(), character.getDeletedAt(), character.getIsActive()));
         return response;
     }
 
@@ -407,11 +408,11 @@ public class CharacterServiceImpl implements CharacterService {
         );
     }
 
-    private String buildStatus(Boolean isDraft, java.time.LocalDateTime deletedAt) {
-        if (deletedAt != null) {
+    private String buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt, Boolean isActive) {
+        if (deletedAt != null || Boolean.FALSE.equals(isActive)) {
             return "INACTIVE";
         }
-        if (Boolean.TRUE.equals(isDraft)) {
+        if (Boolean.TRUE.equals(isPublished)) {
             return "DRAFT";
         }
         return "ACTIVE";

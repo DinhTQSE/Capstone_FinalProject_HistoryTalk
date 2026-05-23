@@ -76,7 +76,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: "+contextId));
 
-        if (!isStaffOrAdmin(role) && context.getDeletedAt() != null) {
+        if (!isStaffOrAdmin(role) && Boolean.FALSE.equals(context.getIsActive())) {
             throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
         }
         
@@ -108,7 +108,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .year(request.getYear())
                 .startYear(request.getStartYear())
                 .endYear(request.getEndYear())
-                .beforeTCN(request.getBeforeTCN() != null ? request.getBeforeTCN() : false)
+                .isBC(request.getIsBC() != null ? request.getIsBC() : false)
                 .location(request.getLocation())
                 .imageUrl(request.getImageUrl())
                 .videoUrl(request.getVideoUrl())
@@ -173,8 +173,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getEndYear() != null) {
             context.setEndYear(request.getEndYear());
         }
-        if (request.getBeforeTCN() != null) {
-            context.setBeforeTCN(request.getBeforeTCN());
+        if (request.getIsBC() != null) {
+            context.setIsBC(request.getIsBC());
         }
         if (request.getLocation() != null) {
             context.setLocation(request.getLocation());
@@ -185,8 +185,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getVideoUrl() != null) {
             context.setVideoUrl(request.getVideoUrl());
         }
-        if (request.getIsDraft() != null) {
-            context.setIsDraft(request.getIsDraft());
+        if (request.getIsPublished() != null) {
+            context.setIsPublished(request.getIsPublished());
         }
         HistoricalContext updatedContext = contextRepository.save(context);
         log.info("Historical context updated successfully with ID: {}", contextId);
@@ -237,6 +237,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         context.setDeletedAt(now);
+        context.setIsActive(false);
         contextRepository.save(context);
 
         // Cascade to Documents
@@ -248,6 +249,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (context.getCharacters() != null) {
             context.getCharacters().forEach(character -> {
                 character.setDeletedAt(now);
+                character.setIsActive(false);
                 documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
                                 character.getCharacterId(), EntityType.CHARACTER, true)
                         .forEach(doc -> doc.setDeletedAt(now));
@@ -315,14 +317,14 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         ? context.getStartYear() + "\u2013" + context.getEndYear()
                         : null)
                 .yearLabel(context.getYear() != null
-                        ? context.getYear() + (Boolean.TRUE.equals(context.getBeforeTCN()) ? " TCN" : " SCN")
+                        ? context.getYear() + (Boolean.TRUE.equals(context.getIsBC()) ? " TCN" : " SCN")
                         : null)
-                .beforeTCN(context.getBeforeTCN())
+                .isBC(context.getIsBC())
                 .location(context.getLocation())
                 .imageUrl(context.getImageUrl())
                 .videoUrl(context.getVideoUrl())
-            .isDraft(context.getIsDraft())
-            .status(buildStatus(context.getIsDraft(), context.getDeletedAt()))
+            .isPublished(context.getIsPublished())
+            .status(buildStatus(context.getIsPublished(), context.getDeletedAt(), context.getIsActive()))
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
                         .uid(context.getCreatedBy().getUid().toString())
                         .userName(context.getCreatedBy().getUserName())
@@ -335,7 +337,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
         private HistoricalContextResponse mapToResponseWithInactive(HistoricalContext context) {
         HistoricalContextResponse response = mapToResponse(context);
-        response.setStatus(buildStatus(context.getIsDraft(), context.getDeletedAt()));
+        response.setStatus(buildStatus(context.getIsPublished(), context.getDeletedAt(), context.getIsActive()));
         return response;
         }
     
@@ -371,11 +373,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             );
         }
 
-        private String buildStatus(Boolean isDraft, java.time.LocalDateTime deletedAt) {
-            if (deletedAt != null) {
+        private String buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt, Boolean isActive) {
+            if (deletedAt != null || Boolean.FALSE.equals(isActive)) {
                 return "INACTIVE";
             }
-            if (Boolean.TRUE.equals(isDraft)) {
+            if (Boolean.TRUE.equals(isPublished)) {
                 return "DRAFT";
             }
             return "ACTIVE";

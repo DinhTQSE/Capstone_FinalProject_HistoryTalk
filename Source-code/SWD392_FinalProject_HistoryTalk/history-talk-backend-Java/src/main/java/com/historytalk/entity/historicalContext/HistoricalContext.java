@@ -59,7 +59,7 @@ public class HistoricalContext {
 
     @Builder.Default
     @Column(name = "is_bc", columnDefinition = "boolean not null default false")
-    private Boolean beforeTCN = false;
+    private Boolean isBC = false;
 
     @Column(name = "location", length = 255)
     private String location;

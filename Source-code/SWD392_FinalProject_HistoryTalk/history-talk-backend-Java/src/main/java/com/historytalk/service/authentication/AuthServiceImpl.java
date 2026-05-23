@@ -243,7 +243,7 @@ public class AuthServiceImpl implements AuthService {
         // Character & documents
         entityManager.createQuery("UPDATE Document d SET d.deletedAt = CURRENT_TIMESTAMP WHERE d.createdBy.uid = :userId AND d.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
-        entityManager.createQuery("UPDATE Character c SET c.deletedAt = CURRENT_TIMESTAMP WHERE c.createdBy.uid = :userId AND c.deletedAt IS NULL")
+        entityManager.createQuery("UPDATE Character c SET c.deletedAt = CURRENT_TIMESTAMP, c.isActive = false WHERE c.createdBy.uid = :userId AND c.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
 
         // HistoricalContext & documents

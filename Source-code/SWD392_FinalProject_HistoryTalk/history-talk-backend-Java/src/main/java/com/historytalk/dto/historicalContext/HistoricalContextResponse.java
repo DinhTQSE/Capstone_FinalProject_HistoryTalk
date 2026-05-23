@@ -45,8 +45,8 @@ public class HistoricalContextResponse {
     @JsonProperty("yearLabel")
     private String yearLabel;
 
-    @JsonProperty("beforeTCN")
-    private Boolean beforeTCN;
+    @JsonProperty("isBC")
+    private Boolean isBC;
 
     @JsonProperty("location")
     private String location;
@@ -57,8 +57,8 @@ public class HistoricalContextResponse {
     @JsonProperty("videoUrl")
     private String videoUrl;
 
-    @JsonProperty("isDraft")
-    private Boolean isDraft;
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 
     @JsonProperty("status")
     private String status;

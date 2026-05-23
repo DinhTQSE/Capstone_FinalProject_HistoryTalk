@@ -59,14 +59,14 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query(value = """
            SELECT * FROM historical_schema."character" c
-           WHERE c.deleted_at IS NOT NULL
+           WHERE c.is_active = false
            ORDER BY c.name ASC
            """, nativeQuery = true)
     List<Character> findAllDeleted();
 
     @Query(value = """
            UPDATE historical_schema."character"
-           SET deleted_at = NULL
+           SET deleted_at = NULL, is_active = true
            WHERE character_id = :characterId
            """, nativeQuery = true)
     @org.springframework.data.jpa.repository.Modifying

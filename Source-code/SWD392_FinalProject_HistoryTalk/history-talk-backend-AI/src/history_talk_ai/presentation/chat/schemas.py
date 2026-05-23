@@ -53,6 +53,11 @@ class GenerateTitleRequest(BaseModel):
     characterData: Optional[CharacterData] = None
     contextData: Optional[HistoricalContextData] = None
 
+class ProcessDocumentRequest(BaseModel):
+    doc_id: str = Field(..., description="UUID của tài liệu")
+    entity_id: str = Field(..., description="UUID của nhân vật hoặc bối cảnh")
+    content: str = Field(..., description="Nội dung toàn bộ tài liệu")
+
 
 # ── Response ──────────────────────────────────────────────────────────────────
 
