@@ -23,6 +23,8 @@ public interface CharacterService {
 
     void softDeleteCharacter(String characterId, String userId, String userRole);
 
+    void toggleActiveCharacter(String characterId, String userId, String userRole);
+
     List<CharacterResponse> getDeletedCharacters();
 
     void restoreCharacter(String characterId);

@@ -158,6 +158,20 @@ public class StaffQuizController {
         return ResponseEntity.ok(ApiResponse.success("", "Quiz soft-deleted successfully"));
     }
 
+    @PatchMapping("/{quizId}/toggle-active")
+    @Operation(summary = "Toggle quiz active state", description = "Toggle whether a quiz is visible/active to customers")
+    public ResponseEntity<ApiResponse<String>> toggleActiveQuiz(
+            @PathVariable String quizId) {
+
+        log.info("PATCH /api/v1/staff/quizzes/{}/toggle-active - toggle quiz active state", quizId);
+
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+        quizService.toggleActiveQuiz(quizId, userId, userRole);
+
+        return ResponseEntity.ok(ApiResponse.success("", "Quiz active state toggled successfully"));
+    }
+
     @PostMapping("/{quizId}/questions")
     @Operation(summary = "Add question to quiz", description = "Add a new question to an existing quiz")
     public ResponseEntity<ApiResponse<String>> addQuestion(

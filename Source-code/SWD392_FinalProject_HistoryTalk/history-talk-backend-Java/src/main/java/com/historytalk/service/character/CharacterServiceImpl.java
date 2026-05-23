@@ -217,6 +217,25 @@ public class CharacterServiceImpl implements CharacterService {
         }
     }
 
+    @Transactional
+    public void toggleActiveCharacter(String characterId, String userId, String userRole) {
+        log.info("Toggling active state for character: {} by user: {}", characterId, userId);
+
+        Character character = characterRepository.findById(UUID.fromString(characterId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Character not found with id: " + characterId));
+
+        if (!isStaffOrAdmin(userRole)) {
+            throw new InvalidRequestException(
+                    "You do not have permission to toggle this character");
+        }
+
+        boolean nextActive = !Boolean.TRUE.equals(character.getIsActive());
+        character.setIsActive(nextActive);
+        character.setDeletedAt(nextActive ? null : java.time.LocalDateTime.now());
+        characterRepository.save(character);
+    }
+
     @Transactional(readOnly = true)
     public List<CharacterResponse> getDeletedCharacters() {
         return characterRepository.findAllDeleted().stream()

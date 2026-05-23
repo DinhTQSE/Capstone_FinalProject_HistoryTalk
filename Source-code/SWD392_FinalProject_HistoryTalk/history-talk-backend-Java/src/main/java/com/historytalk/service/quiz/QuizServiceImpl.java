@@ -269,6 +269,21 @@ public class QuizServiceImpl implements QuizService {
 
     @Transactional
     @Override
+    public void toggleActiveQuiz(String quizId, String userId, String userRole) {
+        log.info("Toggling active state for quiz: {} by user: {}", quizId, userId);
+
+        Quiz quiz = quizRepository.findById(UuidUtils.fromString(quizId, "quizId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found with ID: " + quizId));
+
+        checkOwnershipOrStaffOrAdmin(quiz.getCreatedBy().getUid().toString(), userId, userRole);
+
+        boolean nextActive = quiz.getDeletedAt() != null;
+        quiz.setDeletedAt(nextActive ? null : LocalDateTime.now());
+        quizRepository.save(quiz);
+    }
+
+    @Transactional
+    @Override
     public void addQuestion(String quizId, QuestionRequest request, String userId, String userRole) {
         log.info("Adding question to quiz: {} by user: {}", quizId, userId);
         
@@ -578,6 +593,7 @@ public class QuizServiceImpl implements QuizService {
                 .createdDate(LocalDateTime.now()) // You may need to add createdDate to Quiz entity
                 .updatedDate(LocalDateTime.now()) // You may need to add updatedDate to Quiz entity
                 .deletedAt(quiz.getDeletedAt())
+                .isActive(quiz.getDeletedAt() == null)
                 .questions(questions.stream()
                         .map(this::mapQuestionToResponse)
                         .collect(Collectors.toList()))

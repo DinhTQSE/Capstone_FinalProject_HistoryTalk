@@ -280,6 +280,27 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         log.info("Historical context soft-deleted successfully with ID: {}", contextId);
     }
 
+    @Transactional
+    public void toggleActiveContext(String contextId, String userId, String userRole) {
+        log.info("Toggling active state for historical context with ID: {}", contextId);
+
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Not found with ID: " + contextId
+                ));
+
+        if (!isStaffOrAdmin(userRole)) {
+            throw new InvalidRequestException(
+                    "You do not have permission to toggle this historical context"
+            );
+        }
+
+        boolean nextActive = !Boolean.TRUE.equals(context.getIsActive());
+        context.setIsActive(nextActive);
+        context.setDeletedAt(nextActive ? null : java.time.LocalDateTime.now());
+        contextRepository.save(context);
+    }
+
     @Transactional(readOnly = true)
     public List<HistoricalContextResponse> getDeletedContexts() {
         return contextRepository.findAllDeleted().stream()

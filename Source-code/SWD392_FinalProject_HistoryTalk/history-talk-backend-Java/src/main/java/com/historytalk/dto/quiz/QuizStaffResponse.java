@@ -46,6 +46,8 @@ public class QuizStaffResponse {
 
     private LocalDateTime deletedAt;
 
+    private Boolean isActive;
+
     private List<QuestionResponse> questions;
 
 }

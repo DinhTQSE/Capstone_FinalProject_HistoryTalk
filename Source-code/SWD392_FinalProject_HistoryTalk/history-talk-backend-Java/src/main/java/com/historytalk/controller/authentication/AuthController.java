@@ -50,19 +50,18 @@ public class AuthController {
                 .body(ApiResponse.success(data, "User registered successfully"));
     }
 
-//    @PostMapping("/register-staff")
-//    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-//    @SecurityRequirement(name = "bearerAuth")
-//    @Operation(summary = "Register staff/admin account",
-//               description = "Creates a new CONTENT_ADMIN or SYSTEM_ADMIN account. Requires SYSTEM_ADMIN role.")
-//    public ResponseEntity<ApiResponse<RegisterStaffResponse>> registerStaff(
-//            @Valid @RequestBody RegisterStaffRequest request) {
-//
-//        log.info("POST /api/v1/auth/register-staff - email: {}", request.getEmail());
-//        RegisterStaffResponse data = authService.registerStaff(request);
-//        return ResponseEntity.status(HttpStatus.CREATED)
-//                .body(ApiResponse.success(data, "Staff account registered successfully"));
-//    }
+    @PostMapping("/register-content-admin")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Register content admin/system admin account",
+               description = "Creates a new CONTENT_ADMIN or SYSTEM_ADMIN account. Requires SYSTEM_ADMIN role.")
+    public ResponseEntity<ApiResponse<RegisterStaffResponse>> registerContentAdmin(
+            @Valid @RequestBody RegisterStaffRequest request) {
+
+        log.info("POST /api/v1/auth/register-content-admin - email: {}", request.getEmail());
+        RegisterStaffResponse data = authService.registerStaff(request);
+        return ResponseEntity.ok(ApiResponse.success(data, "Staff account registered successfully"));
+    }
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate with email and password, returns JWT tokens.")
