@@ -5,24 +5,24 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Request body for PUT /staff/quizzes/:quizId
+ * All fields are optional (partial update of quiz metadata, NOT questions).
+ * era is NOT updatable directly — it comes from the historicalContext.
+ * To change era, change the contextId.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateQuizRequest {
 
+    /** null = no change */
     private String title;
 
-    private String description;
+    /** null = no change. Changing context also changes era. */
+    private String contextId;
 
-    private Integer grade;
-
-    private Integer chapterNumber;
-
-    private String chapterTitle;
-
-    private String era;
-
-    private Integer durationSeconds;
-
+    /** null = no change. Must match QuizLevel enum: EASY | MEDIUM | HARD */
+    private String level;
 }

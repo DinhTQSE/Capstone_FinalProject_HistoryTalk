@@ -1,9 +1,8 @@
 package com.historytalk.controller.quiz;
 
 import com.historytalk.dto.ApiResponse;
-import com.historytalk.dto.quiz.*;
 import com.historytalk.dto.PaginatedResponse;
-import com.historytalk.entity.enums.EventEra;
+import com.historytalk.dto.quiz.*;
 import com.historytalk.service.quiz.QuizService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,14 +11,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,237 +25,158 @@ import java.util.List;
 @RequestMapping("/api/v1/staff/quizzes")
 @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
 @SecurityRequirement(name = "bearerAuth")
-@Tag(name = "Quizzes (Staff)", description = "Endpoints for staff/admin to manage quizzes")
+@Tag(name = "Quizzes (Staff)", description = "Endpoints for content admin and system admin to manage quizzes")
 public class StaffQuizController {
 
     private final QuizService quizService;
 
+    /**
+     * GET /staff/quizzes
+     * Paginated list. Optional: search, era, page (0-indexed), size.
+     */
     @GetMapping
-    @Operation(summary = "Get all quizzes (paginated)", description = "Retrieve quizzes with optional search, grade, and era filters")
+    @Operation(summary = "List all quizzes (paginated)", description = "Retrieve quizzes with optional search and era filter.")
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizStaffResponse>>> getAllQuizzes(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Integer grade,
             @RequestParam(required = false) String era,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        log.info("GET /api/v1/staff/quizzes - search: {}, grade: {}, era: {}, page: {}, size: {}", 
-                 search, grade, era, page, size);
-
-        EventEra eraEnum = null;
-        if (era != null && !era.isEmpty()) {
-            try {
-                eraEnum = EventEra.valueOf(era);
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Invalid era value: " + era, "INVALID_ERA"));
-            }
-        }
-
+        log.info("GET /api/v1/staff/quizzes search={} era={} page={} size={}", search, era, page, size);
         Pageable pageable = PageRequest.of(page, size);
-        PaginatedResponse<QuizStaffResponse> data = quizService.getAllQuizzesForStaff(search, grade, eraEnum, pageable);
-
+        PaginatedResponse<QuizStaffResponse> data = quizService.getAllQuizzesForStaff(search, era, pageable);
         return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
     }
 
-    @GetMapping("/contexts/{contextId}")
-    @Operation(summary = "Get quizzes by context (paginated)", description = "Retrieve quizzes under a historical context with optional search, grade, and era filters")
-    public ResponseEntity<ApiResponse<PaginatedResponse<QuizStaffResponse>>> getQuizzesByContext(
-            @PathVariable String contextId,
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) Integer grade,
-            @RequestParam(required = false) String era,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        log.info("GET /api/v1/staff/quizzes/contexts/{} - search: {}, grade: {}, era: {}, page: {}, size: {}",
-                contextId, search, grade, era, page, size);
-
-        EventEra eraEnum = null;
-        if (era != null && !era.isEmpty()) {
-            try {
-                eraEnum = EventEra.valueOf(era);
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Invalid era value: " + era, "INVALID_ERA"));
-            }
-        }
-
-        Pageable pageable = PageRequest.of(page, size);
-        PaginatedResponse<QuizStaffResponse> data = quizService.getQuizzesByContextForStaff(contextId, search, grade, eraEnum, pageable);
-
-        return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
-    }
-
+    /**
+     * GET /staff/quizzes/:quizId
+     * Full quiz detail including all questions.
+     */
     @GetMapping("/{quizId}")
-    @Operation(summary = "Get quiz by ID", description = "Retrieve a specific quiz with all questions")
+    @Operation(summary = "Get quiz by ID", description = "Retrieve full quiz detail including all questions.")
     public ResponseEntity<ApiResponse<QuizStaffResponse>> getQuizById(
             @PathVariable String quizId) {
 
-        log.info("GET /api/v1/staff/quizzes/{} - quiz ID", quizId);
-
+        log.info("GET /api/v1/staff/quizzes/{}", quizId);
         QuizStaffResponse data = quizService.getQuizByIdForStaff(quizId);
-
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz retrieved successfully"));
     }
 
+    /**
+     * POST /staff/quizzes
+     * Create a new quiz with initial questions.
+     */
     @PostMapping
-    @Operation(summary = "Create new quiz", description = "Create a new quiz with initial questions")
+    @Operation(summary = "Create quiz", description = "Create a new quiz with title, context, level, and initial questions.")
     public ResponseEntity<ApiResponse<QuizStaffResponse>> createQuiz(
             @Valid @RequestBody CreateQuizRequest request) {
 
-        log.info("POST /api/v1/staff/quizzes - title: {}", request.getTitle());
-
-        String userId = SecurityUtils.getUserId();
+        log.info("POST /api/v1/staff/quizzes title={}", request.getTitle());
+        UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizStaffResponse data = quizService.createQuiz(request, userId);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(data, "Quiz created successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Quiz created successfully"));
     }
 
+    /**
+     * PUT /staff/quizzes/:quizId
+     * Partial update of quiz metadata (not questions).
+     */
     @PutMapping("/{quizId}")
-    @Operation(summary = "Update quiz", description = "Update quiz information (not questions)")
+    @Operation(summary = "Update quiz metadata", description = "Update title, contextId, or level. All fields are optional.")
     public ResponseEntity<ApiResponse<QuizStaffResponse>> updateQuiz(
             @PathVariable String quizId,
-            @Valid @RequestBody UpdateQuizRequest request) {
+            @RequestBody UpdateQuizRequest request) {
 
-        log.info("PUT /api/v1/staff/quizzes/{} - update quiz", quizId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        QuizStaffResponse data = quizService.updateQuiz(quizId, request, userId, userRole);
-
+        log.info("PUT /api/v1/staff/quizzes/{}", quizId);
+        QuizStaffResponse data = quizService.updateQuiz(quizId, request);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz updated successfully"));
     }
 
+    /**
+     * DELETE /staff/quizzes/:quizId
+     * Permanent hard delete.
+     */
     @DeleteMapping("/{quizId}")
-    @Operation(summary = "Delete quiz", description = "Hard delete a quiz")
-    public ResponseEntity<ApiResponse<String>> deleteQuiz(
+    @Operation(summary = "Delete quiz", description = "Permanently delete a quiz and all its questions.")
+    public ResponseEntity<ApiResponse<Void>> deleteQuiz(
             @PathVariable String quizId) {
 
-        log.info("DELETE /api/v1/staff/quizzes/{} - delete quiz", quizId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.deleteQuiz(quizId, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Quiz deleted successfully"));
+        log.info("DELETE /api/v1/staff/quizzes/{}", quizId);
+        quizService.deleteQuiz(quizId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Quiz deleted successfully"));
     }
 
+    /**
+     * PATCH /staff/quizzes/:quizId/soft-delete
+     * Sets deletedAt to now.
+     */
     @PatchMapping("/{quizId}/soft-delete")
-    @Operation(summary = "Soft delete quiz", description = "Soft delete a quiz")
-    public ResponseEntity<ApiResponse<String>> softDeleteQuiz(
+    @Operation(summary = "Soft delete quiz", description = "Move quiz to trash by setting deletedAt timestamp.")
+    public ResponseEntity<ApiResponse<Void>> softDeleteQuiz(
             @PathVariable String quizId) {
 
-        log.info("PATCH /api/v1/staff/quizzes/{}/soft-delete - soft delete quiz", quizId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.softDeleteQuiz(quizId, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Quiz soft-deleted successfully"));
+        log.info("PATCH /api/v1/staff/quizzes/{}/soft-delete", quizId);
+        quizService.softDeleteQuiz(quizId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Quiz soft-deleted successfully"));
     }
 
+    /**
+     * PATCH /staff/quizzes/:quizId/toggle-active
+     * Flips isActive boolean.
+     */
     @PatchMapping("/{quizId}/toggle-active")
-    @Operation(summary = "Toggle quiz active state", description = "Toggle whether a quiz is visible/active to customers")
-    public ResponseEntity<ApiResponse<String>> toggleActiveQuiz(
+    @Operation(summary = "Toggle quiz active state", description = "Enable or disable quiz visibility to customers.")
+    public ResponseEntity<ApiResponse<Void>> toggleActiveQuiz(
             @PathVariable String quizId) {
 
-        log.info("PATCH /api/v1/staff/quizzes/{}/toggle-active - toggle quiz active state", quizId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.toggleActiveQuiz(quizId, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Quiz active state toggled successfully"));
+        log.info("PATCH /api/v1/staff/quizzes/{}/toggle-active", quizId);
+        quizService.toggleActiveQuiz(quizId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Quiz active state toggled successfully"));
     }
 
+    /**
+     * POST /staff/quizzes/:quizId/questions
+     * Add a question. Returns the created QuizQuestion.
+     */
     @PostMapping("/{quizId}/questions")
-    @Operation(summary = "Add question to quiz", description = "Add a new question to an existing quiz")
-    public ResponseEntity<ApiResponse<String>> addQuestion(
+    @Operation(summary = "Add question", description = "Add a new question to a quiz. Returns the created question.")
+    public ResponseEntity<ApiResponse<QuestionResponse>> addQuestion(
             @PathVariable String quizId,
             @Valid @RequestBody QuestionRequest request) {
 
-        log.info("POST /api/v1/staff/quizzes/{}/questions - add question", quizId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.addQuestion(quizId, request, userId, userRole);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("", "Question added successfully"));
+        log.info("POST /api/v1/staff/quizzes/{}/questions", quizId);
+        QuestionResponse data = quizService.addQuestion(quizId, request);
+        return ResponseEntity.ok(ApiResponse.success(data, "Question added successfully"));
     }
 
+    /**
+     * PUT /staff/quizzes/:quizId/questions/:questionId
+     * Partial update — all fields optional.
+     */
     @PutMapping("/{quizId}/questions/{questionId}")
-    @Operation(summary = "Update question", description = "Update a specific question in a quiz")
-    public ResponseEntity<ApiResponse<String>> updateQuestion(
+    @Operation(summary = "Update question", description = "Partially update a question. All fields are optional.")
+    public ResponseEntity<ApiResponse<Void>> updateQuestion(
             @PathVariable String quizId,
             @PathVariable String questionId,
-            @Valid @RequestBody QuestionRequest request) {
+            @RequestBody QuestionRequest request) {
 
-        log.info("PUT /api/v1/staff/quizzes/{}/questions/{} - update question", quizId, questionId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.updateQuestion(quizId, questionId, request, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Question updated successfully"));
+        log.info("PUT /api/v1/staff/quizzes/{}/questions/{}", quizId, questionId);
+        quizService.updateQuestion(quizId, questionId, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Question updated successfully"));
     }
 
+    /**
+     * DELETE /staff/quizzes/:quizId/questions/:questionId
+     * Hard delete a question.
+     */
     @DeleteMapping("/{quizId}/questions/{questionId}")
-    @Operation(summary = "Delete question", description = "Hard delete a question from a quiz")
-    public ResponseEntity<ApiResponse<String>> deleteQuestion(
+    @Operation(summary = "Delete question", description = "Permanently delete a question from a quiz.")
+    public ResponseEntity<ApiResponse<Void>> deleteQuestion(
             @PathVariable String quizId,
             @PathVariable String questionId) {
 
-        log.info("DELETE /api/v1/staff/quizzes/{}/questions/{} - delete question", quizId, questionId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.deleteQuestion(quizId, questionId, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Question deleted successfully"));
-    }
-
-    @PatchMapping("/{quizId}/questions/{questionId}/soft-delete")
-    @Operation(summary = "Soft delete question", description = "Soft delete a question from a quiz")
-    public ResponseEntity<ApiResponse<String>> softDeleteQuestion(
-            @PathVariable String quizId,
-            @PathVariable String questionId) {
-
-        log.info("PATCH /api/v1/staff/quizzes/{}/questions/{}/soft-delete - soft delete question", quizId, questionId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.softDeleteQuestion(quizId, questionId, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Question soft-deleted successfully"));
-    }
-
-    @PutMapping("/{quizId}/questions/reorder")
-    @Operation(summary = "Reorder questions", description = "Reorder questions in a quiz by providing ordered question IDs")
-    public ResponseEntity<ApiResponse<String>> reorderQuestions(
-            @PathVariable String quizId,
-            @RequestBody List<String> questionIds) {
-
-        log.info("PUT /api/v1/staff/quizzes/{}/questions/reorder - reorder questions", quizId);
-
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.reorderQuestions(quizId, questionIds, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success("", "Questions reordered successfully"));
-    }
-
-    @PatchMapping("/sessions/{sessionId}/soft-delete")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Soft delete quiz session", description = "Soft delete a quiz session (Staff version)")
-    public ResponseEntity<ApiResponse<?>> softDeleteQuizSession(
-            @PathVariable String sessionId) {
-        log.info("PATCH /api/v1/quizzes/sessions/{}/soft-delete", sessionId);
-        String staffId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        quizService.softDeleteQuizSessionStaff(sessionId, staffId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Quiz session soft-deleted successfully"));
+        log.info("DELETE /api/v1/staff/quizzes/{}/questions/{}", quizId, questionId);
+        quizService.deleteQuestion(quizId, questionId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
     }
 }

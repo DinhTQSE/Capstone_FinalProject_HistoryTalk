@@ -39,29 +39,29 @@ public class QuizSession {
     @JoinColumn(name = "uid", nullable = false)
     private User user;
 
+    @Column(name = "limited_time")
+    private Integer limitedTime;
+
     @Column(name = "start_time", nullable = true)
     private LocalDateTime startTime;
 
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
-    @Column(name = "limited_time")
-    private Integer limitedTime;
-
     @Column(name = "score")
-    private Double score;
+    private Float score;
 
     @Builder.Default
-    @Column(name = "is_submitted", nullable = true)
-    private Boolean isSubmitted = false;
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
-    private LocalDateTime createdDate;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private LocalDateTime updatedDate;
+    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;

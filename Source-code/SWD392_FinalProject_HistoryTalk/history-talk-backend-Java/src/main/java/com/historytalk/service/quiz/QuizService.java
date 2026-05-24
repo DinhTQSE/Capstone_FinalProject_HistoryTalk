@@ -1,53 +1,45 @@
 package com.historytalk.service.quiz;
 
-import com.historytalk.dto.quiz.*;
 import com.historytalk.dto.PaginatedResponse;
-import com.historytalk.entity.enums.EventEra;
+import com.historytalk.dto.quiz.*;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface QuizService {
 
-    // Staff operations
-    PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, Integer grade, EventEra era, Pageable pageable);
+    // ==================== Customer ====================
 
-    List<QuizCustomerResponse> getAllQuizzesForCustomer(String search);
+    List<QuizCustomerResponse> getAllQuizzesForCustomer(String search, UUID userId);
+
+    QuizCustomerResponse getQuizByIdForCustomer(String quizId, UUID userId);
+
+    QuizStartResponse startQuiz(String quizId, UUID userId, Integer limitedTime);
+
+    QuizSubmitResponse submitQuiz(QuizSubmitRequest request, UUID userId);
+
+    PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, Pageable pageable);
+
+    // ==================== Staff ====================
+
+    PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable);
 
     QuizStaffResponse getQuizByIdForStaff(String quizId);
 
-    QuizCustomerResponse getQuizByIdForCustomer(String quizId);
+    QuizStaffResponse createQuiz(CreateQuizRequest request, UUID userId);
 
-    QuizStaffResponse createQuiz(CreateQuizRequest request, String userId);
+    QuizStaffResponse updateQuiz(String quizId, UpdateQuizRequest request);
 
-    QuizStaffResponse updateQuiz(String quizId, UpdateQuizRequest request, String userId, String userRole);
+    void deleteQuiz(String quizId);
 
-    void deleteQuiz(String quizId, String userId, String userRole);
+    void softDeleteQuiz(String quizId);
 
-    void softDeleteQuiz(String quizId, String userId, String userRole);
+    void toggleActiveQuiz(String quizId);
 
-    void toggleActiveQuiz(String quizId, String userId, String userRole);
+    QuestionResponse addQuestion(String quizId, QuestionRequest request);
 
-    void addQuestion(String quizId, QuestionRequest request, String userId, String userRole);
+    void updateQuestion(String quizId, String questionId, QuestionRequest request);
 
-    void updateQuestion(String quizId, String questionId, QuestionRequest request, String userId, String userRole);
-
-    void deleteQuestion(String quizId, String questionId, String userId, String userRole);
-
-    void softDeleteQuestion(String quizId, String questionId, String userId, String userRole);
-
-    void reorderQuestions(String quizId, List<String> questionIds, String userId, String userRole);
-
-    PaginatedResponse<QuizStaffResponse> getQuizzesByContextForStaff(String contextId, String search, Integer grade, EventEra era, Pageable pageable);
-
-    // Customer operations
-    QuizStartResponse startQuiz(String quizId, String userId);
-
-    QuizSubmitResponse submitQuiz(QuizSubmitRequest request, String userId);
-
-    PaginatedResponse<QuizHistoryResponse> getQuizHistory(String userId, Pageable pageable);
-
-    void softDeleteQuizSession(String sessionId, String userId);
-
-    void softDeleteQuizSessionStaff(String sessionId, String userId, String userRole);
+    void deleteQuestion(String quizId, String questionId);
 }

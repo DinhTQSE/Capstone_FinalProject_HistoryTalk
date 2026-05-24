@@ -7,6 +7,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * Response for POST /quizzes/:quizId/start
+ * Shape: { sessionId, quizId, title, questions[] }
+ * Note: limitedTime is NOT returned — it is stored server-side in the session.
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,8 +24,5 @@ public class QuizStartResponse {
 
     private String title;
 
-    private Integer limitedTime;
-
     private List<QuestionResponse> questions;
-
 }

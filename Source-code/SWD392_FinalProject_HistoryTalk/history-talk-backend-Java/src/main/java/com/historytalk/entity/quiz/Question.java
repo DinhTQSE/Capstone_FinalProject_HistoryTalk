@@ -30,38 +30,39 @@ public class Question {
     @Column(name = "question_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID questionId;
 
-//    @Lob
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "quiz_id", nullable = false)
+    private Quiz quiz;
+
+    //    @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
-//    @Lob
+    //    @Lob
     @Column(name = "options", columnDefinition = "TEXT", nullable = true)
     private String options;
 
     @Column(name = "correct_answer", nullable = true)
     private Integer correctAnswer;
 
-    @Column(name = "order_index", nullable = true)
-    private Integer orderIndex;
-
-//    @Lob
+    //    @Lob
     @Column(name = "explanation", columnDefinition = "TEXT", nullable = true)
     private String explanation;
 
-    @Column(name = "deleted_at", nullable = true)
-    private LocalDateTime deletedAt;
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
-    private LocalDateTime createdDate;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private LocalDateTime updatedDate;
+    private LocalDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id", nullable = false)
-    private Quiz quiz;
+    @Column(name = "deleted_at", nullable = true)
+    private LocalDateTime deletedAt;
 
     @Builder.Default
     @OneToMany(mappedBy = "question", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

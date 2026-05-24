@@ -7,22 +7,31 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * Response for POST /quizzes/submit
+ * Shape: { resultId, score, totalQuestions, percentage, correctAnswers[], wrongAnswers[] }
+ * correctAnswers/wrongAnswers are 0-based index positions in the questions list.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class QuizSubmitResponse {
 
-    private String sessionId;
+    /** Same value as sessionId */
+    private String resultId;
 
-    private Integer score;
+    /** Number of correct answers */
+    private int score;
 
-    private Integer totalQuestions;
+    private int totalQuestions;
 
-    private Double percentage;
+    /** score / totalQuestions * 100 */
+    private double percentage;
 
+    /** 0-based index positions of correctly answered questions */
     private List<Integer> correctAnswers;
 
+    /** 0-based index positions of incorrectly answered questions */
     private List<Integer> wrongAnswers;
-
 }

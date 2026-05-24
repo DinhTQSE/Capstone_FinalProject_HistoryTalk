@@ -5,9 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Response for GET /quizzes/:id (full detail) and embedded in QuizStartResponse / QuizStaffResponse.
+ * Shape matches contract QuizQuestion: { questionId, content, options[], correctAnswer, explanation? }
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,14 +21,11 @@ public class QuestionResponse {
 
     private String content;
 
+    /** 4 options, deserialized from JSON stored in Question.options */
     private List<String> options;
 
+    /** 0-based index of the correct option */
     private Integer correctAnswer;
 
-    private Integer orderIndex;
-
     private String explanation;
-
-    private LocalDateTime deletedAt;
-
 }

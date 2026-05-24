@@ -1,8 +1,10 @@
 package com.historytalk.dto.quiz;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,31 +12,29 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * Request body for POST /staff/quizzes
+ * Shape: { title, contextId, era?, level, questions[] }
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateQuizRequest {
 
-    @NotBlank(message = "Quiz title is required")
+    @NotBlank(message = "Title is required")
     private String title;
-
-    private String description;
 
     @NotNull(message = "Context ID is required")
     private String contextId;
 
-    private Integer grade;
+    /** Optional. Must match EventEra enum: ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY */
+//    private String era;
 
-    private Integer chapterNumber;
+    @NotNull(message = "Level is required")
+    private String level;
 
-    private String chapterTitle;
-
-    private String era;
-
-    private Integer durationSeconds;
-
-    @NotEmpty(message = "Questions cannot be empty")
+    @NotEmpty(message = "At least one question is required")
+    @Valid
     private List<QuestionRequest> questions;
-
 }

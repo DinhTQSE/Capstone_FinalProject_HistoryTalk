@@ -5,8 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
+/**
+ * Response for GET /quizzes and GET /quizzes/:quizId (Customer).
+ * Shape matches contract QuizSet: { quizId, title, level, era, playCount, contextTitle? }
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,24 +19,14 @@ public class QuizCustomerResponse {
 
     private String title;
 
-    private String description;
+    /** EASY | MEDIUM | HARD */
+    private String level;
 
-    private Integer grade;
-
-    private Integer chapterNumber;
-
-    private String chapterTitle;
-
+    /** ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY — sourced from historicalContext.era */
     private String era;
 
-    private Integer durationSeconds;
-
-    private Integer playCount;
-
-    private Double rating;
+    /** Number of times this user has completed this quiz (endTime IS NOT NULL) */
+    private int playCount;
 
     private String contextTitle;
-
-    private LocalDateTime deletedAt;
-
 }

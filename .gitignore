@@ -68,3 +68,4 @@ Source-code/SWD392_FinalProject_HistoryTalk/history-talk-frontend
 **/secretKey.properties
 
 src/main/resources/standbyMigration
+**/secretKey-prod.properties
