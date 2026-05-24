@@ -43,8 +43,7 @@ public class AiServiceClient {
             @JsonProperty("title") String title,
             @JsonProperty("background") String background,
             @JsonProperty("personality") String personality,
-            @JsonProperty("lifespan") String lifespan,
-            @JsonProperty("side") String side) {}
+            @JsonProperty("lifespan") String lifespan) {}
 
     public record ContextPayload(
             @JsonProperty("contextId") String contextId,
@@ -194,8 +193,7 @@ public class AiServiceClient {
                 c.getTitle(),
                 c.getBackground(),
                 c.getPersonality(),
-                                lifespan,
-                                null);
+                lifespan);
     }
 
     /**
