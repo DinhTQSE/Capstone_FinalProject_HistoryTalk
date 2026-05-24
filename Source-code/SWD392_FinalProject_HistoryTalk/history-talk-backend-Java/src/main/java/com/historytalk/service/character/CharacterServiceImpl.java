@@ -111,8 +111,14 @@ public class CharacterServiceImpl implements CharacterService {
                 .background(request.getBackground())
                 .imageUrl(request.getImageUrl())
                 .personality(request.getPersonality())
-                .bornDate(request.getBornDate())
-                .deathDate(request.getDeathDate())
+                .bornYear(request.getBornYear())
+                .bornMonth(request.getBornMonth())
+                .bornDay(request.getBornDay())
+                .isBornBc(request.getIsBornBc())
+                .deathYear(request.getDeathYear())
+                .deathMonth(request.getDeathMonth())
+                .deathDay(request.getDeathDay())
+                .isDeathBc(request.getIsDeathBc())
                 .isPublished(!Boolean.TRUE.equals(request.getIsDraft() != null ? request.getIsDraft() : true))
                 .historicalContexts(contexts)
                 .createdBy(user)
@@ -152,12 +158,15 @@ public class CharacterServiceImpl implements CharacterService {
         if (request.getPersonality() != null) {
             character.setPersonality(request.getPersonality());
         }
-        if (request.getBornDate() != null) {
-            character.setBornDate(request.getBornDate());
-        }
-        if (request.getDeathDate() != null) {
-            character.setDeathDate(request.getDeathDate());
-        }
+        if (request.getBornYear() != null) character.setBornYear(request.getBornYear());
+        if (request.getBornMonth() != null) character.setBornMonth(request.getBornMonth());
+        if (request.getBornDay() != null) character.setBornDay(request.getBornDay());
+        if (request.getIsBornBc() != null) character.setIsBornBc(request.getIsBornBc());
+        
+        if (request.getDeathYear() != null) character.setDeathYear(request.getDeathYear());
+        if (request.getDeathMonth() != null) character.setDeathMonth(request.getDeathMonth());
+        if (request.getDeathDay() != null) character.setDeathDay(request.getDeathDay());
+        if (request.getIsDeathBc() != null) character.setIsDeathBc(request.getIsDeathBc());
         if (request.getIsPublished() != null) {
             character.setIsPublished(request.getIsPublished());
         }
@@ -347,8 +356,14 @@ public class CharacterServiceImpl implements CharacterService {
                 .background(character.getBackground())
                 .imageUrl(character.getImageUrl())
                 .personality(character.getPersonality())
-                .bornDate(character.getBornDate())
-                .deathDate(character.getDeathDate())
+                .bornYear(character.getBornYear())
+                .bornMonth(character.getBornMonth())
+                .bornDay(character.getBornDay())
+                .isBornBc(character.getIsBornBc())
+                .deathYear(character.getDeathYear())
+                .deathMonth(character.getDeathMonth())
+                .deathDay(character.getDeathDay())
+                .isDeathBc(character.getIsDeathBc())
                 .isPublished(character.getIsPublished())
                 .deletedAt(character.getDeletedAt())
                 .status(buildStatus(character.getIsPublished(), character.getDeletedAt(), character.getIsActive()))

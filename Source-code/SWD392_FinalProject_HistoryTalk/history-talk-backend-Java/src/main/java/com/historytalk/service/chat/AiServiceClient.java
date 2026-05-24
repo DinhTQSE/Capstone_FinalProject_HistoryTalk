@@ -181,12 +181,24 @@ public class AiServiceClient {
      * Build CharacterPayload from a Character entity.
      */
     public static CharacterPayload buildCharacterPayload(com.historytalk.entity.character.Character c) {
-                String lifespan = null;
-                if (c.getBornDate() != null || c.getDeathDate() != null) {
-                        String born = c.getBornDate() != null ? c.getBornDate().toString() : "";
-                        String died = c.getDeathDate() != null ? c.getDeathDate().toString() : "";
-                        lifespan = (born + " - " + died).trim();
-                }
+        String born = "";
+        if (c.getBornYear() != null) {
+            born = (c.getBornDay() != null ? c.getBornDay() + "/" : "") + 
+                   (c.getBornMonth() != null ? c.getBornMonth() + "/" : "") + 
+                   c.getBornYear() + 
+                   (Boolean.TRUE.equals(c.getIsBornBc()) ? " BC" : "");
+        }
+        String died = "";
+        if (c.getDeathYear() != null) {
+            died = (c.getDeathDay() != null ? c.getDeathDay() + "/" : "") + 
+                   (c.getDeathMonth() != null ? c.getDeathMonth() + "/" : "") + 
+                   c.getDeathYear() + 
+                   (Boolean.TRUE.equals(c.getIsDeathBc()) ? " BC" : "");
+        }
+        String lifespan = null;
+        if (!born.isEmpty() || !died.isEmpty()) {
+            lifespan = born + " - " + died;
+        }
         return new CharacterPayload(
                 c.getCharacterId().toString(),
                 c.getName(),

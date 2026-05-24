@@ -64,11 +64,29 @@ public class Character {
     @Column(name = "personality", length = 500)
     private String personality;
 
-    @Column(name = "born_date")
-    private LocalDate bornDate;
+    @Column(name = "born_year")
+    private Integer bornYear;
 
-    @Column(name = "death_date")
-    private LocalDate deathDate;
+    @Column(name = "born_month")
+    private Integer bornMonth;
+
+    @Column(name = "born_day")
+    private Integer bornDay;
+
+    @Column(name = "is_born_bc")
+    private Boolean isBornBc;
+
+    @Column(name = "death_year")
+    private Integer deathYear;
+
+    @Column(name = "death_month")
+    private Integer deathMonth;
+
+    @Column(name = "death_day")
+    private Integer deathDay;
+
+    @Column(name = "is_death_bc")
+    private Boolean isDeathBc;
 
     @Builder.Default
     @Column(name = "is_published", nullable = false)

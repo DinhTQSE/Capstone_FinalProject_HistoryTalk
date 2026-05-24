@@ -34,11 +34,29 @@ public class CharacterResponse {
     @JsonProperty("personality")
     private String personality;
 
-    @JsonProperty("bornDate")
-    private java.time.LocalDate bornDate;
+    @JsonProperty("bornYear")
+    private Integer bornYear;
 
-    @JsonProperty("deathDate")
-    private java.time.LocalDate deathDate;
+    @JsonProperty("bornMonth")
+    private Integer bornMonth;
+
+    @JsonProperty("bornDay")
+    private Integer bornDay;
+
+    @JsonProperty("isBornBc")
+    private Boolean isBornBc;
+
+    @JsonProperty("deathYear")
+    private Integer deathYear;
+
+    @JsonProperty("deathMonth")
+    private Integer deathMonth;
+
+    @JsonProperty("deathDay")
+    private Integer deathDay;
+
+    @JsonProperty("isDeathBc")
+    private Boolean isDeathBc;
 
     @JsonProperty("isPublished")
     private Boolean isPublished;
