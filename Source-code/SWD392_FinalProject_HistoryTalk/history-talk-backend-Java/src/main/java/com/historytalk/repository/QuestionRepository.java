@@ -12,13 +12,15 @@ import java.util.UUID;
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
 
+    /**
+     * Get all non-deleted questions for a quiz, ordered by insertion time.
+     * Note: Question entity has no orderIndex column — use createdAt for stable order.
+     */
     @Query("""
-           SELECT q FROM Question q
-           WHERE q.quiz.quizId = :quizId
-           AND (:includeDeleted = true OR q.deletedAt IS NULL)
-           ORDER BY q.orderIndex ASC
-           """)
-    List<Question> findByQuizIdOrderByOrderIndex(@Param("quizId") UUID quizId,
-                                                  @Param("includeDeleted") boolean includeDeleted);
-
+            SELECT q FROM Question q
+            WHERE q.quiz.quizId = :quizId
+            AND q.deletedAt IS NULL
+            ORDER BY q.createdAt ASC
+            """)
+    List<Question> findActiveByQuizId(@Param("quizId") UUID quizId);
 }

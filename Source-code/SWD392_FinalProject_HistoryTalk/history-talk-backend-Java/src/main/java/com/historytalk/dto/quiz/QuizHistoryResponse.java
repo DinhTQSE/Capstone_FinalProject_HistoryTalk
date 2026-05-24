@@ -5,8 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
+/**
+ * One item in the GET /quizzes/results/me paginated response.
+ * Shape: { sessionId, quizId, quizTitle, score, totalQuestions, percentage, completedAt }
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,16 +21,14 @@ public class QuizHistoryResponse {
 
     private String quizTitle;
 
-    private Double score;
+    /** Number of correct answers */
+    private int score;
 
-    private Integer totalQuestions;
+    private int totalQuestions;
 
-    private Double percentage;
+    /** score / totalQuestions * 100 */
+    private double percentage;
 
-    private Integer timeSpentSeconds;
-
-    private LocalDateTime startTime;
-
-    private LocalDateTime endTime;
-
+    /** ISO8601 datetime — mapped from session.endTime */
+    private String completedAt;
 }

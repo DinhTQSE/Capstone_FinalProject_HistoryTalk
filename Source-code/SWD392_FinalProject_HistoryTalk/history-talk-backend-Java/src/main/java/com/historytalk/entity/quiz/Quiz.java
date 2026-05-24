@@ -2,7 +2,7 @@ package com.historytalk.entity.quiz;
 
 import com.historytalk.entity.user.User;
 import com.historytalk.entity.historicalContext.HistoricalContext;
-import com.historytalk.entity.enums.EventEra;
+import com.historytalk.entity.enums.QuizLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,48 +33,6 @@ public class Quiz {
     @Column(name = "quiz_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID quizId;
 
-    @Column(name = "title", length = 255, nullable = false)
-    private String title;
-
-//    @Lob
-    @Column(name = "description", columnDefinition = "TEXT", nullable = true)
-    private String description;
-
-    @Column(name = "grade", nullable = true)
-    private Integer grade;
-
-    @Column(name = "chapter_number", nullable = true)
-    private Integer chapterNumber;
-
-    @Column(name = "chapter_title", length = 255, nullable = true)
-    private String chapterTitle;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "era", nullable = true)
-    private EventEra era;
-
-    @Column(name = "duration_seconds", nullable = true)
-    private Integer durationSeconds;
-
-    @Builder.Default
-    @Column(name = "play_count", nullable = true)
-    private Integer playCount = 0;
-
-    @Builder.Default
-    @Column(name = "rating", nullable = true)
-    private Double rating = 0.0;
-
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = true, updatable = false)
-    private LocalDateTime createdDate;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedDate;
-
-    @Column(name = "deleted_at", nullable = true)
-    private LocalDateTime deletedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "context_id", nullable = false)
     private HistoricalContext historicalContext;
@@ -83,8 +41,29 @@ public class Quiz {
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
+    @Column(name = "title", length = 255, nullable = false)
+    private String title;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "level", nullable = false)
+    private QuizLevel level;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = true, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at", nullable = true)
+    private LocalDateTime deletedAt;
+
     @Builder.Default
     @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Question> questions = new ArrayList<>();
-
 }

@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Response for GET /staff/quizzes and GET /staff/quizzes/:quizId.
+ * Shape matches contract ContentAdminQuizSet.
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,36 +22,30 @@ public class QuizStaffResponse {
 
     private String title;
 
-    private String description;
-
-    private Integer grade;
-
-    private Integer chapterNumber;
-
-    private String chapterTitle;
-
+    /** ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY — sourced from historicalContext.era */
     private String era;
 
-    private Integer durationSeconds;
+    /** EASY | MEDIUM | HARD */
+    private String level;
 
-    private Integer playCount;
-
-    private Double rating;
+    /** Total completed sessions across all users */
+    private int playCount;
 
     private String contextId;
 
     private String contextTitle;
 
+    /** Username of the staff member who created this quiz */
     private String createdBy;
 
     private LocalDateTime createdDate;
 
     private LocalDateTime updatedDate;
 
-    private LocalDateTime deletedAt;
-
     private Boolean isActive;
 
-    private List<QuestionResponse> questions;
+    /** null if not soft-deleted */
+    private LocalDateTime deletedAt;
 
+    private List<QuestionResponse> questions;
 }

@@ -6,6 +6,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * One answer entry within QuizSubmitRequest.
+ * Shape: { questionId, selectedAnswer }
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,5 +21,4 @@ public class AnswerDetailRequest {
 
     @NotNull(message = "Selected answer is required")
     private Integer selectedAnswer;
-
 }

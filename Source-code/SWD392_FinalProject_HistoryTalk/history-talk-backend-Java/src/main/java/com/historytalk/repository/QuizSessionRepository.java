@@ -16,10 +16,29 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
 
     Optional<QuizSession> findBySessionId(UUID sessionId);
 
-    @Query("SELECT s FROM QuizSession s WHERE s.user.uid = :uid AND (:includeDeleted = true OR s.deletedAt IS NULL) ORDER BY s.createdDate DESC")
-    Page<QuizSession> findByUserUid(
-            @Param("uid") UUID uid,
-            @Param("includeDeleted") boolean includeDeleted,
-            Pageable pageable);
+    @Query("""
+            SELECT s FROM QuizSession s
+            WHERE s.user.uid = :uid
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            ORDER BY s.endTime DESC
+            """)
+    Page<QuizSession> findCompletedByUserUid(@Param("uid") UUID uid, Pageable pageable);
 
+    @Query("""
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.quiz.quizId = :quizId
+            AND s.user.uid = :uid
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            """)
+    long countCompletedByQuizAndUser(@Param("quizId") UUID quizId, @Param("uid") UUID uid);
+
+    @Query("""
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.quiz.quizId = :quizId
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            """)
+    long countCompletedByQuiz(@Param("quizId") UUID quizId);
 }
