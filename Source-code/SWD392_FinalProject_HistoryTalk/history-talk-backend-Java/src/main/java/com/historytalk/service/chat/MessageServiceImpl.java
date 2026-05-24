@@ -44,7 +44,7 @@ public class MessageServiceImpl implements MessageService {
     public GetMessagesResponse getMessages(String sessionId, String userId) {
         log.info("Getting messages for session={} user={}", sessionId, userId);
 
-        chatSessionRepository.findBySessionIdAndUserUid(
+        chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(sessionId), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
 
@@ -74,7 +74,7 @@ public class MessageServiceImpl implements MessageService {
     public SendMessageResponse sendMessage(String userId, SendMessageRequest request) {
         log.info("Sending message in session={} user={}", request.getSessionId(), userId);
 
-        ChatSession session = chatSessionRepository.findBySessionIdAndUserUid(
+        ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(request.getSessionId()), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));

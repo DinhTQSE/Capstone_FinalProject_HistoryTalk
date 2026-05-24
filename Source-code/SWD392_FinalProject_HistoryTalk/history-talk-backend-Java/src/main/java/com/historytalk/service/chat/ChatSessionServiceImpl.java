@@ -68,14 +68,14 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
 
-        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(character.getIsPublished()) || character.getDeletedAt() != null)) {
+        if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(character.getIsPublished(), character.getIsActive(), character.getDeletedAt())) {
             throw new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId());
         }
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId()));
 
-        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
+        if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(context.getIsPublished(), context.getIsActive(), context.getDeletedAt())) {
             throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
         }
 
@@ -217,5 +217,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                         || "STAFF".equalsIgnoreCase(role)
                         || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    private boolean isPubliclyVisible(Boolean isPublished, Boolean isActive, LocalDateTime deletedAt) {
+        return Boolean.TRUE.equals(isPublished)
+                && Boolean.TRUE.equals(isActive)
+                && deletedAt == null;
     }
 }
