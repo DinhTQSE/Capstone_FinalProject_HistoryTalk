@@ -88,7 +88,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         ).execute()
         
         chunks = response.data
-        logger.info(f"RAG retrieved {len(chunks)} chunks for entity_id: {entity_id}")
+        logger.info(f"RAG retrieved {len(chunks)} chunks for entity_ids: {entity_ids}")
         if not chunks:
             return ""
             
