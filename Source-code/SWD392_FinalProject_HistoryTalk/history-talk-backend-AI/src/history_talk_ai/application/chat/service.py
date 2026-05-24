@@ -88,6 +88,7 @@ async def retrieve_history_context(user_question: str, entity_id: str) -> str:
         ).execute()
         
         chunks = response.data
+        logger.info(f"RAG retrieved {len(chunks)} chunks for entity_id: {entity_id}")
         if not chunks:
             return ""
             
@@ -113,7 +114,7 @@ async def generate_reply(
         (assistant_message, suggested_questions)
     """
     # ── RAG Integration ──
-    rag_context = await retrieve_history_context(user_message, character.characterId)
+    rag_context = await retrieve_history_context(user_message, context.contextId)
     
     system_prompt = build_chat_system_prompt(character, context)
     
