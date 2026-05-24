@@ -13,3 +13,4 @@ ADD COLUMN IF NOT EXISTS is_death_bc BOOLEAN;
 ALTER TABLE historical_schema.message
 DROP COLUMN IF EXISTS role,
 DROP COLUMN IF EXISTS side;
+    
