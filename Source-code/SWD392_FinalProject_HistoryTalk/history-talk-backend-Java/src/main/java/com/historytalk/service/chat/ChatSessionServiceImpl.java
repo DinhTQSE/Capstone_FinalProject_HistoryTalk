@@ -92,7 +92,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         // Send greeting message via AI
         try {
             CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
-            ContextPayload contextData = AiServiceClient.buildContextPayload(selectedContext);
+            ContextPayload contextData = AiServiceClient.buildContextPayload(context);
 
             AiChatResult greeting = aiServiceClient.chat(
                     character.getCharacterId().toString(),
