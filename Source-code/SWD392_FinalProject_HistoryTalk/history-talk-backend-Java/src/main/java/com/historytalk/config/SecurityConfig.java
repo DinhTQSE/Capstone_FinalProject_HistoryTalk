@@ -110,6 +110,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/character-documents/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-documents/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/quizzes/**").permitAll()
