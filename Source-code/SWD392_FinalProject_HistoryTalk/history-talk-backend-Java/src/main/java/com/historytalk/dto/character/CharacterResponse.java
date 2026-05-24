@@ -28,7 +28,7 @@ public class CharacterResponse {
     @JsonProperty("background")
     private String background;
 
-    @JsonProperty("imageUrl")
+    @JsonProperty("image")
     private String imageUrl;
 
     @JsonProperty("personality")

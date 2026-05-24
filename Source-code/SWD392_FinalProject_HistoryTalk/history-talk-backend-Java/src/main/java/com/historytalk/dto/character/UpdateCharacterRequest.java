@@ -24,7 +24,7 @@ public class UpdateCharacterRequest {
     @JsonProperty("background")
     private String background;
 
-    @JsonProperty("imageUrl")
+    @JsonProperty("image")
     @Size(max = 255, message = "Image URL must not exceed 255 characters")
     private String imageUrl;
 
