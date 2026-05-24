@@ -71,7 +71,7 @@ async def get_embedding_from_ollama(text: str) -> List[float]:
             logger.error(f"Failed to get embedding from Ollama: {e}")
             return []
 
-async def retrieve_history_context(user_question: str, entity_id: str) -> str:
+async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> str:
     """Retrieve history context from Supabase VectorChunk."""
     query_vector = await get_embedding_from_ollama(user_question)
     if not query_vector:
@@ -83,7 +83,7 @@ async def retrieve_history_context(user_question: str, entity_id: str) -> str:
             {
                 "query_embedding": query_vector,
                 "match_limit": 3,
-                "filter_entity_id": entity_id
+                "filter_entity_ids": entity_ids
             }
         ).execute()
         
@@ -114,7 +114,9 @@ async def generate_reply(
         (assistant_message, suggested_questions)
     """
     # ── RAG Integration ──
-    rag_context = await retrieve_history_context(user_message, context.contextId)
+    # Query both context documents and character documents
+    entity_ids = [context.contextId, character.characterId]
+    rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
