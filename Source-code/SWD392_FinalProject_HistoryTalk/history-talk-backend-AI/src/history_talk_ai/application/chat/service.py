@@ -203,6 +203,12 @@ async def generate_session_title(
 
 async def process_document(request: ProcessDocumentRequest):
     """Process a document by chunking, embedding, and storing in Supabase."""
+    # Delete old chunks for this doc_id to handle upserts properly
+    try:
+        supabase.schema("historical_schema").table("vector_chunk").delete().eq("doc_id", request.doc_id).execute()
+    except Exception as e:
+        logger.error(f"Failed to delete old chunks for doc {request.doc_id}: {e}")
+
     # Chunking logic (simple split by 500 characters)
     content = request.content
     chunk_size = 500
@@ -227,3 +233,12 @@ async def process_document(request: ProcessDocumentRequest):
         except Exception as e:
             logger.error(f"Failed to insert chunk {idx} into Supabase: {e}")
             raise
+
+async def delete_document(doc_id: str):
+    """Delete all chunks for a document from Supabase."""
+    try:
+        supabase.schema("historical_schema").table("vector_chunk").delete().eq("doc_id", doc_id).execute()
+        logger.info(f"Successfully deleted chunks for doc {doc_id}")
+    except Exception as e:
+        logger.error(f"Failed to delete chunks for doc {doc_id}: {e}")
+        raise
