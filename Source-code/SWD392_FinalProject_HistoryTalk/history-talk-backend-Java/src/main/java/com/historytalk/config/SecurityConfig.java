@@ -109,6 +109,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/api-docs/**", "/api/v1/swagger-ui/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
+                        // Payment: webhook must be public (PayOS servers have no JWT)
+                        // Tiers listing is public (pricing page — no auth needed)
+                        .requestMatchers(HttpMethod.POST, "/api/payments/payos/webhook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/tiers").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-documents/**").permitAll()
