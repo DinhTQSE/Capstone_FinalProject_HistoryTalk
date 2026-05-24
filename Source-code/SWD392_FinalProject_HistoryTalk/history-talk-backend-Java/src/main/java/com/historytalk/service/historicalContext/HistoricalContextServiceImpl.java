@@ -43,7 +43,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
-        boolean includeDraft = true;
+        boolean includeDraft = isStaffOrAdmin(role);
         boolean includeDeleted = isStaffOrAdmin(role);
         Page<HistoricalContext> page = contextRepository
             .findAllWithSearch(normalize(search), era, category, includeDraft, includeDeleted, pageable);
@@ -57,7 +57,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     @Transactional(readOnly = true)
     public List<HistoricalContextResponse> getAllContextsSimple(String search, String role) {
         log.info("Fetching all historical contexts with search: {}", search);
-        boolean includeDraft = true;
+        boolean includeDraft = isStaffOrAdmin(role);
         boolean includeDeleted = isStaffOrAdmin(role);
         return contextRepository
                 .findAllSimple(normalize(search), includeDraft, includeDeleted)
