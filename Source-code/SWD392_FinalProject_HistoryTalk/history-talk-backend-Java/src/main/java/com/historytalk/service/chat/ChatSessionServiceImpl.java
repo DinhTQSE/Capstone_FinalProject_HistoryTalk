@@ -68,27 +68,21 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
 
-        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(character.getIsPublished()) || character.getDeletedAt() != null)) {
+        if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(character.getIsPublished(), character.getIsActive(), character.getDeletedAt())) {
             throw new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId());
         }
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId()));
 
-        if (!isStaffOrAdmin(userRole) && (Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
+        if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(context.getIsPublished(), context.getIsActive(), context.getDeletedAt())) {
             throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
         }
-
-        UUID contextIdUUID = UUID.fromString(request.getContextId());
-        var selectedContext = character.getHistoricalContexts().stream()
-            .filter(ctx -> ctx.getContextId().equals(contextIdUUID))
-            .findFirst()
-            .orElseThrow(() -> new InvalidRequestException("Character does not belong to this context"));
 
         ChatSession session = ChatSession.builder()
                 .user(user)
                 .character(character)
-            .historicalContext(selectedContext)
+                .historicalContext(context)
                 .title("")
                 .build();
 
@@ -98,11 +92,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         // Send greeting message via AI
         try {
             CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
-            ContextPayload contextData = AiServiceClient.buildContextPayload(selectedContext);
+            ContextPayload contextData = AiServiceClient.buildContextPayload(context);
 
             AiChatResult greeting = aiServiceClient.chat(
                     character.getCharacterId().toString(),
-                    selectedContext.getContextId().toString(),
+                    context.getContextId().toString(),
                     "Hãy chào và giới thiệu ngắn gọn về bản thân.",
                     Collections.emptyList(),
                     characterData,
@@ -223,5 +217,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                         || "STAFF".equalsIgnoreCase(role)
                         || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    private boolean isPubliclyVisible(Boolean isPublished, Boolean isActive, LocalDateTime deletedAt) {
+        return Boolean.TRUE.equals(isPublished)
+                && Boolean.TRUE.equals(isActive)
+                && deletedAt == null;
     }
 }

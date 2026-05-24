@@ -75,7 +75,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Character not found with id: " + characterId));
 
-        if (!isStaffOrAdmin(role) && Boolean.TRUE.equals(character.getIsPublished())) {
+        if (!isStaffOrAdmin(role) && !Boolean.TRUE.equals(character.getIsPublished())) {
             throw new ResourceNotFoundException("Character not found with id: " + characterId);
         }
         if (!isStaffOrAdmin(role) && Boolean.FALSE.equals(character.getIsActive())) {
@@ -446,7 +446,7 @@ public class CharacterServiceImpl implements CharacterService {
         if (deletedAt != null || Boolean.FALSE.equals(isActive)) {
             return "INACTIVE";
         }
-        if (Boolean.TRUE.equals(isPublished)) {
+        if (!Boolean.TRUE.equals(isPublished)) {
             return "DRAFT";
         }
         return "ACTIVE";

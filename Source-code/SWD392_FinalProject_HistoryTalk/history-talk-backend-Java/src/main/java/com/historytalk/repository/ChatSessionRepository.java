@@ -34,6 +34,18 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
 
     @Query("""
                         SELECT cs FROM ChatSession cs
+                        JOIN FETCH cs.character c
+                        JOIN FETCH cs.historicalContext hc
+                        WHERE cs.sessionId = :sessionId
+                        AND cs.user.uid = :userId
+                        AND cs.deletedAt IS NULL
+                        AND cs.isActive = true
+            """)
+    Optional<ChatSession> findActiveBySessionIdAndUserUid(@Param("sessionId") UUID sessionId,
+                                                          @Param("userId") UUID userId);
+
+    @Query("""
+                        SELECT cs FROM ChatSession cs
                         LEFT JOIN FETCH cs.character c
                         LEFT JOIN FETCH cs.historicalContext hc
                         WHERE cs.user.uid = :userId
