@@ -31,7 +31,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                      AND (:era IS NULL OR hc.era = :era)
                      AND (:category IS NULL OR hc.category = :category)
                      AND (:includeDraft = true OR hc.isPublished = true)
-                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
+                     AND (:includeDeleted = true OR (hc.deletedAt IS NULL AND hc.isActive = true))
                      """)
        Page<HistoricalContext> findAllWithSearch(
                      @Param("search") String search,
@@ -47,7 +47,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                             OR hc.name ILIKE CONCAT('%', :search, '%')
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
                      AND (:includeDraft = true OR hc.isPublished = true)
-                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
+                     AND (:includeDeleted = true OR (hc.deletedAt IS NULL AND hc.isActive = true))
                      ORDER BY hc.createdAt DESC
                      """)
        List<HistoricalContext> findAllSimple(@Param("search") String search,
