@@ -1,5 +1,6 @@
 package com.historytalk.entity.payment;
 
+import com.historytalk.entity.enums.PaymentTransactionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,9 +43,11 @@ public class PaymentTransaction {
     @Column(name = "payload", columnDefinition = "TEXT")
     private String payload;
 
-    /** e.g. SUCCESS, FAILED, PENDING */
+    /** e.g. SUCCESS, FAILED */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50, nullable = false)
-    private String status;
+    private PaymentTransactionStatus status = PaymentTransactionStatus.PENDING;
 
     @Column(name = "transaction_date")
     private LocalDateTime transactionDate;

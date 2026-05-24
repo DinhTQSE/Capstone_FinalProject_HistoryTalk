@@ -1,5 +1,6 @@
 package com.historytalk.entity.payment;
 
+import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -60,8 +61,10 @@ public class PaymentOrder {
     private String qrCode;
 
     /** e.g. PENDING, PAID, CANCELLED, EXPIRED */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50, nullable = false)
-    private String status;
+    private PaymentOrderStatus status = PaymentOrderStatus.PENDING;
 
     /** Timestamp when payment was confirmed */
     @Column(name = "paid_at")
@@ -89,6 +92,6 @@ public class PaymentOrder {
     private LocalDateTime deletedAt;
 
     @Builder.Default
-    @OneToMany(mappedBy = "paymentOrder", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "paymentOrder", fetch = FetchType.LAZY)
     private List<PaymentTransaction> transactions = new ArrayList<>();
 }

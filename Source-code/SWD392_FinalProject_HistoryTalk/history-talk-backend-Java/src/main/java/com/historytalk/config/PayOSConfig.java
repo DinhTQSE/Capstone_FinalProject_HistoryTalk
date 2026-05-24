@@ -1,4 +1,4 @@
-package com.example.historytalk.config;
+package com.historytalk.config;
 
 import lombok.Getter;
 import lombok.Setter;

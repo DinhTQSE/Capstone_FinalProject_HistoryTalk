@@ -45,7 +45,7 @@ public class UserTier {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /** Populated when user cancels the subscription early */
+    /** Timestamp when user requested cancellation. Premium may remain active until endTime. */
     @Column(name = "cancel_at")
     private LocalDateTime cancelAt;
 

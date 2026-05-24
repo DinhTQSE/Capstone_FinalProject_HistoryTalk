@@ -20,7 +20,7 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Query("SELECT o FROM PaymentOrder o WHERE o.orderCode = :orderCode")
     Optional<PaymentOrder> findByOrderCodeForUpdate(@Param("orderCode") Long orderCode);
 
-    List<PaymentOrder> findByUidOrderByCreatedAtDesc(UUID uid);
+    List<PaymentOrder> findByUser_UidOrderByCreateAtDesc(UUID uid);
 
     @Query("""
         SELECT o
