@@ -97,6 +97,11 @@ public class AiServiceClient {
             @JsonProperty("success") boolean success,
             @JsonProperty("data") GenerateTitleData data) {}
 
+    record ProcessDocumentRequest(
+            @JsonProperty("doc_id") String docId,
+            @JsonProperty("entity_id") String entityId,
+            @JsonProperty("content") String content) {}
+
     // ── Public methods ────────────────────────────────────────────────────
 
     /**
@@ -174,6 +179,45 @@ public class AiServiceClient {
         } catch (Exception e) {
             aiMetricsService.recordRequest("generate_title", "failure");
             log.warn("Failed to generate title for session {}: {}", sessionId, e.getMessage());
+        }
+    }
+
+    /**
+     * Calls BE-Python POST /v1/ai/documents/process asynchronously.
+     * Chunks and embeds the document content into Supabase Vector DB.
+     */
+    @Async
+    public void processDocumentAsync(String docId, String entityId, String content) {
+        ProcessDocumentRequest request = new ProcessDocumentRequest(docId, entityId, content);
+        try {
+            log.info("Calling AI service to process document: {}", docId);
+            restClient.post()
+                    .uri("/v1/ai/documents/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully sent document {} for AI processing", docId);
+        } catch (RestClientException e) {
+            log.error("AI service /documents/process call failed for doc {}: {}", docId, e.getMessage());
+        }
+    }
+
+    /**
+     * Calls BE-Python DELETE /v1/ai/documents/{docId} asynchronously.
+     * Deletes the document's chunks from Supabase Vector DB.
+     */
+    @Async
+    public void deleteDocumentAsync(String docId) {
+        try {
+            log.info("Calling AI service to delete document chunks: {}", docId);
+            restClient.delete()
+                    .uri("/v1/ai/documents/" + docId)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully requested AI deletion for document {}", docId);
+        } catch (RestClientException e) {
+            log.error("AI service DELETE /documents call failed for doc {}: {}", docId, e.getMessage());
         }
     }
 
