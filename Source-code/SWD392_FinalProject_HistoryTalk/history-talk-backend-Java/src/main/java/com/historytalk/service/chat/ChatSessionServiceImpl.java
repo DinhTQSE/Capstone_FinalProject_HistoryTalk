@@ -79,16 +79,10 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
         }
 
-        UUID contextIdUUID = UUID.fromString(request.getContextId());
-        var selectedContext = character.getHistoricalContexts().stream()
-            .filter(ctx -> ctx.getContextId().equals(contextIdUUID))
-            .findFirst()
-            .orElseThrow(() -> new InvalidRequestException("Character does not belong to this context"));
-
         ChatSession session = ChatSession.builder()
                 .user(user)
                 .character(character)
-            .historicalContext(selectedContext)
+                .historicalContext(context)
                 .title("")
                 .build();
 
