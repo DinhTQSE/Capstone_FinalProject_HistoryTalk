@@ -11,7 +11,7 @@ public class PaymentMapper {
                 .checkoutUrl(order.getCheckoutUrl())
                 .qrCode(order.getQrCode())
                 .amount(order.getAmount())
-                .status(order.getStatus())
+                .status(order.getStatus().name())
                 .expiredAt(order.getExpiredAt() != null ? order.getExpiredAt().toString() : null)
                 .build();
     }

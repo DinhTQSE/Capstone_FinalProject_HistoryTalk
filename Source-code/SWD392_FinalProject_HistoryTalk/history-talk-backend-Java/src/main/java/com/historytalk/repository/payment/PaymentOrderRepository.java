@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,8 +20,10 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Query("SELECT o FROM PaymentOrder o WHERE o.orderCode = :orderCode")
     Optional<PaymentOrder> findByOrderCodeForUpdate(@Param("orderCode") Long orderCode);
 
-    List<PaymentOrder> findByUser_UidOrderByCreateAtDesc(UUID uid);
+    // Fixed: was findByUser_UidOrderByCreateAtDesc (typo: createAt → createdAt)
+    List<PaymentOrder> findByUser_UidOrderByCreatedAtDesc(UUID uid);
 
+    // Fixed: was OffsetDateTime, but PaymentOrder.expiredAt is LocalDateTime
     @Query("""
         SELECT o
         FROM PaymentOrder o
@@ -31,6 +33,6 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     """)
     List<PaymentOrder> findExpiredPendingOrders(
             @Param("status") PaymentOrderStatus status,
-            @Param("now") OffsetDateTime now
+            @Param("now") LocalDateTime now
     );
 }
