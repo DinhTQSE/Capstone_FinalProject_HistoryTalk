@@ -5,7 +5,7 @@ import com.historytalk.dto.chat.CreateChatSessionRequest;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
-import com.historytalk.entity.enums.MessageRole;
+
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
@@ -119,7 +119,6 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
             Message greetingMsg = Message.builder()
                     .content(greeting.message())
-                    .role(MessageRole.ASSISTANT)
                     .isFromAi(true)
                     .suggestedQuestions(suggestedQuestionsJson)
                     .chatSession(saved)

@@ -1,6 +1,6 @@
 package com.historytalk.entity.chat;
 
-import com.historytalk.entity.enums.MessageRole;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,9 +36,7 @@ public class Message {
     @Column(name = "is_from_ai", nullable = false)
     private Boolean isFromAi;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", length = 20)
-    private MessageRole role;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false)
@@ -66,9 +64,6 @@ public class Message {
     void ensureDefaults() {
         if (this.isFromAi == null) {
             this.isFromAi = Boolean.FALSE;
-        }
-        if (this.role == null) {
-            this.role = Boolean.TRUE.equals(this.isFromAi) ? MessageRole.ASSISTANT : MessageRole.USER;
         }
     }
 }
