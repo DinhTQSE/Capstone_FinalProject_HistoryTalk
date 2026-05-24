@@ -16,8 +16,8 @@ public class MessageResponse {
     @JsonProperty("sessionId")
     private String sessionId;
 
-    @JsonProperty("isFromAi")
-    private Boolean isFromAi;
+    @JsonProperty("role")
+    private String role;
 
     @JsonProperty("content")
     private String content;

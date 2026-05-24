@@ -158,7 +158,7 @@ public class MessageServiceImpl implements MessageService {
         return MessageResponse.builder()
                 .id(message.getMessageId().toString())
                 .sessionId(message.getChatSession().getSessionId().toString())
-                .isFromAi(message.getIsFromAi())
+                .role(Boolean.TRUE.equals(message.getIsFromAi()) ? "ASSISTANT" : "USER")
                 .content(message.getContent())
                                 .createdAt(message.getCreatedAt())
                 .build();
