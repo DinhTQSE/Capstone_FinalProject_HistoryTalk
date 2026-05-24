@@ -24,6 +24,15 @@ public class PayOSWebhookController {
     private final PayOS payOS;
     private final PaymentWebhookService paymentWebhookService;
 
+    /**
+     * PayOS sends a GET to this URL during webhook registration to verify it is reachable.
+     * Must return 200 — no body required.
+     */
+    @GetMapping("/webhook")
+    public ResponseEntity<String> verifyWebhook() {
+        return ResponseEntity.ok("OK");
+    }
+
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(@RequestBody Webhook webhook) {
         try {
@@ -35,6 +44,7 @@ public class PayOSWebhookController {
         } catch (Exception e) {
             log.warn("Rejected PayOS webhook: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Invalid webhook");
+//            return ResponseEntity.ok("OK");
         }
     }
 }
