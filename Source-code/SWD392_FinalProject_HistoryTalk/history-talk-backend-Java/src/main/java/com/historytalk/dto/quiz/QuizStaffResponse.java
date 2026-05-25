@@ -1,5 +1,6 @@
 package com.historytalk.dto.quiz;
 
+import com.historytalk.entity.enums.ContentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,7 +43,9 @@ public class QuizStaffResponse {
 
     private LocalDateTime updatedDate;
 
-    private Boolean isActive;
+    private Boolean isPublished;
+
+    private ContentStatus status;
 
     /** null if not soft-deleted */
     private LocalDateTime deletedAt;

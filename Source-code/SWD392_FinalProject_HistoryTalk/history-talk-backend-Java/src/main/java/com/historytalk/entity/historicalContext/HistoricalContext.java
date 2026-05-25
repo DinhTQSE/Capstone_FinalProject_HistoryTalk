@@ -33,7 +33,7 @@ public class HistoricalContext {
     @Column(name = "context_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID contextId;
 
-    @Column(name = "name", nullable = false, length = 100, unique = true)
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
 //    @Lob
@@ -73,10 +73,6 @@ public class HistoricalContext {
     @Builder.Default
     @Column(name = "is_published", nullable = false)
     private Boolean isPublished = false;
-
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)

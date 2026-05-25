@@ -121,20 +121,6 @@ public class StaffQuizController {
     }
 
     /**
-     * PATCH /staff/quizzes/:quizId/toggle-active
-     * Flips isActive boolean.
-     */
-    @PatchMapping("/{quizId}/toggle-active")
-    @Operation(summary = "Toggle quiz active state", description = "Enable or disable quiz visibility to customers.")
-    public ResponseEntity<ApiResponse<Void>> toggleActiveQuiz(
-            @PathVariable String quizId) {
-
-        log.info("PATCH /api/v1/staff/quizzes/{}/toggle-active", quizId);
-        quizService.toggleActiveQuiz(quizId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Quiz active state toggled successfully"));
-    }
-
-    /**
      * POST /staff/quizzes/:quizId/questions
      * Add a question. Returns the created QuizQuestion.
      */

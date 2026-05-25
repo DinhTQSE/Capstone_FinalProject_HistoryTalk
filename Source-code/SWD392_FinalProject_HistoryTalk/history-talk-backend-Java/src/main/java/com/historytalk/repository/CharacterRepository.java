@@ -29,6 +29,10 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndCharacterIdNot(String name, UUID characterId);
+
     @Query(value = """
             SELECT DISTINCT c FROM Character c
               LEFT JOIN c.historicalContexts hc
@@ -59,15 +63,16 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query(value = """
            SELECT * FROM historical_schema."character" c
-           WHERE c.is_active = false
+           WHERE c.deleted_at IS NOT NULL
            ORDER BY c.name ASC
            """, nativeQuery = true)
     List<Character> findAllDeleted();
 
     @Query(value = """
            UPDATE historical_schema."character"
-           SET deleted_at = NULL, is_active = true
+           SET deleted_at = NULL
            WHERE character_id = :characterId
+             AND deleted_at IS NOT NULL
            """, nativeQuery = true)
     @org.springframework.data.jpa.repository.Modifying
     int restoreById(@Param("characterId") UUID characterId);
@@ -78,6 +83,6 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
     @Query("SELECT COUNT(c) FROM Character c WHERE c.isPublished = true")
     long countPublished();
 
-    @Query("SELECT COUNT(c) FROM Character c WHERE c.deletedAt IS NULL AND c.isActive = true")
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.deletedAt IS NULL AND c.isPublished = true")
     long countActive();
 }

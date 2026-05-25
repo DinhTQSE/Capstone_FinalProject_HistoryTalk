@@ -59,10 +59,6 @@ public class User {
     @Column(name = "last_active_date")
     private LocalDateTime lastActiveDate;
 
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

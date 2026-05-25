@@ -1,6 +1,7 @@
 package com.historytalk.dto.character;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -62,7 +63,7 @@ public class CharacterResponse {
     private Boolean isPublished;
 
     @JsonProperty("status")
-    private String status;
+    private ContentStatus status;
 
     @JsonProperty("era")
     private EventEra era;

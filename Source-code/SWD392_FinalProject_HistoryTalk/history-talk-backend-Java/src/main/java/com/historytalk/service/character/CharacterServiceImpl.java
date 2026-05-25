@@ -6,6 +6,7 @@ import com.historytalk.dto.character.CreateCharacterRequest;
 import com.historytalk.dto.character.UpdateCharacterRequest;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.document.Document;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.historicalContext.HistoricalContext;
@@ -55,7 +56,7 @@ public class CharacterServiceImpl implements CharacterService {
         int pageSize = Math.min(limit, 20);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), pageSize);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, includeDeleted, pageable);
         return PaginatedResponse.<CharacterResponse>builder()
                 .content(result.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()))
@@ -78,7 +79,7 @@ public class CharacterServiceImpl implements CharacterService {
         if (!isStaffOrAdmin(role) && !Boolean.TRUE.equals(character.getIsPublished())) {
             throw new ResourceNotFoundException("Character not found with id: " + characterId);
         }
-        if (!isStaffOrAdmin(role) && Boolean.FALSE.equals(character.getIsActive())) {
+        if (!isStaffOrAdmin(role) && character.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Character not found with id: " + characterId);
         }
         return mapToResponse(character);
@@ -88,7 +89,7 @@ public class CharacterServiceImpl implements CharacterService {
     public List<CharacterResponse> getCharactersByContext(String contextId, String role) {
         log.info("Fetching characters for context: {}", contextId);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
                 .stream()
                 .map(this::mapToResponse)
@@ -98,6 +99,10 @@ public class CharacterServiceImpl implements CharacterService {
     @Transactional
     public CharacterResponse createCharacter(CreateCharacterRequest request, String userId) {
         log.info("Creating character: {} by user: {}", request.getName(), userId);
+
+        if (characterRepository.existsByNameIgnoreCase(request.getName())) {
+            throw new InvalidRequestException("Character name already exists");
+        }
 
         Set<HistoricalContext> contexts = resolveContexts(request);
 
@@ -144,6 +149,9 @@ public class CharacterServiceImpl implements CharacterService {
         }
 
         if (request.getName() != null && !request.getName().isBlank()) {
+            if (characterRepository.existsByNameIgnoreCaseAndCharacterIdNot(request.getName(), character.getCharacterId())) {
+                throw new InvalidRequestException("Character name already exists");
+            }
             character.setName(request.getName());
         }
         if (request.getTitle() != null) {
@@ -206,43 +214,24 @@ public class CharacterServiceImpl implements CharacterService {
                     "You do not have permission to soft delete this character");
         }
 
-        character.setDeletedAt(java.time.LocalDateTime.now());
-        character.setIsActive(false);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        character.setDeletedAt(now);
         characterRepository.save(character);
 
         // Cascade soft-delete to documents
         documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
                 character.getCharacterId(), EntityType.CHARACTER, true)
-            .forEach(doc -> doc.setDeletedAt(java.time.LocalDateTime.now()));
+            .forEach(doc -> doc.setDeletedAt(now));
 
         // Cascade soft-delete to chat sessions
         if (character.getChatSessions() != null) {
             character.getChatSessions().forEach(session -> {
-                session.setDeletedAt(java.time.LocalDateTime.now());
+                session.setDeletedAt(now);
                 if (session.getMessages() != null) {
-                    session.getMessages().forEach(msg -> msg.setDeletedAt(java.time.LocalDateTime.now()));
+                    session.getMessages().forEach(msg -> msg.setDeletedAt(now));
                 }
             });
         }
-    }
-
-    @Transactional
-    public void toggleActiveCharacter(String characterId, String userId, String userRole) {
-        log.info("Toggling active state for character: {} by user: {}", characterId, userId);
-
-        Character character = characterRepository.findById(UUID.fromString(characterId))
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Character not found with id: " + characterId));
-
-        if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException(
-                    "You do not have permission to toggle this character");
-        }
-
-        boolean nextActive = !Boolean.TRUE.equals(character.getIsActive());
-        character.setIsActive(nextActive);
-        character.setDeletedAt(nextActive ? null : java.time.LocalDateTime.now());
-        characterRepository.save(character);
     }
 
     @Transactional(readOnly = true)
@@ -320,7 +309,7 @@ public class CharacterServiceImpl implements CharacterService {
         boolean includeDraftAndDeleted = isStaffOrAdmin(role);
         return character.getHistoricalContexts().stream()
                 .filter(ctx -> includeDraftAndDeleted
-                        || (!Boolean.TRUE.equals(ctx.getIsPublished()) && Boolean.TRUE.equals(ctx.getIsActive())))
+                        || (Boolean.TRUE.equals(ctx.getIsPublished()) && ctx.getDeletedAt() == null))
                 .sorted(Comparator.comparing(HistoricalContext::getName, String.CASE_INSENSITIVE_ORDER))
                 .map(hc -> CharacterResponse.ContextInfo.builder()
                         .contextId(hc.getContextId().toString())
@@ -366,7 +355,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .isDeathBc(character.getIsDeathBc())
                 .isPublished(character.getIsPublished())
                 .deletedAt(character.getDeletedAt())
-                .status(buildStatus(character.getIsPublished(), character.getDeletedAt(), character.getIsActive()))
+                .status(buildStatus(character.getIsPublished(), character.getDeletedAt()))
             .era(ctx != null ? ctx.getEra() : null)
                 .events(events)
             .context(ctx == null ? null : CharacterResponse.ContextInfo.builder()
@@ -385,7 +374,7 @@ public class CharacterServiceImpl implements CharacterService {
 
     private CharacterResponse mapToResponseWithInactive(Character character) {
         CharacterResponse response = mapToResponse(character);
-        response.setStatus(buildStatus(character.getIsPublished(), character.getDeletedAt(), character.getIsActive()));
+        response.setStatus(buildStatus(character.getIsPublished(), character.getDeletedAt()));
         return response;
     }
 
@@ -442,13 +431,13 @@ public class CharacterServiceImpl implements CharacterService {
         );
     }
 
-    private String buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt, Boolean isActive) {
-        if (deletedAt != null || Boolean.FALSE.equals(isActive)) {
-            return "INACTIVE";
+    private ContentStatus buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt) {
+        if (deletedAt != null) {
+            return ContentStatus.INACTIVE;
         }
         if (!Boolean.TRUE.equals(isPublished)) {
-            return "DRAFT";
+            return ContentStatus.DRAFT;
         }
-        return "ACTIVE";
+        return ContentStatus.ACTIVE;
     }
 }

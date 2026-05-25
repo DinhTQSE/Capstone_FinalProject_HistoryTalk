@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.*;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
@@ -238,7 +239,7 @@ public class QuizServiceImpl implements QuizService {
                 .level(level)
                 .historicalContext(context)
                 .createdBy(user)
-                .isActive(false)
+                .isPublished(Boolean.TRUE.equals(request.getIsPublished()))
                 .build();
         quiz = quizRepository.save(quiz);
 
@@ -281,6 +282,10 @@ public class QuizServiceImpl implements QuizService {
             quiz.setLevel(parseLevel(request.getLevel()));
         }
 
+        if (request.getIsPublished() != null) {
+            quiz.setIsPublished(request.getIsPublished());
+        }
+
         quiz = quizRepository.save(quiz);
         return mapToStaffResponse(quiz);
     }
@@ -300,18 +305,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("softDeleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
-        quiz.setIsActive(false);
         quiz.setDeletedAt(LocalDateTime.now());
-        quizRepository.save(quiz);
-    }
-
-    @Override
-    @Transactional
-    public void toggleActiveQuiz(String quizId) {
-        log.info("toggleActiveQuiz: quizId={}", quizId);
-        Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
-        quiz.setIsActive(!quiz.getIsActive());
         quizRepository.save(quiz);
     }
 
@@ -415,10 +409,21 @@ public class QuizServiceImpl implements QuizService {
                 .createdBy(quiz.getCreatedBy() != null ? quiz.getCreatedBy().getUserName() : null)
                 .createdDate(quiz.getCreatedAt())
                 .updatedDate(quiz.getUpdatedAt())
-                .isActive(quiz.getIsActive())
+                .isPublished(quiz.getIsPublished())
+                .status(buildStatus(quiz.getIsPublished(), quiz.getDeletedAt()))
                 .deletedAt(quiz.getDeletedAt())
                 .questions(questions.stream().map(this::mapToQuestionResponse).collect(Collectors.toList()))
                 .build();
+    }
+
+    private ContentStatus buildStatus(Boolean isPublished, LocalDateTime deletedAt) {
+        if (deletedAt != null) {
+            return ContentStatus.INACTIVE;
+        }
+        if (!Boolean.TRUE.equals(isPublished)) {
+            return ContentStatus.DRAFT;
+        }
+        return ContentStatus.ACTIVE;
     }
 
     private QuestionResponse mapToQuestionResponse(Question q) {

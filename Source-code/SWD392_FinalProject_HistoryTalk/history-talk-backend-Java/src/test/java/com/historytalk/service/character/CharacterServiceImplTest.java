@@ -1,8 +1,10 @@
 package com.historytalk.service.character;
 
 import com.historytalk.dto.character.CharacterResponse;
+import com.historytalk.dto.character.CreateCharacterRequest;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
@@ -17,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,7 +52,6 @@ class CharacterServiceImplTest {
                 .name("Tran Hung Dao")
                 .background("Historical character background")
                 .isPublished(true)
-                .isActive(true)
                 .createdBy(creator)
                 .build();
 
@@ -59,6 +61,20 @@ class CharacterServiceImplTest {
 
         assertThat(response.getCharacterId()).isEqualTo(characterId.toString());
         assertThat(response.getName()).isEqualTo("Tran Hung Dao");
-        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        assertThat(response.getStatus().name()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void createCharacterRejectsDuplicateNameEvenIfExistingRecordIsTrashed() {
+        CreateCharacterRequest request = CreateCharacterRequest.builder()
+                .name("Tran Hung Dao")
+                .background("Historical character background")
+                .build();
+
+        when(characterRepository.existsByNameIgnoreCase("Tran Hung Dao")).thenReturn(true);
+
+        assertThatThrownBy(() -> characterService.createCharacter(request, UUID.randomUUID().toString()))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("Character name already exists");
     }
 }

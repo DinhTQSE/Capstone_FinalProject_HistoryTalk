@@ -49,10 +49,6 @@ public class Question {
     @Column(name = "explanation", columnDefinition = "TEXT", nullable = true)
     private String explanation;
 
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdAt;

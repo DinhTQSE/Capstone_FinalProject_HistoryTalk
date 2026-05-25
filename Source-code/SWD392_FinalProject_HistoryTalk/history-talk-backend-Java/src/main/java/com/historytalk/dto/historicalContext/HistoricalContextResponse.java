@@ -1,6 +1,7 @@
 package com.historytalk.dto.historicalContext;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
 import lombok.AllArgsConstructor;
@@ -61,7 +62,7 @@ public class HistoricalContextResponse {
     private Boolean isPublished;
 
     @JsonProperty("status")
-    private String status;
+    private ContentStatus status;
 
     @JsonProperty("createdBy")
     private CreatedByInfo createdBy;
