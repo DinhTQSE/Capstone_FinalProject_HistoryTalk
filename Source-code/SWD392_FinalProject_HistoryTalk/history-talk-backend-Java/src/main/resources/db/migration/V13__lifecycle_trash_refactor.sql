@@ -19,11 +19,11 @@ ALTER TABLE historical_schema.quiz_session DROP COLUMN IF EXISTS is_active;
 CREATE INDEX IF NOT EXISTS idx_quiz_deleted_at ON historical_schema.quiz (deleted_at);
 CREATE INDEX IF NOT EXISTS idx_quiz_publish_filter ON historical_schema.quiz (deleted_at, is_published, title);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_character_name_all
+CREATE INDEX IF NOT EXISTS idx_character_name_lookup_all
     ON historical_schema."character" (lower(name));
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_historical_context_name_all
+CREATE INDEX IF NOT EXISTS idx_historical_context_name_lookup_all
     ON historical_schema.historical_context (lower(name));
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_quiz_title_all
+CREATE INDEX IF NOT EXISTS idx_quiz_title_lookup_all
     ON historical_schema.quiz (lower(title));

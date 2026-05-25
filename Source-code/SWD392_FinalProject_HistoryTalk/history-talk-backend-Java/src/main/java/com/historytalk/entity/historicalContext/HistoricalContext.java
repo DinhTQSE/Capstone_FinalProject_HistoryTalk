@@ -33,7 +33,7 @@ public class HistoricalContext {
     @Column(name = "context_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID contextId;
 
-    @Column(name = "name", nullable = false, length = 100, unique = true)
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
 //    @Lob

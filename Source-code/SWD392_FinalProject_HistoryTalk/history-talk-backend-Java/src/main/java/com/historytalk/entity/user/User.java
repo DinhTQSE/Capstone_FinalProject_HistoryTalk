@@ -2,6 +2,7 @@ package com.historytalk.entity.user;
 
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.enums.UserRole;
+import com.historytalk.entity.payment.Tier;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -47,8 +48,9 @@ public class User {
     @Column(name = "role", length = 50, nullable = false)
     private UserRole role;
 
-    @Column(name = "tier_id", columnDefinition = "uuid")
-    private UUID tierId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tier_id")
+    private Tier tier;
 
     @Builder.Default
     @Column(name = "token", nullable = false)

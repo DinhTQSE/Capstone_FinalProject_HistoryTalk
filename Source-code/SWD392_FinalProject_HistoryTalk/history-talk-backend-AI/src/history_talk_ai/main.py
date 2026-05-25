@@ -1,5 +1,13 @@
 """FastAPI application entry point."""
 
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+# Resolve .env relative to the project root (2 levels up from this file)
+_ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=_ENV_PATH)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -32,4 +40,4 @@ app.include_router(chat_router.router)
 
 @app.get("/health", tags=["Health"])
 async def health():
-    return {"status": "ok", "llm_provider": settings.LLM_PROVIDER, "llm_model": settings.LLM_MODEL}
+    return {"status": "ok", "llm_model": settings.LLM_MODEL}
