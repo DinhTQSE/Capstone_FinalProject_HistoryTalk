@@ -49,11 +49,12 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
             JOIN q.historicalContext hc
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
             AND (:era IS NULL OR hc.era = :era)
-            AND q.deletedAt IS NULL
+            AND (:includeDeleted = true OR q.deletedAt IS NULL)
             """)
     Page<Quiz> findAllForStaff(
             @Param("search") String search,
             @Param("era") EventEra era,
+            @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 
     /**

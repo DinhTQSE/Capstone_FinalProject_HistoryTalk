@@ -56,7 +56,7 @@ public class CharacterServiceImpl implements CharacterService {
         int pageSize = Math.min(limit, 20);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), pageSize);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = false;
+        boolean includeDeleted = isSystemAdmin(role);
         Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, includeDeleted, pageable);
         return PaginatedResponse.<CharacterResponse>builder()
                 .content(result.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()))
@@ -89,7 +89,7 @@ public class CharacterServiceImpl implements CharacterService {
     public List<CharacterResponse> getCharactersByContext(String contextId, String role) {
         log.info("Fetching characters for context: {}", contextId);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = false;
+        boolean includeDeleted = isSystemAdmin(role);
         return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
                 .stream()
                 .map(this::mapToResponse)
@@ -429,6 +429,10 @@ public class CharacterServiceImpl implements CharacterService {
                         || "STAFF".equalsIgnoreCase(role)
                         || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    private boolean isSystemAdmin(String role) {
+        return role != null && "SYSTEM_ADMIN".equalsIgnoreCase(role);
     }
 
     private ContentStatus buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt) {

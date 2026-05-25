@@ -23,7 +23,7 @@ public interface QuizService {
 
     // ==================== Staff ====================
 
-    PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable);
+    PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable, String role);
 
     QuizStaffResponse getQuizByIdForStaff(String quizId);
 
