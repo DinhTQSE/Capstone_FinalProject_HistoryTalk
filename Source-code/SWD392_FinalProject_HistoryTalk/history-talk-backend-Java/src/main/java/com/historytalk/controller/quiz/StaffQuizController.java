@@ -44,7 +44,8 @@ public class StaffQuizController {
 
         log.info("GET /api/v1/staff/quizzes search={} era={} page={} size={}", search, era, page, size);
         Pageable pageable = PageRequest.of(page, size);
-        PaginatedResponse<QuizStaffResponse> data = quizService.getAllQuizzesForStaff(search, era, pageable);
+        String role = SecurityUtils.getRoleName();
+        PaginatedResponse<QuizStaffResponse> data = quizService.getAllQuizzesForStaff(search, era, pageable, role);
         return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
     }
 
