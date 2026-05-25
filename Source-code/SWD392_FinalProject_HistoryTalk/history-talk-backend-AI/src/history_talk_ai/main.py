@@ -1,5 +1,13 @@
 """FastAPI application entry point."""
 
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+# Resolve .env relative to the project root (2 levels up from this file)
+_ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=_ENV_PATH)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
