@@ -3,6 +3,8 @@ package com.historytalk.service.payment;
 import com.historytalk.config.PayOSConfig;
 import com.historytalk.dto.payment.CreatePaymentResponse;
 import com.historytalk.dto.payment.PaymentHistoryResponse;
+import com.historytalk.dto.payment.PayOSReturnRequest;
+import com.historytalk.dto.payment.PayOSReturnResponse;
 import com.historytalk.dto.payment.TierResponse;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.payment.PaymentOrder;
@@ -142,6 +144,120 @@ public class PaymentService {
                         .isActive(t.getIsActive())
                         .build())
                 .toList();
+    }
+
+    /**
+     * Handles the PayOS return-URL callback forwarded by the frontend.
+     *
+     * PayOS redirects the browser to cancelUrl/returnUrl with query params
+     * (code, id, cancel, status, orderCode). The frontend POSTs those params
+     * here so the backend can synchronise the order status without waiting for
+     * the async webhook.
+     *
+     * Rules:
+     * - Requires JWT; uid must match the order owner (ownership guard).
+     * - Idempotent: if the order is already terminal (CANCELLED/PAID/EXPIRED/FAILED)
+     *   the method returns immediately without writing to the DB.
+     * - PROCESSING from PayOS is treated as PENDING (no state change).
+     * - This method NEVER upgrades the user's tier. Tier upgrade is exclusively
+     *   handled by PaymentWebhookService.handlePaid() after HMAC verification.
+     */
+    @Transactional
+    public PayOSReturnResponse handlePayOSReturn(UUID uid, PayOSReturnRequest request) {
+        // 1. Look up the order
+        PaymentOrder order = paymentOrderRepository.findByOrderCode(request.getOrderCode())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Payment order not found: " + request.getOrderCode()));
+
+        // 2. Ownership guard
+        if (!order.getUser().getUid().equals(uid)) {
+            throw new InvalidRequestException("Order does not belong to this user");
+        }
+
+        PaymentOrderStatus current = order.getStatus();
+
+        // 3. Idempotency guard — return immediately if already terminal
+        if (isTerminal(current)) {
+            log.info("PayOS return: order {} already terminal ({}), skipping",
+                    order.getOrderCode(), current);
+            return buildResponse(order.getOrderCode(), current);
+        }
+
+        // 4. Resolve new status from PayOS params
+        PaymentOrderStatus resolved = resolveStatus(request);
+
+        // 5. Persist if status changed
+        if (resolved == PaymentOrderStatus.CANCELLED) {
+            order.setStatus(PaymentOrderStatus.CANCELLED);
+            paymentOrderRepository.save(order);
+            log.info("PayOS return: order {} marked CANCELLED (user-initiated)", order.getOrderCode());
+
+        } else if (resolved == PaymentOrderStatus.PAID) {
+            // UI-only sync — tier upgrade must come from the verified webhook
+            order.setStatus(PaymentOrderStatus.PAID);
+            order.setPaidAt(LocalDateTime.now());
+            paymentOrderRepository.save(order);
+            log.info("PayOS return: order {} status synced to PAID (UI only, webhook handles tier)",
+                    order.getOrderCode());
+
+        } else {
+            // PENDING / PROCESSING — no state change, just echo back
+            log.info("PayOS return: order {} status remains {} (PayOS status={})",
+                    order.getOrderCode(), current, request.getStatus());
+        }
+
+        PaymentOrderStatus finalStatus = (resolved != null) ? resolved : current;
+        return buildResponse(order.getOrderCode(), finalStatus);
+    }
+
+    // -------------------------------------------------------------------------
+    // Return-URL helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns true if the order is in a terminal state that should not be
+     * overwritten by a late return-URL call.
+     */
+    private boolean isTerminal(PaymentOrderStatus status) {
+        return status == PaymentOrderStatus.CANCELLED
+                || status == PaymentOrderStatus.PAID
+                || status == PaymentOrderStatus.EXPIRED
+                || status == PaymentOrderStatus.FAILED;
+    }
+
+    /**
+     * Maps PayOS return params to our internal PaymentOrderStatus.
+     * PROCESSING is intentionally treated as PENDING (no enum value added).
+     * Returns null for PENDING/PROCESSING to signal "no state change".
+     */
+    private PaymentOrderStatus resolveStatus(PayOSReturnRequest request) {
+        if (Boolean.TRUE.equals(request.getCancel())
+                || "CANCELLED".equalsIgnoreCase(request.getStatus())) {
+            return PaymentOrderStatus.CANCELLED;
+        }
+        if ("PAID".equalsIgnoreCase(request.getStatus())) {
+            return PaymentOrderStatus.PAID;
+        }
+        // PENDING or PROCESSING — no change
+        return null;
+    }
+
+    /**
+     * Builds the response with a human-readable message keyed on status.
+     */
+    private PayOSReturnResponse buildResponse(Long orderCode, PaymentOrderStatus status) {
+        String message = switch (status) {
+            case CANCELLED -> "Payment has been cancelled.";
+            case PAID      -> "Payment has already been confirmed.";
+            case EXPIRED   -> "Payment link has expired. Please create a new order.";
+            case FAILED    -> "Payment failed. Please try again.";
+            default        -> "Payment is pending. Please wait for confirmation.";
+        };
+        return PayOSReturnResponse.builder()
+                .orderCode(orderCode)
+                .resolvedStatus(status.name())
+                .message(message)
+                .build();
     }
 
     private Long generateOrderCode() {
