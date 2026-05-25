@@ -31,7 +31,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                      AND (:era IS NULL OR hc.era = :era)
                      AND (:category IS NULL OR hc.category = :category)
                      AND (:includeDraft = true OR hc.isPublished = true)
-                     AND (:includeDeleted = true OR (hc.deletedAt IS NULL AND hc.isActive = true))
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
                      """)
        Page<HistoricalContext> findAllWithSearch(
                      @Param("search") String search,
@@ -47,7 +47,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                             OR hc.name ILIKE CONCAT('%', :search, '%')
                             OR hc.description ILIKE CONCAT('%', :search, '%'))
                      AND (:includeDraft = true OR hc.isPublished = true)
-                     AND (:includeDeleted = true OR (hc.deletedAt IS NULL AND hc.isActive = true))
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
                      ORDER BY hc.createdAt DESC
                      """)
        List<HistoricalContext> findAllSimple(@Param("search") String search,
@@ -63,8 +63,9 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        @Query(value = """
                UPDATE historical_schema.historical_context
-               SET deleted_at = NULL, is_active = true
+               SET deleted_at = NULL
                WHERE context_id = :contextId
+                 AND deleted_at IS NOT NULL
                """, nativeQuery = true)
        @org.springframework.data.jpa.repository.Modifying
        int restoreById(@Param("contextId") UUID contextId);
@@ -75,6 +76,6 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
        @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.isPublished = true")
        long countPublished();
 
-       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.deletedAt IS NULL AND hc.isActive = true")
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.deletedAt IS NULL AND hc.isPublished = true")
        long countActive();
 }

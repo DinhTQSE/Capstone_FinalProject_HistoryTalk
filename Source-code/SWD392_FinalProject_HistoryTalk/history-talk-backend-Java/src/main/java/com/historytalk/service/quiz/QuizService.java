@@ -35,8 +35,6 @@ public interface QuizService {
 
     void softDeleteQuiz(String quizId);
 
-    void toggleActiveQuiz(String quizId);
-
     QuestionResponse addQuestion(String quizId, QuestionRequest request);
 
     void updateQuestion(String quizId, String questionId, QuestionRequest request);

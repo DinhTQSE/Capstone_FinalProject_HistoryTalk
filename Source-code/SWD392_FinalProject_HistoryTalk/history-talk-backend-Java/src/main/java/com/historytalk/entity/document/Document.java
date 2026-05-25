@@ -66,10 +66,6 @@ public class Document {
     @JoinColumn(name = "uploaded_by", nullable = false)
     private User createdBy;
 
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
     @CreationTimestamp
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;

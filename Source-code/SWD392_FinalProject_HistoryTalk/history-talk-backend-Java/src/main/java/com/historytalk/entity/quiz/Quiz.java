@@ -49,8 +49,8 @@ public class Quiz {
     private QuizLevel level;
 
     @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
+    @Column(name = "is_published", nullable = false)
+    private Boolean isPublished = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
@@ -66,4 +66,14 @@ public class Quiz {
     @Builder.Default
     @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Question> questions = new ArrayList<>();
+
+    public Boolean getIsDraft() {
+        return !Boolean.TRUE.equals(isPublished);
+    }
+
+    public void setIsDraft(Boolean isDraft) {
+        if (isDraft != null) {
+            this.isPublished = !Boolean.TRUE.equals(isDraft);
+        }
+    }
 }

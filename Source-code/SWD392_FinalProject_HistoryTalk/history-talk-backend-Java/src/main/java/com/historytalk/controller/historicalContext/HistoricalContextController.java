@@ -148,7 +148,7 @@ public class HistoricalContextController {
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Soft-delete a historical context",
-               description = "Mark a historical context as deleted (data preserved). Cascades to documents, characters, and quizzes.")
+               description = "Mark a historical context as deleted (data preserved). Cascades to context documents, chat sessions, and quizzes; mapped characters remain independent.")
     public ResponseEntity<ApiResponse<?>> softDeleteContext(
             @PathVariable String contextId) {
 
@@ -160,19 +160,4 @@ public class HistoricalContextController {
         return ResponseEntity.ok(ApiResponse.success(null, "Historical context soft-deleted successfully"));
     }
 
-    @PatchMapping("/{contextId}/toggle-active")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Toggle historical context active state",
-               description = "Toggle whether a historical context is visible/active (Staff/Admin only).")
-    public ResponseEntity<ApiResponse<?>> toggleActiveContext(
-            @PathVariable String contextId) {
-
-        log.info("PATCH /v1/historical-contexts/{}/toggle-active", contextId);
-        String userId = SecurityUtils.getUserId();
-        String userRole = SecurityUtils.getRoleName();
-        contextService.toggleActiveContext(contextId, userId, userRole);
-
-        return ResponseEntity.ok(ApiResponse.success(null, "Historical context active state toggled successfully"));
-    }
 }

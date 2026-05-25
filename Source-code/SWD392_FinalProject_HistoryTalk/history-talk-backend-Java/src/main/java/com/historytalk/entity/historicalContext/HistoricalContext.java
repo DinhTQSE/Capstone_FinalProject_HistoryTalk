@@ -74,10 +74,6 @@ public class HistoricalContext {
     @Column(name = "is_published", nullable = false)
     private Boolean isPublished = false;
 
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;

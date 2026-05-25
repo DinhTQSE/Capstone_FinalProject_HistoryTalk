@@ -114,19 +114,6 @@ public class CharacterController {
         return ResponseEntity.ok(ApiResponse.success(null, "Character soft-deleted successfully"));
     }
 
-    @PatchMapping("/{characterId}/toggle-active")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Toggle character active state", description = "Toggle whether a character is visible/active (Staff/Admin only)")
-    public ResponseEntity<ApiResponse<?>> toggleActiveCharacter(
-            @PathVariable String characterId) {
-        log.info("PATCH /v1/characters/{}/toggle-active", characterId);
-        String staffId = SecurityUtils.getUserId();
-        String staffRole = SecurityUtils.getRoleName();
-        characterService.toggleActiveCharacter(characterId, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Character active state toggled successfully"));
-    }
-
     @PostMapping("/{characterId}/contexts/{contextId}")
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")

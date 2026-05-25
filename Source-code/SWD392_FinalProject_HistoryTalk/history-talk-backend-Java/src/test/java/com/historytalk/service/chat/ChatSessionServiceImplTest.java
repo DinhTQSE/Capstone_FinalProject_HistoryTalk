@@ -69,7 +69,6 @@ class ChatSessionServiceImplTest {
                 .name("Tran Hung Dao")
                 .background("Historical character background")
                 .isPublished(true)
-                .isActive(true)
                 .createdBy(user)
                 .build();
         HistoricalContext context = HistoricalContext.builder()
@@ -77,7 +76,6 @@ class ChatSessionServiceImplTest {
                 .name("Bach Dang")
                 .description("Historical context description")
                 .isPublished(true)
-                .isActive(true)
                 .createdBy(user)
                 .build();
         CreateChatSessionRequest request = new CreateChatSessionRequest();

@@ -39,7 +39,6 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
                         WHERE cs.sessionId = :sessionId
                         AND cs.user.uid = :userId
                         AND cs.deletedAt IS NULL
-                        AND cs.isActive = true
             """)
     Optional<ChatSession> findActiveBySessionIdAndUserUid(@Param("sessionId") UUID sessionId,
                                                           @Param("userId") UUID userId);
@@ -58,8 +57,12 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     @Query("SELECT COUNT(cs) FROM ChatSession cs")
     long countCurrent();
 
-    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.isActive = true")
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL")
     long countActive();
+
+    List<ChatSession> findByCharacterCharacterId(UUID characterId);
+
+    List<ChatSession> findByHistoricalContextContextId(UUID contextId);
 
     @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.createdAt >= :from AND cs.createdAt < :to")
     long countCreatedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);

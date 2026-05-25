@@ -53,10 +53,6 @@ public class Message {
     @Column(name = "suggested_questions", columnDefinition = "TEXT")
     private String suggestedQuestions;
 
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
 

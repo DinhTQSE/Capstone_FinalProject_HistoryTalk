@@ -17,24 +17,24 @@ import java.util.UUID;
 public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
     /**
-     * Customer — active quizzes only, optional title search (ILIKE).
+     * Customer — published quizzes only, optional title search (ILIKE).
      */
     @Query("""
             SELECT q FROM Quiz q
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
-            AND q.isActive = true
+            AND q.isPublished = true
             AND q.deletedAt IS NULL
             ORDER BY q.title ASC
             """)
     List<Quiz> findAllActiveForCustomer(@Param("search") String search);
 
     /**
-     * Customer — single active quiz by ID.
+     * Customer — single published quiz by ID.
      */
     @Query("""
             SELECT q FROM Quiz q
             WHERE q.quizId = :quizId
-            AND q.isActive = true
+            AND q.isPublished = true
             AND q.deletedAt IS NULL
             """)
     Optional<Quiz> findActiveById(@Param("quizId") UUID quizId);
@@ -42,7 +42,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     /**
      * Staff — paginated list with optional search and era filter.
      * era is filtered on historicalContext.era (not on Quiz directly).
-     * Shows all non-deleted quizzes regardless of isActive.
+     * Shows all non-deleted quizzes regardless of isPublished.
      */
     @Query("""
             SELECT q FROM Quiz q
@@ -65,4 +65,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
      * Duplicate title check for quiz update (exclude self).
      */
     boolean existsByTitleIgnoreCaseAndQuizIdNot(String title, UUID quizId);
+
+    @Query("SELECT q FROM Quiz q WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
+    List<Quiz> findAllDeleted();
 }

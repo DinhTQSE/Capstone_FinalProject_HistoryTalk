@@ -37,4 +37,6 @@ public class CreateQuizRequest {
     @NotEmpty(message = "At least one question is required")
     @Valid
     private List<QuestionRequest> questions;
+
+    private Boolean isPublished = false;
 }
