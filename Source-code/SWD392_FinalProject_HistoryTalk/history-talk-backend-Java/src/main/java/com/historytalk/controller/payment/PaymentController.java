@@ -16,7 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/payments")
+@RequestMapping("/v1/api/payments")
 public class PaymentController {
     private final PaymentService paymentService;
 
