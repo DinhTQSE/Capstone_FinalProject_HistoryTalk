@@ -28,7 +28,12 @@ public class AiServiceClient {
             ChatSessionRepository chatSessionRepository,
             AiMetricsService aiMetricsService,
             RestClient.Builder restClientBuilder) {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(60000); // 60s
+        factory.setReadTimeout(180000); // 3 minutes
+
         this.restClient = restClientBuilder
+                .requestFactory(factory)
                 .baseUrl(aiServiceUrl)
                 .build();
         this.chatSessionRepository = chatSessionRepository;
@@ -43,7 +48,8 @@ public class AiServiceClient {
             @JsonProperty("title") String title,
             @JsonProperty("background") String background,
             @JsonProperty("personality") String personality,
-            @JsonProperty("lifespan") String lifespan) {}
+            @JsonProperty("lifespan") String lifespan) {
+    }
 
     public record ContextPayload(
             @JsonProperty("contextId") String contextId,
@@ -54,13 +60,16 @@ public class AiServiceClient {
             @JsonProperty("startYear") Integer startYear,
             @JsonProperty("endYear") Integer endYear,
             @JsonProperty("isBC") Boolean isBC,
-            @JsonProperty("location") String location) {}
+            @JsonProperty("location") String location) {
+    }
 
     public record MessageHistoryItem(
             @JsonProperty("role") String role,
-            @JsonProperty("content") String content) {}
+            @JsonProperty("content") String content) {
+    }
 
-    public record AiChatResult(String message, List<String> suggestedQuestions) {}
+    public record AiChatResult(String message, List<String> suggestedQuestions) {
+    }
 
     // ── Internal request / response records ───────────────────────────────
 
@@ -70,16 +79,19 @@ public class AiServiceClient {
             @JsonProperty("userMessage") String userMessage,
             @JsonProperty("messageHistory") List<MessageHistoryItem> messageHistory,
             @JsonProperty("characterData") CharacterPayload characterData,
-            @JsonProperty("contextData") ContextPayload contextData) {}
+            @JsonProperty("contextData") ContextPayload contextData) {
+    }
 
     record ChatResponseData(
             @JsonProperty("message") String message,
             @JsonProperty("suggestedQuestions") List<String> suggestedQuestions,
-            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {}
+            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+    }
 
     record ChatApiResponse(
             @JsonProperty("success") boolean success,
-            @JsonProperty("data") ChatResponseData data) {}
+            @JsonProperty("data") ChatResponseData data) {
+    }
 
     record GenerateTitleRequest(
             @JsonProperty("characterId") String characterId,
@@ -87,20 +99,24 @@ public class AiServiceClient {
             @JsonProperty("firstUserMessage") String firstUserMessage,
             @JsonProperty("firstAssistantMessage") String firstAssistantMessage,
             @JsonProperty("characterData") CharacterPayload characterData,
-            @JsonProperty("contextData") ContextPayload contextData) {}
+            @JsonProperty("contextData") ContextPayload contextData) {
+    }
 
     record GenerateTitleData(
             @JsonProperty("title") String title,
-            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {}
+            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+    }
 
     record GenerateTitleApiResponse(
             @JsonProperty("success") boolean success,
-            @JsonProperty("data") GenerateTitleData data) {}
+            @JsonProperty("data") GenerateTitleData data) {
+    }
 
     record ProcessDocumentRequest(
             @JsonProperty("doc_id") String docId,
             @JsonProperty("entity_id") String entityId,
-            @JsonProperty("content") String content) {}
+            @JsonProperty("content") String content) {
+    }
 
     // ── Public methods ────────────────────────────────────────────────────
 
@@ -227,17 +243,17 @@ public class AiServiceClient {
     public static CharacterPayload buildCharacterPayload(com.historytalk.entity.character.Character c) {
         String born = "";
         if (c.getBornYear() != null) {
-            born = (c.getBornDay() != null ? c.getBornDay() + "/" : "") + 
-                   (c.getBornMonth() != null ? c.getBornMonth() + "/" : "") + 
-                   c.getBornYear() + 
-                   (Boolean.TRUE.equals(c.getIsBornBc()) ? " BC" : "");
+            born = (c.getBornDay() != null ? c.getBornDay() + "/" : "") +
+                    (c.getBornMonth() != null ? c.getBornMonth() + "/" : "") +
+                    c.getBornYear() +
+                    (Boolean.TRUE.equals(c.getIsBornBc()) ? " BC" : "");
         }
         String died = "";
         if (c.getDeathYear() != null) {
-            died = (c.getDeathDay() != null ? c.getDeathDay() + "/" : "") + 
-                   (c.getDeathMonth() != null ? c.getDeathMonth() + "/" : "") + 
-                   c.getDeathYear() + 
-                   (Boolean.TRUE.equals(c.getIsDeathBc()) ? " BC" : "");
+            died = (c.getDeathDay() != null ? c.getDeathDay() + "/" : "") +
+                    (c.getDeathMonth() != null ? c.getDeathMonth() + "/" : "") +
+                    c.getDeathYear() +
+                    (Boolean.TRUE.equals(c.getIsDeathBc()) ? " BC" : "");
         }
         String lifespan = null;
         if (!born.isEmpty() || !died.isEmpty()) {
