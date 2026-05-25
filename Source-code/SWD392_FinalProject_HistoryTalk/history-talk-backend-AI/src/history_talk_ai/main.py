@@ -40,4 +40,4 @@ app.include_router(chat_router.router)
 
 @app.get("/health", tags=["Health"])
 async def health():
-    return {"status": "ok", "llm_provider": settings.LLM_PROVIDER, "llm_model": settings.LLM_MODEL}
+    return {"status": "ok", "llm_model": settings.LLM_MODEL}
