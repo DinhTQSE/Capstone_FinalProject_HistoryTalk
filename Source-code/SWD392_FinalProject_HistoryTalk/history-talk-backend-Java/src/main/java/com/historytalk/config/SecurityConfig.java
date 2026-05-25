@@ -114,7 +114,10 @@ public class SecurityConfig {
                         // Tiers listing is public (pricing page — no auth needed)
                         .requestMatchers(HttpMethod.POST, "/api/payments/payos/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/payos/webhook").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/payments/tiers").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/Historical-tell/api/payments/payos/webhook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/Historical-tell/api/payments/payos/webhook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/api/payments/tiers").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/Historical-tell/v1/api/payments/tiers").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/character-documents/**").permitAll()
