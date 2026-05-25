@@ -16,18 +16,18 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/v1/api/payments")
+@RequestMapping("/api/v1/payments")
 public class PaymentController {
     private final PaymentService paymentService;
 
     /**
      * Creates a PayOS payment link for the given tier.
-     * Requires authentication — the user's uid is read from the JWT via SecurityUtils.
+     * Requires authentication — the user's uid is read from the JWT via
+     * SecurityUtils.
      */
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<CreatePaymentResponse>> createCheckout(
-            @RequestBody CreatePaymentRequest request
-    ) throws Exception {
+            @RequestBody CreatePaymentRequest request) throws Exception {
         UUID uid = UUID.fromString(SecurityUtils.getUserId());
         CreatePaymentResponse response = paymentService.createPayOSCheckout(uid, request.getTierId());
         return ResponseEntity.ok(ApiResponse.success(response, "Payment checkout created successfully"));
