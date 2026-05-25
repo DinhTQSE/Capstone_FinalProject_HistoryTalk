@@ -112,11 +112,11 @@ public class SecurityConfig {
 
                         // Payment: webhook must be public (PayOS servers have no JWT)
                         // Tiers listing is public (pricing page — no auth needed)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/tiers").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/payos/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/payos/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/Historical-tell/api/payments/payos/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/Historical-tell/api/payments/payos/webhook").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/api/payments/tiers").permitAll()
                         .requestMatchers(HttpMethod.GET, "/Historical-tell/v1/api/payments/tiers").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
