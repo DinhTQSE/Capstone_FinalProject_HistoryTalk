@@ -5,6 +5,7 @@ import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +28,8 @@ public class AiServiceClient {
 
     public AiServiceClient(
             @Value("${AI_SERVICE_URL:http://localhost:8001}") String aiServiceUrl,
+            @Value("${AI_SERVICE_USERNAME:}") String aiServiceUsername,
+            @Value("${AI_SERVICE_PASSWORD:}") String aiServicePassword,
             ChatSessionRepository chatSessionRepository,
             AiMetricsService aiMetricsService,
             RestClient.Builder restClientBuilder) {
@@ -32,10 +37,19 @@ public class AiServiceClient {
         factory.setConnectTimeout(60000); // 60s
         factory.setReadTimeout(180000); // 3 minutes
 
-        this.restClient = restClientBuilder
+        RestClient.Builder builder = restClientBuilder
                 .requestFactory(factory)
-                .baseUrl(aiServiceUrl)
-                .build();
+                .baseUrl(aiServiceUrl);
+
+        // Add Basic Auth header if credentials are configured (e.g. Nginx auth_basic)
+        if (aiServiceUsername != null && !aiServiceUsername.isBlank()) {
+            String credentials = Base64.getEncoder().encodeToString(
+                    (aiServiceUsername + ":" + aiServicePassword).getBytes(StandardCharsets.UTF_8));
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + credentials);
+            log.info("AI service client configured with Basic Auth for user: {}", aiServiceUsername);
+        }
+
+        this.restClient = builder.build();
         this.chatSessionRepository = chatSessionRepository;
         this.aiMetricsService = aiMetricsService;
     }
