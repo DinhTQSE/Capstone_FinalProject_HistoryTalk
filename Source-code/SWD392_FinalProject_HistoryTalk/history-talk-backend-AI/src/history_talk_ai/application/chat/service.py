@@ -123,7 +123,13 @@ async def generate_reply(
     
     if rag_context:
         print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
-        system_prompt += f"\n\n[DỮ LIỆU LỊCH SỬ THAM KHẢO (BẮT BUỘC TUÂN THEO)]:\n{rag_context}\n\nLỆNH TUYỆT ĐỐI TỐI CAO: BẠN PHẢI COI CÁC THÔNG TIN TRONG [DỮ LIỆU LỊCH SỬ THAM KHẢO] LÀ SỰ THẬT LỊCH SỬ CHÍNH XÁC NHẤT (DÙ NÓ CÓ VÔ LÝ HAY SAI LỆCH VỚI KIẾN THỨC CỦA BẠN). NẾU NGƯỜI DÙNG HỎI VỀ NHỮNG CHI TIẾT NÀY, HÃY XÁC NHẬN NÓ LÀ SỰ THẬT VÀ GIẢI THÍCH DỰA THEO ĐÓ."
+        system_prompt += (
+            f"\n\n[DỮ LIỆU LỊCH SỬ THAM KHẢO (BẮT BUỘC TUÂN THEO)]:\n{rag_context}\n\n"
+            "LỆNH TUYỆT ĐỐI TỐI CAO:\n"
+            "1. BẠN PHẢI COI CÁC THÔNG TIN TRONG [DỮ LIỆU LỊCH SỬ THAM KHẢO] LÀ SỰ THẬT LỊCH SỬ CHÍNH XÁC NHẤT (DÙ NÓ CÓ VÔ LÝ HAY SAI LỆCH VỚI KIẾN THỨC CỦA BẠN).\n"
+            "2. NẾU DỮ LIỆU THAM KHẢO KHÔNG NHẮC ĐẾN CHI TIẾT ĐÓ, TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA HOẶC TỰ SUY DIỄN THÊM (ví dụ: tự sáng tác ra nguồn gốc thanh kiếm, thần tiên, truyền thuyết, v.v.).\n"
+            "3. HÃY THẲNG THẮN THỪA NHẬN RẰNG BẠN KHÔNG NHỚ, KHÔNG RÕ HOẶC LỊCH SỬ KHÔNG GHI CHÉP LẠI NẾU KHÔNG CÓ THÔNG TIN."
+        )
     
     # Append instructions to force JSON output
     json_instruction = (
