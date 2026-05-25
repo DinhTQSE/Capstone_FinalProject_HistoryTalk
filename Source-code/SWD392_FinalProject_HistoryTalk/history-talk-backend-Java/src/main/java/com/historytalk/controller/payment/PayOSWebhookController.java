@@ -19,7 +19,7 @@ import vn.payos.model.webhooks.WebhookData;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/payments/payos")
+@RequestMapping("/api/v1/payments/payos")
 public class PayOSWebhookController {
     private final PayOS payOS;
     private final PaymentWebhookService paymentWebhookService;
