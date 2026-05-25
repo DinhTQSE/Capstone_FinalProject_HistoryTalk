@@ -4,6 +4,8 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.payment.CreatePaymentRequest;
 import com.historytalk.dto.payment.CreatePaymentResponse;
 import com.historytalk.dto.payment.PaymentHistoryResponse;
+import com.historytalk.dto.payment.PayOSReturnRequest;
+import com.historytalk.dto.payment.PayOSReturnResponse;
 import com.historytalk.dto.payment.TierResponse;
 import com.historytalk.service.payment.PaymentService;
 import com.historytalk.utils.SecurityUtils;
@@ -52,5 +54,27 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<List<TierResponse>>> listTiers() {
         List<TierResponse> tiers = paymentService.listActiveTiers();
         return ResponseEntity.ok(ApiResponse.success(tiers, "Tiers retrieved successfully"));
+    }
+
+    /**
+     * Processes the PayOS return-URL callback forwarded by the frontend.
+     *
+     * When PayOS redirects the user's browser to cancelUrl or returnUrl, the
+     * frontend receives query params (code, id, cancel, status, orderCode) and
+     * must POST them here so the backend can update the order status for the UI
+     * without waiting for the async webhook.
+     *
+     * Requires authentication — the order ownership is validated against the
+     * authenticated user's uid so that users cannot update each other's orders.
+     *
+     * This endpoint does NOT upgrade the user's tier; that remains exclusively
+     * in the webhook path which performs HMAC verification.
+     */
+    @PostMapping("/payos/return")
+    public ResponseEntity<ApiResponse<PayOSReturnResponse>> handlePayOSReturn(
+            @RequestBody PayOSReturnRequest request) {
+        UUID uid = UUID.fromString(SecurityUtils.getUserId());
+        PayOSReturnResponse response = paymentService.handlePayOSReturn(uid, request);
+        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 }
