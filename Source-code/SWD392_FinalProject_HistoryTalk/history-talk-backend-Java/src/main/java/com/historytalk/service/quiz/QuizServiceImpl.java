@@ -204,7 +204,7 @@ public class QuizServiceImpl implements QuizService {
     public PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable, String role) {
         log.info("getAllQuizzesForStaff: search={}, era={}", search, era);
         EventEra eraEnum = parseEra(era);
-        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, isSystemAdmin(role), pageable);
+        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, isContentManager(role), pageable);
         return toPaginatedResponse(page.map(this::mapToStaffResponse));
     }
 
@@ -426,8 +426,13 @@ public class QuizServiceImpl implements QuizService {
         return ContentStatus.ACTIVE;
     }
 
-    private boolean isSystemAdmin(String role) {
-        return role != null && "SYSTEM_ADMIN".equalsIgnoreCase(role);
+    private boolean isContentManager(String role) {
+        return role != null && (
+                "CONTENT_ADMIN".equalsIgnoreCase(role)
+                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "STAFF".equalsIgnoreCase(role)
+                        || "ADMIN".equalsIgnoreCase(role)
+        );
     }
 
     private QuestionResponse mapToQuestionResponse(Question q) {
