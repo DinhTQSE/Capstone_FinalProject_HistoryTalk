@@ -24,6 +24,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByUserNameIgnoreCase(String userName);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE User u SET u.token = u.token - :tokensToDeduct WHERE u.uid = :userId")
+    int deductTokens(@Param("userId") UUID userId, @Param("tokensToDeduct") Integer tokensToDeduct);
+
     @Query("SELECT COUNT(u) FROM User u")
     long countAllUsers();
 

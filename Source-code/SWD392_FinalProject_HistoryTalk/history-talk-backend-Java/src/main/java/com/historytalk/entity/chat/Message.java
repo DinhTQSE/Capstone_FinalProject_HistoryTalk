@@ -56,6 +56,9 @@ public class Message {
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
 
+    @Column(name = "token")
+    private Integer token;
+
     @PrePersist
     void ensureDefaults() {
         if (this.isFromAi == null) {

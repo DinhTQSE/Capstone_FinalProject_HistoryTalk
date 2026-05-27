@@ -61,9 +61,18 @@ class ProcessDocumentRequest(BaseModel):
 
 # ── Response ──────────────────────────────────────────────────────────────────
 
+class TokenUsage(BaseModel):
+    provider: str = "ollama"
+    model: str = "qwen2.5:14b"
+    promptTokens: int = 0
+    completionTokens: int = 0
+    totalTokens: int = 0
+
+
 class ChatResponseData(BaseModel):
     message: str
     suggestedQuestions: List[str] = Field(default_factory=list)
+    tokenUsage: TokenUsage = Field(default_factory=TokenUsage)
 
 
 class ChatResponse(BaseModel):
@@ -73,6 +82,7 @@ class ChatResponse(BaseModel):
 
 class GenerateTitleResponseData(BaseModel):
     title: str
+    tokenUsage: TokenUsage = Field(default_factory=TokenUsage)
 
 
 class GenerateTitleResponse(BaseModel):

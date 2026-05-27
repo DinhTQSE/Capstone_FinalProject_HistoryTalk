@@ -37,6 +37,7 @@ public class MessageServiceImpl implements MessageService {
     private final ChatSessionRepository chatSessionRepository;
     private final AiServiceClient aiServiceClient;
     private final ObjectMapper objectMapper;
+    private final com.historytalk.repository.UserRepository userRepository;
 
     // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
@@ -78,6 +79,10 @@ public class MessageServiceImpl implements MessageService {
                 UUID.fromString(request.getSessionId()), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
+
+        if (session.getUser().getToken() <= 0) {
+            throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
+        }
 
         // Load existing history BEFORE saving new user message
         List<Message> existingMessages = messageRepository
@@ -121,13 +126,34 @@ public class MessageServiceImpl implements MessageService {
         String suggestedQuestionsJson = serializeSuggestedQuestions(aiResult.suggestedQuestions());
 
         // Save assistant message
+        Integer promptToken = 0;
+        Integer completionToken = 0;
+        Integer totalToken = 0;
+        if (aiResult.tokenUsage() != null) {
+            promptToken = aiResult.tokenUsage().promptTokens();
+            completionToken = aiResult.tokenUsage().completionTokens();
+            totalToken = aiResult.tokenUsage().totalTokens();
+        }
+
+        // Save prompt tokens to the User's message
+        savedUserMsg.setToken(promptToken);
+        messageRepository.save(savedUserMsg);
+
         Message assistantMsg = Message.builder()
                 .content(aiResult.message())
                 .isFromAi(true)
                 .suggestedQuestions(suggestedQuestionsJson)
                 .chatSession(session)
+                .token(completionToken)
                 .build();
         Message savedAssistantMsg = messageRepository.save(assistantMsg);
+
+        int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
+        if (totalToken != null && totalToken > 0) {
+            userRepository.deductTokens(session.getUser().getUid(), totalToken);
+            remainingTokens = Math.max(0, remainingTokens - totalToken);
+            session.getUser().setToken(remainingTokens);
+        }
 
         // Update session lastMessageAt
         session.setLastMessageAt(LocalDateTime.now());
@@ -149,6 +175,9 @@ public class MessageServiceImpl implements MessageService {
                 .userMessage(mapToMessageResponse(savedUserMsg))
                 .assistantMessage(mapToMessageResponse(savedAssistantMsg))
                 .suggestedQuestions(aiResult.suggestedQuestions())
+                .remainingTokens(remainingTokens)
+                .promptTokens(promptToken)
+                .completionTokens(completionToken)
                 .build();
     }
 
