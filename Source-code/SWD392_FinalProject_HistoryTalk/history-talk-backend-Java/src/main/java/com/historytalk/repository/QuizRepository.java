@@ -2,6 +2,7 @@ package com.historytalk.repository;
 
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.quiz.Quiz;
+import com.historytalk.repository.dashboard.DashboardTopQuizProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -69,4 +70,52 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
     @Query("SELECT q FROM Quiz q WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
     List<Quiz> findAllDeleted();
+
+    @Query("SELECT COUNT(q) FROM Quiz q")
+    long countAllQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.isPublished = true")
+    long countPublishedQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.isPublished = false")
+    long countDraftQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NOT NULL")
+    long countDeletedQuizzes();
+
+    @Query(value = """
+            SELECT CAST(q.quiz_id AS text) AS "quizId",
+                   q.title AS title,
+                   q.level AS level,
+                   COUNT(qs.session_id) AS "startedSessions",
+                   COUNT(qs.session_id) FILTER (WHERE qs.end_time IS NOT NULL) AS "completedSessions",
+                   COALESCE(AVG(
+                       CASE
+                           WHEN qs.end_time IS NOT NULL
+                            AND qs.score IS NOT NULL
+                            AND qc.question_count > 0
+                           THEN qs.score * 100.0 / qc.question_count
+                       END
+                   ), 0.0) AS "averageScorePercentage"
+            FROM quiz q
+            LEFT JOIN (
+                SELECT quiz_id, COUNT(*) AS question_count
+                FROM question
+                WHERE deleted_at IS NULL
+                GROUP BY quiz_id
+            ) qc ON qc.quiz_id = q.quiz_id
+            LEFT JOIN quiz_session qs
+              ON qs.quiz_id = q.quiz_id
+             AND qs.deleted_at IS NULL
+             AND qs.created_at >= :from
+             AND qs.created_at < :to
+            WHERE q.deleted_at IS NULL
+            GROUP BY q.quiz_id, q.title, q.level
+            ORDER BY "completedSessions" DESC, "startedSessions" DESC, q.title ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<DashboardTopQuizProjection> findTopQuizzesForDashboard(
+            @Param("from") java.time.LocalDateTime from,
+            @Param("to") java.time.LocalDateTime to,
+            @Param("limit") int limit);
 }

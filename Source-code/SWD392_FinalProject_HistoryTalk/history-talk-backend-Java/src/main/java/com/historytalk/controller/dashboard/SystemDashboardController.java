@@ -4,7 +4,11 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.dashboard.DashboardChatActivityResponse;
 import com.historytalk.dto.dashboard.DashboardContentSummaryResponse;
 import com.historytalk.dto.dashboard.DashboardOverviewResponse;
+import com.historytalk.dto.dashboard.DashboardPaymentResponse;
+import com.historytalk.dto.dashboard.DashboardQuizAnalyticsResponse;
+import com.historytalk.dto.dashboard.DashboardRevenueResponse;
 import com.historytalk.dto.dashboard.DashboardSystemHealthResponse;
+import com.historytalk.dto.dashboard.DashboardTierAnalyticsResponse;
 import com.historytalk.dto.dashboard.DashboardUserAnalyticsResponse;
 import com.historytalk.service.dashboard.SystemDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -88,6 +92,62 @@ public class SystemDashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getSystemHealth(),
                 "System health retrieved successfully"
+        ));
+    }
+
+    @GetMapping("/revenue")
+    @Operation(summary = "Get revenue analytics", description = "Returns revenue summary, order status counts, tier revenue, and revenue trend")
+    public ResponseEntity<ApiResponse<DashboardRevenueResponse>> getRevenue(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity) {
+        log.info("GET /api/v1/system-admin/dashboard/revenue - from: {}, to: {}, granularity: {}",
+                from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getRevenue(from, to, granularity),
+                "Revenue analytics retrieved successfully"
+        ));
+    }
+
+    @GetMapping("/payments")
+    @Operation(summary = "Get payment analytics", description = "Returns payment order status and payment transaction trend")
+    public ResponseEntity<ApiResponse<DashboardPaymentResponse>> getPayments(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity) {
+        log.info("GET /api/v1/system-admin/dashboard/payments - from: {}, to: {}, granularity: {}",
+                from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getPayments(from, to, granularity),
+                "Payment analytics retrieved successfully"
+        ));
+    }
+
+    @GetMapping("/tiers")
+    @Operation(summary = "Get tier analytics", description = "Returns tier usage, subscription, and purchase analytics")
+    public ResponseEntity<ApiResponse<DashboardTierAnalyticsResponse>> getTiers(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity) {
+        log.info("GET /api/v1/system-admin/dashboard/tiers - from: {}, to: {}, granularity: {}",
+                from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getTiers(from, to, granularity),
+                "Tier analytics retrieved successfully"
+        ));
+    }
+
+    @GetMapping("/quiz")
+    @Operation(summary = "Get quiz analytics", description = "Returns quiz inventory, quiz session trend, top quizzes, and wrong-answer analytics")
+    public ResponseEntity<ApiResponse<DashboardQuizAnalyticsResponse>> getQuiz(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity) {
+        log.info("GET /api/v1/system-admin/dashboard/quiz - from: {}, to: {}, granularity: {}",
+                from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getQuiz(from, to, granularity),
+                "Quiz analytics retrieved successfully"
         ));
     }
 }

@@ -3,8 +3,14 @@ package com.historytalk.service.dashboard;
 import com.historytalk.dto.dashboard.DashboardChatActivityResponse;
 import com.historytalk.dto.dashboard.DashboardContentSummaryResponse;
 import com.historytalk.dto.dashboard.DashboardOverviewResponse;
+import com.historytalk.dto.dashboard.DashboardPaymentResponse;
+import com.historytalk.dto.dashboard.DashboardQuizAnalyticsResponse;
+import com.historytalk.dto.dashboard.DashboardRevenueResponse;
 import com.historytalk.dto.dashboard.DashboardSystemHealthResponse;
+import com.historytalk.dto.dashboard.DashboardTierAnalyticsResponse;
 import com.historytalk.dto.dashboard.DashboardUserAnalyticsResponse;
+import com.historytalk.entity.enums.PaymentOrderStatus;
+import com.historytalk.entity.enums.PaymentTransactionStatus;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.CharacterRepository;
@@ -12,8 +18,23 @@ import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.MessageRepository;
+import com.historytalk.repository.QuizAnswerDetailRepository;
+import com.historytalk.repository.QuizRepository;
+import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.dashboard.DashboardPeriodRevenueProjection;
 import com.historytalk.repository.dashboard.DashboardPeriodCountProjection;
+import com.historytalk.repository.dashboard.DashboardQuizTrendProjection;
+import com.historytalk.repository.dashboard.DashboardStatusCountProjection;
+import com.historytalk.repository.dashboard.DashboardTierRevenueProjection;
+import com.historytalk.repository.dashboard.DashboardTierUsersProjection;
+import com.historytalk.repository.dashboard.DashboardTopQuizProjection;
+import com.historytalk.repository.dashboard.DashboardTopWrongQuestionProjection;
+import com.historytalk.repository.dashboard.DashboardTransactionTrendProjection;
+import com.historytalk.repository.payment.PaymentOrderRepository;
+import com.historytalk.repository.payment.PaymentTransactionRepository;
+import com.historytalk.repository.payment.TierRepository;
+import com.historytalk.repository.payment.UserTierRepository;
 import io.micrometer.core.instrument.Measurement;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -53,6 +74,13 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     private final DocumentRepository documentRepository;
     private final ChatSessionRepository chatSessionRepository;
     private final MessageRepository messageRepository;
+    private final PaymentOrderRepository paymentOrderRepository;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+    private final TierRepository tierRepository;
+    private final UserTierRepository userTierRepository;
+    private final QuizRepository quizRepository;
+    private final QuizSessionRepository quizSessionRepository;
+    private final QuizAnswerDetailRepository quizAnswerDetailRepository;
     private final MeterRegistry meterRegistry;
     private final ObjectProvider<HealthEndpoint> healthEndpointProvider;
 
@@ -198,6 +226,173 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 .build();
     }
 
+    @Override
+    public DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity) {
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+
+        long totalRevenue = toLong(paymentOrderRepository.sumAmountByStatus(PaymentOrderStatus.PAID));
+        long paidOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PAID);
+        long averageOrderValue = paidOrders == 0 ? 0 : totalRevenue / paidOrders;
+
+        Map<String, DashboardPeriodRevenueProjection> revenueByPeriod = toRevenuePeriodMap(
+                paymentOrderRepository.sumPaidRevenueByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+
+        List<DashboardRevenueResponse.RevenueTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> {
+                    DashboardPeriodRevenueProjection row = revenueByPeriod.get(period);
+                    return DashboardRevenueResponse.RevenueTrendPoint.builder()
+                            .date(period)
+                            .revenue(row == null ? 0L : toLong(row.getRevenue()))
+                            .paidOrders(row == null ? 0L : nullSafe(row.getPaidOrders()))
+                            .build();
+                })
+                .toList();
+
+        return DashboardRevenueResponse.builder()
+                .summary(DashboardRevenueResponse.RevenueSummary.builder()
+                        .totalRevenue(totalRevenue)
+                        .revenueToday(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
+                                PaymentOrderStatus.PAID, todayStart, tomorrowStart)))
+                        .revenueThisMonth(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
+                                PaymentOrderStatus.PAID, monthStart, tomorrowStart)))
+                        .paidOrders(paidOrders)
+                        .averageOrderValue(averageOrderValue)
+                        .build())
+                .ordersByStatus(buildOrderStatusCounts())
+                .revenueByTier(paymentOrderRepository.sumPaidRevenueByTier(range.fromDateTime(), range.toExclusive())
+                        .stream()
+                        .map(this::toRevenueByTier)
+                        .toList())
+                .trend(trend)
+                .build();
+    }
+
+    @Override
+    public DashboardPaymentResponse getPayments(LocalDate from, LocalDate to, String granularity) {
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+        Map<String, DashboardTransactionTrendProjection> transactionsByPeriod = toTransactionPeriodMap(
+                paymentTransactionRepository.countTransactionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+
+        long pendingOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PENDING);
+        long paidOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PAID);
+        long cancelledOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.CANCELLED);
+        long expiredOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.EXPIRED);
+        long failedOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.FAILED);
+
+        List<DashboardPaymentResponse.TransactionTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> {
+                    DashboardTransactionTrendProjection row = transactionsByPeriod.get(period);
+                    return DashboardPaymentResponse.TransactionTrendPoint.builder()
+                            .date(period)
+                            .success(row == null ? 0L : nullSafe(row.getSuccess()))
+                            .failed(row == null ? 0L : nullSafe(row.getFailed()))
+                            .build();
+                })
+                .toList();
+
+        return DashboardPaymentResponse.builder()
+                .summary(DashboardPaymentResponse.PaymentSummary.builder()
+                        .totalOrders(pendingOrders + paidOrders + cancelledOrders + expiredOrders + failedOrders)
+                        .pendingOrders(pendingOrders)
+                        .paidOrders(paidOrders)
+                        .cancelledOrders(cancelledOrders)
+                        .expiredOrders(expiredOrders)
+                        .failedOrders(failedOrders)
+                        .successfulTransactions(paymentTransactionRepository.countByDeletedAtIsNullAndStatus(
+                                PaymentTransactionStatus.SUCCESS))
+                        .failedTransactions(paymentTransactionRepository.countByDeletedAtIsNullAndStatus(
+                                PaymentTransactionStatus.FAILED))
+                        .build())
+                .transactionTrend(trend)
+                .build();
+    }
+
+    @Override
+    public DashboardTierAnalyticsResponse getTiers(LocalDate from, LocalDate to, String granularity) {
+        DateRange range = resolveDateRange(from, to);
+        LocalDateTime now = LocalDateTime.now();
+        long currentPaidUsers = tierRepository.countCurrentPaidCustomers();
+        long currentFreeUsers = tierRepository.countCurrentFreeCustomers();
+        long customerBase = currentPaidUsers + currentFreeUsers;
+
+        return DashboardTierAnalyticsResponse.builder()
+                .summary(DashboardTierAnalyticsResponse.TierSummary.builder()
+                        .activeTiers(tierRepository.countByIsActiveTrueAndDeletedAtIsNull())
+                        .currentPaidUsers(currentPaidUsers)
+                        .currentFreeUsers(currentFreeUsers)
+                        .activeSubscriptions(userTierRepository.countActiveSubscriptions(now))
+                        .expiringSoonSubscriptions(userTierRepository.countExpiringSoonSubscriptions(
+                                now, now.plusDays(7)))
+                        .freeToPaidConversionRate(percentage(
+                                paymentOrderRepository.countDistinctPaidCustomers(), customerBase))
+                        .build())
+                .usersByTier(tierRepository.countCustomerUsersByTier()
+                        .stream()
+                        .map(this::toUsersByTier)
+                        .toList())
+                .purchasesByTier(paymentOrderRepository.sumPaidRevenueByTier(range.fromDateTime(), range.toExclusive())
+                        .stream()
+                        .map(this::toPurchasesByTier)
+                        .toList())
+                .build();
+    }
+
+    @Override
+    public DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity) {
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+        long startedSessions = quizSessionRepository.countStartedSessions();
+        long completedSessions = quizSessionRepository.countCompletedSessions();
+
+        Map<String, DashboardQuizTrendProjection> sessionsByPeriod = toQuizPeriodMap(
+                quizSessionRepository.countSessionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+
+        List<DashboardQuizAnalyticsResponse.QuizSessionTrendPoint> trend = initializePeriods(
+                range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> {
+                    DashboardQuizTrendProjection row = sessionsByPeriod.get(period);
+                    return DashboardQuizAnalyticsResponse.QuizSessionTrendPoint.builder()
+                            .date(period)
+                            .started(row == null ? 0L : nullSafe(row.getStarted()))
+                            .completed(row == null ? 0L : nullSafe(row.getCompleted()))
+                            .build();
+                })
+                .toList();
+
+        return DashboardQuizAnalyticsResponse.builder()
+                .summary(DashboardQuizAnalyticsResponse.QuizSummary.builder()
+                        .totalQuizzes(quizRepository.countAllQuizzes())
+                        .publishedQuizzes(quizRepository.countPublishedQuizzes())
+                        .draftQuizzes(quizRepository.countDraftQuizzes())
+                        .deletedQuizzes(quizRepository.countDeletedQuizzes())
+                        .startedSessions(startedSessions)
+                        .completedSessions(completedSessions)
+                        .completionRate(percentage(completedSessions, startedSessions))
+                        .averageScorePercentage(nullSafe(quizSessionRepository.averageScorePercentage()))
+                        .build())
+                .sessionsTrend(trend)
+                .topQuizzes(quizRepository.findTopQuizzesForDashboard(
+                                range.fromDateTime(), range.toExclusive(), 5)
+                        .stream()
+                        .map(this::toTopQuiz)
+                        .toList())
+                .topWrongQuestions(quizAnswerDetailRepository.findTopWrongQuestionsForDashboard(
+                                range.fromDateTime(), range.toExclusive(), 5)
+                        .stream()
+                        .map(this::toTopWrongQuestion)
+                        .toList())
+                .build();
+    }
+
     private DashboardOverviewResponse.RoleOverview buildRoleOverview() {
         return DashboardOverviewResponse.RoleOverview.builder()
                 .customers(userRepository.countActiveUsersByRole(UserRole.CUSTOMER))
@@ -302,6 +497,116 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
             result.put(row.getPeriod(), row.getCount() == null ? 0L : row.getCount());
         }
         return result;
+    }
+
+    private Map<String, DashboardPeriodRevenueProjection> toRevenuePeriodMap(
+            List<DashboardPeriodRevenueProjection> rows) {
+        Map<String, DashboardPeriodRevenueProjection> result = new LinkedHashMap<>();
+        for (DashboardPeriodRevenueProjection row : rows) {
+            result.put(row.getPeriod(), row);
+        }
+        return result;
+    }
+
+    private Map<String, DashboardTransactionTrendProjection> toTransactionPeriodMap(
+            List<DashboardTransactionTrendProjection> rows) {
+        Map<String, DashboardTransactionTrendProjection> result = new LinkedHashMap<>();
+        for (DashboardTransactionTrendProjection row : rows) {
+            result.put(row.getPeriod(), row);
+        }
+        return result;
+    }
+
+    private Map<String, DashboardQuizTrendProjection> toQuizPeriodMap(List<DashboardQuizTrendProjection> rows) {
+        Map<String, DashboardQuizTrendProjection> result = new LinkedHashMap<>();
+        for (DashboardQuizTrendProjection row : rows) {
+            result.put(row.getPeriod(), row);
+        }
+        return result;
+    }
+
+    private List<DashboardRevenueResponse.StatusCount> buildOrderStatusCounts() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (PaymentOrderStatus status : PaymentOrderStatus.values()) {
+            counts.put(status.name(), 0L);
+        }
+        for (DashboardStatusCountProjection row : paymentOrderRepository.countOrdersByStatus()) {
+            counts.put(row.getStatus(), nullSafe(row.getCount()));
+        }
+        return counts.entrySet().stream()
+                .map(entry -> DashboardRevenueResponse.StatusCount.builder()
+                        .status(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .toList();
+    }
+
+    private DashboardRevenueResponse.RevenueByTier toRevenueByTier(DashboardTierRevenueProjection row) {
+        return DashboardRevenueResponse.RevenueByTier.builder()
+                .tierId(row.getTierId())
+                .tierTitle(row.getTierTitle())
+                .revenue(toLong(row.getRevenue()))
+                .paidOrders(nullSafe(row.getPaidOrders()))
+                .build();
+    }
+
+    private DashboardTierAnalyticsResponse.PurchasesByTier toPurchasesByTier(DashboardTierRevenueProjection row) {
+        return DashboardTierAnalyticsResponse.PurchasesByTier.builder()
+                .tierId(row.getTierId())
+                .tierTitle(row.getTierTitle())
+                .revenue(toLong(row.getRevenue()))
+                .paidOrders(nullSafe(row.getPaidOrders()))
+                .build();
+    }
+
+    private DashboardTierAnalyticsResponse.UsersByTier toUsersByTier(DashboardTierUsersProjection row) {
+        return DashboardTierAnalyticsResponse.UsersByTier.builder()
+                .tierId(row.getTierId())
+                .tierTitle(row.getTierTitle())
+                .users(nullSafe(row.getUsers()))
+                .build();
+    }
+
+    private DashboardQuizAnalyticsResponse.TopQuiz toTopQuiz(DashboardTopQuizProjection row) {
+        return DashboardQuizAnalyticsResponse.TopQuiz.builder()
+                .quizId(row.getQuizId())
+                .title(row.getTitle())
+                .level(row.getLevel())
+                .startedSessions(nullSafe(row.getStartedSessions()))
+                .completedSessions(nullSafe(row.getCompletedSessions()))
+                .averageScorePercentage(nullSafe(row.getAverageScorePercentage()))
+                .build();
+    }
+
+    private DashboardQuizAnalyticsResponse.TopWrongQuestion toTopWrongQuestion(
+            DashboardTopWrongQuestionProjection row) {
+        return DashboardQuizAnalyticsResponse.TopWrongQuestion.builder()
+                .questionId(row.getQuestionId())
+                .quizId(row.getQuizId())
+                .quizTitle(row.getQuizTitle())
+                .wrongAnswers(nullSafe(row.getWrongAnswers()))
+                .totalAnswers(nullSafe(row.getTotalAnswers()))
+                .wrongRate(nullSafe(row.getWrongRate()) * 100.0)
+                .build();
+    }
+
+    private long toLong(Number value) {
+        return value == null ? 0L : value.longValue();
+    }
+
+    private long nullSafe(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private double nullSafe(Double value) {
+        return value == null ? 0.0 : value;
+    }
+
+    private double percentage(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return 0.0;
+        }
+        return numerator * 100.0 / denominator;
     }
 
     private List<String> initializePeriods(LocalDate from, LocalDate to, String bucket) {
