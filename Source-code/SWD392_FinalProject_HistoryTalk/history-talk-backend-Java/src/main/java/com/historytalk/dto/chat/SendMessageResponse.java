@@ -21,4 +21,10 @@ public class SendMessageResponse {
 
     @JsonProperty("remainingTokens")
     private Integer remainingTokens;
+
+    @JsonProperty("promptTokens")
+    private Integer promptTokens;
+
+    @JsonProperty("completionTokens")
+    private Integer completionTokens;
 }

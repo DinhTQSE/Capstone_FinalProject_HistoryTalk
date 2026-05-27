@@ -176,6 +176,8 @@ public class MessageServiceImpl implements MessageService {
                 .assistantMessage(mapToMessageResponse(savedAssistantMsg))
                 .suggestedQuestions(aiResult.suggestedQuestions())
                 .remainingTokens(remainingTokens)
+                .promptTokens(promptToken)
+                .completionTokens(completionToken)
                 .build();
     }
 
