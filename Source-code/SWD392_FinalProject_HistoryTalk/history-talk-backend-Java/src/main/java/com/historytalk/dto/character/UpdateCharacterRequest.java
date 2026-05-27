@@ -28,6 +28,10 @@ public class UpdateCharacterRequest {
     @Size(max = 255, message = "Image URL must not exceed 255 characters")
     private String imageUrl;
 
+    @JsonProperty("modelUrl")
+    @Size(max = 500, message = "3D model URL must not exceed 500 characters")
+    private String modelUrl;
+
     @JsonProperty("personality")
     @Size(max = 500, message = "Personality must not exceed 500 characters")
     private String personality;

@@ -204,7 +204,7 @@ public class QuizServiceImpl implements QuizService {
     public PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable, String role) {
         log.info("getAllQuizzesForStaff: search={}, era={}", search, era);
         EventEra eraEnum = parseEra(era);
-        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, isContentManager(role), pageable);
+        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, false, pageable);
         return toPaginatedResponse(page.map(this::mapToStaffResponse));
     }
 
@@ -411,7 +411,6 @@ public class QuizServiceImpl implements QuizService {
                 .updatedDate(quiz.getUpdatedAt())
                 .isPublished(quiz.getIsPublished())
                 .status(buildStatus(quiz.getIsPublished(), quiz.getDeletedAt()))
-                .deletedAt(quiz.getDeletedAt())
                 .questions(questions.stream().map(this::mapToQuestionResponse).collect(Collectors.toList()))
                 .build();
     }

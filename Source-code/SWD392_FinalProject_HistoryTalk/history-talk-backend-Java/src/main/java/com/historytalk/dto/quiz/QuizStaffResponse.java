@@ -47,8 +47,5 @@ public class QuizStaffResponse {
 
     private ContentStatus status;
 
-    /** null if not soft-deleted */
-    private LocalDateTime deletedAt;
-
     private List<QuestionResponse> questions;
 }
