@@ -56,7 +56,7 @@ public class CharacterServiceImpl implements CharacterService {
         int pageSize = Math.min(limit, 20);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), pageSize);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, includeDeleted, pageable);
         return PaginatedResponse.<CharacterResponse>builder()
                 .content(result.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()))
@@ -89,7 +89,7 @@ public class CharacterServiceImpl implements CharacterService {
     public List<CharacterResponse> getCharactersByContext(String contextId, String role) {
         log.info("Fetching characters for context: {}", contextId);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
                 .stream()
                 .map(this::mapToResponse)
@@ -115,6 +115,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .title(request.getTitle())
                 .background(request.getBackground())
                 .imageUrl(request.getImageUrl())
+                .modelUrl(request.getModelUrl())
                 .personality(request.getPersonality())
                 .bornYear(request.getBornYear())
                 .bornMonth(request.getBornMonth())
@@ -162,6 +163,9 @@ public class CharacterServiceImpl implements CharacterService {
         }
         if (request.getImageUrl() != null) {
             character.setImageUrl(request.getImageUrl());
+        }
+        if (request.getModelUrl() != null) {
+            character.setModelUrl(request.getModelUrl());
         }
         if (request.getPersonality() != null) {
             character.setPersonality(request.getPersonality());
@@ -344,6 +348,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .title(character.getTitle())
                 .background(character.getBackground())
                 .imageUrl(character.getImageUrl())
+                .modelUrl(character.getModelUrl())
                 .personality(character.getPersonality())
                 .bornYear(character.getBornYear())
                 .bornMonth(character.getBornMonth())
@@ -354,7 +359,6 @@ public class CharacterServiceImpl implements CharacterService {
                 .deathDay(character.getDeathDay())
                 .isDeathBc(character.getIsDeathBc())
                 .isPublished(character.getIsPublished())
-                .deletedAt(character.getDeletedAt())
                 .status(buildStatus(character.getIsPublished(), character.getDeletedAt()))
             .era(ctx != null ? ctx.getEra() : null)
                 .events(events)

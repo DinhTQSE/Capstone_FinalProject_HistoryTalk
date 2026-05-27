@@ -32,6 +32,9 @@ public class CharacterResponse {
     @JsonProperty("image")
     private String imageUrl;
 
+    @JsonProperty("modelUrl")
+    private String modelUrl;
+
     @JsonProperty("personality")
     private String personality;
 
@@ -79,9 +82,6 @@ public class CharacterResponse {
 
     @JsonProperty("createdBy")
     private StaffInfo createdBy;
-
-    @JsonProperty("deletedAt")
-    private LocalDateTime deletedAt;
 
     @JsonProperty("createdDate")
     private LocalDateTime createdDate;

@@ -47,7 +47,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         Page<HistoricalContext> page = contextRepository
             .findAllWithSearch(normalize(search), era, category, includeDraft, includeDeleted, pageable);
         
@@ -61,7 +61,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     public List<HistoricalContextResponse> getAllContextsSimple(String search, String role) {
         log.info("Fetching all historical contexts with search: {}", search);
         boolean includeDraft = isStaffOrAdmin(role);
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         return contextRepository
                 .findAllSimple(normalize(search), includeDraft, includeDeleted)
                 .stream()
@@ -322,7 +322,6 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         .build())
                 .createdDate(context.getCreatedDate())
                 .updatedDate(context.getUpdatedDate())
-                .deletedAt(context.getDeletedAt())
                 .build();
     }
 
