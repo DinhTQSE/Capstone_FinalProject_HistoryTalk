@@ -1,16 +1,21 @@
 package com.historytalk.controller.payment;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.payment.AdminPaymentHistoryResponse;
 import com.historytalk.dto.payment.CreatePaymentRequest;
 import com.historytalk.dto.payment.CreatePaymentResponse;
 import com.historytalk.dto.payment.PaymentHistoryResponse;
 import com.historytalk.dto.payment.PayOSReturnRequest;
 import com.historytalk.dto.payment.PayOSReturnResponse;
 import com.historytalk.dto.payment.TierResponse;
+import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.service.payment.PaymentService;
 import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,14 +41,32 @@ public class PaymentController {
     }
 
     /**
-     * Returns the authenticated user's full payment order history, newest first.
-     * Requires authentication.
+     * Returns the authenticated customer's own payment order history, newest first.
+     * Requires CUSTOMER role.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<List<PaymentHistoryResponse>>> getMyPaymentHistory() {
+        UUID uid = UUID.fromString(SecurityUtils.getUserId());
+        List<PaymentHistoryResponse> history = paymentService.getMyPaymentHistory(uid);
+        return ResponseEntity.ok(ApiResponse.success(history, "Payment history retrieved successfully"));
+    }
+
+    /**
+     * Returns all customers' payment order history for SYSTEM_ADMIN.
+     * Optional query params: status, userId.
+     * Results are paginated (page 0-indexed, default size 20), newest first.
      */
     @GetMapping("/history")
-    public ResponseEntity<ApiResponse<List<PaymentHistoryResponse>>> getPaymentHistory() {
-        UUID uid = UUID.fromString(SecurityUtils.getUserId());
-        List<PaymentHistoryResponse> history = paymentService.getPaymentHistory(uid);
-        return ResponseEntity.ok(ApiResponse.success(history, "Payment history retrieved successfully"));
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<PaginatedResponse<AdminPaymentHistoryResponse>>> getAllPaymentHistory(
+            @RequestParam(required = false) PaymentOrderStatus status,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        var pageable = PageRequest.of(page, size);
+        var data = paymentService.getAllPaymentHistory(status, userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(data, "Payment history retrieved successfully"));
     }
 
     /**

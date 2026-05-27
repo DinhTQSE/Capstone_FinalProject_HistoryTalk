@@ -1,6 +1,8 @@
 package com.historytalk.service.payment;
 
 import com.historytalk.config.PayOSConfig;
+import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.payment.AdminPaymentHistoryResponse;
 import com.historytalk.dto.payment.CreatePaymentResponse;
 import com.historytalk.dto.payment.PaymentHistoryResponse;
 import com.historytalk.dto.payment.PayOSReturnRequest;
@@ -17,6 +19,8 @@ import com.historytalk.repository.payment.TierRepository;
 import com.historytalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.PayOS;
@@ -107,10 +111,11 @@ public class PaymentService {
     }
 
     /**
-     * Returns the authenticated user's payment order history, newest first.
+     * Returns the authenticated customer's own payment order history, newest first.
+     * Called from GET /api/v1/payments/me.
      */
     @Transactional(readOnly = true)
-    public List<PaymentHistoryResponse> getPaymentHistory(UUID uid) {
+    public List<PaymentHistoryResponse> getMyPaymentHistory(UUID uid) {
         List<PaymentOrder> orders = paymentOrderRepository.findByUser_UidOrderByCreatedAtDesc(uid);
 
         return orders.stream()
@@ -127,6 +132,50 @@ public class PaymentService {
                         .expiredAt(o.getExpiredAt() != null ? o.getExpiredAt().toString() : null)
                         .build())
                 .toList();
+    }
+
+    /**
+     * Returns all customers' payment order history for SYSTEM_ADMIN.
+     * Called from GET /api/v1/payments/history.
+     *
+     * Both filters are optional — pass null to omit.
+     * Results are paginated, newest first.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminPaymentHistoryResponse> getAllPaymentHistory(
+            PaymentOrderStatus status,
+            UUID userId,
+            Pageable pageable) {
+
+        Page<PaymentOrder> page = paymentOrderRepository.findAllForAdmin(status, userId, pageable);
+
+        List<AdminPaymentHistoryResponse> content = page.getContent().stream()
+                .map(o -> AdminPaymentHistoryResponse.builder()
+                        .orderId(o.getOrderId().toString())
+                        .orderCode(o.getOrderCode())
+                        .tierId(o.getTier().getTierId().toString())
+                        .tierTitle(o.getTier().getTitle())
+                        .amount(o.getAmount())
+                        .status(o.getStatus().name())
+                        .paymentLinkId(o.getPaymentLinkId())
+                        .createdAt(o.getCreatedAt() != null ? o.getCreatedAt().toString() : null)
+                        .paidAt(o.getPaidAt() != null ? o.getPaidAt().toString() : null)
+                        .expiredAt(o.getExpiredAt() != null ? o.getExpiredAt().toString() : null)
+                        .userId(o.getUser().getUid().toString())
+                        .userName(o.getUser().getUserName())
+                        .userEmail(o.getUser().getEmail())
+                        .build())
+                .toList();
+
+        return PaginatedResponse.<AdminPaymentHistoryResponse>builder()
+                .content(content)
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .currentPage(page.getNumber())
+                .pageSize(page.getSize())
+                .hasNext(page.hasNext())
+                .hasPrevious(page.hasPrevious())
+                .build();
     }
 
     /**
