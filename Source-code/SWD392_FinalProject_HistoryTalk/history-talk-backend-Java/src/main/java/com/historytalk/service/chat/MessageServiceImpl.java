@@ -148,8 +148,11 @@ public class MessageServiceImpl implements MessageService {
                 .build();
         Message savedAssistantMsg = messageRepository.save(assistantMsg);
 
+        int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
         if (totalToken != null && totalToken > 0) {
             userRepository.deductTokens(session.getUser().getUid(), totalToken);
+            remainingTokens = Math.max(0, remainingTokens - totalToken);
+            session.getUser().setToken(remainingTokens);
         }
 
         // Update session lastMessageAt
@@ -172,6 +175,7 @@ public class MessageServiceImpl implements MessageService {
                 .userMessage(mapToMessageResponse(savedUserMsg))
                 .assistantMessage(mapToMessageResponse(savedAssistantMsg))
                 .suggestedQuestions(aiResult.suggestedQuestions())
+                .remainingTokens(remainingTokens)
                 .build();
     }
 

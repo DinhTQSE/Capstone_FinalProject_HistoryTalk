@@ -18,4 +18,7 @@ public class SendMessageResponse {
 
     @JsonProperty("suggestedQuestions")
     private List<String> suggestedQuestions;
+
+    @JsonProperty("remainingTokens")
+    private Integer remainingTokens;
 }

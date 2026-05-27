@@ -159,6 +159,9 @@ public class AiServiceClient {
             if (response == null || response.data() == null) {
                 throw new SystemException("Empty response from AI service");
             }
+            
+            log.info("Received from Python AI: tokenUsage={}", response.data().tokenUsage());
+            
             aiMetricsService.recordRequest("chat", "success");
             aiMetricsService.recordTokens(response.data().tokenUsage());
             return new AiChatResult(response.data().message(), response.data().suggestedQuestions(), response.data().tokenUsage());
