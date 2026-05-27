@@ -93,7 +93,7 @@ class ChatSessionServiceImplTest {
             return session;
         });
         when(aiServiceClient.chat(anyString(), anyString(), anyString(), anyList(), any(), any()))
-                .thenReturn(new AiServiceClient.AiChatResult("Xin chao", List.of()));
+                .thenReturn(new AiServiceClient.AiChatResult("Xin chao", List.of(), null));
 
         ChatSessionResponse response = chatSessionService.createSession(userId.toString(), "USER", request);
 
