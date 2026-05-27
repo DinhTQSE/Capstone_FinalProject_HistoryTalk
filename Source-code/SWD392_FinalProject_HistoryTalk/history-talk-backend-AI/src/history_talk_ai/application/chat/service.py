@@ -223,7 +223,6 @@ async def process_document(request: ProcessDocumentRequest):
     except Exception as e:
         logger.error(f"Failed to delete old chunks for doc {request.doc_id}: {e}")
 
-    # Chunking logic (overlap to prevent cutting sentences in half)
     content = request.content
     chunk_size = 600
     overlap = 150
@@ -232,10 +231,34 @@ async def process_document(request: ProcessDocumentRequest):
     if len(content) <= chunk_size:
         chunks = [content]
     else:
-        for i in range(0, len(content), chunk_size - overlap):
-            chunks.append(content[i:i+chunk_size])
-            if i + chunk_size >= len(content):
+        start = 0
+        while start < len(content):
+            end = start + chunk_size
+            if end >= len(content):
+                chunks.append(content[start:])
                 break
+            
+            # Find the last period, newline, or space to avoid cutting words
+            last_period = content.rfind('.', start, end)
+            last_newline = content.rfind('\n', start, end)
+            last_space = content.rfind(' ', start, end)
+            
+            # Prefer splitting at a period or newline, otherwise space
+            split_at = max(last_period, last_newline)
+            if split_at <= start + chunk_size // 2: # If no good punctuation in the second half, fallback to space
+                split_at = last_space
+                
+            if split_at <= start: # Fallback if no space at all
+                split_at = end
+            else:
+                split_at += 1 # Include the space or punctuation in the current chunk
+                
+            chunks.append(content[start:split_at].strip())
+            start = split_at - overlap
+            
+            # Ensure we always move forward
+            if start <= chunks[-1].rfind(' ', 0, len(chunks[-1]) - overlap):
+                 start = split_at - overlap
     
     for idx, chunk_text in enumerate(chunks):
         embedding = await get_embedding_from_ollama(chunk_text)
