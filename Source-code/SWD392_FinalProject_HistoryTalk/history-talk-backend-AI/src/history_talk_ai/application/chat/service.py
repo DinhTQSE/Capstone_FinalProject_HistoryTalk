@@ -129,9 +129,9 @@ async def generate_reply(
         system_prompt += (
             f"\n\n[DỮ LIỆU LỊCH SỬ THAM KHẢO (BẮT BUỘC TUÂN THEO)]:\n{rag_context}\n\n"
             "LỆNH TUYỆT ĐỐI TỐI CAO:\n"
-            "1. BẠN PHẢI COI CÁC THÔNG TIN TRONG [DỮ LIỆU LỊCH SỬ THAM KHẢO] LÀ SỰ THẬT LỊCH SỬ CHÍNH XÁC NHẤT (DÙ NÓ CÓ VÔ LÝ HAY SAI LỆCH VỚI KIẾN THỨC CỦA BẠN).\n"
-            "2. NẾU DỮ LIỆU THAM KHẢO KHÔNG NHẮC ĐẾN CHI TIẾT ĐÓ, TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA HOẶC TỰ SUY DIỄN THÊM (ví dụ: tự sáng tác ra nguồn gốc thanh kiếm, thần tiên, truyền thuyết, v.v.).\n"
-            "3. HÃY THẲNG THẮN THỪA NHẬN RẰNG BẠN KHÔNG NHỚ, KHÔNG RÕ HOẶC LỊCH SỬ KHÔNG GHI CHÉP LẠI NẾU KHÔNG CÓ THÔNG TIN."
+            "1. BẠN PHẢI COI CÁC THÔNG TIN TRONG [DỮ LIỆU LỊCH SỬ THAM KHẢO] LÀ SỰ THẬT LỊCH SỬ CHÍNH XÁC NHẤT. Nếu thông tin này mâu thuẫn với lịch sử trò chuyện (message history) hoặc kiến thức cũ của bạn, BẠN BẮT BUỘC PHẢI ƯU TIÊN VÀ SỬ DỤNG DỮ LIỆU THAM KHẢO ĐỂ TRẢ LỜI/ĐÍNH CHÍNH LẠI.\n"
+            "2. Bám sát từng chữ trong Dữ liệu tham khảo để trả lời. TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA HOẶC TỰ SUY DIỄN THÊM (ví dụ: tự sáng tác ra bánh nếp, nguồn gốc thanh kiếm, thần tiên, truyền thuyết, v.v.).\n"
+            "3. HÃY THẲNG THẮN THỪA NHẬN RẰNG BẠN KHÔNG NHỚ, KHÔNG RÕ HOẶC LỊCH SỬ KHÔNG GHI CHÉP LẠI NẾU KHÔNG CÓ THÔNG TIN TRONG DỮ LIỆU THAM KHẢO."
         )
     
     # Append instructions to force JSON output
@@ -254,11 +254,27 @@ async def process_document(request: ProcessDocumentRequest):
                 split_at += 1 # Include the space or punctuation in the current chunk
                 
             chunks.append(content[start:split_at].strip())
-            start = split_at - overlap
             
-            # Ensure we always move forward
-            if start <= chunks[-1].rfind(' ', 0, len(chunks[-1]) - overlap):
-                 start = split_at - overlap
+            # Determine the start of the next chunk (overlap)
+            next_start = split_at - overlap
+            if next_start > start:
+                # Try to find a period to start the next chunk cleanly
+                period_after = content.find('.', next_start, split_at)
+                if period_after != -1 and period_after < split_at - 20:
+                    start = period_after + 1
+                else:
+                    # Fallback to the next space
+                    space_after = content.find(' ', next_start, split_at)
+                    if space_after != -1:
+                        start = space_after + 1
+                    else:
+                        start = next_start
+            else:
+                start = split_at
+                
+            # Strip leading spaces for the next chunk's start
+            while start < len(content) and content[start].isspace():
+                start += 1
     
     for idx, chunk_text in enumerate(chunks):
         embedding = await get_embedding_from_ollama(chunk_text)
