@@ -1022,7 +1022,7 @@ XÃ³a cÃ¢u há»i. Response `200`.
 
 ## 11. System Dashboard - System Admin
 
-> Plan A only. Revenue, payment, tier analytics, token usage, AI cost, and quiz analytics are not included yet.
+> Includes Plan A and Plan B Phase 2A. Token usage and AI cost are not included yet because the Python AI service does not return `tokenUsage` yet.
 
 All endpoints require:
 
@@ -1243,6 +1243,204 @@ Lightweight backend health for the in-app dashboard. Grafana remains the detaile
   "timestamp": "2026-05-23T13:00:00"
 }
 ```
+
+### `GET /system-admin/dashboard/revenue`
+
+Revenue analytics from paid payment orders.
+
+**Query params:**
+
+| Param | Type | Required | Default | Notes |
+|---|---|---:|---|---|
+| `from` | date `YYYY-MM-DD` | no | `to - 29 days` | Inclusive |
+| `to` | date `YYYY-MM-DD` | no | today | Inclusive |
+| `granularity` | `day` \| `week` \| `month` | no | `day` | Max range: 180 days |
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "message": "Revenue analytics retrieved successfully",
+  "data": {
+    "summary": {
+      "totalRevenue": 0,
+      "revenueToday": 0,
+      "revenueThisMonth": 0,
+      "paidOrders": 0,
+      "averageOrderValue": 0
+    },
+    "ordersByStatus": [
+      { "status": "PENDING", "count": 0 },
+      { "status": "PAID", "count": 0 },
+      { "status": "CANCELLED", "count": 0 },
+      { "status": "EXPIRED", "count": 0 },
+      { "status": "FAILED", "count": 0 }
+    ],
+    "revenueByTier": [
+      {
+        "tierId": "00000000-0000-0000-0000-000000000002",
+        "tierTitle": "plus",
+        "revenue": 0,
+        "paidOrders": 0
+      }
+    ],
+    "trend": [
+      { "date": "2026-05-27", "revenue": 0, "paidOrders": 0 }
+    ]
+  },
+  "timestamp": "2026-05-27T13:00:00"
+}
+```
+
+Notes:
+
+- Revenue only counts `payment_order.status = PAID`.
+- Revenue trend uses `payment_order.paid_at`.
+- Amount values are VND integers.
+
+### `GET /system-admin/dashboard/payments`
+
+Payment order and transaction analytics.
+
+**Query params:**
+
+| Param | Type | Required | Default | Notes |
+|---|---|---:|---|---|
+| `from` | date `YYYY-MM-DD` | no | `to - 29 days` | Inclusive |
+| `to` | date `YYYY-MM-DD` | no | today | Inclusive |
+| `granularity` | `day` \| `week` \| `month` | no | `day` | Max range: 180 days |
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "message": "Payment analytics retrieved successfully",
+  "data": {
+    "summary": {
+      "totalOrders": 0,
+      "pendingOrders": 0,
+      "paidOrders": 0,
+      "cancelledOrders": 0,
+      "expiredOrders": 0,
+      "failedOrders": 0,
+      "successfulTransactions": 0,
+      "failedTransactions": 0
+    },
+    "transactionTrend": [
+      { "date": "2026-05-27", "success": 0, "failed": 0 }
+    ]
+  },
+  "timestamp": "2026-05-27T13:00:00"
+}
+```
+
+### `GET /system-admin/dashboard/tiers`
+
+Tier/package analytics.
+
+**Query params:**
+
+| Param | Type | Required | Default | Notes |
+|---|---|---:|---|---|
+| `from` | date `YYYY-MM-DD` | no | `to - 29 days` | Inclusive, used for purchase stats |
+| `to` | date `YYYY-MM-DD` | no | today | Inclusive |
+| `granularity` | `day` \| `week` \| `month` | no | `day` | Accepted for consistency |
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "message": "Tier analytics retrieved successfully",
+  "data": {
+    "summary": {
+      "activeTiers": 0,
+      "currentPaidUsers": 0,
+      "currentFreeUsers": 0,
+      "activeSubscriptions": 0,
+      "expiringSoonSubscriptions": 0,
+      "freeToPaidConversionRate": 0.0
+    },
+    "usersByTier": [
+      { "tierId": "00000000-0000-0000-0000-000000000001", "tierTitle": "free", "users": 0 }
+    ],
+    "purchasesByTier": [
+      { "tierId": "00000000-0000-0000-0000-000000000002", "tierTitle": "plus", "paidOrders": 0, "revenue": 0 }
+    ]
+  },
+  "timestamp": "2026-05-27T13:00:00"
+}
+```
+
+Notes:
+
+- `freeToPaidConversionRate` is a percentage from `0` to `100`.
+- Current tier uses `user.tier_id`.
+- Active subscriptions use `user_tier`.
+
+### `GET /system-admin/dashboard/quiz`
+
+Quiz analytics.
+
+**Query params:**
+
+| Param | Type | Required | Default | Notes |
+|---|---|---:|---|---|
+| `from` | date `YYYY-MM-DD` | no | `to - 29 days` | Inclusive |
+| `to` | date `YYYY-MM-DD` | no | today | Inclusive |
+| `granularity` | `day` \| `week` \| `month` | no | `day` | Max range: 180 days |
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "message": "Quiz analytics retrieved successfully",
+  "data": {
+    "summary": {
+      "totalQuizzes": 0,
+      "publishedQuizzes": 0,
+      "draftQuizzes": 0,
+      "deletedQuizzes": 0,
+      "startedSessions": 0,
+      "completedSessions": 0,
+      "completionRate": 0.0,
+      "averageScorePercentage": 0.0
+    },
+    "sessionsTrend": [
+      { "date": "2026-05-27", "started": 0, "completed": 0 }
+    ],
+    "topQuizzes": [
+      {
+        "quizId": "uuid",
+        "title": "string",
+        "level": "EASY",
+        "startedSessions": 0,
+        "completedSessions": 0,
+        "averageScorePercentage": 0.0
+      }
+    ],
+    "topWrongQuestions": [
+      {
+        "questionId": "uuid",
+        "quizId": "uuid",
+        "quizTitle": "string",
+        "wrongAnswers": 0,
+        "totalAnswers": 0,
+        "wrongRate": 0.0
+      }
+    ]
+  },
+  "timestamp": "2026-05-27T13:00:00"
+}
+```
+
+Notes:
+
+- `completionRate`, `averageScorePercentage`, and `wrongRate` are percentages from `0` to `100`.
+- Completed sessions are sessions where `end_time` is not null.
 
 ### Errors
 
