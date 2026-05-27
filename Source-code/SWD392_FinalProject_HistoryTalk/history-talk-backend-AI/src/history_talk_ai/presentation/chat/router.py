@@ -11,6 +11,7 @@ from history_talk_ai.presentation.chat.schemas import (
     GenerateTitleResponse,
     GenerateTitleResponseData,
     ProcessDocumentRequest,
+    TokenUsage,
 )
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
@@ -87,7 +88,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
     )
 
     try:
-        message, suggested_questions = await llm_service.generate_reply(
+        message, suggested_questions, prompt_tokens, completion_tokens = await llm_service.generate_reply(
             character=character,
             context=context,
             user_message=body.userMessage,
@@ -98,8 +99,14 @@ async def chat(body: ChatRequest) -> ChatResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"LLM error: {exc}",
         )
+    
+    token_usage = TokenUsage(
+        promptTokens=prompt_tokens,
+        completionTokens=completion_tokens,
+        totalTokens=prompt_tokens + completion_tokens
+    )
 
-    return ChatResponse(data=ChatResponseData(message=message, suggestedQuestions=suggested_questions))
+    return ChatResponse(data=ChatResponseData(message=message, suggestedQuestions=suggested_questions, tokenUsage=token_usage))
 
 
 # ── POST /v1/ai/generate-title ────────────────────────────────────────────────
@@ -122,7 +129,7 @@ async def generate_title(body: GenerateTitleRequest) -> GenerateTitleResponse:
     )
 
     try:
-        title = await llm_service.generate_session_title(
+        title, prompt_tokens, completion_tokens = await llm_service.generate_session_title(
             character=character,
             first_user_message=body.firstUserMessage,
             first_assistant_message=body.firstAssistantMessage,
@@ -133,7 +140,13 @@ async def generate_title(body: GenerateTitleRequest) -> GenerateTitleResponse:
             detail=f"LLM error: {exc}",
         )
 
-    return GenerateTitleResponse(data=GenerateTitleResponseData(title=title))
+    token_usage = TokenUsage(
+        promptTokens=prompt_tokens,
+        completionTokens=completion_tokens,
+        totalTokens=prompt_tokens + completion_tokens
+    )
+
+    return GenerateTitleResponse(data=GenerateTitleResponseData(title=title, tokenUsage=token_usage))
 
 
 # ── POST /v1/ai/documents/process ───────────────────────────────────────────

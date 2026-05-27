@@ -23,8 +23,8 @@ supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 # Use a global client to reuse connections (Connection Pooling) for faster requests
 ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
-async def _call_ollama(messages: list[dict], expect_json: bool = True) -> str:
-    """Make an async call to the Ollama endpoint."""
+async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+    """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
@@ -48,7 +48,10 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> str:
         )
         response.raise_for_status()
         data = response.json()
-        return data.get("message", {}).get("content", "")
+        content = data.get("message", {}).get("content", "")
+        prompt_tokens = data.get("prompt_eval_count", 0)
+        completion_tokens = data.get("eval_count", 0)
+        return content, prompt_tokens, completion_tokens
     except Exception as e:
         logger.error(f"Failed to call Ollama: {e}")
         raise
@@ -107,12 +110,12 @@ async def generate_reply(
     context: HistoricalContextData,
     user_message: str,
     message_history: List[MessageHistoryItem],
-) -> tuple[str, List[str]]:
+) -> tuple[str, List[str], int, int]:
     """
     Invoke the LLM in character-roleplay mode.
 
     Returns:
-        (assistant_message, suggested_questions)
+        (assistant_message, suggested_questions, prompt_tokens, completion_tokens)
     """
     # ── RAG Integration ──
     # Query both context documents and character documents
@@ -151,7 +154,7 @@ async def generate_reply(
     # Append the new user turn
     messages.append({"role": "user", "content": user_message})
 
-    response_text = await _call_ollama(messages, expect_json=True)
+    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=True)
     
     try:
         # Sometimes models wrap json in markdown fences
@@ -164,18 +167,18 @@ async def generate_reply(
         parsed = json.loads(clean_text.strip())
         message = parsed.get("message", "")
         suggested_questions = parsed.get("suggestedQuestions", [])
-        return message, suggested_questions[:3]
+        return message, suggested_questions[:3], prompt_tokens, completion_tokens
     except Exception as e:
         logger.error(f"Failed to parse JSON from Ollama: {response_text}. Error: {e}")
         # Fallback if json parsing fails
-        return response_text, []
+        return response_text, [], prompt_tokens, completion_tokens
 
 async def generate_session_title(
     character: CharacterData,
     first_user_message: str,
     first_assistant_message: str,
-) -> str:
-    """Generate a short session title from the first exchange."""
+) -> tuple[str, int, int]:
+    """Generate a short session title from the first exchange. Returns (title, prompt_tokens, completion_tokens)"""
     system_prompt = build_title_system_prompt(character)
     
     json_instruction = (
@@ -197,7 +200,7 @@ async def generate_session_title(
         {"role": "user", "content": conversation_snippet}
     ]
 
-    response_text = await _call_ollama(messages, expect_json=True)
+    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=True)
     
     try:
         clean_text = response_text.strip()
@@ -207,10 +210,10 @@ async def generate_session_title(
             clean_text = clean_text[:-3]
             
         parsed = json.loads(clean_text.strip())
-        return parsed.get("title", "Cuộc trò chuyện mới")
+        return parsed.get("title", "Cuộc trò chuyện mới"), prompt_tokens, completion_tokens
     except Exception as e:
         logger.error(f"Failed to parse JSON from Ollama title generation: {response_text}. Error: {e}")
-        return "Cuộc trò chuyện mới"
+        return "Cuộc trò chuyện mới", prompt_tokens, completion_tokens
 
 async def process_document(request: ProcessDocumentRequest):
     """Process a document by chunking, embedding, and storing in Supabase."""

@@ -82,7 +82,7 @@ public class AiServiceClient {
             @JsonProperty("content") String content) {
     }
 
-    public record AiChatResult(String message, List<String> suggestedQuestions) {
+    public record AiChatResult(String message, List<String> suggestedQuestions, AiMetricsService.TokenUsage tokenUsage) {
     }
 
     // ── Internal request / response records ───────────────────────────────
@@ -161,7 +161,7 @@ public class AiServiceClient {
             }
             aiMetricsService.recordRequest("chat", "success");
             aiMetricsService.recordTokens(response.data().tokenUsage());
-            return new AiChatResult(response.data().message(), response.data().suggestedQuestions());
+            return new AiChatResult(response.data().message(), response.data().suggestedQuestions(), response.data().tokenUsage());
         } catch (RestClientException e) {
             aiMetricsService.recordRequest("chat", "failure");
             log.error("AI service /chat call failed: {}", e.getMessage());
