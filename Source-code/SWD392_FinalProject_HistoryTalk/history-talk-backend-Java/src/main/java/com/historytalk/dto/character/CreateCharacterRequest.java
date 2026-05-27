@@ -30,19 +30,41 @@ public class CreateCharacterRequest {
     @NotBlank(message = "Background is required")
     private String background;
 
-    @JsonProperty("imageUrl")
+    @JsonProperty("image")
     @Size(max = 255, message = "Image URL must not exceed 255 characters")
     private String imageUrl;
+
+    @JsonProperty("modelUrl")
+    @Size(max = 500, message = "3D model URL must not exceed 500 characters")
+    private String modelUrl;
 
     @JsonProperty("personality")
     @Size(max = 500, message = "Personality must not exceed 500 characters")
     private String personality;
 
-    @JsonProperty("bornDate")
-    private java.time.LocalDate bornDate;
+    @JsonProperty("bornYear")
+    private Integer bornYear;
 
-    @JsonProperty("deathDate")
-    private java.time.LocalDate deathDate;
+    @JsonProperty("bornMonth")
+    private Integer bornMonth;
+
+    @JsonProperty("bornDay")
+    private Integer bornDay;
+
+    @JsonProperty("isBornBc")
+    private Boolean isBornBc;
+
+    @JsonProperty("deathYear")
+    private Integer deathYear;
+
+    @JsonProperty("deathMonth")
+    private Integer deathMonth;
+
+    @JsonProperty("deathDay")
+    private Integer deathDay;
+
+    @JsonProperty("isDeathBc")
+    private Boolean isDeathBc;
 
     @JsonProperty("isPublished")
     private Boolean isPublished = false;

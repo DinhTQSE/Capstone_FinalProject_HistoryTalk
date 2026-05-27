@@ -44,6 +44,7 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     private final HistoricalContextRepository contextRepository;
     private final UserRepository userRepository;
     private final DocumentProcessorFactory documentProcessorFactory;
+    private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
     
     /**
      * Get all documents
@@ -148,6 +149,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
 
         Document saved = documentRepository.save(doc);
         log.info("Document created: {} with ID: {}", request.getTitle(), saved.getDocId());
+        
+        // Trigger async document processing in AI backend
+        aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        
         return mapToResponse(saved);
     }
     
@@ -191,6 +196,13 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
 
         Document updated = documentRepository.save(doc);
         log.info("Document updated: {}", docId);
+
+        // If content changed, we should probably re-process the document.
+        // The Python backend process endpoint handles upserts by doc_id.
+        if (request.getContent() != null && !request.getContent().isBlank()) {
+            aiServiceClient.processDocumentAsync(updated.getDocId().toString(), updated.getEntityId().toString(), updated.getContent());
+        }
+
         return mapToResponse(updated);
     }
     
@@ -216,6 +228,9 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
 
         documentRepository.delete(doc);
         log.info("Document deleted: {}", docId);
+        
+        // Trigger async document deletion in AI backend
+        aiServiceClient.deleteDocumentAsync(docId);
     }
     
     /**

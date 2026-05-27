@@ -31,7 +31,7 @@ class CharacterData(BaseModel):
     image: Optional[str] = None
     personality: Optional[str] = None
     lifespan: Optional[str] = None
-    side: Optional[str] = None
+
     era: Optional[str] = None
     context: Optional[ContextSummary] = None
     events: Optional[List[EventSummary]] = None

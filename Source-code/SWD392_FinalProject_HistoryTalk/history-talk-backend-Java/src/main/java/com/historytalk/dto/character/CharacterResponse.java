@@ -1,6 +1,7 @@
 package com.historytalk.dto.character;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,23 +29,44 @@ public class CharacterResponse {
     @JsonProperty("background")
     private String background;
 
-    @JsonProperty("imageUrl")
+    @JsonProperty("image")
     private String imageUrl;
+
+    @JsonProperty("modelUrl")
+    private String modelUrl;
 
     @JsonProperty("personality")
     private String personality;
 
-    @JsonProperty("bornDate")
-    private java.time.LocalDate bornDate;
+    @JsonProperty("bornYear")
+    private Integer bornYear;
 
-    @JsonProperty("deathDate")
-    private java.time.LocalDate deathDate;
+    @JsonProperty("bornMonth")
+    private Integer bornMonth;
+
+    @JsonProperty("bornDay")
+    private Integer bornDay;
+
+    @JsonProperty("isBornBc")
+    private Boolean isBornBc;
+
+    @JsonProperty("deathYear")
+    private Integer deathYear;
+
+    @JsonProperty("deathMonth")
+    private Integer deathMonth;
+
+    @JsonProperty("deathDay")
+    private Integer deathDay;
+
+    @JsonProperty("isDeathBc")
+    private Boolean isDeathBc;
 
     @JsonProperty("isPublished")
     private Boolean isPublished;
 
     @JsonProperty("status")
-    private String status;
+    private ContentStatus status;
 
     @JsonProperty("era")
     private EventEra era;
@@ -60,9 +82,6 @@ public class CharacterResponse {
 
     @JsonProperty("createdBy")
     private StaffInfo createdBy;
-
-    @JsonProperty("deletedAt")
-    private LocalDateTime deletedAt;
 
     @JsonProperty("createdDate")
     private LocalDateTime createdDate;

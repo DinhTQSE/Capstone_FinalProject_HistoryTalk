@@ -22,12 +22,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -50,19 +54,18 @@ public class AuthController {
                 .body(ApiResponse.success(data, "User registered successfully"));
     }
 
-//    @PostMapping("/register-staff")
-//    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-//    @SecurityRequirement(name = "bearerAuth")
-//    @Operation(summary = "Register staff/admin account",
-//               description = "Creates a new CONTENT_ADMIN or SYSTEM_ADMIN account. Requires SYSTEM_ADMIN role.")
-//    public ResponseEntity<ApiResponse<RegisterStaffResponse>> registerStaff(
-//            @Valid @RequestBody RegisterStaffRequest request) {
-//
-//        log.info("POST /api/v1/auth/register-staff - email: {}", request.getEmail());
-//        RegisterStaffResponse data = authService.registerStaff(request);
-//        return ResponseEntity.status(HttpStatus.CREATED)
-//                .body(ApiResponse.success(data, "Staff account registered successfully"));
-//    }
+    @PostMapping("/register-content-admin")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Register content admin/system admin account",
+               description = "Creates a new CONTENT_ADMIN or SYSTEM_ADMIN account. Requires SYSTEM_ADMIN role.")
+    public ResponseEntity<ApiResponse<RegisterStaffResponse>> registerContentAdmin(
+            @Valid @RequestBody RegisterStaffRequest request) {
+
+        log.info("POST /api/v1/auth/register-content-admin - email: {}", request.getEmail());
+        RegisterStaffResponse data = authService.registerStaff(request);
+        return ResponseEntity.ok(ApiResponse.success(data, "Staff account registered successfully"));
+    }
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate with email and password, returns JWT tokens.")
@@ -72,6 +75,28 @@ public class AuthController {
         log.info("POST /api/v1/auth/login - email: {}", request.getEmail());
         LoginResponse data = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(data, "Login successful"));
+    }
+
+    @PostMapping("/google/login-url")
+    @Operation(summary = "Get Google login URL", description = "Returns backend Google OAuth2 authorization URL.")
+    public ResponseEntity<ApiResponse<Map<String, String>>> googleLoginUrl() {
+        Map<String, String> data = Map.of("url", "/Historical-tell/oauth2/authorization/google");
+        return ResponseEntity.ok(ApiResponse.success(data, "Google login URL generated successfully"));
+    }
+
+    @GetMapping("/google/backend-test/success")
+    @Operation(summary = "Backend-only Google OAuth success callback", description = "Local test endpoint for OAuth redirects before frontend integration.")
+    public ResponseEntity<ApiResponse<Map<String, String>>> googleBackendTestSuccess(
+            @RequestParam Map<String, String> queryParams) {
+        return ResponseEntity.ok(ApiResponse.success(queryParams, "Google OAuth backend test successful"));
+    }
+
+    @GetMapping("/google/backend-test/failure")
+    @Operation(summary = "Backend-only Google OAuth failure callback", description = "Local test endpoint for OAuth failure redirects before frontend integration.")
+    public ResponseEntity<ApiResponse<Map<String, String>>> googleBackendTestFailure(
+            @RequestParam Map<String, String> queryParams) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Google OAuth backend test failed", queryParams.getOrDefault("error", "GOOGLE_OAUTH_FAILED")));
     }
 
     @PostMapping("/refresh-token")

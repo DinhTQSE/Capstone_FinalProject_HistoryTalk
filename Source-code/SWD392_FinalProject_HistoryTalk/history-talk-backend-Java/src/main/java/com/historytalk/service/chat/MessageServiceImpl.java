@@ -8,7 +8,7 @@ import com.historytalk.dto.chat.SendMessageRequest;
 import com.historytalk.dto.chat.SendMessageResponse;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
-import com.historytalk.entity.enums.MessageRole;
+
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
@@ -44,7 +44,7 @@ public class MessageServiceImpl implements MessageService {
     public GetMessagesResponse getMessages(String sessionId, String userId) {
         log.info("Getting messages for session={} user={}", sessionId, userId);
 
-        chatSessionRepository.findBySessionIdAndUserUid(
+        chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(sessionId), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
 
@@ -57,7 +57,7 @@ public class MessageServiceImpl implements MessageService {
 
         // suggestedQuestions from last ASSISTANT message
         List<String> suggestedQuestions = messages.stream()
-                .filter(m -> m.getRole() == MessageRole.ASSISTANT)
+                .filter(m -> Boolean.TRUE.equals(m.getIsFromAi()))
                 .reduce((first, second) -> second) // last ASSISTANT message
                 .map(m -> parseSuggestedQuestions(m.getSuggestedQuestions()))
                 .orElse(Collections.emptyList());
@@ -74,7 +74,7 @@ public class MessageServiceImpl implements MessageService {
     public SendMessageResponse sendMessage(String userId, SendMessageRequest request) {
         log.info("Sending message in session={} user={}", request.getSessionId(), userId);
 
-        ChatSession session = chatSessionRepository.findBySessionIdAndUserUid(
+        ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(request.getSessionId()), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
@@ -84,14 +84,13 @@ public class MessageServiceImpl implements MessageService {
                 .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId(), false);
 
         long userMessageCount = existingMessages.stream()
-                .filter(m -> m.getRole() == MessageRole.USER)
+                .filter(m -> Boolean.FALSE.equals(m.getIsFromAi()))
                 .count();
         boolean isFirstUserMessage = (userMessageCount == 0);
 
         // Save user message
         Message userMsg = Message.builder()
                 .content(request.getContent())
-                .role(MessageRole.USER)
                 .isFromAi(false)
                 .chatSession(session)
                 .build();
@@ -100,7 +99,7 @@ public class MessageServiceImpl implements MessageService {
         // Build history for AI (all existing messages, not including current user message)
         List<MessageHistoryItem> history = existingMessages.stream()
                 .map(m -> new MessageHistoryItem(
-                        m.getRole() == MessageRole.ASSISTANT ? "assistant" : "user",
+                        Boolean.TRUE.equals(m.getIsFromAi()) ? "assistant" : "user",
                         m.getContent()))
                 .toList();
 
@@ -124,7 +123,6 @@ public class MessageServiceImpl implements MessageService {
         // Save assistant message
         Message assistantMsg = Message.builder()
                 .content(aiResult.message())
-                .role(MessageRole.ASSISTANT)
                 .isFromAi(true)
                 .suggestedQuestions(suggestedQuestionsJson)
                 .chatSession(session)
@@ -160,7 +158,7 @@ public class MessageServiceImpl implements MessageService {
         return MessageResponse.builder()
                 .id(message.getMessageId().toString())
                 .sessionId(message.getChatSession().getSessionId().toString())
-                .role(message.getRole().name())
+                .role(Boolean.TRUE.equals(message.getIsFromAi()) ? "ASSISTANT" : "USER")
                 .content(message.getContent())
                                 .createdAt(message.getCreatedAt())
                 .build();

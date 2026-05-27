@@ -63,8 +63,9 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        @Query(value = """
                UPDATE historical_schema.historical_context
-               SET deleted_at = NULL, is_active = true
+               SET deleted_at = NULL
                WHERE context_id = :contextId
+                 AND deleted_at IS NOT NULL
                """, nativeQuery = true)
        @org.springframework.data.jpa.repository.Modifying
        int restoreById(@Param("contextId") UUID contextId);
@@ -75,6 +76,6 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
        @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.isPublished = true")
        long countPublished();
 
-       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.deletedAt IS NULL AND hc.isActive = true")
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.deletedAt IS NULL AND hc.isPublished = true")
        long countActive();
 }

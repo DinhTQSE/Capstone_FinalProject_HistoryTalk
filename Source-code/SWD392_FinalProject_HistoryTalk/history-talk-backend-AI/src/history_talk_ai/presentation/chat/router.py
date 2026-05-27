@@ -157,6 +157,21 @@ async def process_document(body: ProcessDocumentRequest):
         )
 
 
+@router.delete(
+    "/documents/{doc_id}",
+    summary="Delete a document's chunks from VectorChunk (Supabase)",
+    description="Deletes all vector chunks associated with the given document ID.",
+)
+async def delete_document(doc_id: str):
+    try:
+        await llm_service.delete_document(doc_id)
+        return {"success": True, "message": f"Document {doc_id} chunks deleted successfully."}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Document deletion error: {exc}",
+        )
+
 # ── GET /v1/ai/character/{id} — diagnostic ────────────────────────────────────
 
 @router.get(

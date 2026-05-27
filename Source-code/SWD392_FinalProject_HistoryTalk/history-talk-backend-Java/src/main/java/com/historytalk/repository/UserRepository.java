@@ -27,11 +27,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT COUNT(u) FROM User u")
     long countAllUsers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.isActive = true")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL")
     long countActiveUsers();
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.isActive = false")
-    long countInactiveUsers();
+    default long countInactiveUsers() {
+        return 0L;
+    }
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NOT NULL")
     long countDeletedUsers();

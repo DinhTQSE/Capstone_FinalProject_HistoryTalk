@@ -1,0 +1,561 @@
+# Authentication Module Handoff
+
+This document summarizes the authentication module in the Java backend so another agent can continue work without re-reading the full codebase.
+
+## Backend Location
+
+Java backend:
+
+```text
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
+```
+
+The repo-local guidance describes a layered Spring Boot structure. In the current backend, authentication is implemented across controller, service, repository/entity, config, security, and utility packages.
+
+## Main Files
+
+```text
+src/main/java/com/historytalk/controller/authentication/AuthController.java
+src/main/java/com/historytalk/service/authentication/AuthService.java
+src/main/java/com/historytalk/service/authentication/AuthServiceImpl.java
+src/main/java/com/historytalk/service/authentication/JwtService.java
+src/main/java/com/historytalk/service/authentication/JwtServiceImpl.java
+src/main/java/com/historytalk/service/authentication/CustomUserDetailsService.java
+src/main/java/com/historytalk/config/SecurityConfig.java
+src/main/java/com/historytalk/config/RestAuthenticationEntryPoint.java
+src/main/java/com/historytalk/security/JwtAuthenticationFilter.java
+src/main/java/com/historytalk/security/JwtTokenProvider.java
+src/main/java/com/historytalk/security/UserPrincipal.java
+src/main/java/com/historytalk/security/AuthenticatedPrincipal.java
+src/main/java/com/historytalk/utils/SecurityUtils.java
+src/main/java/com/historytalk/entity/user/User.java
+src/main/java/com/historytalk/entity/enums/UserRole.java
+src/main/java/com/historytalk/repository/UserRepository.java
+src/main/java/com/historytalk/dto/authentication/*.java
+src/main/resources/application.properties
+src/main/resources/application-prod.properties
+```
+
+## Roles
+
+Roles are defined in `UserRole.java`:
+
+```java
+CUSTOMER
+CONTENT_ADMIN
+SYSTEM_ADMIN
+```
+
+Spring Security authorities are created as:
+
+```text
+ROLE_CUSTOMER
+ROLE_CONTENT_ADMIN
+ROLE_SYSTEM_ADMIN
+```
+
+Controller method authorization uses expressions like:
+
+```java
+@PreAuthorize("hasRole('SYSTEM_ADMIN')")
+```
+
+## Public Auth API
+
+Base route:
+
+```text
+/api/v1/auth
+```
+
+Endpoints in `AuthController.java`:
+
+```text
+POST  /api/v1/auth/register
+POST  /api/v1/auth/register-content-admin
+POST  /api/v1/auth/login
+POST  /api/v1/auth/refresh-token
+POST  /api/v1/auth/logout
+PATCH /api/v1/auth/users/{userId}/deactivate
+PATCH /api/v1/auth/me/deactivate
+```
+
+Expected purpose:
+
+```text
+/register                  Creates CUSTOMER account
+/register-content-admin    Creates CONTENT_ADMIN or SYSTEM_ADMIN account; requires SYSTEM_ADMIN
+/login                     Authenticates email/password and returns JWT pair
+/refresh-token             Exchanges refresh token for a new access token
+/logout                    Blacklists the provided bearer token in memory
+/users/{userId}/deactivate SYSTEM_ADMIN deactivates another user
+/me/deactivate             Current user deactivates own account
+```
+
+## Registration Flow
+
+Normal user registration:
+
+```text
+AuthController.register
+  -> AuthServiceImpl.register
+    -> validate password confirmation
+    -> check email uniqueness with UserRepository.existsByEmailIgnoreCase
+    -> check username uniqueness with UserRepository.existsByUserNameIgnoreCase
+    -> hash password with PasswordEncoder
+    -> save User with role CUSTOMER
+    -> return RegisterResponse
+```
+
+Important behavior:
+
+```text
+email is lowercased before saving
+password is stored as BCrypt hash
+new public users always receive CUSTOMER role
+```
+
+Staff/admin registration:
+
+```text
+AuthController.registerContentAdmin
+  -> @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+  -> AuthServiceImpl.registerStaff
+    -> validate password confirmation
+    -> check email and username uniqueness
+    -> parse requested role
+    -> reject CUSTOMER
+    -> accept CONTENT_ADMIN or SYSTEM_ADMIN
+    -> save user
+```
+
+Role aliases accepted by `parsePrivilegedRole`:
+
+```text
+STAFF -> CONTENT_ADMIN
+ADMIN -> SYSTEM_ADMIN
+```
+
+## Login Flow
+
+Login endpoint:
+
+```text
+POST /api/v1/auth/login
+```
+
+Code flow:
+
+```text
+AuthController.login
+  -> AuthServiceImpl.login
+    -> AuthenticationManager.authenticate(email, password)
+      -> DaoAuthenticationProvider
+        -> CustomUserDetailsService.loadUserByUsername(email)
+          -> UserRepository.findByEmailIgnoreCase(email)
+          -> reject if deletedAt is not null
+          -> return UserPrincipal
+      -> PasswordEncoder verifies raw password against BCrypt hash
+    -> reload User from UserRepository
+    -> reject if deletedAt is not null
+    -> build JWT claims from UserPrincipal
+    -> generate access token
+    -> generate refresh token
+    -> return LoginResponse
+```
+
+Login response includes:
+
+```text
+accessToken
+refreshToken
+tokenType = Bearer
+expiresIn
+uid
+userName
+email
+role
+```
+
+## JWT Claims
+
+Access tokens are generated by `JwtTokenProvider.generateAccessToken`.
+
+Subject:
+
+```text
+sub = user email
+```
+
+Extra claims:
+
+```text
+uid  = user UUID as string
+role = CUSTOMER, CONTENT_ADMIN, or SYSTEM_ADMIN
+```
+
+Refresh tokens are generated by `JwtTokenProvider.generateRefreshToken`.
+
+Refresh token content:
+
+```text
+sub = user email
+issuedAt
+expiration
+signature
+```
+
+Refresh tokens do not include `uid` or `role` claims in the current implementation.
+
+## JWT Configuration
+
+JWT configuration is sourced from environment-backed properties:
+
+```properties
+jwt.secret=${JWT_SECRET}
+jwt.expiration=${JWT_EXPIRATION_MS}
+jwt.refreshExpiration=${JWT_REFRESH_EXPIRATION_MS}
+```
+
+`JwtTokenProvider` injects these directly with uppercase keys:
+
+```java
+@Value("${JWT_SECRET}")
+private String jwtSecret;
+
+@Value("${JWT_EXPIRATION_MS}")
+private long jwtExpirationInMs;
+
+@Value("${JWT_REFRESH_EXPIRATION_MS}")
+private long jwtRefreshExpirationInMs;
+```
+
+Signing algorithm:
+
+```text
+HS512
+```
+
+The secret is converted with:
+
+```java
+Keys.hmacShaKeyFor(jwtSecret.getBytes())
+```
+
+The secret must be long enough for HS512.
+
+## Request Authentication Flow
+
+Protected requests are authenticated by `JwtAuthenticationFilter`, registered before `UsernamePasswordAuthenticationFilter`.
+
+Flow:
+
+```text
+Incoming HTTP request
+  -> JwtAuthenticationFilter.doFilterInternal
+    -> read Authorization header
+    -> require "Bearer " prefix
+    -> extract JWT
+    -> JwtTokenProvider.validateToken
+      -> verify signature
+      -> verify expiry
+    -> extract email from sub
+    -> extract uid claim
+    -> extract role claim
+    -> create AuthenticatedPrincipal(email, uid, role)
+    -> create authority ROLE_<role>
+    -> set UsernamePasswordAuthenticationToken in SecurityContextHolder
+  -> controller method runs
+```
+
+After this, Spring can enforce:
+
+```text
+.authenticated()
+@PreAuthorize(...)
+SecurityUtils.getUserId()
+SecurityUtils.getRoleName()
+```
+
+## SecurityContext Principal Types
+
+During login credential validation:
+
+```text
+UserPrincipal
+```
+
+This wraps the database `User` entity and implements `UserDetails`.
+
+During JWT-authenticated API requests:
+
+```text
+AuthenticatedPrincipal
+```
+
+This is lightweight and populated from token claims only:
+
+```text
+email
+uid
+role
+```
+
+`SecurityUtils` expects `AuthenticatedPrincipal` for normal JWT requests.
+
+## Security Rules
+
+`SecurityConfig` defines two filter chains.
+
+Actuator chain:
+
+```text
+/actuator/health      public
+/actuator/prometheus  allowed only from configured monitoring IPs
+other /actuator/**    denied
+```
+
+Main chain:
+
+```text
+Swagger/OpenAPI paths                         public
+/api/v1/auth/**                               public at request-matcher level
+GET /api/v1/characters/**                    public
+GET /api/v1/historical-contexts/**           public
+GET /api/v1/historical-documents/**          public
+GET /api/v1/quizzes/**                       public
+/api/v1/chat/**                              authenticated
+POST /api/v1/quizzes/**                      authenticated
+PATCH /api/v1/quizzes/**                     authenticated
+any other request                            authenticated
+```
+
+Important nuance:
+
+`/api/v1/auth/**` is globally permitted in the HTTP matcher, but some auth controller methods still use `@PreAuthorize`, such as:
+
+```java
+@PreAuthorize("hasRole('SYSTEM_ADMIN')")
+```
+
+This means method security is currently responsible for protecting privileged auth endpoints.
+
+## Refresh Token Flow
+
+Endpoint:
+
+```text
+POST /api/v1/auth/refresh-token
+```
+
+Flow:
+
+```text
+AuthController.refreshToken
+  -> AuthServiceImpl.refreshToken(refreshToken)
+    -> reject blank token
+    -> validate token signature and expiry
+    -> reject if token is in BLACKLISTED_TOKENS
+    -> extract email from refresh token subject
+    -> load User by email
+    -> build fresh uid/role claims from current User
+    -> create new access token
+    -> return same refresh token plus new access token
+```
+
+The refresh token is not rotated.
+
+## Logout Flow
+
+Endpoint:
+
+```text
+POST /api/v1/auth/logout
+Authorization: Bearer <token>
+```
+
+Flow:
+
+```text
+AuthController.logout
+  -> AuthServiceImpl.logout
+    -> require Authorization header
+    -> require Bearer prefix
+    -> extract token
+    -> add token to AuthServiceImpl.BLACKLISTED_TOKENS
+```
+
+`BLACKLISTED_TOKENS` is an in-memory concurrent set:
+
+```java
+public static final Set<String> BLACKLISTED_TOKENS =
+    Collections.newSetFromMap(new ConcurrentHashMap<>());
+```
+
+Production note already present in code:
+
+```text
+Replace with Redis in production.
+```
+
+## User Deactivation Flow
+
+System admin deactivation:
+
+```text
+PATCH /api/v1/auth/users/{userId}/deactivate
+```
+
+Self-deactivation:
+
+```text
+PATCH /api/v1/auth/me/deactivate
+```
+
+Flow:
+
+```text
+AuthController
+  -> SecurityUtils.getUserId()
+  -> AuthServiceImpl.softDeleteUser(targetUserId, staffId)
+    -> load requesting user
+    -> if target user differs from requester, requester must be SYSTEM_ADMIN
+    -> load target user
+    -> set targetUser.deletedAt = now
+    -> save user
+    -> cascade soft delete related content
+```
+
+Cascade soft delete updates:
+
+```text
+Document
+Character
+HistoricalContext
+Message
+ChatSession
+QuizSession
+```
+
+## User Entity Fields Relevant To Auth
+
+`User.java` maps to table:
+
+```java
+@Table(name = "\"user\"")
+```
+
+Important fields:
+
+```text
+uid              UUID primary key
+userName         unique
+email            unique
+password         BCrypt hash
+role             UserRole enum
+isActive         Boolean, default true
+deletedAt        soft-delete marker
+createdAt
+updatedAt
+lastActiveDate
+```
+
+Soft-deleted users are rejected by:
+
+```text
+CustomUserDetailsService.loadUserByUsername
+AuthServiceImpl.login
+```
+
+## Repository Methods Used By Auth
+
+`UserRepository.java` methods:
+
+```java
+Optional<User> findByEmailIgnoreCase(String email);
+Optional<User> findByUserNameIgnoreCase(String userName);
+boolean existsByEmailIgnoreCase(String email);
+boolean existsByUserNameIgnoreCase(String userName);
+```
+
+## Known Risks And Follow-Up Items
+
+1. `JwtAuthenticationFilter` does not check `BLACKLISTED_TOKENS`.
+
+   Logout adds the token to the blacklist, and refresh checks the blacklist, but normal access-token authentication appears to validate only signature and expiry. That means a logged-out access token may continue working until it expires.
+
+2. `BLACKLISTED_TOKENS` is in memory.
+
+   Token revocation disappears on app restart and does not work across multiple backend instances. Use Redis or another shared store in production.
+
+3. `/api/v1/auth/**` is permitted globally.
+
+   Privileged auth endpoints rely on `@PreAuthorize`. This can work because method security is enabled, but it is safer and clearer to permit only public auth endpoints at HTTP level:
+
+   ```text
+   POST /api/v1/auth/register
+   POST /api/v1/auth/login
+   POST /api/v1/auth/refresh-token
+   ```
+
+   Then require authentication for:
+
+   ```text
+   POST  /api/v1/auth/logout
+   POST  /api/v1/auth/register-content-admin
+   PATCH /api/v1/auth/users/{userId}/deactivate
+   PATCH /api/v1/auth/me/deactivate
+   ```
+
+4. Role comments are stale in some files.
+
+   Some comments mention `USER`, `STAFF`, or `ADMIN`, but actual enum values are:
+
+   ```text
+   CUSTOMER
+   CONTENT_ADMIN
+   SYSTEM_ADMIN
+   ```
+
+5. Refresh tokens are not rotated.
+
+   The current implementation returns the same refresh token after issuing a new access token.
+
+6. `UserPrincipal.isEnabled()` always returns `true`.
+
+   Soft-delete is checked in `CustomUserDetailsService`, but `UserPrincipal` itself does not reflect `deletedAt` or `isActive`.
+
+7. `isActive` is not consistently used for auth blocking.
+
+   Login checks `deletedAt`, not `isActive`. Dashboard queries use both `deletedAt` and `isActive`.
+
+8. CORS allows all origins with credentials.
+
+   `SecurityConfig` uses:
+
+   ```java
+   config.setAllowedOriginPatterns(List.of("*"));
+   config.setAllowedMethods(List.of("*"));
+   config.setAllowedHeaders(List.of("*"));
+   config.setExposedHeaders(List.of("*"));
+   config.setAllowCredentials(true);
+   ```
+
+   This should be tightened before production.
+
+## Mental Model For Future Agents
+
+Think of the module as two separate authentication moments:
+
+```text
+Login time:
+  DB lookup + BCrypt password validation + UserPrincipal
+
+Request time:
+  JWT validation + claims extraction + AuthenticatedPrincipal
+```
+
+The database is used during login and refresh. Normal protected requests do not reload the user from the database; they trust the signed JWT claims.
+
+Therefore, changes to user role or deactivation may not affect already-issued access tokens until expiry unless the filter starts checking user state or a token revocation store.
+

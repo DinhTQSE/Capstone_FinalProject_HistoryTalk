@@ -148,7 +148,7 @@ public class HistoricalContextController {
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Soft-delete a historical context",
-               description = "Mark a historical context as deleted (data preserved). Cascades to documents, characters, and quizzes.")
+               description = "Mark a historical context as deleted (data preserved). Cascades to context documents, chat sessions, and quizzes; mapped characters remain independent.")
     public ResponseEntity<ApiResponse<?>> softDeleteContext(
             @PathVariable String contextId) {
 
@@ -159,4 +159,5 @@ public class HistoricalContextController {
 
         return ResponseEntity.ok(ApiResponse.success(null, "Historical context soft-deleted successfully"));
     }
+
 }

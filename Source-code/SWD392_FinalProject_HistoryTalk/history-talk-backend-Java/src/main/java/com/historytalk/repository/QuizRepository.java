@@ -16,61 +16,57 @@ import java.util.UUID;
 @Repository
 public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
-       @Query("SELECT q FROM Quiz q WHERE q.quizId = :quizId AND q.deletedAt IS NULL")
-       Optional<Quiz> findActiveById(@Param("quizId") UUID quizId);
-
-    Optional<Quiz> findByTitleIgnoreCase(String title);
-
-    boolean existsByTitleIgnoreCaseAndQuizIdNot(String title, UUID quizId);
-
-    Page<Quiz> findByCreatedByUid(UUID uid, Pageable pageable);
-
+    /**
+     * Customer — published quizzes only, optional title search (ILIKE).
+     */
     @Query("""
-           SELECT q FROM Quiz q
-           WHERE (:search IS NULL OR :search = ''
-                  OR q.title ILIKE CONCAT('%', :search, '%')
-                  OR q.description ILIKE CONCAT('%', :search, '%'))
-           AND (:grade IS NULL OR q.grade = :grade)
-           AND (:era IS NULL OR q.era = :era)
-           AND (:includeDeleted = true OR q.deletedAt IS NULL)
-           """)
-    Page<Quiz> findAllWithSearch(
+            SELECT q FROM Quiz q
+            WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
+            AND q.isPublished = true
+            AND q.deletedAt IS NULL
+            ORDER BY q.title ASC
+            """)
+    List<Quiz> findAllActiveForCustomer(@Param("search") String search);
+
+    /**
+     * Customer — single published quiz by ID.
+     */
+    @Query("""
+            SELECT q FROM Quiz q
+            WHERE q.quizId = :quizId
+            AND q.isPublished = true
+            AND q.deletedAt IS NULL
+            """)
+    Optional<Quiz> findActiveById(@Param("quizId") UUID quizId);
+
+    /**
+     * Staff — paginated list with optional search and era filter.
+     * era is filtered on historicalContext.era (not on Quiz directly).
+     * Shows all non-deleted quizzes regardless of isPublished.
+     */
+    @Query("""
+            SELECT q FROM Quiz q
+            JOIN q.historicalContext hc
+            WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
+            AND (:era IS NULL OR hc.era = :era)
+            AND (:includeDeleted = true OR q.deletedAt IS NULL)
+            """)
+    Page<Quiz> findAllForStaff(
             @Param("search") String search,
-            @Param("grade") Integer grade,
             @Param("era") EventEra era,
             @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 
-    @Query("""
-          SELECT q FROM Quiz q
-          WHERE q.historicalContext.contextId = :contextId
-            AND (:search IS NULL OR :search = ''
-                OR q.title ILIKE CONCAT('%', :search, '%')
-                OR q.description ILIKE CONCAT('%', :search, '%'))
-          AND (:grade IS NULL OR q.grade = :grade)
-          AND (:era IS NULL OR q.era = :era)
-          AND (:includeDeleted = true OR q.deletedAt IS NULL)
-          """)
-    Page<Quiz> findAllByContextWithSearch(
-           @Param("contextId") UUID contextId,
-           @Param("search") String search,
-           @Param("grade") Integer grade,
-           @Param("era") EventEra era,
-           @Param("includeDeleted") boolean includeDeleted,
-           Pageable pageable);
+    /**
+     * Duplicate title check for new quiz creation.
+     */
+    boolean existsByTitleIgnoreCase(String title);
 
-    @Query("""
-           SELECT q FROM Quiz q
-           WHERE (:search IS NULL OR :search = ''
-                  OR q.title ILIKE CONCAT('%', :search, '%')
-                  OR q.description ILIKE CONCAT('%', :search, '%'))
-           AND (:includeDeleted = true OR q.deletedAt IS NULL)
-           ORDER BY q.playCount DESC
-           """)
-    List<Quiz> findAllSimple(@Param("search") String search,
-                             @Param("includeDeleted") boolean includeDeleted);
+    /**
+     * Duplicate title check for quiz update (exclude self).
+     */
+    boolean existsByTitleIgnoreCaseAndQuizIdNot(String title, UUID quizId);
 
-    @Query("SELECT q FROM Quiz q WHERE UPPER(q.title) = UPPER(:title) AND q.deletedAt IS NULL")
-    Optional<Quiz> findActiveByTitleIgnoreCase(@Param("title") String title);
-
+    @Query("SELECT q FROM Quiz q WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
+    List<Quiz> findAllDeleted();
 }

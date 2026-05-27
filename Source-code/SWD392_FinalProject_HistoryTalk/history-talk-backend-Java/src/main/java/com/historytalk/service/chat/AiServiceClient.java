@@ -5,6 +5,7 @@ import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,12 +28,28 @@ public class AiServiceClient {
 
     public AiServiceClient(
             @Value("${AI_SERVICE_URL:http://localhost:8001}") String aiServiceUrl,
+            @Value("${AI_SERVICE_USERNAME:}") String aiServiceUsername,
+            @Value("${AI_SERVICE_PASSWORD:}") String aiServicePassword,
             ChatSessionRepository chatSessionRepository,
             AiMetricsService aiMetricsService,
             RestClient.Builder restClientBuilder) {
-        this.restClient = restClientBuilder
-                .baseUrl(aiServiceUrl)
-                .build();
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(60000); // 60s
+        factory.setReadTimeout(180000); // 3 minutes
+
+        RestClient.Builder builder = restClientBuilder
+                .requestFactory(factory)
+                .baseUrl(aiServiceUrl);
+
+        // Add Basic Auth header if credentials are configured (e.g. Nginx auth_basic)
+        if (aiServiceUsername != null && !aiServiceUsername.isBlank()) {
+            String credentials = Base64.getEncoder().encodeToString(
+                    (aiServiceUsername + ":" + aiServicePassword).getBytes(StandardCharsets.UTF_8));
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + credentials);
+            log.info("AI service client configured with Basic Auth for user: {}", aiServiceUsername);
+        }
+
+        this.restClient = builder.build();
         this.chatSessionRepository = chatSessionRepository;
         this.aiMetricsService = aiMetricsService;
     }
@@ -43,8 +62,8 @@ public class AiServiceClient {
             @JsonProperty("title") String title,
             @JsonProperty("background") String background,
             @JsonProperty("personality") String personality,
-            @JsonProperty("lifespan") String lifespan,
-            @JsonProperty("side") String side) {}
+            @JsonProperty("lifespan") String lifespan) {
+    }
 
     public record ContextPayload(
             @JsonProperty("contextId") String contextId,
@@ -52,13 +71,19 @@ public class AiServiceClient {
             @JsonProperty("description") String description,
             @JsonProperty("era") String era,
             @JsonProperty("year") Integer year,
-            @JsonProperty("location") String location) {}
+            @JsonProperty("startYear") Integer startYear,
+            @JsonProperty("endYear") Integer endYear,
+            @JsonProperty("isBC") Boolean isBC,
+            @JsonProperty("location") String location) {
+    }
 
     public record MessageHistoryItem(
             @JsonProperty("role") String role,
-            @JsonProperty("content") String content) {}
+            @JsonProperty("content") String content) {
+    }
 
-    public record AiChatResult(String message, List<String> suggestedQuestions) {}
+    public record AiChatResult(String message, List<String> suggestedQuestions) {
+    }
 
     // ── Internal request / response records ───────────────────────────────
 
@@ -68,16 +93,19 @@ public class AiServiceClient {
             @JsonProperty("userMessage") String userMessage,
             @JsonProperty("messageHistory") List<MessageHistoryItem> messageHistory,
             @JsonProperty("characterData") CharacterPayload characterData,
-            @JsonProperty("contextData") ContextPayload contextData) {}
+            @JsonProperty("contextData") ContextPayload contextData) {
+    }
 
     record ChatResponseData(
             @JsonProperty("message") String message,
             @JsonProperty("suggestedQuestions") List<String> suggestedQuestions,
-            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {}
+            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+    }
 
     record ChatApiResponse(
             @JsonProperty("success") boolean success,
-            @JsonProperty("data") ChatResponseData data) {}
+            @JsonProperty("data") ChatResponseData data) {
+    }
 
     record GenerateTitleRequest(
             @JsonProperty("characterId") String characterId,
@@ -85,15 +113,24 @@ public class AiServiceClient {
             @JsonProperty("firstUserMessage") String firstUserMessage,
             @JsonProperty("firstAssistantMessage") String firstAssistantMessage,
             @JsonProperty("characterData") CharacterPayload characterData,
-            @JsonProperty("contextData") ContextPayload contextData) {}
+            @JsonProperty("contextData") ContextPayload contextData) {
+    }
 
     record GenerateTitleData(
             @JsonProperty("title") String title,
-            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {}
+            @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+    }
 
     record GenerateTitleApiResponse(
             @JsonProperty("success") boolean success,
-            @JsonProperty("data") GenerateTitleData data) {}
+            @JsonProperty("data") GenerateTitleData data) {
+    }
+
+    record ProcessDocumentRequest(
+            @JsonProperty("doc_id") String docId,
+            @JsonProperty("entity_id") String entityId,
+            @JsonProperty("content") String content) {
+    }
 
     // ── Public methods ────────────────────────────────────────────────────
 
@@ -176,23 +213,73 @@ public class AiServiceClient {
     }
 
     /**
+     * Calls BE-Python POST /v1/ai/documents/process asynchronously.
+     * Chunks and embeds the document content into Supabase Vector DB.
+     */
+    @Async
+    public void processDocumentAsync(String docId, String entityId, String content) {
+        ProcessDocumentRequest request = new ProcessDocumentRequest(docId, entityId, content);
+        try {
+            log.info("Calling AI service to process document: {}", docId);
+            restClient.post()
+                    .uri("/v1/ai/documents/process")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully sent document {} for AI processing", docId);
+        } catch (RestClientException e) {
+            log.error("AI service /documents/process call failed for doc {}: {}", docId, e.getMessage());
+        }
+    }
+
+    /**
+     * Calls BE-Python DELETE /v1/ai/documents/{docId} asynchronously.
+     * Deletes the document's chunks from Supabase Vector DB.
+     */
+    @Async
+    public void deleteDocumentAsync(String docId) {
+        try {
+            log.info("Calling AI service to delete document chunks: {}", docId);
+            restClient.delete()
+                    .uri("/v1/ai/documents/" + docId)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully requested AI deletion for document {}", docId);
+        } catch (RestClientException e) {
+            log.error("AI service DELETE /documents call failed for doc {}: {}", docId, e.getMessage());
+        }
+    }
+
+    /**
      * Build CharacterPayload from a Character entity.
      */
     public static CharacterPayload buildCharacterPayload(com.historytalk.entity.character.Character c) {
-                String lifespan = null;
-                if (c.getBornDate() != null || c.getDeathDate() != null) {
-                        String born = c.getBornDate() != null ? c.getBornDate().toString() : "";
-                        String died = c.getDeathDate() != null ? c.getDeathDate().toString() : "";
-                        lifespan = (born + " - " + died).trim();
-                }
+        String born = "";
+        if (c.getBornYear() != null) {
+            born = (c.getBornDay() != null ? c.getBornDay() + "/" : "") +
+                    (c.getBornMonth() != null ? c.getBornMonth() + "/" : "") +
+                    c.getBornYear() +
+                    (Boolean.TRUE.equals(c.getIsBornBc()) ? " BC" : "");
+        }
+        String died = "";
+        if (c.getDeathYear() != null) {
+            died = (c.getDeathDay() != null ? c.getDeathDay() + "/" : "") +
+                    (c.getDeathMonth() != null ? c.getDeathMonth() + "/" : "") +
+                    c.getDeathYear() +
+                    (Boolean.TRUE.equals(c.getIsDeathBc()) ? " BC" : "");
+        }
+        String lifespan = null;
+        if (!born.isEmpty() || !died.isEmpty()) {
+            lifespan = born + " - " + died;
+        }
         return new CharacterPayload(
                 c.getCharacterId().toString(),
                 c.getName(),
                 c.getTitle(),
                 c.getBackground(),
                 c.getPersonality(),
-                                lifespan,
-                                null);
+                lifespan);
     }
 
     /**
@@ -205,6 +292,9 @@ public class AiServiceClient {
                 ctx.getDescription(),
                 ctx.getEra() != null ? ctx.getEra().name() : null,
                 ctx.getYear(),
+                ctx.getStartYear(),
+                ctx.getEndYear(),
+                ctx.getIsBC(),
                 ctx.getLocation());
     }
 }

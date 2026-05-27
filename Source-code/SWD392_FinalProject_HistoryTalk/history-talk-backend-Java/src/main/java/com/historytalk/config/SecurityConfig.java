@@ -2,6 +2,8 @@ package com.historytalk.config;
 
 import com.historytalk.security.JwtAuthenticationFilter;
 import com.historytalk.security.JwtTokenProvider;
+import com.historytalk.security.oauth2.OAuth2AuthenticationFailureHandler;
+import com.historytalk.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.historytalk.service.authentication.CustomUserDetailsService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +20,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.security.web.SecurityFilterChain;
@@ -53,6 +54,9 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
+    private final OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler;
+    private final OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler;
 
     @Value("${monitoring.allowed-ips:127.0.0.1,0:0:0:0:0:0:0:1}")
     private String monitoringAllowedIps;
@@ -63,13 +67,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(passwordEncoder());
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(passwordEncoder);
         provider.setUserDetailsService(userDetailsService);
         return provider;
     }
@@ -102,14 +101,26 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authenticationProvider(authenticationProvider())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
                         .requestMatchers("/api/v1/api-docs/**", "/api/v1/swagger-ui/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers("/Historical-tell/oauth2/**", "/Historical-tell/login/oauth2/**").permitAll()
+
+                        // Payment: webhook must be public (PayOS servers have no JWT)
+                        // Tiers listing is public (pricing page — no auth needed)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/tiers").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/Historical-tell/api/v1/payments/tiers").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/payos/webhook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/payos/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/Historical-tell/api/v1/payments/payos/webhook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/Historical-tell/api/v1/payments/payos/webhook").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/character-documents/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-documents/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/quizzes/**").permitAll()
@@ -119,6 +130,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/quizzes/**").authenticated()
 
                         .anyRequest().authenticated()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .baseUri("/Historical-tell/oauth2/authorization"))
+                        .redirectionEndpoint(redirection -> redirection
+                                .baseUri("/Historical-tell/login/oauth2/code/*"))
+                        .successHandler(oauth2AuthenticationSuccessHandler)
+                        .failureHandler(oauth2AuthenticationFailureHandler)
                 )
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();

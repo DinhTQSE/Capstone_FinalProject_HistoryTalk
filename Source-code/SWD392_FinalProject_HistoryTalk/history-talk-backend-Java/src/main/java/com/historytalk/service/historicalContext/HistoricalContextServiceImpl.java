@@ -4,6 +4,7 @@ import com.historytalk.dto.historicalContext.CreateHistoricalContextRequest;
 import com.historytalk.dto.historicalContext.HistoricalContextResponse;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.historicalContext.UpdateHistoricalContextRequest;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
@@ -13,6 +14,7 @@ import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
+import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final HistoricalContextRepository contextRepository;
         private final UserRepository userRepository;
         private final DocumentRepository documentRepository;
+        private final ChatSessionRepository chatSessionRepository;
     
     /**
      * Get all historical contexts with pagination and search
@@ -43,8 +46,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         log.info("Fetching historical contexts with search: {}, era: {}, category: {}", search, era, category);
         
-        boolean includeDraft = true;
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDraft = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         Page<HistoricalContext> page = contextRepository
             .findAllWithSearch(normalize(search), era, category, includeDraft, includeDeleted, pageable);
         
@@ -57,8 +60,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     @Transactional(readOnly = true)
     public List<HistoricalContextResponse> getAllContextsSimple(String search, String role) {
         log.info("Fetching all historical contexts with search: {}", search);
-        boolean includeDraft = true;
-        boolean includeDeleted = isStaffOrAdmin(role);
+        boolean includeDraft = isStaffOrAdmin(role);
+        boolean includeDeleted = false;
         return contextRepository
                 .findAllSimple(normalize(search), includeDraft, includeDeleted)
                 .stream()
@@ -76,7 +79,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: "+contextId));
 
-        if (!isStaffOrAdmin(role) && Boolean.FALSE.equals(context.getIsActive())) {
+        if (!isStaffOrAdmin(role)
+                && (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
             throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
         }
         
@@ -237,7 +241,6 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         context.setDeletedAt(now);
-        context.setIsActive(false);
         contextRepository.save(context);
 
         // Cascade to Documents
@@ -245,24 +248,12 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 context.getContextId(), EntityType.CONTEXT, true)
             .forEach(doc -> doc.setDeletedAt(now));
 
-        // Cascade to Characters and their children
-        if (context.getCharacters() != null) {
-            context.getCharacters().forEach(character -> {
-                character.setDeletedAt(now);
-                character.setIsActive(false);
-                documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
-                                character.getCharacterId(), EntityType.CHARACTER, true)
-                        .forEach(doc -> doc.setDeletedAt(now));
-                if (character.getChatSessions() != null) {
-                    character.getChatSessions().forEach(session -> {
-                        session.setDeletedAt(now);
-                        if (session.getMessages() != null) {
-                            session.getMessages().forEach(msg -> msg.setDeletedAt(now));
-                        }
-                    });
-                }
-            });
-        }
+        chatSessionRepository.findByHistoricalContextContextId(context.getContextId()).forEach(session -> {
+            session.setDeletedAt(now);
+            if (session.getMessages() != null) {
+                session.getMessages().forEach(msg -> msg.setDeletedAt(now));
+            }
+        });
 
         // Cascade to Quizzes and their children
         if (context.getQuizzes() != null) {
@@ -324,20 +315,19 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .imageUrl(context.getImageUrl())
                 .videoUrl(context.getVideoUrl())
             .isPublished(context.getIsPublished())
-            .status(buildStatus(context.getIsPublished(), context.getDeletedAt(), context.getIsActive()))
+            .status(buildStatus(context.getIsPublished(), context.getDeletedAt()))
                 .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
                         .uid(context.getCreatedBy().getUid().toString())
                         .userName(context.getCreatedBy().getUserName())
                         .build())
                 .createdDate(context.getCreatedDate())
                 .updatedDate(context.getUpdatedDate())
-                .deletedAt(context.getDeletedAt())
                 .build();
     }
 
         private HistoricalContextResponse mapToResponseWithInactive(HistoricalContext context) {
         HistoricalContextResponse response = mapToResponse(context);
-        response.setStatus(buildStatus(context.getIsPublished(), context.getDeletedAt(), context.getIsActive()));
+        response.setStatus(buildStatus(context.getIsPublished(), context.getDeletedAt()));
         return response;
         }
     
@@ -373,13 +363,13 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             );
         }
 
-        private String buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt, Boolean isActive) {
-            if (deletedAt != null || Boolean.FALSE.equals(isActive)) {
-                return "INACTIVE";
+        private ContentStatus buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt) {
+            if (deletedAt != null) {
+                return ContentStatus.INACTIVE;
             }
-            if (Boolean.TRUE.equals(isPublished)) {
-                return "DRAFT";
+            if (!Boolean.TRUE.equals(isPublished)) {
+                return ContentStatus.DRAFT;
             }
-            return "ACTIVE";
+            return ContentStatus.ACTIVE;
         }
 }

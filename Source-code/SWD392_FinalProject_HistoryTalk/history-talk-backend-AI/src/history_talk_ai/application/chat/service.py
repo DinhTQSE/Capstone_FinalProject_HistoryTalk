@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 # ── Ollama HTTP Client ────────────────────────────────────────────────────────
+# Use a global client to reuse connections (Connection Pooling) for faster requests
+ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
 async def _call_ollama(messages: list[dict], expect_json: bool = True) -> str:
     """Make an async call to the Ollama endpoint."""
@@ -38,19 +40,18 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> str:
 
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            response = await client.post(
-                settings.OLLAMA_BASE_URL,
-                json=payload,
-                auth=auth
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("message", {}).get("content", "")
-        except Exception as e:
-            logger.error(f"Failed to call Ollama: {e}")
-            raise
+    try:
+        response = await ollama_client.post(
+            settings.OLLAMA_BASE_URL,
+            json=payload,
+            auth=auth
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get("message", {}).get("content", "")
+    except Exception as e:
+        logger.error(f"Failed to call Ollama: {e}")
+        raise
 
 async def get_embedding_from_ollama(text: str) -> List[float]:
     """Get embedding vector for a given text from Ollama."""
@@ -61,17 +62,16 @@ async def get_embedding_from_ollama(text: str) -> List[float]:
     }
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            response = await client.post(url, json=payload, auth=auth)
-            response.raise_for_status()
-            data = response.json()
-            return data.get("embedding", [])
-        except Exception as e:
-            logger.error(f"Failed to get embedding from Ollama: {e}")
-            return []
+    try:
+        response = await ollama_client.post(url, json=payload, auth=auth)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("embedding", [])
+    except Exception as e:
+        logger.error(f"Failed to get embedding from Ollama: {e}")
+        return []
 
-async def retrieve_history_context(user_question: str, entity_id: str) -> str:
+async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> str:
     """Retrieve history context from Supabase VectorChunk."""
     query_vector = await get_embedding_from_ollama(user_question)
     if not query_vector:
@@ -82,12 +82,14 @@ async def retrieve_history_context(user_question: str, entity_id: str) -> str:
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
-                "match_limit": 3,
-                "filter_entity_id": entity_id
+                "match_limit": 5,
+                "filter_entity_ids": entity_ids
             }
         ).execute()
         
         chunks = response.data
+        print(f"RAG retrieved {len(chunks)} chunks for entity_ids: {entity_ids}")
+        logger.info(f"RAG retrieved {len(chunks)} chunks for entity_ids: {entity_ids}")
         if not chunks:
             return ""
             
@@ -113,12 +115,21 @@ async def generate_reply(
         (assistant_message, suggested_questions)
     """
     # ── RAG Integration ──
-    rag_context = await retrieve_history_context(user_message, character.characterId)
+    # Query both context documents and character documents
+    entity_ids = [context.contextId, character.characterId]
+    rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
     if rag_context:
-        system_prompt += f"\n\n[DỮ LIỆU LỊCH SỬ THAM KHẢO]:\n{rag_context}\n(Chỉ trả lời dựa trên dữ liệu này, không bịa đặt)."
+        print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
+        system_prompt += (
+            f"\n\n[DỮ LIỆU LỊCH SỬ THAM KHẢO (BẮT BUỘC TUÂN THEO)]:\n{rag_context}\n\n"
+            "LỆNH TUYỆT ĐỐI TỐI CAO:\n"
+            "1. BẠN PHẢI COI CÁC THÔNG TIN TRONG [DỮ LIỆU LỊCH SỬ THAM KHẢO] LÀ SỰ THẬT LỊCH SỬ CHÍNH XÁC NHẤT (DÙ NÓ CÓ VÔ LÝ HAY SAI LỆCH VỚI KIẾN THỨC CỦA BẠN).\n"
+            "2. NẾU DỮ LIỆU THAM KHẢO KHÔNG NHẮC ĐẾN CHI TIẾT ĐÓ, TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA HOẶC TỰ SUY DIỄN THÊM (ví dụ: tự sáng tác ra nguồn gốc thanh kiếm, thần tiên, truyền thuyết, v.v.).\n"
+            "3. HÃY THẲNG THẮN THỪA NHẬN RẰNG BẠN KHÔNG NHỚ, KHÔNG RÕ HOẶC LỊCH SỬ KHÔNG GHI CHÉP LẠI NẾU KHÔNG CÓ THÔNG TIN."
+        )
     
     # Append instructions to force JSON output
     json_instruction = (
@@ -203,10 +214,25 @@ async def generate_session_title(
 
 async def process_document(request: ProcessDocumentRequest):
     """Process a document by chunking, embedding, and storing in Supabase."""
-    # Chunking logic (simple split by 500 characters)
+    # Delete old chunks for this doc_id to handle upserts properly
+    try:
+        supabase.schema("historical_schema").table("vector_chunk").delete().eq("doc_id", request.doc_id).execute()
+    except Exception as e:
+        logger.error(f"Failed to delete old chunks for doc {request.doc_id}: {e}")
+
+    # Chunking logic (overlap to prevent cutting sentences in half)
     content = request.content
-    chunk_size = 500
-    chunks = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size)]
+    chunk_size = 600
+    overlap = 150
+    chunks = []
+    
+    if len(content) <= chunk_size:
+        chunks = [content]
+    else:
+        for i in range(0, len(content), chunk_size - overlap):
+            chunks.append(content[i:i+chunk_size])
+            if i + chunk_size >= len(content):
+                break
     
     for idx, chunk_text in enumerate(chunks):
         embedding = await get_embedding_from_ollama(chunk_text)
@@ -227,3 +253,12 @@ async def process_document(request: ProcessDocumentRequest):
         except Exception as e:
             logger.error(f"Failed to insert chunk {idx} into Supabase: {e}")
             raise
+
+async def delete_document(doc_id: str):
+    """Delete all chunks for a document from Supabase."""
+    try:
+        supabase.schema("historical_schema").table("vector_chunk").delete().eq("doc_id", doc_id).execute()
+        logger.info(f"Successfully deleted chunks for doc {doc_id}")
+    except Exception as e:
+        logger.error(f"Failed to delete chunks for doc {doc_id}: {e}")
+        raise

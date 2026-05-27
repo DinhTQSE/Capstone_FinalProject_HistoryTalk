@@ -37,7 +37,7 @@ logs/
 # Environment variables - NEVER COMMIT CREDENTIALS
 # See .env.example for required variables
 # Each developer creates own .env file locally
-.env
+# .env
 .env.local
 .env.*.local
 .env.production
@@ -68,3 +68,4 @@ Source-code/SWD392_FinalProject_HistoryTalk/history-talk-frontend
 **/secretKey.properties
 
 src/main/resources/standbyMigration
+**/secretKey-prod.properties

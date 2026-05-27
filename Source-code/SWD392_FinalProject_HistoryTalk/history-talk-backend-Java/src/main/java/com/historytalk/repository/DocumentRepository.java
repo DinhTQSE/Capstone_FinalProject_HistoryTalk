@@ -72,6 +72,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("SELECT COUNT(d) FROM Document d")
     long countCurrent();
 
-    @Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL AND d.isActive = true")
+    @Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL")
     long countActive();
+
+    List<Document> findByEntityIdAndEntityType(UUID entityId, EntityType entityType);
 }
