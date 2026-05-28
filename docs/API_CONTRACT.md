@@ -1,6 +1,6 @@
 ﻿# HistoryTalk â€” API Contract
 
-> **Version:** 2.1 â€” Synced with FE source code  
+> **Version:** 2.2 - synced with Java backend source on 2026-05-28
 > **Base URL:** `{BACKEND_BASE_URL}/api/v1`  
 > **Response Wrapper:** `{ success: boolean, message: string, data: T, timestamp: string }`  
 > **Auth:** `Authorization: Bearer <accessToken>`  
@@ -186,8 +186,9 @@ YÃªu cáº§u role `SYSTEM_ADMIN`.
   personality?: string
   lifespan?: string        // VD: "898â€“944"
   era?: string             // ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY
-  isActive?: boolean
-  isPublished?: boolean     // true = Ä‘Ã£ publish cho ngÆ°á»i dÃ¹ng xem
+  modelUrl?: string | null  // URL model 3D
+  isPublished?: boolean     // true = visible when not deleted
+  status?: "ACTIVE" | "DRAFT" | "INACTIVE"
   createdAt?: string        // ISO8601 - thá»i gian táº¡o (admin only)
   updatedAt?: string        // ISO8601 - thá»i gian cáº­p nháº­t (admin only)
   context?: { contextId: string }   // nested object
@@ -198,8 +199,8 @@ YÃªu cáº§u role `SYSTEM_ADMIN`.
 > **Quan trá»ng:** FE dÃ¹ng `raw.characterId ?? raw.id` lÃ m id. Pháº£i tráº£ `characterId`.  
 > **Quan trá»ng:** FE dÃ¹ng `raw.image ?? raw.imageUrl`. Æ¯u tiÃªn tráº£ field `image`.  
 > **Quan trá»ng:** `contextId` náº±m trong `context.contextId` (nested).  
-> **Quan trá»ng:** CUSTOMER: GET /characters auto-filter `isPublished=true`, ignore `published` param.  
-> **Quan trá»ng:** ADMIN/STAFF: `?published=true` chá»‰ published, `?published=false` chá»‰ unpublished, khÃ´ng truyá»n = táº¥t cáº£.  
+> **Quan trá»ng:** CUSTOMER/guest list APIs hide soft-deleted records and only expose visible content according to backend role filtering.
+> **Quan trá»ng:** ADMIN/STAFF APIs still exclude soft-deleted records from main lists; use trash APIs for deleted records.
 > **Quan trá»ng:** `createdAt` vÃ  `updatedAt` chá»‰ tráº£ vá» cho ADMIN/STAFF, CUSTOMER sáº½ khÃ´ng tháº¥y.
 
 ---
@@ -214,14 +215,13 @@ YÃªu cáº§u role `SYSTEM_ADMIN`.
 | `page` | number | 0-indexed |
 | `limit` | number | Sá»‘ item/trang |
 | `era` | string | `ANCIENT` \| `MEDIEVAL` \| `MODERN` \| `CONTEMPORARY` |
-| `published` | boolean | `true` = chá»‰ published, `false` = chá»‰ unpublished, khÃ´ng truyá»n = táº¥t cáº£ |
 
 **Response `200`:**
 ```json
 {
   "success": true,
   "data": {
-    "content": [ { "characterId": "...", "name": "...", "title": "...", "background": "...", "image": "url", "era": "MEDIEVAL", "isActive": true, "isPublished": true } ],
+    "content": [ { "characterId": "...", "name": "...", "title": "...", "background": "...", "image": "url", "modelUrl": "url", "era": "MEDIEVAL", "isPublished": true, "status": "ACTIVE" } ],
     "totalElements": 24,
     "totalPages": 3,
     "currentPage": 0,
@@ -246,11 +246,12 @@ YÃªu cáº§u role `SYSTEM_ADMIN`.
     "title": "string",
     "background": "string",
     "image": "string | null",
+    "modelUrl": "string | null",
     "personality": "string",
     "lifespan": "string",
     "era": "MEDIEVAL",
-    "isActive": true,
     "isPublished": true,
+    "status": "ACTIVE",
     "context": { "contextId": "string" }
   }
 }
@@ -262,7 +263,7 @@ YÃªu cáº§u role `SYSTEM_ADMIN`.
 
 Láº¥y danh sÃ¡ch nhÃ¢n váº­t thuá»™c 1 bá»‘i cáº£nh lá»‹ch sá»­.
 
-> **Quan trá»ng:** BE auto-filter theo role. CUSTOMER chá»‰ tháº¥y `isPublished: true`. ADMIN/STAFF tháº¥y táº¥t cáº£.
+> **Quan trá»ng:** BE auto-filter theo role. Main lists exclude soft-deleted records; use trash APIs for deleted records.
 
 **Response `200`:**
 ```json
@@ -297,8 +298,8 @@ YÃªu cáº§u role `CONTENT_ADMIN` | `SYSTEM_ADMIN`.
   "image": "string | null",
   "personality": "string",
   "lifespan": "string",
-  "isActive": true,
-  "isPublished": false     // máº·c Ä‘á»‹nh false khi táº¡o má»›i
+  "modelUrl": "string | null",
+  "isPublished": false     // default false on create
 }
 ```
 
@@ -320,9 +321,9 @@ Permanent delete. Response `200`.
 
 ---
 
-### `PATCH /characters/:id/toggle-active`
+### `PATCH /characters/:id/soft-delete`
 
-Báº­t/Táº¯t hoáº¡t Ä‘á»™ng (Ä‘áº£o ngÆ°á»£c `isActive`). Response `200`.
+Move a character to trash by setting `deletedAt`. Response `200`.
 
 ---
 
@@ -351,7 +352,8 @@ Gáº¯n nhÃ¢n váº­t vÃ o bá»‘i cáº£nh. Response `200`.
   imageUrl?: string | null
   videoUrl?: string | null
   period?: string
-  isActive?: boolean
+  isPublished?: boolean
+  status?: "ACTIVE" | "DRAFT" | "INACTIVE"
 }
 ```
 
@@ -384,7 +386,8 @@ Gáº¯n nhÃ¢n váº­t vÃ o bá»‘i cáº£nh. Response `200`.
         "location": "SÃ´ng Báº¡ch Äáº±ng",
         "imageUrl": "string | null",
         "videoUrl": "string | null",
-        "isActive": true
+        "isPublished": true,
+        "status": "ACTIVE"
       }
     ],
     "totalElements": 48,
@@ -419,7 +422,7 @@ YÃªu cáº§u role `CONTENT_ADMIN` | `SYSTEM_ADMIN`.
   "location": "string",
   "imageUrl": "string | null",
   "videoUrl": "string | null",
-  "isActive": true
+  "isPublished": false
 }
 ```
 
@@ -439,9 +442,9 @@ Permanent delete. Response `200`.
 
 ---
 
-### `PATCH /historical-contexts/:id/toggle-active`
+### `PATCH /historical-contexts/:id/soft-delete`
 
-Báº­t/Táº¯t hoáº¡t Ä‘á»™ng. Response `200`.
+Move a historical context to trash by setting `deletedAt`. Response `200`.
 
 ---
 
@@ -831,7 +834,8 @@ Báº¯t Ä‘áº§u phiÃªn lÃ m bÃ i. KhÃ´ng cáº§n body.
   createdBy: string
   createdDate: string      // ISO8601
   updatedDate: string      // ISO8601
-  isActive: boolean
+  isPublished: boolean
+  status: "ACTIVE" | "DRAFT" | "INACTIVE"
   questions: QuizQuestion[]
 }
 ```
@@ -921,9 +925,9 @@ Permanent delete. Response `200`.
 
 ---
 
-### `PATCH /staff/quizzes/:quizId/toggle-active`
+### `PATCH /staff/quizzes/:quizId/soft-delete`
 
-Báº­t/Táº¯t hoáº¡t Ä‘á»™ng (Ä‘áº£o `isActive`). Response `200`.
+Move a quiz to trash by setting `deletedAt`. Response `200`.
 
 ---
 
@@ -1007,11 +1011,14 @@ XÃ³a cÃ¢u há»i. Response `200`.
 - Táº¥t cáº£ datetime dÃ¹ng **ISO 8601 UTC**: `"2026-05-22T14:30:00Z"`
 - `createdDate` / `updatedDate` (Staff Quiz) â€” cÃ¹ng format ISO 8601.
 
-### Active State pattern
+### Content lifecycle pattern
 
-- ThÃªm `isActive: boolean (default true)` vÃ o `Character`, `HistoricalContext`, `Quiz`.
-- Má»i GET query filter `WHERE isActive = true` máº·c Ä‘á»‹nh cho phÃ­a Customer.
-- PATCH `/:id/toggle-active` thá»±c hiá»‡n báº­t/táº¯t (Ä‘áº£o tráº¡ng thÃ¡i `isActive`).
+- Content lifecycle for `Character`, `HistoricalContext`, and `Quiz` is derived from `deletedAt` and `isPublished`.
+- `deletedAt != null` -> `status = INACTIVE`.
+- `deletedAt == null && isPublished == false` -> `status = DRAFT`.
+- `deletedAt == null && isPublished == true` -> `status = ACTIVE`.
+- Main list APIs exclude soft-deleted records. Use `/system/trash` APIs for deleted records.
+- Soft-delete endpoints use `PATCH /:id/soft-delete`; toggle-active endpoints are no longer current.
 
 ### Role check
 

@@ -1,8 +1,8 @@
 # HistoryTalk Project Handoff
 
-Last updated: 2026-05-19
+Last verified: 2026-05-28
 
-This document summarizes repository state, service architecture, local setup, important modules, operational commands, and caveats. For the business-domain and durable technical transfer guide, read `docs/DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md`.
+This document summarizes the current repository state, service architecture, operational commands, and caveats. For business/domain context, read `docs/DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md`. For the frontend/backend API contract, read `docs/API_CONTRACT.md`.
 
 ## 1. Repository Overview
 
@@ -19,6 +19,8 @@ Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
 Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-AI
 ```
 
+Important note: `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend` is not the active Java source directory. It currently only contains local environment material. Use `history-talk-backend-Java` for the Spring Boot backend.
+
 Documentation:
 
 ```text
@@ -28,7 +30,7 @@ docs/services/history-talk-backend-ai/
 docs/superpowers/
 ```
 
-The Java backend was restored to the conventional Spring Boot package structure on 2026-05-19. Do not reintroduce `presentation`, `application`, or `dataaccess` package roots for Java.
+The Java backend uses conventional Spring Boot packages. Do not reintroduce Java package roots named `presentation`, `application`, `dataaccess`, or `common`. Those names are still used in the Python AI service package layout.
 
 ## 2. Git Working Rules
 
@@ -38,15 +40,16 @@ Remote:
 origin https://github.com/DinhTQSE/SWD392_FinalProject_HistoryTalk.git
 ```
 
-Current branch:
+Verified working state on 2026-05-28:
 
 ```text
-main
+branch: refactor/KhaiVDD
+working tree: clean
 ```
 
 Use `git status -sb` before staging and pushing. Stage only intended files, and do not stage unrelated local edits.
 
-Do not commit new local-only or generated files:
+Do not commit local-only or generated files:
 
 ```text
 .env
@@ -60,40 +63,16 @@ target/ build output
 
 Some legacy `target/` artifacts may already be tracked. Do not stage new build output during normal work; cleanup of existing tracked artifacts should be a separate deliberate change.
 
-The active Java backend directory is:
-
-```text
-Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
-```
-
-## 3. System Architecture
-
-Runtime flow:
+## 3. Runtime Architecture
 
 ```text
 Frontend
-  -> Java backend, Spring Boot, port 8080
+  -> Java backend, Spring Boot, port 8080, servlet path /Historical-tell
   -> Python AI backend, FastAPI, port 8001
   -> LLM provider, OpenAI or Google Gemini
 ```
 
-The frontend should call the Java backend. The Python AI service is an internal service called by the Java backend for chat generation and title generation.
-
-Java backend responsibilities:
-
-- Authentication and JWT issuance.
-- User, character, historical context, document, chat, and quiz APIs.
-- Persistence through Spring Data JPA repositories.
-- Database schema managed by SQL migration files.
-- Calling the AI service for roleplay chat.
-
-Python AI backend responsibilities:
-
-- Receive chat requests from Java.
-- Build roleplay prompts from character and historical context data.
-- Call the configured LLM through LangChain.
-- Return assistant message, suggested questions, and generated chat titles.
-- Provide diagnostic proxy endpoints for Java character/context lookup.
+The frontend should call the Java backend. The Python AI service is an internal service called by Java for chat generation, title generation, and diagnostic character/context lookups.
 
 ## 4. Java Backend
 
@@ -103,27 +82,44 @@ Path:
 Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
 ```
 
-Tech stack:
+Current stack:
 
-- Java 21
-- Spring Boot 3.2.5
-- Maven
-- Spring Web
-- Spring Security
-- Spring Data JPA
-- PostgreSQL runtime driver
-- MySQL runtime driver is also present
-- Flyway dependency is present
-- Lombok
-- Springdoc OpenAPI
-- JJWT
+```text
+Java 21
+Spring Boot 3.2.5
+Maven
+Spring Web
+Spring Security
+Spring Data JPA
+Spring Validation
+Springdoc OpenAPI
+JJWT
+Lombok
+PostgreSQL runtime driver
+MySQL runtime driver
+Flyway
+PayOS Java SDK
+Spring Boot Actuator
+Micrometer Prometheus
+Spring Security OAuth2 Client
+```
 
-Build and compile:
+Build and test:
 
 ```powershell
 cd Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
 mvn -q -DskipTests compile
+mvn -q test
 ```
+
+Verified on 2026-05-28:
+
+```text
+mvn -q -DskipTests compile -> exit code 0
+mvn -q test                -> exit code 0
+```
+
+Mockito/ByteBuddy may print JVM dynamic-agent warnings on newer JDKs. Those warnings are not test failures.
 
 Run:
 
@@ -131,130 +127,114 @@ Run:
 mvn spring-boot:run
 ```
 
-Configured port:
+Runtime paths:
 
 ```text
-8080
+Java port: 8080
+Servlet path: /Historical-tell
+Swagger UI: /Historical-tell/api/v1/swagger-ui
+OpenAPI docs: /Historical-tell/api/v1/api-docs
 ```
 
-Servlet path:
+## 5. Java Package Structure
 
-```text
-/Historical-tell
-```
-
-Swagger/OpenAPI paths from current config:
-
-```text
-/Historical-tell/api/v1/swagger-ui
-/Historical-tell/api/v1/api-docs
-```
-
-### Java Package Structure
-
-Current Java package root:
+Package root:
 
 ```text
 src/main/java/com/historytalk
 ```
 
-Current package layout:
+Top-level packages:
 
 ```text
-config       Spring config, OpenAPI config, security config
+config       Spring, OpenAPI, Swagger, PayOS, OAuth2, security handlers
 controller   REST controllers
 dto          Request/response DTOs
 entity       JPA entities and enums
 exception    Custom exceptions and global exception handler
 mapper       DTO/entity mapping helpers
 repository   Spring Data JPA repositories
-security     JWT filter, token provider, authenticated principal
-service      Business services and AI service client
-utils        Utility helpers and auth utility classes
+security     JWT filter, token provider, principal model, OAuth2 handlers
+service      Business services, payment, dashboard, AI client
+utils        UUID/security/JWT utility helpers
 ```
 
 Current class counts by top-level package:
 
 ```text
-config 5
-controller 7
-dto 43
-entity 17
+config 8
+controller 12
+dto 58
+entity 23
 exception 8
-mapper 4
-repository 10
-security 4
-service 24
+mapper 6
+repository 14
+security 6
+service 36
 utils 4
 ```
 
-### Main Java Domains
+## 6. Main Java Domains
 
 Authentication:
 
 - Controller: `controller/authentication/AuthController.java`
 - Services: `service/authentication/*`
-- Security: `security/*`, `utils/authentication/*`
+- Security: `security/*`, `security/oauth2/*`, `utils/authentication/*`
 - Endpoints under `/api/v1/auth`
+- Google OAuth browser redirect flow is implemented.
 
 Characters:
 
-- Controller: `controller/character/CharacterController.java`
-- Service: `service/character/*`
-- Entity: `entity/character/*`
+- Controllers: `controller/character/CharacterController.java`, `CharacterDocumentController.java`
+- Services: `service/character/*`
+- Entity: `entity/character/Character.java`
 - Repository: `repository/CharacterRepository.java`
-- Endpoints under `/api/v1/characters`
+- Endpoints under `/api/v1/characters` and `/api/v1/character-documents`
+- Character responses include `modelUrl`.
 
 Historical contexts and documents:
 
-- Controllers:
-  - `controller/historicalContext/HistoricalContextController.java`
-  - `controller/historicalContext/HistoricalContextDocumentController.java`
+- Controllers: `controller/historicalContext/*`
 - Services: `service/historicalContext/*`
 - Document parsing strategies: `service/historicalContext/strategy/*`
-- Entities: `entity/historicalContext/*`
-- Repositories:
-  - `repository/HistoricalContextRepository.java`
-  - `repository/HistoricalContextDocumentRepository.java`
-- Endpoints under:
-  - `/api/v1/historical-contexts`
-  - `/api/v1/historical-documents`
+- Entities: `entity/historicalContext/*`, `entity/document/Document.java`
+- Repositories: `HistoricalContextRepository`, `DocumentRepository`
+- Endpoints under `/api/v1/historical-contexts` and `/api/v1/historical-documents`
 
 Chat:
 
 - Controller: `controller/chat/ChatController.java`
 - Services: `service/chat/*`
 - Entities: `entity/chat/*`
-- Repositories:
-  - `repository/ChatSessionRepository.java`
-  - `repository/MessageRepository.java`
+- Repositories: `ChatSessionRepository`, `MessageRepository`
 - AI integration: `service/chat/AiServiceClient.java`
 - Endpoints under `/api/v1/chat`
 
 Quiz:
 
-- Controllers:
-  - `controller/quiz/QuizController.java`
-  - `controller/quiz/StaffQuizController.java`
+- Controllers: `controller/quiz/QuizController.java`, `StaffQuizController.java`
 - Services: `service/quiz/*`
 - Entities: `entity/quiz/*`
-- Repositories:
-  - `repository/QuizRepository.java`
-  - `repository/QuestionRepository.java`
-  - `repository/QuizSessionRepository.java`
-  - `repository/QuizResultRepository.java`
+- Repositories: `QuizRepository`, `QuestionRepository`, `QuizSessionRepository`
 - Public endpoints under `/api/v1/quizzes`
 - Staff endpoints under `/api/v1/staff/quizzes`
 
-Shared enums:
+Payment:
 
-- `entity/enums/DocumentType.java`
-- `entity/enums/EventCategory.java`
-- `entity/enums/EventEra.java`
-- `entity/enums/MessageRole.java`
-- `entity/enums/UserRole.java`
+- Controllers: `controller/payment/PaymentController.java`, `PayOSWebhookController.java`
+- Services: `service/payment/*`
+- Entities: `entity/payment/*`
+- Repositories: `repository/payment/*`
+- Endpoints under `/api/v1/payments`
 
-## 5. Java Configuration
+System dashboard and trash:
+
+- Controllers: `controller/dashboard/SystemDashboardController.java`, `controller/trash/SystemTrashController.java`
+- Services: `service/dashboard/*`, `service/trash/*`
+- Endpoints under `/api/v1/system-admin/dashboard` and `/api/v1/system/trash`
+
+## 7. Java Configuration
 
 Main config file:
 
@@ -262,7 +242,7 @@ Main config file:
 src/main/resources/application.properties
 ```
 
-Important properties:
+Important current properties:
 
 ```properties
 spring.application.name=history-talk-backend
@@ -275,13 +255,16 @@ spring.datasource.password=${DB_PASSWORD}
 spring.datasource.hikari.schema=${DB_SCHEMA}
 spring.jpa.properties.hibernate.default_schema=${DB_SCHEMA}
 spring.jpa.hibernate.ddl-auto=none
-spring.flyway.enabled=false
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+spring.flyway.schemas=${DB_SCHEMA}
+spring.flyway.out-of-order=true
 jwt.secret=${JWT_SECRET}
 jwt.expiration=${JWT_EXPIRATION_MS}
 jwt.refreshExpiration=${JWT_REFRESH_EXPIRATION_MS}
 ```
 
-Required Java runtime environment/config values:
+Required Java runtime values:
 
 ```text
 DB_URL
@@ -291,7 +274,21 @@ DB_SCHEMA
 JWT_SECRET
 JWT_EXPIRATION_MS
 JWT_REFRESH_EXPIRATION_MS
-AI_SERVICE_URL optional, defaults to http://localhost:8001
+PAYOS_CLIENT_ID
+PAYOS_API_KEY
+PAYOS_CHECKSUM_KEY
+PAYOS_RETURN_URL
+PAYOS_CANCEL_URL
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+FRONTEND_OAUTH_SUCCESS_URL
+FRONTEND_OAUTH_FAILURE_URL
+```
+
+Optional value:
+
+```text
+AI_SERVICE_URL defaults to http://localhost:8001
 ```
 
 Sensitive local config:
@@ -302,9 +299,7 @@ src/main/resources/secretKey.properties
 
 This file is intentionally ignored by git through `**/secretKey.properties`.
 
-Note: `.env.example` in the Java service lists the expected local database, JWT, and AI service variables. Runtime loading still depends on the team's chosen local launch method.
-
-## 6. Java Security Rules
+## 8. Java Security Rules
 
 Security config:
 
@@ -314,50 +309,73 @@ src/main/java/com/historytalk/config/SecurityConfig.java
 
 Current access policy:
 
+- Actuator health is public.
+- Actuator Prometheus is restricted by allowed IPs.
 - Swagger/OpenAPI endpoints are public.
-- `/api/v1/auth/**` is public.
-- GET requests for characters, historical contexts, historical documents, and quizzes are public.
-- Chat endpoints require authentication.
-- Quiz mutation/session/result soft-delete endpoints require authentication.
+- `/api/v1/auth/**`, OAuth2 authorization, and OAuth2 callbacks are public.
+- Payment tiers and PayOS webhook endpoints are public.
+- GET requests for characters, character documents, historical contexts, historical documents, and quizzes are public.
+- `/api/v1/chat/**` requires authentication.
+- Quiz mutation endpoints require authentication.
 - All other endpoints require authentication.
 
-JWT filter:
+Method-level annotations still enforce content/admin roles for content management endpoints.
+
+## 9. Database And Migrations
+
+Migration files currently committed:
 
 ```text
-src/main/java/com/historytalk/security/JwtAuthenticationFilter.java
-```
-
-Principal model:
-
-```text
-src/main/java/com/historytalk/security/UserPrincipal.java
-src/main/java/com/historytalk/security/AuthenticatedPrincipal.java
-```
-
-## 7. Database And Migrations
-
-Migration files:
-
-```text
-src/main/resources/db/migration/V1__seed_roles.sql
-src/main/resources/db/migration/V2__add_chat_session_fields.sql
-src/main/resources/db/migration/V3__add_message_suggested_questions.sql
-src/main/resources/db/migration/V4__upgrade_quiz_module.sql
-src/main/resources/db/migration/V5__schema_updates.sql
-src/main/resources/db/migration/V6__indexes_and_quiz_fk.sql
-src/main/resources/db/migration/V7__seed_sample_data.sql
-src/main/resources/db/migration/V8__draft_publish_and_trash.sql
-src/main/resources/db/migration/V9__add_document_type_to_historical_context_document.sql
+V1__seed_roles.sql
+V2__add_chat_session_fields.sql
+V3__add_message_suggested_questions.sql
+V4__upgrade_quiz_module.sql
+V5__schema_updates.sql
+V6__indexes_and_quiz_fk.sql
+V7__seed_sample_data.sql
+V8__draft_publish_and_trash.sql
+V9__update_character_date_fields.sql
+V10__add_payment_and_tier_tables.sql
+V11__payment_order_unique_order_code.sql
+V12__sync_quiz_tables_with_entities.sql
+V13__lifecycle_trash_refactor.sql
+V14__add_character_model_url.sql
 ```
 
 Important notes:
 
 - `spring.jpa.hibernate.ddl-auto=none`, so Hibernate should not mutate schema automatically.
-- `spring.flyway.enabled=false` in current config, even though Flyway dependency and migration files exist.
-- Before enabling Flyway in any environment, confirm the existing database schema and migration history.
-- PostgreSQL is the expected local database from README/config examples.
+- Flyway is enabled in the current Java config.
+- `DB_SCHEMA` must match the target schema. Current migrations are written for the project schema strategy; verify database state before running against any shared database.
+- PostgreSQL is the expected local database from current config examples.
 
-## 8. Python AI Backend
+## 10. Content Lifecycle
+
+Current content lifecycle for characters, historical contexts, and quizzes:
+
+```text
+deletedAt != null -> INACTIVE
+deletedAt == null && isPublished == false -> DRAFT
+deletedAt == null && isPublished == true -> ACTIVE
+```
+
+Main list APIs exclude soft-deleted records. Trash APIs expose deleted records for restore or hard-delete workflows.
+
+Soft-delete endpoints:
+
+```text
+PATCH /Historical-tell/api/v1/characters/{characterId}/soft-delete
+PATCH /Historical-tell/api/v1/historical-contexts/{contextId}/soft-delete
+PATCH /Historical-tell/api/v1/staff/quizzes/{quizId}/soft-delete
+```
+
+Central trash endpoints:
+
+```text
+/Historical-tell/api/v1/system/trash
+```
+
+## 11. Python AI Backend
 
 Path:
 
@@ -365,57 +383,18 @@ Path:
 Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-AI
 ```
 
-Tech stack:
-
-- Python 3.x
-- FastAPI
-- Uvicorn
-- Pydantic v2
-- pydantic-settings
-- httpx
-- LangChain
-- OpenAI and Google GenAI integrations
-
-Install:
+Runtime:
 
 ```powershell
 cd Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-AI
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Run:
-
-```powershell
 python main.py
 ```
 
-Alternative run command:
+Alternative:
 
 ```powershell
 uvicorn history_talk_ai.main:app --reload --port 8001 --app-dir src
 ```
-
-Configured/default port:
-
-```text
-8001
-```
-
-Docs:
-
-```text
-http://localhost:8001/docs
-```
-
-Health:
-
-```text
-GET /health
-```
-
-### Python Package Structure
 
 Current Python package root:
 
@@ -426,116 +405,49 @@ src/history_talk_ai
 Important modules:
 
 ```text
-main.py                                  FastAPI app setup
-presentation/chat/router.py              AI endpoints
-presentation/chat/schemas.py             Request/response schemas
-application/chat/service.py              LLM orchestration
-application/prompting/prompt_builder.py  Roleplay prompt construction
-dataaccess/java_backend/client.py         Java backend client
-dataaccess/java_backend/*_schema.py       Java response schemas
-common/config/settings.py                Environment settings
-common/errors/                           Reserved for custom errors
+main.py
+presentation/chat/router.py
+presentation/chat/schemas.py
+application/chat/service.py
+application/prompting/prompt_builder.py
+dataaccess/java_backend/client.py
+common/config/settings.py
 ```
 
-There are still legacy empty `app/` package folders. Current runtime code uses `src/history_talk_ai`.
+The AI service has no committed `.env.example`. Create `.env` manually from settings in `src/history_talk_ai/common/config/settings.py`.
 
-### Python Environment
-
-Settings source:
-
-```text
-src/history_talk_ai/common/config/settings.py
-```
-
-Important variables:
-
-```text
-JAVA_BACKEND_URL default http://localhost:8080/Historical-tell
-CHARACTER_API_PATH default /api/v1/characters
-CONTEXT_API_PATH default /api/v1/historical-contexts
-JAVA_CLIENT_TIMEOUT default 10.0
-LLM_PROVIDER openai or google, default openai
-OPENAI_API_KEY
-GOOGLE_API_KEY
-LLM_MODEL default gemini-2.5-flash-lite in current code
-LLM_TEMPERATURE default 0.7
-LLM_MAX_TOKENS default 1024
-APP_HOST default 0.0.0.0
-APP_PORT default 8001
-DEBUG default false
-```
-
-There is no AI `.env.example` in the current AI service. New developers should create `.env` manually based on the variables above.
-
-## 9. Java To AI Chat Flow
-
-Java client:
-
-```text
-history-talk-backend-Java/src/main/java/com/historytalk/service/chat/AiServiceClient.java
-```
-
-AI routes:
-
-```text
-history-talk-backend-AI/src/history_talk_ai/presentation/chat/router.py
-```
-
-Primary flow:
+## 12. Java To AI Chat Flow
 
 1. Frontend calls Java `/Historical-tell/api/v1/chat/...`.
 2. Java validates JWT and resolves the current user.
-3. Java loads character/context/session/message data from the database.
-4. Java builds `characterData` and `contextData` payloads.
+3. Java loads character, context, session, and message data.
+4. Java builds `characterData` and `contextData`.
 5. Java calls AI service `POST /v1/ai/chat`.
-6. AI service uses supplied payloads to avoid callback loops.
-7. AI service calls the configured LLM and returns:
-   - assistant message
-   - suggested questions
-8. Java persists the assistant message.
-9. Java may asynchronously call `POST /v1/ai/generate-title` for the first exchange.
+6. AI service calls the configured LLM and returns assistant message plus suggested questions.
+7. Java persists the assistant message.
+8. Java may call `POST /v1/ai/generate-title` asynchronously for the first exchange.
 
-AI service diagnostic endpoints:
+AI diagnostic endpoints:
 
 ```text
 GET /v1/ai/character/{characterId}
 GET /v1/ai/context/{contextId}
 ```
 
-Use these only for debugging service-to-service connectivity.
-
-## 10. Key API Areas
-
-Java public/auth endpoints:
+## 13. Key API Areas
 
 ```text
-POST /Historical-tell/api/v1/auth/register
-POST /Historical-tell/api/v1/auth/login
-POST /Historical-tell/api/v1/auth/refresh-token
-POST /Historical-tell/api/v1/auth/logout
-```
-
-Java content endpoints:
-
-```text
+/Historical-tell/api/v1/auth
 /Historical-tell/api/v1/characters
+/Historical-tell/api/v1/character-documents
 /Historical-tell/api/v1/historical-contexts
 /Historical-tell/api/v1/historical-documents
-```
-
-Java chat endpoints:
-
-```text
-/Historical-tell/api/v1/chat/sessions
-/Historical-tell/api/v1/chat/messages
-/Historical-tell/api/v1/chat/history
-```
-
-Java quiz endpoints:
-
-```text
+/Historical-tell/api/v1/chat
 /Historical-tell/api/v1/quizzes
 /Historical-tell/api/v1/staff/quizzes
+/Historical-tell/api/v1/system/trash
+/Historical-tell/api/v1/system-admin/dashboard
+/Historical-tell/api/v1/payments
 ```
 
 Python AI endpoints:
@@ -548,13 +460,19 @@ GET /v1/ai/context/{contextId}
 GET /health
 ```
 
-## 11. Verification Commands
+## 14. Verification Commands
 
 Java compile:
 
 ```powershell
 cd Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
 mvn -q -DskipTests compile
+```
+
+Java tests:
+
+```powershell
+mvn -q test
 ```
 
 Java structure check:
@@ -578,60 +496,27 @@ Python router import smoke check:
 python -c "import sys; sys.path.insert(0, 'src'); from history_talk_ai.presentation.chat.router import router; print('python-router-import-ok')"
 ```
 
-Git remote status check:
-
-```powershell
-git fetch --all --prune
-git status -sb
-git log --oneline origin/main..HEAD
-git log --oneline HEAD..origin/main
-```
-
-## 12. Current Known Caveats
-
-Git/worktree:
+## 15. Current Known Caveats
 
 - Keep local-only files and generated output out of commits.
-- Do not stage `.codex/`, `.idea/`, service `.env` files, `secretKey.properties`, or new build output.
-
-Java environment:
-
-- `secretKey.properties` is the current local secret config path.
-- `.env.example` documents the expected local database, JWT, and AI service variables, but runtime loading still depends on the team's chosen local launch method.
-
-Database:
-
-- Flyway migrations exist, but Flyway is disabled.
-- Do not enable migrations in a shared environment without checking schema state.
-
-Python:
-
+- Java local secrets are currently loaded through `src/main/resources/secretKey.properties` or environment variables.
+- Flyway is enabled. Verify target database/schema state before running the application against shared data.
+- Payment expiry scheduler class exists, but `HistoryTalkApplication` currently has `@EnableAsync` and does not have `@EnableScheduling`; scheduled expiry will not run until scheduling is enabled.
 - The AI service has no `.env.example`.
-- Legacy empty `app/` folders remain after the `src/history_talk_ai` migration.
-- The AI Dockerfile still references the old `app.main:app` module path. Update it before relying on Docker for the AI service.
+- Legacy empty AI `app/` folders may remain after the `src/history_talk_ai` migration.
+- The AI Dockerfile may still reference the old `app.main:app` path. Check before relying on Docker for the AI service.
+- Some older README/comment text contains mojibake. Avoid copying corrupted text into new docs.
 
-Encoding:
+## 16. New Developer Start
 
-- Some existing README/comment text has mojibake from earlier encoding corruption. Avoid copying that text into new docs without fixing it.
-
-## 13. Recommended First Day For A New Developer
-
-1. Pull latest `main`.
-2. Create local Java secret config with database/JWT values.
-3. Create AI `.env` with LLM and Java backend values.
-4. Run Java compile or tests.
-5. Run Python import smoke check.
-6. Start PostgreSQL and verify database schema.
-7. Start Java backend on port 8080.
-8. Start AI backend on port 8001.
-9. Open Java Swagger and AI Swagger.
-10. Test auth login, a public content endpoint, and chat session flow.
-
-## 14. Change Guidelines
-
-- Keep Java packages in the Spring Boot convention: `controller`, `service`, `repository`, `entity`, `dto`, `mapper`, `config`, `security`, `exception`, `utils`.
-- Do not move Java back to `presentation`, `application`, or `dataaccess`.
-- Keep API behavior stable unless the frontend contract is updated.
-- Treat `SecurityConfig`, `application.properties`, database migrations, and AI request/response schemas as shared-contract files.
-- Run compile/import checks before pushing.
-- Never commit `.env`, `secretKey.properties`, API keys, database passwords, or `.codex/`.
+1. Read this handoff, then `docs/DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md`.
+2. Read `docs/API_CONTRACT.md`.
+3. Create Java local secrets/env values.
+4. Create AI `.env` values.
+5. Run `mvn -q -DskipTests compile`.
+6. Run `mvn -q test`.
+7. Run Python import smoke checks.
+8. Start PostgreSQL and verify target schema.
+9. Start Java on port 8080 and AI on port 8001.
+10. Open Java Swagger and AI Swagger.
+11. Test login, one public content endpoint, and one chat flow.

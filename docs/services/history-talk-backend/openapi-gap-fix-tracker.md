@@ -1,29 +1,54 @@
 # OpenAPI Gap Fix Tracker
 
-Source contract: `docs/openapi.json`  
-Backend checked: `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java` ---
+Last verified: 2026-05-28
 
-## Fixed in this pass--
+This tracker is retained as context for earlier FE/BE contract work. The current API source of truth is:
 
-| Gap | Contract endpoint/config | Backend change | Status |
-| --- | --- | --- | --- |
-| Servlet path mismatch | Server base is `/api/v1`; backend added `/Historical-tell` before it | Set `spring.mvc.servlet.path=/` in `application.properties` and `application-prod.properties` | Fixed |
-| Content admin registration missing | `POST /auth/register-content-admin` | Added `POST /api/v1/auth/register-content-admin`, protected by `SYSTEM_ADMIN`, using existing `AuthService.registerStaff` | Fixed |
-| Character toggle-active missing | `PATCH /characters/{id}/toggle-active` | Added `PATCH /api/v1/characters/{characterId}/toggle-active` and `CharacterService.toggleActiveCharacter` | Fixed |
-| Historical context toggle-active missing | `PATCH /historical-contexts/{id}/toggle-active` | Added `PATCH /api/v1/historical-contexts/{contextId}/toggle-active` and `HistoricalContextService.toggleActiveContext` | Fixed |
-| Staff quiz toggle-active missing | `PATCH /staff/quizzes/{quizId}/toggle-active` | Added `PATCH /api/v1/staff/quizzes/{quizId}/toggle-active` and `QuizService.toggleActiveQuiz` | Fixed |
+```text
+docs/API_CONTRACT.md
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/java/com/historytalk/controller
+```
 
-## Compatibility notes
+## Current Contract Status
 
-- Existing `soft-delete` endpoints were kept. The new toggle endpoints are contract-facing aliases with reversible active/inactive behavior.
-- Quiz currently has no `is_active` database column. Its active state is derived from `deleted_at == null`, and `QuizStaffResponse.isActive` now exposes that state.
-- Character and historical context toggles flip `is_active` and clear/set `deleted_at` accordingly.
+The previous `toggle-active` contract is obsolete. Current content lifecycle uses:
 
-## Known remaining OpenAPI drift to review separately
+```text
+deletedAt != null -> INACTIVE
+deletedAt == null && isPublished == false -> DRAFT
+deletedAt == null && isPublished == true -> ACTIVE
+```
 
-| Backend-only endpoint | Note |
+Current soft-delete endpoints:
+
+```text
+PATCH /api/v1/characters/{characterId}/soft-delete
+PATCH /api/v1/historical-contexts/{contextId}/soft-delete
+PATCH /api/v1/staff/quizzes/{quizId}/soft-delete
+```
+
+Deleted content is managed through:
+
+```text
+/api/v1/system/trash
+```
+
+## Current Known Drift
+
+`docs/openapi.json` is older than the Java controllers and still contains `toggle-active` paths. Do not use it as the current contract until it is regenerated from the running backend or replaced with an updated OpenAPI export.
+
+Known backend areas that should be included in a regenerated OpenAPI document:
+
+| Area | Current backend path |
 | --- | --- |
-| `/api/v1/historical-documents/**` | Present in backend, not in current `docs/openapi.json` |
-| `/api/v1/characters/{characterId}/contexts` | Present in backend, not in current `docs/openapi.json` |
-| `DELETE /api/v1/characters/{characterId}/contexts/{contextId}` | Present in backend, not in current `docs/openapi.json` |
-| `PUT /api/v1/staff/quizzes/{quizId}/questions/reorder` | Present in backend, not in current `docs/openapi.json` |
+| Auth and Google OAuth helper | `/api/v1/auth/**` |
+| Characters | `/api/v1/characters/**` |
+| Character documents | `/api/v1/character-documents/**` |
+| Historical contexts | `/api/v1/historical-contexts/**` |
+| Historical documents | `/api/v1/historical-documents/**` |
+| Chat | `/api/v1/chat/**` |
+| Customer quiz | `/api/v1/quizzes/**` |
+| Staff quiz | `/api/v1/staff/quizzes/**` |
+| Trash | `/api/v1/system/trash/**` |
+| System dashboard | `/api/v1/system-admin/dashboard/**` |
+| Payments | `/api/v1/payments/**` |

@@ -1,5 +1,10 @@
 # Quiz Module — From-Scratch Implementation Plan
 
+> Historical plan note: this file predates the lifecycle/trash refactor.
+> Current quiz lifecycle uses `isPublished`, `deletedAt`, `status`, and
+> `PATCH /api/v1/staff/quizzes/{quizId}/soft-delete`.
+> Use `docs/API_CONTRACT.md` and `docs/PROJECT_HANDOFF.md` for current behavior.
+
 ## Context
 
 All old quiz code has been deleted. This plan creates the entire quiz module fresh based on:

@@ -1,15 +1,26 @@
 # Design Pattern Review
 
-## Patterns Đang Dùng
-- **Strategy (xử lý nội dung tài liệu)**: `DocumentProcessorStrategy` định nghĩa hợp đồng; các chiến lược cụ thể `TextProcessorStrategy` và `MarkdownProcessorStrategy` chịu trách nhiệm validate/sanitize theo loại nội dung ([Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/DocumentProcessorStrategy.java#L1-L17](Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/DocumentProcessorStrategy.java#L1-L17), [Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/TextProcessorStrategy.java#L1-L29](Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/TextProcessorStrategy.java#L1-L29), [Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/MarkdownProcessorStrategy.java#L1-L32](Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/MarkdownProcessorStrategy.java#L1-L32)).
+Last verified: 2026-05-28
 
-- **Factory (chọn chiến lược theo DocumentType)**: `DocumentProcessorFactory` map `DocumentType` → strategy, ném lỗi nếu loại không hỗ trợ; Spring autowire danh sách strategy để sẵn sàng mở rộng ([Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/DocumentProcessorFactory.java#L1-L29](Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/strategy/DocumentProcessorFactory.java#L1-L29)).
+## Patterns In Use
 
-- **Strategy + Factory in action (Service layer)**: `HistoricalContextDocumentServiceImpl.createDocument/updateDocument` lấy `DocumentType`, gọi factory để chọn strategy, sau đó process content trước khi save/update; bảo vệ bằng owner-check và exception rõ ràng ([Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/HistoricalContextDocumentServiceImpl.java#L110-L169](Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/HistoricalContextDocumentServiceImpl.java#L110-L169)).
+- Strategy pattern: `DocumentProcessorStrategy` defines the document-processing contract. Current implementations include `TextProcessorStrategy` and `MarkdownProcessorStrategy`.
+- Factory pattern: `DocumentProcessorFactory` selects a `DocumentProcessorStrategy` by `DocumentType` and rejects unsupported types.
+- Service orchestration: `HistoricalContextDocumentServiceImpl` delegates document content validation/sanitization to the selected strategy before persistence.
+- Builder pattern: Lombok `@Builder` is used across DTO/entity construction where the source code already follows that style.
 
-- **Builder pattern (Lombok)**: các entity dùng `@Builder` để khởi tạo bất biến, ví dụ tạo `HistoricalContextDocument` trong `createDocument` ([Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/HistoricalContextDocumentServiceImpl.java#L123-L129](Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend/src/main/java/com/historyTalk/service/historicalContext/HistoricalContextDocumentServiceImpl.java#L123-L129)).
+## Current Source Paths
 
-## Nhận Xét & Đề Xuất
-- Strategy + Factory đã tách biệt logic định dạng, dễ mở rộng thêm `PdfProcessorStrategy`/`HtmlProcessorStrategy` mà không chạm Service.
-- Có thể bổ sung unit test riêng cho từng strategy để cover size limit, sanitize `<script>` và lỗi null/blank.
-- Nếu cần thống kê/telemetry, cân nhắc wrapper hoặc decorator quanh strategy để log thời gian xử lý và tỉ lệ lỗi.
+```text
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/java/com/historytalk/service/historicalContext/strategy/DocumentProcessorStrategy.java
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/java/com/historytalk/service/historicalContext/strategy/TextProcessorStrategy.java
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/java/com/historytalk/service/historicalContext/strategy/MarkdownProcessorStrategy.java
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/java/com/historytalk/service/historicalContext/strategy/DocumentProcessorFactory.java
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/java/com/historytalk/service/historicalContext/HistoricalContextDocumentServiceImpl.java
+```
+
+## Notes
+
+- The previous inactive backend directory and old mixed-case Java package path are obsolete.
+- Keep document-format behavior behind strategies. Add a new strategy implementation when introducing a new document type instead of expanding conditional logic inside the service.
+- Focused unit tests for each strategy would improve coverage for null/blank content, size limits, and sanitization behavior.

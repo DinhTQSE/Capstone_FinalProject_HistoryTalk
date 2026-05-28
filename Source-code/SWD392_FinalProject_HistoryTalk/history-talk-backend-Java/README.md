@@ -1,8 +1,16 @@
 # 📚 History Talk Backend - Historical Context API
 
+> Status note, verified 2026-05-28: this README is historical and partially stale.
+> Use `docs/PROJECT_HANDOFF.md`, `docs/API_CONTRACT.md`, and
+> `docs/services/history-talk-backend/README.md` as the current source of truth.
+> The active backend is `history-talk-backend-Java`, Java 21, Spring Boot 3.2.5,
+> servlet path `/Historical-tell`, Flyway enabled through `V14`, and current
+> content lifecycle uses `isPublished` + `deletedAt` + `status`, not `isActive`
+> toggle endpoints.
+
 **Version**: 1.0.0 | **Status**: ✅ Production Ready | **Date**: February 28, 2026
 
-Backend API cho nền tảng học Lịch sử History Talk. Quản lý Historical Context (bối cảnh lịch sử) với Spring Boot 3.2.0, PostgreSQL, JWT authentication.
+Backend API cho nền tảng học Lịch sử History Talk. Current backend stack uses Spring Boot 3.2.5, Java 21, PostgreSQL, JWT authentication, OAuth2, PayOS, Flyway, and monitoring endpoints.
 
 ---
 
@@ -46,7 +54,7 @@ Backend API cho nền tảng học Lịch sử History Talk. Quản lý Historic
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Java 17+ 
+- Java 21
 - Maven 3.8+
 - PostgreSQL 14+ (running on localhost:5432)
 
@@ -503,7 +511,7 @@ The API uses custom HTTP headers for testing purposes to simulate authentication
 ## 📁 Project Structure (27 Java Classes)
 
 ```
-src/main/java/com/historyTalk/
+src/main/java/com/historytalk/
 ├── HistoryTalkApplication.java       ← Main app
 ├── config/
 │   ├── SecurityConfig.java           ← JWT + CORS (updated with docs routes)
@@ -664,7 +672,7 @@ Deletion endpoints now remove rows from the database. Use database backups or tr
 | Database doesn't exist | `psql -U postgres -c "CREATE DATABASE history_talk_db;"` |
 | Cannot connect to PostgreSQL | Check: Service running? Correct password? Port 5432? |
 | Port 8080 already in use | Change in application.properties: `server.port=8081` |
-| "No POM in directory" | Run from `history-talk-backend/` folder |
+| "No POM in directory" | Run from `history-talk-backend-Java/` folder |
 | Swagger shows "Failed to load" | Verify app running: http://localhost:8080/swagger-ui.html |
 
 ---
@@ -672,7 +680,7 @@ Deletion endpoints now remove rows from the database. Use database backups or tr
 ## 📦 Technology Stack
 
 ```
-Java 17 + Spring Boot 3.2.0
+Java 21 + Spring Boot 3.2.5
 ├── Spring Web (REST)
 ├── Spring Data JPA (Database)
 ├── Spring Security (Auth)

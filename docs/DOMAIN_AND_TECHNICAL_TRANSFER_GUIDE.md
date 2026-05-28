@@ -1,6 +1,6 @@
 # HistoryTalk Domain And Technical Transfer Guide
 
-Last updated: 2026-05-19
+Last verified: 2026-05-28
 
 This guide is for a developer joining the HistoryTalk project. It explains the business domain, the current service architecture, the Java Spring Boot package structure, the Python AI service, and the main operational rules that should be preserved.
 
@@ -205,15 +205,15 @@ Current top-level package layout:
 Current class counts by top-level package:
 
 ```text
-config 5
-controller 7
-dto 43
-entity 17
+config 8
+controller 12
+dto 58
+entity 23
 exception 8
-mapper 4
-repository 10
-security 4
-service 24
+mapper 6
+repository 14
+security 6
+service 36
 utils 4
 ```
 
@@ -271,7 +271,10 @@ spring.datasource.password=${DB_PASSWORD}
 spring.datasource.hikari.schema=${DB_SCHEMA}
 spring.jpa.properties.hibernate.default_schema=${DB_SCHEMA}
 spring.jpa.hibernate.ddl-auto=none
-spring.flyway.enabled=false
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+spring.flyway.schemas=${DB_SCHEMA}
+spring.flyway.out-of-order=true
 jwt.secret=${JWT_SECRET}
 jwt.expiration=${JWT_EXPIRATION_MS}
 jwt.refreshExpiration=${JWT_REFRESH_EXPIRATION_MS}
@@ -287,6 +290,15 @@ DB_SCHEMA
 JWT_SECRET
 JWT_EXPIRATION_MS
 JWT_REFRESH_EXPIRATION_MS
+PAYOS_CLIENT_ID
+PAYOS_API_KEY
+PAYOS_CHECKSUM_KEY
+PAYOS_RETURN_URL
+PAYOS_CANCEL_URL
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+FRONTEND_OAUTH_SUCCESS_URL
+FRONTEND_OAUTH_FAILURE_URL
 ```
 
 Optional Java value:
@@ -330,16 +342,21 @@ V5__schema_updates.sql
 V6__indexes_and_quiz_fk.sql
 V7__seed_sample_data.sql
 V8__draft_publish_and_trash.sql
-V9__add_document_type_to_historical_context_document.sql
+V9__update_character_date_fields.sql
+V10__add_payment_and_tier_tables.sql
+V11__payment_order_unique_order_code.sql
+V12__sync_quiz_tables_with_entities.sql
+V13__lifecycle_trash_refactor.sql
+V14__add_character_model_url.sql
 ```
 
-Flyway is present as a dependency, but disabled in `application.properties`:
+Flyway is enabled in `application.properties`:
 
 ```properties
-spring.flyway.enabled=false
+spring.flyway.enabled=true
 ```
 
-Before enabling Flyway in any shared or production database, compare the live schema with the migration history. Do not let Hibernate or Flyway mutate a shared schema without a deliberate migration plan.
+Before running the application against any shared or production database, compare the live schema with the committed migration history. Do not let Flyway mutate a shared schema unless the migration plan is deliberate and reviewed.
 
 Schema naming caveat:
 
@@ -349,7 +366,7 @@ application.properties uses DB_SCHEMA
 existing SQL migrations hard-code historical_schema
 ```
 
-Choose one schema strategy before running migrations locally. If using the existing migration files as-is, create and point the database work at `historical_schema` or update the migrations deliberately. Do not enable Flyway with `DB_SCHEMA=public` while the migration SQL still references `historical_schema`.
+Choose one schema strategy before running migrations locally. `DB_SCHEMA` must match the target schema expected by the migrations and database. Do not point Flyway at a shared schema until the current schema state and migration history are verified.
 
 ## 9. Python AI Backend Overview
 
@@ -544,7 +561,8 @@ The following caveats matter for new developers:
 
 | Area | Caveat |
 | --- | --- |
-| Flyway | SQL migrations exist, but Flyway is disabled in current Java config. |
+| Flyway | Flyway is enabled in current Java config; verify target schema state before running against shared data. |
+| Payment scheduler | `PaymentExpiryScheduler` exists, but the main app currently has `@EnableAsync` and no `@EnableScheduling`, so scheduled expiry will not run until scheduling is enabled. |
 | AI env sample | The AI backend does not currently include a committed `.env.example`. |
 | Python legacy folders | Some old empty `app/` package folders may still exist, but runtime code uses `src/history_talk_ai`. |
 | AI Dockerfile | The AI Dockerfile still references the old `app.main:app` module path. Update it before relying on Docker for the AI service. |
