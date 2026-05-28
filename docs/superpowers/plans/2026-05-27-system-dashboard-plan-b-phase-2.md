@@ -2,6 +2,8 @@
 
 Date: 2026-05-27
 
+Last updated: 2026-05-28
+
 Status: planning for review
 
 Related old plan:
@@ -29,11 +31,12 @@ Token usage and AI cost are still not ready for direct dashboard implementation 
 
 Updated Phase 2B decision:
 
-- Add `tokenUsage` to `message`.
-- If `message.is_from_ai = false`, `message.token_usage` is prompt token usage.
-- If `message.is_from_ai = true`, `message.token_usage` is completion token usage.
+- Add `token` to `message`.
+- If `message.is_from_ai = false`, `message.token` is prompt token usage.
+- If `message.is_from_ai = true`, `message.token` is completion token usage.
 - `user.token` is the remaining token balance of the user.
 - Dashboard token usage should read from `message`, not from a separate token audit table in the MVP.
+- Token reset tracking with `user.last_token_reset_at` is out of scope for this phase and will be handled separately.
 
 ## 2. Source Review Summary
 
@@ -180,14 +183,14 @@ So Java receives `tokenUsage = null`, and `AiMetricsService.recordTokens()` does
 Confirmed backend storage direction:
 
 ```text
-message.token_usage
+message.token
 ```
 
 Token interpretation:
 
 ```text
-message.is_from_ai = false -> promptTokens
-message.is_from_ai = true  -> completionTokens
+message.is_from_ai = false -> promptTokens stored in message.token
+message.is_from_ai = true  -> completionTokens stored in message.token
 ```
 
 User balance:
@@ -218,6 +221,7 @@ user.token = remaining tokens
 - Token usage by user/session
 - Token usage trend
 - Remaining token distribution from `user.token`
+- Users out of token balance
 
 ## 4. API Contract Proposal
 
@@ -440,6 +444,8 @@ Phase 2 initial response:
     "promptTokens": 0,
     "completionTokens": 0,
     "totalTokens": 0,
+    "remainingTokens": 0,
+    "usersOutOfTokens": 0,
     "estimatedCost": 0
   },
   "requestsByOperation": [
@@ -449,8 +455,22 @@ Phase 2 initial response:
   "tokensByModel": [
     { "provider": "ollama", "model": "qwen2.5:14b", "promptTokens": 0, "completionTokens": 0, "totalTokens": 0, "estimatedCost": 0 }
   ],
+  "tokenBalanceByTier": [
+    { "tierId": "uuid", "tierTitle": "free", "users": 0, "remainingTokens": 0, "averageRemainingTokens": 0.0 }
+  ],
+  "topUsersByTokenUsage": [
+    {
+      "uid": "uuid",
+      "userName": "string",
+      "email": "string",
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "remainingTokens": 0
+    }
+  ],
   "trend": [
-    { "date": "2026-05-27", "requests": 0, "failures": 0, "tokens": 0, "estimatedCost": 0 }
+    { "date": "2026-05-27", "requests": 0, "failures": 0, "promptTokens": 0, "completionTokens": 0, "totalTokens": 0, "estimatedCost": 0 }
   ]
 }
 ```
@@ -458,7 +478,8 @@ Phase 2 initial response:
 Important limitation:
 
 - Request counters can come from Micrometer.
-- Historical token data cannot be reliably returned from REST API until token usage is persisted into `message.token_usage`.
+- Historical token data cannot be reliably returned from REST API until token usage is persisted into `message.token`.
+- Token balance comes from `user.token`.
 - Model/provider breakdown requires either storing provider/model on message or adding another metadata source later. MVP can report prompt/completion/total tokens without provider/model split.
 
 ## 5. Required AI Token Pipeline
@@ -519,32 +540,32 @@ historytalk.ai.tokens
 For business dashboard MVP, add token persistence to `message`:
 
 ```text
-message.token_usage INT NOT NULL DEFAULT 0
+message.token INT NOT NULL DEFAULT 0
 ```
 
 Java entity field:
 
 ```text
-Message.tokenUsage
+Message.token
 ```
 
 Implementation notes:
 
-- Use Flyway migration to add `token_usage` to `message`.
+- Use Flyway migration to add `token` to `message`.
 - Keep all existing UUID primary key types unchanged.
 - Python returns `promptTokens`, `completionTokens`, and `totalTokens`.
-- Java saves the user message with `tokenUsage = promptTokens`.
-- Java saves the assistant message with `tokenUsage = completionTokens`.
+- Java saves the user message with `token = promptTokens`.
+- Java saves the assistant message with `token = completionTokens`.
 - Java deducts `user.token` by `totalTokens`.
 - Java still records Micrometer counters for Grafana.
-- Failed AI calls should not create completion token usage. The already-saved user message can keep `tokenUsage = 0` unless prompt token counting is available before the AI call returns.
+- Failed AI calls should not create completion token usage. The already-saved user message can keep `token = 0` unless prompt token counting is available before the AI call returns.
 
 Dashboard token calculations:
 
 ```text
-promptTokens     = SUM(message.token_usage WHERE is_from_ai = false)
-completionTokens = SUM(message.token_usage WHERE is_from_ai = true)
-totalTokens      = SUM(message.token_usage)
+promptTokens     = SUM(message.token WHERE is_from_ai = false)
+completionTokens = SUM(message.token WHERE is_from_ai = true)
+totalTokens      = SUM(message.token)
 remainingTokens  = SUM(user.token) or per-user distribution from user.token
 ```
 
@@ -665,6 +686,7 @@ Add projection queries for:
 - Total tokens by period
 - Token usage by user/session through message -> chat_session -> user
 - Remaining token summary from `user.token`
+- Users out of token balance where `user.token <= 0`
 - AI usage trend
 - Estimated cost trend only if cost formula is later approved
 
@@ -725,6 +747,8 @@ Add optional cards:
     "aiRequests": 0,
     "aiFailures": 0,
     "totalTokens": 0,
+    "remainingTokens": 0,
+    "usersOutOfTokens": 0,
     "estimatedCost": 0
   }
 }
@@ -783,13 +807,14 @@ Do this after FE confirms which cards are shown on the first screen.
 
 ### Step 6 - Message Token Persistence And User Balance
 
-- [ ] Add Flyway migration for `message.token_usage INT NOT NULL DEFAULT 0`.
-- [ ] Add `tokenUsage` field to `Message` entity.
-- [ ] Save user message `tokenUsage = promptTokens`.
-- [ ] Save assistant message `tokenUsage = completionTokens`.
+- [ ] Add Flyway migration for `message.token INT NOT NULL DEFAULT 0`.
+- [ ] Add `token` field to `Message` entity.
+- [ ] Save user message `token = promptTokens`.
+- [ ] Save assistant message `token = completionTokens`.
 - [ ] Deduct `user.token` by `totalTokens`.
 - [ ] Block chat request when `user.token <= 0`.
-- [ ] Add dashboard queries on `message.token_usage`.
+- [ ] Add dashboard queries on `message.token`.
+- [ ] Add dashboard queries on `user.token`.
 - [ ] Keep Micrometer counters for Grafana.
 - [ ] Add dashboard `ai-usage` endpoint.
 
@@ -798,7 +823,7 @@ Do this after FE confirms which cards are shown on the first screen.
 - [ ] After review approval, update `docs/API_CONTRACT.md`.
 - [ ] Add Plan B endpoints and response examples.
 - [ ] Mark cost fields as zero or hidden until cost formula is approved.
-- [ ] Document that prompt/completion token usage comes from `message.tokenUsage`.
+- [ ] Document that prompt/completion token usage comes from `message.token`.
 - [ ] Document that `user.token` is remaining token balance.
 - [ ] Sync with FE contract/openapi if FE wants generated OpenAPI shape.
 
@@ -826,17 +851,21 @@ Should Ollama cost be displayed as 0, hidden, or estimated by internal infra cos
 
 ### Risk 2 - User Token Is Remaining Balance
 
-`user.token` is confirmed as the remaining token balance. Token usage history should not be read from this field. Usage history should be read from `message.token_usage`.
+`user.token` is confirmed as the remaining token balance. Token usage history should not be read from this field. Usage history should be read from `message.token`.
 
 Implementation rule:
 
 ```text
-message.is_from_ai = false -> prompt token usage
-message.is_from_ai = true  -> completion token usage
+message.is_from_ai = false -> prompt token usage stored in message.token
+message.is_from_ai = true  -> completion token usage stored in message.token
 user.token                 -> remaining token balance
 ```
 
-### Risk 3 - Revenue Period Field
+### Risk 3 - Token Reset Tracking Is Deferred
+
+`user.last_token_reset_at` and reset-cycle analytics are intentionally out of scope for this phase. Another implementation pass will own reset tracking.
+
+### Risk 4 - Revenue Period Field
 
 Revenue trend should use `paid_at`. If existing paid records have null `paid_at`, the dashboard may undercount historical revenue.
 
@@ -846,7 +875,7 @@ Decision needed:
 Should old paid orders with null paid_at fallback to updated_at?
 ```
 
-### Risk 4 - Quiz Score Percent
+### Risk 5 - Quiz Score Percent
 
 `quiz_session.score` stores number of correct answers, not percentage. Percent requires active question count.
 
@@ -884,7 +913,7 @@ Reason:
 Implement second:
 
 - Python `tokenUsage`
-- Java `message.token_usage` persistence
+- Java `message.token` persistence
 - User token deduction from `user.token`
 - AI usage/cost endpoint
 - Token usage endpoint
@@ -893,5 +922,5 @@ Reason:
 
 - Current Python response does not return token data.
 - Java Micrometer counters alone are not enough for business dashboard history.
-- The confirmed MVP source of truth for token usage history is `message.token_usage`.
+- The confirmed MVP source of truth for token usage history is `message.token`.
 - Cost rules are not finalized for Ollama.

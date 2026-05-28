@@ -8,6 +8,7 @@ import com.historytalk.dto.dashboard.DashboardQuizAnalyticsResponse;
 import com.historytalk.dto.dashboard.DashboardRevenueResponse;
 import com.historytalk.dto.dashboard.DashboardSystemHealthResponse;
 import com.historytalk.dto.dashboard.DashboardTierAnalyticsResponse;
+import com.historytalk.dto.dashboard.DashboardTokenUsageResponse;
 import com.historytalk.dto.dashboard.DashboardUserAnalyticsResponse;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.enums.PaymentTransactionStatus;
@@ -26,9 +27,14 @@ import com.historytalk.repository.dashboard.DashboardPeriodRevenueProjection;
 import com.historytalk.repository.dashboard.DashboardPeriodCountProjection;
 import com.historytalk.repository.dashboard.DashboardQuizTrendProjection;
 import com.historytalk.repository.dashboard.DashboardStatusCountProjection;
+import com.historytalk.repository.dashboard.DashboardTokenBalanceByTierProjection;
+import com.historytalk.repository.dashboard.DashboardTokenBalanceSummaryProjection;
+import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
+import com.historytalk.repository.dashboard.DashboardTokenTrendProjection;
 import com.historytalk.repository.dashboard.DashboardTierRevenueProjection;
 import com.historytalk.repository.dashboard.DashboardTierUsersProjection;
 import com.historytalk.repository.dashboard.DashboardTopQuizProjection;
+import com.historytalk.repository.dashboard.DashboardTopTokenUserProjection;
 import com.historytalk.repository.dashboard.DashboardTopWrongQuestionProjection;
 import com.historytalk.repository.dashboard.DashboardTransactionTrendProjection;
 import com.historytalk.repository.payment.PaymentOrderRepository;
@@ -234,6 +240,8 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime yearStart = today.withDayOfYear(1).atStartOfDay();
+        LocalDateTime nextYearStart = today.plusYears(1).withDayOfYear(1).atStartOfDay();
 
         long totalRevenue = toLong(paymentOrderRepository.sumAmountByStatus(PaymentOrderStatus.PAID));
         long paidOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PAID);
@@ -261,6 +269,8 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                                 PaymentOrderStatus.PAID, todayStart, tomorrowStart)))
                         .revenueThisMonth(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
                                 PaymentOrderStatus.PAID, monthStart, tomorrowStart)))
+                        .revenueThisYear(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
+                                PaymentOrderStatus.PAID, yearStart, nextYearStart)))
                         .paidOrders(paidOrders)
                         .averageOrderValue(averageOrderValue)
                         .build())
@@ -389,6 +399,55 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                                 range.fromDateTime(), range.toExclusive(), 5)
                         .stream()
                         .map(this::toTopWrongQuestion)
+                        .toList())
+                .build();
+    }
+
+    @Override
+    public DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity) {
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+
+        DashboardTokenSummaryProjection tokenSummary = messageRepository.sumTokensBetween(
+                range.fromDateTime(), range.toExclusive());
+        DashboardTokenBalanceSummaryProjection balanceSummary = userRepository.getTokenBalanceSummary();
+        Map<String, DashboardTokenTrendProjection> tokensByPeriod = toTokenPeriodMap(
+                messageRepository.sumTokensByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+
+        List<DashboardTokenUsageResponse.TokenTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> {
+                    DashboardTokenTrendProjection row = tokensByPeriod.get(period);
+                    return DashboardTokenUsageResponse.TokenTrendPoint.builder()
+                            .date(period)
+                            .promptTokens(row == null ? 0L : nullSafe(row.getPromptTokens()))
+                            .completionTokens(row == null ? 0L : nullSafe(row.getCompletionTokens()))
+                            .totalTokens(row == null ? 0L : nullSafe(row.getTotalTokens()))
+                            .build();
+                })
+                .toList();
+
+        return DashboardTokenUsageResponse.builder()
+                .summary(DashboardTokenUsageResponse.TokenSummary.builder()
+                        .promptTokens(tokenSummary == null ? 0L : nullSafe(tokenSummary.getPromptTokens()))
+                        .completionTokens(tokenSummary == null ? 0L : nullSafe(tokenSummary.getCompletionTokens()))
+                        .totalTokens(tokenSummary == null ? 0L : nullSafe(tokenSummary.getTotalTokens()))
+                        .remainingTokens(balanceSummary == null ? 0L : nullSafe(balanceSummary.getRemainingTokens()))
+                        .averageRemainingTokens(balanceSummary == null ? 0.0
+                                : nullSafe(balanceSummary.getAverageRemainingTokens()))
+                        .usersOutOfTokens(balanceSummary == null ? 0L
+                                : nullSafe(balanceSummary.getUsersOutOfTokens()))
+                        .estimatedCost(0L)
+                        .build())
+                .trend(trend)
+                .tokenBalanceByTier(userRepository.countTokenBalanceByTier()
+                        .stream()
+                        .map(this::toTokenBalanceByTier)
+                        .toList())
+                .topUsersByTokenUsage(messageRepository.findTopTokenUsers(
+                                range.fromDateTime(), range.toExclusive(), 10)
+                        .stream()
+                        .map(this::toTopTokenUser)
                         .toList())
                 .build();
     }
@@ -525,6 +584,14 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         return result;
     }
 
+    private Map<String, DashboardTokenTrendProjection> toTokenPeriodMap(List<DashboardTokenTrendProjection> rows) {
+        Map<String, DashboardTokenTrendProjection> result = new LinkedHashMap<>();
+        for (DashboardTokenTrendProjection row : rows) {
+            result.put(row.getPeriod(), row);
+        }
+        return result;
+    }
+
     private List<DashboardRevenueResponse.StatusCount> buildOrderStatusCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
         for (PaymentOrderStatus status : PaymentOrderStatus.values()) {
@@ -587,6 +654,32 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 .wrongAnswers(nullSafe(row.getWrongAnswers()))
                 .totalAnswers(nullSafe(row.getTotalAnswers()))
                 .wrongRate(nullSafe(row.getWrongRate()) * 100.0)
+                .build();
+    }
+
+    private DashboardTokenUsageResponse.TokenBalanceByTier toTokenBalanceByTier(
+            DashboardTokenBalanceByTierProjection row) {
+        return DashboardTokenUsageResponse.TokenBalanceByTier.builder()
+                .tierId(row.getTierId())
+                .tierTitle(row.getTierTitle())
+                .users(nullSafe(row.getUsers()))
+                .remainingTokens(nullSafe(row.getRemainingTokens()))
+                .averageRemainingTokens(nullSafe(row.getAverageRemainingTokens()))
+                .usersOutOfTokens(nullSafe(row.getUsersOutOfTokens()))
+                .build();
+    }
+
+    private DashboardTokenUsageResponse.TopTokenUser toTopTokenUser(DashboardTopTokenUserProjection row) {
+        return DashboardTokenUsageResponse.TopTokenUser.builder()
+                .uid(row.getUid())
+                .userName(row.getUserName())
+                .email(row.getEmail())
+                .tierId(row.getTierId())
+                .tierTitle(row.getTierTitle())
+                .promptTokens(nullSafe(row.getPromptTokens()))
+                .completionTokens(nullSafe(row.getCompletionTokens()))
+                .totalTokens(nullSafe(row.getTotalTokens()))
+                .remainingTokens(nullSafe(row.getRemainingTokens()))
                 .build();
     }
 

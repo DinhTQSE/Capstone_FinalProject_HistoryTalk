@@ -26,6 +26,7 @@ public class DashboardRevenueResponse {
         private long totalRevenue;
         private long revenueToday;
         private long revenueThisMonth;
+        private long revenueThisYear;
         private long paidOrders;
         private long averageOrderValue;
     }

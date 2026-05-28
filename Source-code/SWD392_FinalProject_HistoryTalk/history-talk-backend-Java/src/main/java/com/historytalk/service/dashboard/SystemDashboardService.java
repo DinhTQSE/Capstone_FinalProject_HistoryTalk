@@ -8,6 +8,7 @@ import com.historytalk.dto.dashboard.DashboardQuizAnalyticsResponse;
 import com.historytalk.dto.dashboard.DashboardRevenueResponse;
 import com.historytalk.dto.dashboard.DashboardSystemHealthResponse;
 import com.historytalk.dto.dashboard.DashboardTierAnalyticsResponse;
+import com.historytalk.dto.dashboard.DashboardTokenUsageResponse;
 import com.historytalk.dto.dashboard.DashboardUserAnalyticsResponse;
 
 import java.time.LocalDate;
@@ -31,4 +32,6 @@ public interface SystemDashboardService {
     DashboardTierAnalyticsResponse getTiers(LocalDate from, LocalDate to, String granularity);
 
     DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity);
+
+    DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity);
 }

@@ -3,6 +3,8 @@ package com.historytalk.repository;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.dashboard.DashboardPeriodCountProjection;
+import com.historytalk.repository.dashboard.DashboardTokenBalanceByTierProjection;
+import com.historytalk.repository.dashboard.DashboardTokenBalanceSummaryProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -93,4 +95,32 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(u.token, 0)), 0) AS "remainingTokens",
+                   COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
+                   COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
+            FROM "user" u
+            WHERE u.deleted_at IS NULL
+              AND u.role = 'CUSTOMER'
+            """, nativeQuery = true)
+    DashboardTokenBalanceSummaryProjection getTokenBalanceSummary();
+
+    @Query(value = """
+            SELECT CAST(t.tier_id AS text) AS "tierId",
+                   COALESCE(t.title, 'free') AS "tierTitle",
+                   COUNT(u.uid) AS users,
+                   COALESCE(SUM(COALESCE(u.token, 0)), 0) AS "remainingTokens",
+                   COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
+                   COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
+            FROM "user" u
+            LEFT JOIN tier t
+              ON t.tier_id = u.tier_id
+             AND t.deleted_at IS NULL
+            WHERE u.deleted_at IS NULL
+              AND u.role = 'CUSTOMER'
+            GROUP BY t.tier_id, t.title
+            ORDER BY users DESC, "tierTitle" ASC
+            """, nativeQuery = true)
+    List<DashboardTokenBalanceByTierProjection> countTokenBalanceByTier();
 }
