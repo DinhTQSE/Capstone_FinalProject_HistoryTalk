@@ -9,6 +9,7 @@ import com.historytalk.dto.dashboard.DashboardQuizAnalyticsResponse;
 import com.historytalk.dto.dashboard.DashboardRevenueResponse;
 import com.historytalk.dto.dashboard.DashboardSystemHealthResponse;
 import com.historytalk.dto.dashboard.DashboardTierAnalyticsResponse;
+import com.historytalk.dto.dashboard.DashboardTokenUsageResponse;
 import com.historytalk.dto.dashboard.DashboardUserAnalyticsResponse;
 import com.historytalk.service.dashboard.SystemDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -148,6 +149,20 @@ public class SystemDashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getQuiz(from, to, granularity),
                 "Quiz analytics retrieved successfully"
+        ));
+    }
+
+    @GetMapping("/tokens")
+    @Operation(summary = "Get token usage analytics", description = "Returns token usage, token balance, and top token users")
+    public ResponseEntity<ApiResponse<DashboardTokenUsageResponse>> getTokens(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity) {
+        log.info("GET /api/v1/system-admin/dashboard/tokens - from: {}, to: {}, granularity: {}",
+                from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(
+                dashboardService.getTokens(from, to, granularity),
+                "Token usage analytics retrieved successfully"
         ));
     }
 }

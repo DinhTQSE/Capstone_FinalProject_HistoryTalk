@@ -2265,6 +2265,76 @@
           }
         }
       }
+    },
+    "/system-admin/dashboard/tokens": {
+      "get": {
+        "tags": [
+          "System Dashboard"
+        ],
+        "summary": "Get token usage dashboard",
+        "description": "Returns token usage by message.token, current token balance by user.token, and top users by token usage.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive start date. Default is to - 29 days."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive end date. Default is today."
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "default": "day"
+            },
+            "description": "Trend bucket. Max date range is 180 days."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token usage analytics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseWrapper"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardTokenUsageResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2884,6 +2954,10 @@
                 "type": "integer",
                 "format": "int64"
               },
+              "revenueThisYear": {
+                "type": "integer",
+                "format": "int64"
+              },
               "paidOrders": {
                 "type": "integer",
                 "format": "int64"
@@ -2897,6 +2971,7 @@
               "totalRevenue",
               "revenueToday",
               "revenueThisMonth",
+              "revenueThisYear",
               "paidOrders",
               "averageOrderValue"
             ]
@@ -3302,6 +3377,189 @@
           "sessionsTrend",
           "topQuizzes",
           "topWrongQuestions"
+        ]
+      },
+      "DashboardTokenSummary": {
+        "type": "object",
+        "properties": {
+          "promptTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "averageRemainingTokens": {
+            "type": "number",
+            "format": "double"
+          },
+          "usersOutOfTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "estimatedCost": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "promptTokens",
+          "completionTokens",
+          "totalTokens",
+          "remainingTokens",
+          "averageRemainingTokens",
+          "usersOutOfTokens",
+          "estimatedCost"
+        ]
+      },
+      "DashboardTokenTrendPoint": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "promptTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "date",
+          "promptTokens",
+          "completionTokens",
+          "totalTokens"
+        ]
+      },
+      "DashboardTokenBalanceByTier": {
+        "type": "object",
+        "properties": {
+          "tierId": {
+            "type": "string",
+            "nullable": true
+          },
+          "tierTitle": {
+            "type": "string"
+          },
+          "users": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "averageRemainingTokens": {
+            "type": "number",
+            "format": "double"
+          },
+          "usersOutOfTokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "tierTitle",
+          "users",
+          "remainingTokens",
+          "averageRemainingTokens",
+          "usersOutOfTokens"
+        ]
+      },
+      "DashboardTopTokenUser": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "tierId": {
+            "type": "string",
+            "nullable": true
+          },
+          "tierTitle": {
+            "type": "string"
+          },
+          "promptTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completionTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingTokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "uid",
+          "userName",
+          "email",
+          "tierTitle",
+          "promptTokens",
+          "completionTokens",
+          "totalTokens",
+          "remainingTokens"
+        ]
+      },
+      "DashboardTokenUsageResponse": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/DashboardTokenSummary"
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTokenTrendPoint"
+            }
+          },
+          "tokenBalanceByTier": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTokenBalanceByTier"
+            }
+          },
+          "topUsersByTokenUsage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTopTokenUser"
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "trend",
+          "tokenBalanceByTier",
+          "topUsersByTokenUsage"
         ]
       }
     }

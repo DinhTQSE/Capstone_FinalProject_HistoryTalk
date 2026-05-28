@@ -1267,6 +1267,7 @@ Revenue analytics from paid payment orders.
       "totalRevenue": 0,
       "revenueToday": 0,
       "revenueThisMonth": 0,
+      "revenueThisYear": 0,
       "paidOrders": 0,
       "averageOrderValue": 0
     },
@@ -1297,6 +1298,7 @@ Notes:
 
 - Revenue only counts `payment_order.status = PAID`.
 - Revenue trend uses `payment_order.paid_at`.
+- `summary.revenueThisYear` counts paid revenue from January 1 of the current year to January 1 of the next year.
 - Amount values are VND integers.
 
 ### `GET /system-admin/dashboard/payments`
@@ -1441,6 +1443,78 @@ Notes:
 
 - `completionRate`, `averageScorePercentage`, and `wrongRate` are percentages from `0` to `100`.
 - Completed sessions are sessions where `end_time` is not null.
+
+### `GET /system-admin/dashboard/tokens`
+
+Token usage and token balance dashboard.
+
+**Query params:**
+
+| Param | Type | Required | Default | Notes |
+|---|---|---:|---|---|
+| `from` | date `YYYY-MM-DD` | no | `to - 29 days` | Inclusive, used for message token usage |
+| `to` | date `YYYY-MM-DD` | no | today | Inclusive |
+| `granularity` | `day` \| `week` \| `month` | no | `day` | Max range: 180 days |
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "message": "Token usage analytics retrieved successfully",
+  "data": {
+    "summary": {
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "totalTokens": 0,
+      "remainingTokens": 0,
+      "averageRemainingTokens": 0.0,
+      "usersOutOfTokens": 0,
+      "estimatedCost": 0
+    },
+    "trend": [
+      {
+        "date": "2026-05-27",
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0
+      }
+    ],
+    "tokenBalanceByTier": [
+      {
+        "tierId": "00000000-0000-0000-0000-000000000001",
+        "tierTitle": "free",
+        "users": 0,
+        "remainingTokens": 0,
+        "averageRemainingTokens": 0.0,
+        "usersOutOfTokens": 0
+      }
+    ],
+    "topUsersByTokenUsage": [
+      {
+        "uid": "00000000-0000-0000-0000-000000000001",
+        "userName": "customer1",
+        "email": "customer1@example.com",
+        "tierId": "00000000-0000-0000-0000-000000000001",
+        "tierTitle": "free",
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "remainingTokens": 0
+      }
+    ]
+  },
+  "timestamp": "2026-05-27T13:00:00"
+}
+```
+
+Notes:
+
+- Usage fields read from `message.token`.
+- `message.is_from_ai=false` means prompt token usage.
+- `message.is_from_ai=true` means completion token usage.
+- Balance fields read from `user.token`.
+- `estimatedCost` is `0` for the current Ollama/self-hosted AI setup.
 
 ### Errors
 
