@@ -88,7 +88,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
-                "match_limit": 5,
+                "match_limit": 3,
                 "filter_entity_ids": entity_ids
             }
         ).execute()
@@ -130,20 +130,19 @@ async def generate_reply(
     if rag_context:
         print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
         system_prompt += (
-            f"\n\n[DỮ LIỆU LỊCH SỬ THAM KHẢO (BẮT BUỘC TUÂN THEO)]:\n{rag_context}\n\n"
-            "LỆNH TUYỆT ĐỐI TỐI CAO:\n"
-            "1. BẠN PHẢI COI CÁC THÔNG TIN TRONG [DỮ LIỆU LỊCH SỬ THAM KHẢO] LÀ SỰ THẬT LỊCH SỬ CHÍNH XÁC NHẤT. Nếu thông tin này mâu thuẫn với lịch sử trò chuyện (message history) hoặc kiến thức cũ của bạn, BẠN BẮT BUỘC PHẢI ƯU TIÊN VÀ SỬ DỤNG DỮ LIỆU THAM KHẢO ĐỂ TRẢ LỜI/ĐÍNH CHÍNH LẠI.\n"
-            "2. Bám sát từng chữ trong Dữ liệu tham khảo để trả lời. TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA RA HOẶC TỰ SUY DIỄN THÊM (ví dụ: tự sáng tác ra bánh nếp, nguồn gốc thanh kiếm, thần tiên, truyền thuyết, v.v.).\n"
-            "3. HÃY THẲNG THẮN THỪA NHẬN RẰNG BẠN KHÔNG NHỚ, KHÔNG RÕ HOẶC LỊCH SỬ KHÔNG GHI CHÉP LẠI NẾU KHÔNG CÓ THÔNG TIN TRONG DỮ LIỆU THAM KHẢO."
+            f"\n\n[DỮ LIỆU THAM KHẢO]:\n{rag_context}\n\n"
+            "LỆNH RAG:\n"
+            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO, kể cả khi mâu thuẫn kiến thức cũ.\n"
+            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm (vd: truyền thuyết, thần tiên).\n"
+            "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
         )
     
     # Append instructions to force JSON output
     json_instruction = (
-        "\n\nBẠN BẮT BUỘC PHẢI TRẢ VỀ KẾT QUẢ DƯỚI ĐỊNH DẠNG JSON. KHÔNG KÈM THEO BẤT KỲ VĂN BẢN NÀO BÊN NGOÀI JSON.\n"
-        "Cấu trúc JSON yêu cầu:\n"
+        "\n\nCHỈ TRẢ VỀ JSON:\n"
         "{\n"
-        '  "message": "Câu trả lời của bạn",\n'
-        '  "suggestedQuestions": ["Câu hỏi 1", "Câu hỏi 2", "Câu hỏi 3"]\n'
+        '  "message": "Câu trả lời",\n'
+        '  "suggestedQuestions": ["câu 1", "câu 2", "câu 3"]\n'
         "}"
     )
     system_prompt += json_instruction
@@ -185,10 +184,9 @@ async def generate_session_title(
     system_prompt = build_title_system_prompt(character)
     
     json_instruction = (
-        "\n\nBẠN BẮT BUỘC PHẢI TRẢ VỀ KẾT QUẢ DƯỚI ĐỊNH DẠNG JSON. KHÔNG KÈM THEO BẤT KỲ VĂN BẢN NÀO BÊN NGOÀI JSON.\n"
-        "Cấu trúc JSON yêu cầu:\n"
+        "\n\nCHỈ TRẢ VỀ JSON:\n"
         "{\n"
-        '  "title": "Tiêu đề ngắn gọn dưới 8 từ tiếng Việt"\n'
+        '  "title": "Tiêu đề dưới 8 từ"\n'
         "}"
     )
     system_prompt += json_instruction

@@ -101,8 +101,8 @@ public class MessageServiceImpl implements MessageService {
                 .build();
         Message savedUserMsg = messageRepository.save(userMsg);
 
-        // Build history for AI (only send the last 6 messages to save tokens and prevent hallucination loop)
-        int MAX_HISTORY_MESSAGES = 6;
+        // Build history for AI (only send the last 4 messages to save tokens)
+        int MAX_HISTORY_MESSAGES = 4;
         int startIndex = Math.max(0, existingMessages.size() - MAX_HISTORY_MESSAGES);
         List<Message> recentMessages = existingMessages.subList(startIndex, existingMessages.size());
 

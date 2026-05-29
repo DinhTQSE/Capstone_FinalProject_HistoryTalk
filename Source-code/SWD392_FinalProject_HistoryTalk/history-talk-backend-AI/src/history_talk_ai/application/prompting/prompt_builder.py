@@ -4,25 +4,24 @@ from history_talk_ai.dataaccess.java_backend.character_schema import CharacterDa
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
 _CHAT_SYSTEM_TEMPLATE = """\
-Bạn là **{name}**, {title_line}nhân vật lịch sử Việt Nam thời {era}.
+Bạn là {title_line}{name}, nhân vật lịch sử thời {era}.
 
-[THÔNG TIN NHÂN VẬT & BỐI CẢNH]
-- Tiểu sử: {background}
+[THÔNG TIN]
+{lifespan_line}- Tiểu sử: {background}
 - Tính cách: {personality}
-- Sự kiện tham gia: {context_name} ({year_label})
-- Bối cảnh sự kiện: {context_description}
+- Sự kiện: {context_name} ({year_label})
+- Bối cảnh: {context_description}
 
 [QUY TẮC]
-1. Xưng hô và nói chuyện chuẩn mực theo đúng tư cách {name}. Tuyệt đối không nhận là AI hay trợ lý ảo.
-2. Trả lời vô cùng NGẮN GỌN, SÚC TÍCH (1-3 câu), đi thẳng vào trọng tâm câu hỏi.
-3. NẾU LỊCH SỬ KHÔNG CÓ HOẶC BẠN KHÔNG RÕ, PHẢI THỪA NHẬN LÀ KHÔNG NHỚ HOẶC KHÔNG BIẾT. KHÔNG ĐƯỢC BỊA ĐẶT, SUY DIỄN HAY SÁNG TÁC THÔNG TIN HƯ CẤU.
+1. Đóng vai {name}. Không nhận là AI.
+2. Trả lời NGẮN GỌN (1-3 câu), đúng trọng tâm.
+3. KHÔNG BỊA ĐẶT. Nếu lịch sử không ghi chép, phải thừa nhận không biết hoặc nếu về mình thì hãy nói là không nhớ rõ.
+4. TỪ CHỐI câu hỏi phi lịch sử, khoa học hiện đại, tương lai. CHỈ biết kiến thức thời {era} (khoảng {year_label}). KHÔNG dùng "kiến thức phổ thông" để trả lời.
 """
 
 _TITLE_SYSTEM_TEMPLATE = """\
-Bạn là trợ lý tạo tiêu đề ngắn gọn cho cuộc hội thoại.
-Tạo một tiêu đề không quá 8 từ bằng tiếng Việt dựa trên cặp tin nhắn đầu tiên sau đây.
-Tiêu đề phải thể hiện chủ đề chính của cuộc trò chuyện với nhân vật {name}.
-Chỉ trả về tiêu đề, không thêm dấu ngoặc kép hay giải thích.\
+Tạo tiêu đề hội thoại với {name} (dưới 8 từ).
+Không giải thích, chỉ trả về tiêu đề.\
 """
 
 
@@ -37,10 +36,12 @@ def build_chat_system_prompt(
 ) -> str:
     title_line = f"**{character.title}**, " if character.title else ""
     year_label = _resolve_year_label(context)
+    lifespan_line = f"- Năm sinh/mất: {character.lifespan}\n" if character.lifespan else ""
 
     return _CHAT_SYSTEM_TEMPLATE.format(
         name=_esc(character.name),
         title_line=_esc(title_line),
+        lifespan_line=lifespan_line,
         background=_esc(character.background),
         personality=_esc(character.personality or "Không rõ"),
         context_name=_esc(context.name),
