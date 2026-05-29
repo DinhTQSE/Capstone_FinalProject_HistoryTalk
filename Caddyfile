@@ -1,0 +1,15 @@
+historytalk.app {
+    handle /Historical-tell/* {
+        reverse_proxy historytalk-java:8080 {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Port 443
+        }
+    }
+    handle /v1/* {
+        reverse_proxy http://historytalk-ai:8001
+    }
+
+    handle /health {
+        reverse_proxy http://historytalk-ai:8001
+    }
+}

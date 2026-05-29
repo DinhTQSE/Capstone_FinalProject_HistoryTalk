@@ -129,11 +129,11 @@ When authorization is added:
 
 Current backend role mismatch to resolve later:
 
-| Target ERD/API Role | Current Backend Role |
-| --- | --- |
-| `CUSTOMER` | `CUSTOMER` |
-| `CONTENT_ADMIN` | currently similar to `STAFF` |
-| `SYSTEM_ADMIN` | currently similar to `ADMIN` |
+| Target ERD/API Role | Current Backend Role         |
+| ---------------------| ------------------------------|
+| `CUSTOMER`          | `CUSTOMER`                   |
+| `CONTENT_ADMIN`     | currently similar to `STAFF` |
+| `SYSTEM_ADMIN`      | currently similar to `ADMIN` |
 
 This role mapping must be finalized before adding real authorization.
 

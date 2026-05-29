@@ -23,6 +23,10 @@ supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 # Use a global client to reuse connections (Connection Pooling) for faster requests
 ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
+
+def _ollama_url(path: str) -> str:
+    return f"{settings.OLLAMA_BASE_URL.rstrip('/')}{path}"
+
 async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
     """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
     payload = {
@@ -42,7 +46,7 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[
 
     try:
         response = await ollama_client.post(
-            settings.OLLAMA_BASE_URL,
+            _ollama_url("/api/chat"),
             json=payload,
             auth=auth
         )
@@ -58,7 +62,6 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[
 
 async def get_embedding_from_ollama(text: str) -> List[float]:
     """Get embedding vector for a given text from Ollama."""
-    url = settings.OLLAMA_BASE_URL.replace("/api/chat", "/api/embeddings")
     payload = {
         "model": "nomic-embed-text",
         "prompt": text
@@ -66,7 +69,7 @@ async def get_embedding_from_ollama(text: str) -> List[float]:
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
 
     try:
-        response = await ollama_client.post(url, json=payload, auth=auth)
+        response = await ollama_client.post(_ollama_url("/api/embeddings"), json=payload, auth=auth)
         response.raise_for_status()
         data = response.json()
         return data.get("embedding", [])
@@ -219,7 +222,7 @@ async def process_document(request: ProcessDocumentRequest):
     """Process a document by chunking, embedding, and storing in Supabase."""
     # Delete old chunks for this doc_id to handle upserts properly
     try:
-        supabase.schema("historical_schema").table("vector_chunk").delete().eq("doc_id", request.doc_id).execute()
+        supabase.schema(settings.SUPABASE_SCHEMA).table("vector_chunk").delete().eq("doc_id", request.doc_id).execute()
     except Exception as e:
         logger.error(f"Failed to delete old chunks for doc {request.doc_id}: {e}")
 
@@ -291,7 +294,7 @@ async def process_document(request: ProcessDocumentRequest):
                 "embedding": embedding,
                 "sequence_number": idx + 1
             }
-            supabase.schema("historical_schema").table("vector_chunk").insert(record).execute()
+            supabase.schema(settings.SUPABASE_SCHEMA).table("vector_chunk").insert(record).execute()
         except Exception as e:
             logger.error(f"Failed to insert chunk {idx} into Supabase: {e}")
             raise
@@ -299,7 +302,7 @@ async def process_document(request: ProcessDocumentRequest):
 async def delete_document(doc_id: str):
     """Delete all chunks for a document from Supabase."""
     try:
-        supabase.schema("historical_schema").table("vector_chunk").delete().eq("doc_id", doc_id).execute()
+        supabase.schema(settings.SUPABASE_SCHEMA).table("vector_chunk").delete().eq("doc_id", doc_id).execute()
         logger.info(f"Successfully deleted chunks for doc {doc_id}")
     except Exception as e:
         logger.error(f"Failed to delete chunks for doc {doc_id}: {e}")

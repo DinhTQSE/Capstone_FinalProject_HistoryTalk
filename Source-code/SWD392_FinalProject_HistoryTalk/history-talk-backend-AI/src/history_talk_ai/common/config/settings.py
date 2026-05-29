@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Literal
 
 
 class Settings(BaseSettings):
@@ -11,17 +10,18 @@ class Settings(BaseSettings):
     JAVA_CLIENT_TIMEOUT: float = 10.0
 
     # ── LLM (Ollama) ──────────────────────────────────────────────────────────
-    OLLAMA_BASE_URL: str = "http://109.237.69.169/api/chat"
-    OLLAMA_USERNAME: str = "mtn_ai"
-    OLLAMA_PASSWORD: str = "130205"
+    OLLAMA_BASE_URL: str
+    OLLAMA_USERNAME: str = ""
+    OLLAMA_PASSWORD: str = ""
     LLM_MODEL: str = "qwen2.5:14b"
     LLM_TEMPERATURE: float = 0.7
     # Max tokens for character response (not counting the structured wrapper)
     LLM_MAX_TOKENS: int = 1024
 
     # ── Supabase ──────────────────────────────────────────────────────────────
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
+    SUPABASE_URL: str
+    SUPABASE_KEY: str
+    SUPABASE_SCHEMA: str = "historical_schema"
 
     # ── App ───────────────────────────────────────────────────────────────────
     APP_HOST: str = "0.0.0.0"

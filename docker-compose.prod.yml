@@ -1,0 +1,77 @@
+services:
+  historytalk-java:
+    image: ghcr.io/dinhtqse/historytalk-java:latest # Dùng image từ GHCR
+    container_name: historytalk-java
+    restart: unless-stopped
+    env_file:
+      - .env.java.prod
+    networks:
+      - historytalk-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1500M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/Historical-tell/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  historytalk-ai:
+    image: ghcr.io/dinhtqse/historytalk-ai:latest # Dùng image từ GHCR
+    container_name: historytalk-ai
+    restart: unless-stopped
+    env_file:
+      - .env.ai.prod
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - historytalk-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1500M
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: historytalk-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - historytalk-net
+    depends_on:
+      historytalk-java:
+        condition: service_healthy
+      historytalk-ai:
+        condition: service_healthy
+
+networks:
+  historytalk-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

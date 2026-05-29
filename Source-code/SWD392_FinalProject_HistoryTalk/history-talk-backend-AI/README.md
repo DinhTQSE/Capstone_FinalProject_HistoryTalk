@@ -143,8 +143,8 @@ Tất cả cấu hình được load qua `.env` (sử dụng `pydantic-settings`
 | Variable | Ví dụ | Mô tả |
 |---|---|---|
 | `JAVA_BACKEND_URL` | `http://localhost:8080/Historical-tell` | Java backend base URL |
-| `OLLAMA_BASE_URL` | `http://109.237.69.169/api/chat` | URL của Ollama Server |
-| `OLLAMA_USERNAME` | `mtn_ai` | (Nếu có Basic Auth) |
+| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Base URL của Ollama Server khi chạy trong Docker |
+| `OLLAMA_USERNAME` | `` | (Nếu có Basic Auth) |
 | `OLLAMA_PASSWORD` | `***` | (Nếu có Basic Auth) |
 | `LLM_MODEL` | `qwen2.5:14b` | Model name sử dụng trên Ollama |
 | `SUPABASE_URL` | `https://vwy...supabase.co` | Supabase Project URL |
