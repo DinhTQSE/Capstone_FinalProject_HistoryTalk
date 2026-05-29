@@ -14,6 +14,10 @@ import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.payment.TierRepository;
+import com.historytalk.repository.payment.UserTierRepository;
+import com.historytalk.entity.payment.Tier;
+import com.historytalk.entity.payment.UserTier;
 import com.historytalk.security.UserPrincipal;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -48,6 +52,8 @@ public class AuthServiceImpl implements AuthService {
     private EntityManager entityManager;
 
     private final UserRepository userRepository;
+    private final TierRepository tierRepository;
+    private final UserTierRepository userTierRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
@@ -74,7 +80,28 @@ public class AuthServiceImpl implements AuthService {
                 .role(UserRole.CUSTOMER)
                 .build();
 
+        java.util.Optional<Tier> freeTierOpt = tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free");
+        if (freeTierOpt.isPresent()) {
+            Tier freeTier = freeTierOpt.get();
+            user.setTier(freeTier);
+            user.setToken(freeTier.getLimitedToken());
+            user.setLastTokenResetAt(LocalDateTime.now());
+        }
+
         User saved = userRepository.save(user);
+
+        if (freeTierOpt.isPresent()) {
+            Tier freeTier = freeTierOpt.get();
+            UserTier userTier = UserTier.builder()
+                    .user(saved)
+                    .tier(freeTier)
+                    .startTime(LocalDateTime.now())
+                    .endTime(LocalDateTime.now().plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120)) // 10 years for free tier if no_month is 0
+                    .isActive(true)
+                    .build();
+            userTierRepository.save(userTier);
+        }
+
         log.info("User registered with uid: {}", saved.getUid());
 
         return RegisterResponse.builder()
