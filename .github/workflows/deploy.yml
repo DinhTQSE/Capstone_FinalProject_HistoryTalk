@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ deployment ]
+    branches: [ main ]
 
 jobs:
   build:
@@ -49,7 +49,7 @@ jobs:
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
             # CẬP NHẬT CẤU HÌNH MỚI NHẤT TỪ GITHUB
             cd /home/minhtringuyen/SWD392_FinalProject_HistoryTalk/
-            git pull origin deployment
+            git pull origin main
             # 1. Bắt buộc kéo image mới nhất về (kể cả khi tag vẫn là latest)
             docker compose -f docker-compose.prod.yml pull
             
