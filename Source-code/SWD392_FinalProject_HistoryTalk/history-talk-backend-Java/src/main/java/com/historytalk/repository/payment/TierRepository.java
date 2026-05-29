@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 public interface TierRepository extends JpaRepository<Tier, UUID> {
     List<Tier> findByIsActiveTrueAndDeletedAtIsNull();
+    java.util.Optional<Tier> findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull(String title);
 
     long countByIsActiveTrueAndDeletedAtIsNull();
 

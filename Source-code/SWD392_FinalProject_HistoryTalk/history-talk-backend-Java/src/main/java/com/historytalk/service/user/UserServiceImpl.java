@@ -32,9 +32,19 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public UserProfileResponse getMyProfile(String userId) {
-        return userMapper.toProfileResponse(loadActiveUser(userId));
+        User user = loadActiveUser(userId);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (user.getLastTokenResetAt() == null || !user.getLastTokenResetAt().toLocalDate().isEqual(today)) {
+            com.historytalk.entity.payment.Tier tier = user.getTier();
+            if (tier != null && tier.getLimitedToken() != null) {
+                user.setToken((user.getToken() == null ? 0 : user.getToken()) + tier.getLimitedToken());
+            }
+            user.setLastTokenResetAt(java.time.LocalDateTime.now());
+            user = userRepository.save(user);
+        }
+        return userMapper.toProfileResponse(user);
     }
 
     @Override

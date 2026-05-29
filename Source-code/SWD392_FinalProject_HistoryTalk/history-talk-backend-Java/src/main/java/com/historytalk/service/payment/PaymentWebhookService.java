@@ -229,6 +229,7 @@ public class PaymentWebhookService {
 
         // Replace token balance with the new tier's allowance (resolved decision: replace, not top-up)
         user.setToken(newTier.getLimitedToken());
+        user.setLastTokenResetAt(LocalDateTime.now());
 
         userRepository.save(user);
         log.info("User {} tier → '{}', token reset to {}", user.getUid(), newTier.getTitle(), newTier.getLimitedToken());

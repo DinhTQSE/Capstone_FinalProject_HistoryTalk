@@ -80,6 +80,9 @@ public class User {
     @Column(name = "last_active_date")
     private LocalDateTime lastActiveDate;
 
+    @Column(name = "last_token_reset_at")
+    private LocalDateTime lastTokenResetAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
