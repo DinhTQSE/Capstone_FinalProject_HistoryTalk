@@ -12,4 +12,11 @@ historytalk.app {
     handle /health {
         reverse_proxy http://historytalk-ai:8001
     }
+
+    handle_path /historytalkwdp/* {
+        reverse_proxy http://historytalk-express:5000 {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Port 443
+        }
+    }
 }

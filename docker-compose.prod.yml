@@ -1,4 +1,33 @@
 services:
+  express-backend:
+    build:
+      context: ./Source-code/SWD392_FinalProject_HistoryTalk/wdp301-backend
+      dockerfile: Dockerfile
+    container_name: historytalk-express
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=development
+      - MONGO_URI=mongodb+srv://datdat2kk5:datdat2kk5@historytalkdb.l3pzqfp.mongodb.net/?appName=HistoryTalkDB
+      - CORS_ORIGIN=http://localhost:3000
+      - JWT_SECRET=hellowdp301letsgetthehighestgradepossible
+      - JWT_EXPIRES_IN=7d
+      - AI_SERVICE_URL=http://historytalk-ai:8001
+    networks:
+      - historytalk-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+
   historytalk-java:
     image: ghcr.io/dinhtqse/historytalk-java:latest # Dùng image từ GHCR
     container_name: historytalk-java
