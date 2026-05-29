@@ -88,7 +88,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
-                "match_limit": 5,
+                "match_limit": 3,
                 "filter_entity_ids": entity_ids
             }
         ).execute()
