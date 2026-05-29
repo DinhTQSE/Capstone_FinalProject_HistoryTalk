@@ -39,6 +39,8 @@ services:
         required: false
     networks:
       - historytalk-net
+    environment:
+      - AI_SERVICE_URL=http://historytalk-ai:8001
     logging:
       driver: "json-file"
       options:
