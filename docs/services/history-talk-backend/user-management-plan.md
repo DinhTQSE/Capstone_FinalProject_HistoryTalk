@@ -60,7 +60,7 @@ Do not reintroduce `isActive`. User lifecycle stays based on `deletedAt`.
 Add:
 
 ```text
-src/main/resources/db/migration/V15__add_user_profile_fields.sql
+src/main/resources/db/migration/V16__add_user_profile_fields.sql
 ```
 
 Migration behavior:
@@ -195,7 +195,7 @@ Entity and migration:
 ```text
 entity/user/User.java
 entity/enums/Gender.java
-src/main/resources/db/migration/V15__add_user_profile_fields.sql
+src/main/resources/db/migration/V16__add_user_profile_fields.sql
 ```
 
 Controllers:

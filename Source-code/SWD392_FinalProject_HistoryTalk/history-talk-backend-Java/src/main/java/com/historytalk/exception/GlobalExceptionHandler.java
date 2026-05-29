@@ -55,6 +55,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex);
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex) {
+        return buildErrorResponse(ex);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         ErrorResponse errorResponse = ErrorResponse.builder()

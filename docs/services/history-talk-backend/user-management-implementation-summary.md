@@ -46,7 +46,7 @@ OTHER
 Added:
 
 ```text
-Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/resources/db/migration/V15__add_user_profile_fields.sql
+Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/src/main/resources/db/migration/V16__add_user_profile_fields.sql
 ```
 
 Migration adds profile columns to `historical_schema."user"`:
@@ -131,7 +131,7 @@ Entity and migration:
 
 ```text
 src/main/java/com/historytalk/entity/enums/Gender.java
-src/main/resources/db/migration/V15__add_user_profile_fields.sql
+src/main/resources/db/migration/V16__add_user_profile_fields.sql
 ```
 
 Tests:
