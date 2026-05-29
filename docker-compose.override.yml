@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  historytalk-java:
+    build:
+      context: ./Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
+      dockerfile: Dockerfile
+    image: historytalk-java:local
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+
+  historytalk-ai:
+    build:
+      context: ./Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-AI
+      dockerfile: Dockerfile
+    image: historytalk-ai:local
+    ports:
+      - "8001:8001"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+
+  caddy:
+    profiles:
+      - production

@@ -1,0 +1,11 @@
+:80 {
+    handle /Historical-tell/* {
+        reverse_proxy historytalk-java:8080
+    }
+    handle /v1/* {
+        reverse_proxy http://historytalk-ai:8001
+    }
+    handle /health {
+        reverse_proxy http://historytalk-ai:8001
+    }
+}

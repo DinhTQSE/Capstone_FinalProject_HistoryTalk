@@ -4,7 +4,10 @@ services:
     container_name: historytalk-java
     restart: unless-stopped
     env_file:
-      - .env.java.prod
+      - path: .env.java.prod
+        required: false
+      - path: .env.java.dev
+        required: false
     networks:
       - historytalk-net
     logging:
@@ -28,7 +31,10 @@ services:
     container_name: historytalk-ai
     restart: unless-stopped
     env_file:
-      - .env.ai.prod
+      - path: .env.ai.prod
+        required: false
+      - path: .env.ai.dev
+        required: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
