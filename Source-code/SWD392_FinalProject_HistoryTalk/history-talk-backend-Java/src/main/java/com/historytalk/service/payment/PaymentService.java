@@ -26,6 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.payos.PayOS;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -59,8 +63,16 @@ public class PaymentService {
             throw new InvalidRequestException("Free tier does not require payment");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expiredAt = now.plusMinutes(15);
+//        LocalDateTime now = LocalDateTime.now();
+//        LocalDateTime expiredAt = now.plusMinutes(15);
+        Instant expiredAtInstant = Instant.now().plus(15, ChronoUnit.MINUTES);
+
+        long payosExpiredAt = expiredAtInstant.getEpochSecond();
+
+        LocalDateTime expiredAtDb = LocalDateTime.ofInstant(
+                expiredAtInstant,
+                ZoneId.of("Asia/Ho_Chi_Minh")
+        );
 
         Long orderCode = generateOrderCode();
 
@@ -74,7 +86,7 @@ public class PaymentService {
                 .amount(tier.getAmount())
                 .description(description)
                 .status(PaymentOrderStatus.PENDING)
-                .expiredAt(expiredAt)
+                .expiredAt(expiredAtDb)
                 .isActive(true)
                 .build();
 
@@ -86,7 +98,8 @@ public class PaymentService {
                 .description(description)
                 .returnUrl(payOSConfig.getReturnUrl())
                 .cancelUrl(payOSConfig.getCancelUrl())
-                .expiredAt(expiredAt.toEpochSecond(ZoneOffset.ofHours(7)))
+//                .expiredAt(expiredAt.toEpochSecond(ZoneOffset.ofHours(7)))
+                .expiredAt(payosExpiredAt)
                 .build();
 
         var paymentLink = payOS.paymentRequests().create(request);
