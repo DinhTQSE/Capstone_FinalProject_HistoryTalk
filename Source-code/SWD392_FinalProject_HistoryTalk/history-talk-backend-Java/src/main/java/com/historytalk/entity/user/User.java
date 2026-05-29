@@ -1,6 +1,7 @@
 package com.historytalk.entity.user;
 
 import com.historytalk.entity.chat.ChatSession;
+import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.payment.Tier;
 import jakarta.persistence.*;
@@ -15,6 +16,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +45,25 @@ public class User {
 
     @Column(name = "password", length = 100, nullable = false)
     private String password;
+
+    @Column(name = "full_name", length = 150)
+    private String fullName;
+
+    @Column(name = "dob")
+    private LocalDate dob;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender", length = 20)
+    private Gender gender;
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
+    @Column(name = "address", length = 500)
+    private String address;
+
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 50, nullable = false)
