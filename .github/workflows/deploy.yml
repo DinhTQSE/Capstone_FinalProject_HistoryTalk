@@ -50,7 +50,7 @@ jobs:
             # CẬP NHẬT CẤU HÌNH MỚI NHẤT TỪ GITHUB
             cd /home/minhtringuyen/SWD392_FinalProject_HistoryTalk/
             git pull origin main
-            # 1. Bắt buộc kéo image mới nhất về (kể cả khi tag vẫn là latest)
+           
             docker compose -f docker-compose.prod.yml pull
             
             # 2. Ép buộc tạo lại container ngay cả khi cấu hình không đổi
