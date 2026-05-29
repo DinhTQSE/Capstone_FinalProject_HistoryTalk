@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -29,29 +30,29 @@ public class PaymentExpiryScheduler {
 
     private final PaymentOrderRepository paymentOrderRepository;
 
-    /**
-     * Marks all PENDING orders with expiredAt <= now as EXPIRED.
-     * fixedDelay (not fixedRate) ensures the next run starts only after the
-     * current run finishes, preventing overlapping executions.
-     */
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void expirePendingOrders() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        log.info("Expiry scheduler running. nowUtc={}", now);
 
         List<PaymentOrder> expiredOrders = paymentOrderRepository
                 .findExpiredPendingOrders(PaymentOrderStatus.PENDING, now);
+
+        log.info("Expiry scheduler found {} expired PENDING order(s)", expiredOrders.size());
 
         if (expiredOrders.isEmpty()) {
             return;
         }
 
-        log.info("Expiry scheduler: found {} PENDING order(s) to expire", expiredOrders.size());
-
         for (PaymentOrder order : expiredOrders) {
             order.setStatus(PaymentOrderStatus.EXPIRED);
-            paymentOrderRepository.save(order);
-            log.info("Expired order: orderCode={}, expiredAt={}", order.getOrderCode(), order.getExpiredAt());
+            log.info("Expired order: orderCode={}, expiredAt={}",
+                    order.getOrderCode(),
+                    order.getExpiredAt());
         }
+
+        paymentOrderRepository.saveAll(expiredOrders);
     }
 }
