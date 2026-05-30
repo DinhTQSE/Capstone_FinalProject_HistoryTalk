@@ -25,6 +25,7 @@ public class UserProfileResponse {
     private String avatarUrl;
     private String tierId;
     private String tierTitle;
+    private LocalDateTime subscriptionEndTime;
     private Integer token;
     private LocalDateTime lastActiveDate;
     private LocalDateTime createdAt;

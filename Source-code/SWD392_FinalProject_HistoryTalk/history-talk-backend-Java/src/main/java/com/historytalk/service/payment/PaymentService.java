@@ -11,12 +11,15 @@ import com.historytalk.dto.payment.TierResponse;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.Tier;
+import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.TierRepository;
+import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,11 +33,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+
 
 @Slf4j
 @Service
@@ -46,6 +49,8 @@ public class PaymentService {
     private final UserRepository userRepository;
     private final TierRepository tierRepository;
     private final PaymentOrderRepository paymentOrderRepository;
+    private final UserTierRepository userTierRepository;
+
 
     @Transactional
     public CreatePaymentResponse createPayOSCheckout(UUID uid, String tierId) throws Exception {
@@ -61,6 +66,16 @@ public class PaymentService {
 
         if (tier.getAmount() == null || tier.getAmount() <= 0) {
             throw new InvalidRequestException("Free tier does not require payment");
+        }
+
+        // Block purchase if user already has a live paid subscription
+        LocalDateTime guardNow = LocalDateTime.now();
+        Optional<UserTier> activePaid = userTierRepository.findCurrentActiveByUid(uid, guardNow);
+        if (activePaid.isPresent() && activePaid.get().getTier().getAmount() > 0) {
+            throw new InvalidRequestException(
+                "You already have an active \'" + activePaid.get().getTier().getTitle()
+                + "\' subscription that expires on " + activePaid.get().getEndTime()
+                + ". Subscriptions cannot be stacked, upgraded, or cancelled mid-period.");
         }
 
 //        LocalDateTime now = LocalDateTime.now();

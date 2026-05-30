@@ -83,7 +83,6 @@ public class AuthServiceImpl implements AuthService {
         java.util.Optional<Tier> freeTierOpt = tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free");
         if (freeTierOpt.isPresent()) {
             Tier freeTier = freeTierOpt.get();
-            user.setTier(freeTier);
             user.setToken(freeTier.getLimitedToken());
             user.setLastTokenResetAt(LocalDateTime.now());
         }

@@ -7,11 +7,14 @@ import com.historytalk.dto.user.UpdateMyProfileRequest;
 import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
 import com.historytalk.entity.enums.Gender;
+import com.historytalk.entity.payment.Tier;
+import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.mapper.user.UserMapper;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.payment.UserTierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -30,21 +35,33 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final UserTierRepository userTierRepository;
 
     @Override
     @Transactional
     public UserProfileResponse getMyProfile(String userId) {
         User user = loadActiveUser(userId);
-        java.time.LocalDate today = java.time.LocalDate.now();
-        if (user.getLastTokenResetAt() == null || !user.getLastTokenResetAt().toLocalDate().isEqual(today)) {
-            com.historytalk.entity.payment.Tier tier = user.getTier();
-            if (tier != null && tier.getLimitedToken() != null) {
-                user.setToken((user.getToken() == null ? 0 : user.getToken()) + tier.getLimitedToken());
+        UUID uid = user.getUid();
+        LocalDateTime now = LocalDateTime.now();
+
+        // Resolve current active tier: paid tier is preferred over free (ORDER BY amount DESC)
+        Optional<UserTier> activeSubOpt = userTierRepository.findCurrentActiveByUid(uid, now);
+        Tier activeTier = activeSubOpt.map(UserTier::getTier).orElse(null);
+        LocalDateTime subEndTime = activeSubOpt.map(UserTier::getEndTime).orElse(null);
+
+        // Daily token top-up based on whichever tier is currently active
+        LocalDate today = LocalDate.now();
+        if (user.getLastTokenResetAt() == null ||
+                !user.getLastTokenResetAt().toLocalDate().isEqual(today)) {
+            if (activeTier != null && activeTier.getLimitedToken() != null) {
+                user.setToken((user.getToken() == null ? 0 : user.getToken())
+                        + activeTier.getLimitedToken());
             }
-            user.setLastTokenResetAt(java.time.LocalDateTime.now());
+            user.setLastTokenResetAt(now);
             user = userRepository.save(user);
         }
-        return userMapper.toProfileResponse(user);
+
+        return userMapper.toProfileResponse(user, activeTier, subEndTime);
     }
 
     @Override
@@ -53,7 +70,7 @@ public class UserServiceImpl implements UserService {
         User user = loadActiveUser(userId);
         applyProfileUpdate(user, request.getUserName(), request.getFullName(), request.getDob(), request.getGender(),
                 request.getPhoneNumber(), request.getAddress(), request.getAvatarUrl());
-        return userMapper.toProfileResponse(userRepository.save(user));
+        return userMapper.toProfileResponse(userRepository.save(user), null, null);
     }
 
     @Override
@@ -78,7 +95,9 @@ public class UserServiceImpl implements UserService {
         Pageable pageable = PageRequest.of(safePage, safeSize);
         var users = userRepository.findAll(pageable);
         return PaginatedResponse.<UserProfileResponse>builder()
-                .content(users.getContent().stream().map(userMapper::toProfileResponse).toList())
+                .content(users.getContent().stream()
+                        .map(u -> userMapper.toProfileResponse(u, null, null))
+                        .toList())
                 .totalElements(users.getTotalElements())
                 .totalPages(users.getTotalPages())
                 .currentPage(users.getNumber())
@@ -91,7 +110,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserProfileResponse getUserById(String userId) {
-        return userMapper.toProfileResponse(loadUser(userId));
+        return userMapper.toProfileResponse(loadUser(userId), null, null);
     }
 
     @Override
@@ -100,7 +119,7 @@ public class UserServiceImpl implements UserService {
         User user = loadUser(userId);
         applyProfileUpdate(user, request.getUserName(), request.getFullName(), request.getDob(), request.getGender(),
                 request.getPhoneNumber(), request.getAddress(), request.getAvatarUrl());
-        return userMapper.toProfileResponse(userRepository.save(user));
+        return userMapper.toProfileResponse(userRepository.save(user), null, null);
     }
 
     @Override
@@ -108,7 +127,7 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponse updateUserRole(String userId, UpdateUserRoleRequest request) {
         User user = loadUser(userId);
         user.setRole(request.getRole());
-        return userMapper.toProfileResponse(userRepository.save(user));
+        return userMapper.toProfileResponse(userRepository.save(user), null, null);
     }
 
     private User loadActiveUser(String userId) {
