@@ -80,7 +80,7 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
 
-        if (session.getUser().getToken() <= 0) {
+        if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER && session.getUser().getToken() <= 0) {
             throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
         }
 
@@ -153,7 +153,7 @@ public class MessageServiceImpl implements MessageService {
         Message savedAssistantMsg = messageRepository.save(assistantMsg);
 
         int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
-        if (totalToken != null && totalToken > 0) {
+        if (totalToken != null && totalToken > 0 && session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
             userRepository.deductTokens(session.getUser().getUid(), totalToken);
             remainingTokens = Math.max(0, remainingTokens - totalToken);
             session.getUser().setToken(remainingTokens);
