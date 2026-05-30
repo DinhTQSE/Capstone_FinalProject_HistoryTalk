@@ -186,52 +186,42 @@ public class PaymentWebhookService {
         Tier newTier = order.getTier();
         LocalDateTime now = LocalDateTime.now();
 
-        Optional<UserTier> activeOpt = userTierRepository.findActiveByUidForUpdate(user.getUid());
+        // Check for any currently active paid subscription (pessimistic lock prevents race conditions)
+        Optional<UserTier> existingPaid = userTierRepository.findCurrentActiveByUidForUpdate(user.getUid(), now);
 
-        if (activeOpt.isPresent()) {
-            UserTier current = activeOpt.get();
-
-            // If user still has time left, extend from their current end time.
-            // If they have lapsed, start from now.
-            LocalDateTime baseTime = current.getEndTime().isAfter(now)
-                    ? current.getEndTime()
-                    : now;
-
-            current.setIsActive(false);
-            userTierRepository.save(current);
-
-            UserTier next = UserTier.builder()
-                    .user(user)
-                    .tier(newTier)
-                    .startTime(baseTime)
-                    .endTime(baseTime.plusMonths(newTier.getNoMonth()))
-                    .isActive(true)
-                    .build();
-            userTierRepository.save(next);
-
-            log.info("Extended tier for user {} → {} until {}", user.getUid(), newTier.getTitle(), next.getEndTime());
-        } else {
-            UserTier userTier = UserTier.builder()
-                    .user(user)
-                    .tier(newTier)
-                    .startTime(now)
-                    .endTime(now.plusMonths(newTier.getNoMonth()))
-                    .isActive(true)
-                    .build();
-            userTierRepository.save(userTier);
-
-            log.info("Created new tier for user {} → {} until {}",
-                    user.getUid(), newTier.getTitle(), userTier.getEndTime());
+        if (existingPaid.isPresent()) {
+            UserTier current = existingPaid.get();
+            if (current.getTier().getAmount() > 0) {
+                // Idempotency guard: a live paid subscription already exists.
+                // This should not normally happen (purchase guard in PaymentService blocks it),
+                // but webhooks can arrive out of order or be retried.
+                log.warn("User {} already has active paid sub '{}' until {}. Skipping duplicate webhook.",
+                        user.getUid(), current.getTier().getTitle(), current.getEndTime());
+                return;
+            }
+            // A free-tier row came back (amount = 0) — this means the query returned the free row
+            // because no paid row exists. That is fine — proceed to create the paid subscription.
         }
 
-        // Update user's current tier reference
-        user.setTier(newTier);
+        // Create the new paid UserTier starting from now.
+        // The free-tier UserTier row is intentionally NOT deactivated — it remains as the
+        // permanent fallback so that when this paid sub expires, the user automatically
+        // reverts to free without any extra DB writes.
+        UserTier newSub = UserTier.builder()
+                .user(user)
+                .tier(newTier)
+                .startTime(now)
+                .endTime(now.plusMonths(newTier.getNoMonth()))
+                .isActive(true)
+                .build();
+        userTierRepository.save(newSub);
 
-        // Replace token balance with the new tier's allowance (resolved decision: replace, not top-up)
+        // Reset token balance to the new paid tier's allowance
         user.setToken(newTier.getLimitedToken());
-        user.setLastTokenResetAt(LocalDateTime.now());
-
+        user.setLastTokenResetAt(now);
         userRepository.save(user);
-        log.info("User {} tier → '{}', token reset to {}", user.getUid(), newTier.getTitle(), newTier.getLimitedToken());
+
+        log.info("User {} subscribed to '{}' until {}, tokens reset to {}",
+                user.getUid(), newTier.getTitle(), newSub.getEndTime(), newTier.getLimitedToken());
     }
 }

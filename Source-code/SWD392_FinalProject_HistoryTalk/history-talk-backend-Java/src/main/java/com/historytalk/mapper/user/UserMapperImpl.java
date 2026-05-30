@@ -5,12 +5,13 @@ import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.user.User;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Component
 public class UserMapperImpl implements UserMapper {
 
     @Override
-    public UserProfileResponse toProfileResponse(User user) {
-        Tier tier = user.getTier();
+    public UserProfileResponse toProfileResponse(User user, Tier activeTier, LocalDateTime subscriptionEndTime) {
         return UserProfileResponse.builder()
                 .uid(user.getUid() != null ? user.getUid().toString() : null)
                 .userName(user.getUserName())
@@ -22,8 +23,10 @@ public class UserMapperImpl implements UserMapper {
                 .phoneNumber(user.getPhoneNumber())
                 .address(user.getAddress())
                 .avatarUrl(user.getAvatarUrl())
-                .tierId(tier != null && tier.getTierId() != null ? tier.getTierId().toString() : null)
-                .tierTitle(tier != null ? tier.getTitle() : null)
+                .tierId(activeTier != null && activeTier.getTierId() != null
+                        ? activeTier.getTierId().toString() : null)
+                .tierTitle(activeTier != null ? activeTier.getTitle() : null)
+                .subscriptionEndTime(subscriptionEndTime)
                 .token(user.getToken())
                 .lastActiveDate(user.getLastActiveDate())
                 .createdAt(user.getCreatedAt())
