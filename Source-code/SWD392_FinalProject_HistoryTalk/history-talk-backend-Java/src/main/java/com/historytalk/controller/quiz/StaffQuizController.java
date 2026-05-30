@@ -13,9 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -165,5 +167,32 @@ public class StaffQuizController {
         log.info("DELETE /api/v1/staff/quizzes/{}/questions/{}", quizId, questionId);
         quizService.deleteQuestion(quizId, questionId);
         return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
+    }
+
+    /**
+     * POST /staff/quizzes/import
+     * Bulk-import quizzes from a CSV file.
+     * Each distinct quiz title in the CSV becomes one quiz.
+     * Rows sharing the same title become the questions for that quiz.
+     * Conflicting/invalid quiz groups are skipped and reported in the response.
+     */
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Import quizzes from CSV",
+            description = "Upload a .csv file to bulk-create quizzes. " +
+                    "Rows with the same 'title' are grouped into one quiz; each row is one question. " +
+                    "Duplicate titles and invalid rows are skipped and reported in the response. " +
+                    "All imported quizzes are created as drafts (isPublished = false). " +
+                    "Required columns: title, contextId, level, questionContent, " +
+                    "option1, option2, option3, option4, correctAnswer, explanation."
+    )
+    public ResponseEntity<ApiResponse<QuizImportResponse>> importQuizzes(
+            @RequestPart("file") MultipartFile file) {
+
+        log.info("POST /api/v1/staff/quizzes/import filename={} size={}",
+                file.getOriginalFilename(), file.getSize());
+        UUID userId = UUID.fromString(SecurityUtils.getUserId());
+        QuizImportResponse data = quizService.importQuizzesFromCsv(file, userId);
+        return ResponseEntity.ok(ApiResponse.success(data, "CSV import completed"));
     }
 }

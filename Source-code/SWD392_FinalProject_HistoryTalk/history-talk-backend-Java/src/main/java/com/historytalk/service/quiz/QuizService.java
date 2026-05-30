@@ -3,6 +3,7 @@ package com.historytalk.service.quiz;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.*;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -40,4 +41,8 @@ public interface QuizService {
     void updateQuestion(String quizId, String questionId, QuestionRequest request);
 
     void deleteQuestion(String quizId, String questionId);
+
+    // ==================== Import ====================
+
+    QuizImportResponse importQuizzesFromCsv(MultipartFile file, UUID userId);
 }
