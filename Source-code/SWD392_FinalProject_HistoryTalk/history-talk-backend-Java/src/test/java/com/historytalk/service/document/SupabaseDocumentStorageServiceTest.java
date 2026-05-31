@@ -9,11 +9,14 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -85,6 +88,50 @@ class SupabaseDocumentStorageServiceTest {
         assertThatThrownBy(() -> service.uploadPdf(EntityType.CONTEXT, UUID.randomUUID(), UUID.randomUUID(), file))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("PDF file must not be empty");
+    }
+
+    @Test
+    void uploadPdfAllowsFileLargerThanTenMbWhenWithinFiftyMbLimit() throws Exception {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SupabaseDocumentStorageService service = new SupabaseDocumentStorageService(
+                "https://example.supabase.co",
+                "service-role-key",
+                "documents",
+                builder);
+        UUID entityId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getSize()).thenReturn(11L * 1024 * 1024);
+        when(file.getOriginalFilename()).thenReturn("large-source.pdf");
+        when(file.getContentType()).thenReturn("application/pdf");
+        when(file.getBytes()).thenReturn("pdf-bytes".getBytes());
+
+        server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/documents/context/" + entityId + "/" + docId + ".pdf"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
+
+        UploadedDocumentFile uploaded = service.uploadPdf(EntityType.CONTEXT, entityId, docId, file);
+
+        assertThat(uploaded.objectPath()).isEqualTo("documents/context/" + entityId + "/" + docId + ".pdf");
+        server.verify();
+    }
+
+    @Test
+    void uploadPdfRejectsFileLargerThanFiftyMb() {
+        SupabaseDocumentStorageService service = new SupabaseDocumentStorageService(
+                "https://example.supabase.co",
+                "service-role-key",
+                "documents",
+                RestClient.builder());
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getSize()).thenReturn(51L * 1024 * 1024);
+
+        assertThatThrownBy(() -> service.uploadPdf(EntityType.CONTEXT, UUID.randomUUID(), UUID.randomUUID(), file))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("50MB");
     }
 
     @Test
