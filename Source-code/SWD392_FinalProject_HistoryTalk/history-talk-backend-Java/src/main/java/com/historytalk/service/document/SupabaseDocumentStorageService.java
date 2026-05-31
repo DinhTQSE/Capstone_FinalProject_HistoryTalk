@@ -20,7 +20,7 @@ import java.util.UUID;
 @Service
 public class SupabaseDocumentStorageService {
 
-    private static final long MAX_FILE_BYTES = 10 * 1024 * 1024;
+    private static final long MAX_FILE_BYTES = 50 * 1024 * 1024;
 
     private final RestClient restClient;
     private final String supabaseUrl;
@@ -116,7 +116,7 @@ public class SupabaseDocumentStorageService {
             throw new InvalidRequestException("PDF file must not be empty");
         }
         if (file.getSize() > MAX_FILE_BYTES) {
-            throw new InvalidRequestException("PDF file size exceeds 10MB limit");
+            throw new InvalidRequestException("PDF file size exceeds 50MB limit");
         }
         String originalName = file.getOriginalFilename();
         if (originalName == null || !originalName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
