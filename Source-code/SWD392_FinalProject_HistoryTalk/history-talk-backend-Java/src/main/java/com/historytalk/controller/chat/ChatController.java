@@ -112,7 +112,13 @@ public class ChatController {
      */
     @PostMapping(value = "/messages/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter sendMessageStream(
-            @Valid @RequestBody SendMessageRequest request) {
+            @Valid @RequestBody SendMessageRequest request,
+            jakarta.servlet.http.HttpServletResponse response) {
+
+        // Disable Nginx and proxy buffering to ensure smooth character-by-character streaming
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Connection", "keep-alive");
 
         String userId = SecurityUtils.getUserId();
         return messageService.sendMessageStream(userId, request);
