@@ -110,7 +110,7 @@ public class ChatController {
      * POST /v1/chat/messages/stream
      * Sends a user message and receives a streaming AI response (SSE).
      */
-    @PostMapping("/messages/stream")
+    @PostMapping(value = "/messages/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter sendMessageStream(
             @Valid @RequestBody SendMessageRequest request) {
 
