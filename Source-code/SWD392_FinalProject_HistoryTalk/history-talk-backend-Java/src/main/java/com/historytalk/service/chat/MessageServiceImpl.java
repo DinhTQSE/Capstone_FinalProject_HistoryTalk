@@ -257,7 +257,7 @@ public class MessageServiceImpl implements MessageService {
                             if ("text".equals(type)) {
                                 String chunk = node.path("data").asText();
                                 fullMessage.append(chunk);
-                                emitter.send(SseEmitter.event().data(line));
+                                emitter.send(SseEmitter.event().data(jsonStr));
                             } else if ("metadata".equals(type)) {
                                 JsonNode data = node.path("data");
                                 promptToken.set(data.path("promptTokens").asInt());
@@ -267,9 +267,9 @@ public class MessageServiceImpl implements MessageService {
                                     List<String> sqList = objectMapper.convertValue(sqNode, new TypeReference<List<String>>(){});
                                     suggestedQuestions[0] = serializeSuggestedQuestions(sqList);
                                 }
-                                emitter.send(SseEmitter.event().data(line));
+                                emitter.send(SseEmitter.event().data(jsonStr));
                             } else if ("error".equals(type)) {
-                                emitter.send(SseEmitter.event().data(line));
+                                emitter.send(SseEmitter.event().data(jsonStr));
                             }
                         }
                     } catch (Exception ex) {
@@ -313,7 +313,7 @@ public class MessageServiceImpl implements MessageService {
                         }
 
                         // Send final event to let client know remaining tokens
-                        emitter.send(SseEmitter.event().data("data: {\"type\":\"done\",\"remainingTokens\":" + remainingTokens + "}"));
+                        emitter.send(SseEmitter.event().data("{\"type\":\"done\",\"remainingTokens\":" + remainingTokens + "}"));
                         emitter.complete();
                     } catch (Exception e) {
                         log.error("Error completing stream: {}", e.getMessage());
