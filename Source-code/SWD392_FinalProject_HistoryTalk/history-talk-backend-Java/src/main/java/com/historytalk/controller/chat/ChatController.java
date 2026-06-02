@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 @RestController
@@ -104,6 +104,18 @@ public class ChatController {
         SendMessageResponse result = messageService.sendMessage(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(result, "Message sent successfully"));
+    }
+
+    /**
+     * POST /v1/chat/messages/stream
+     * Sends a user message and receives a streaming AI response (SSE).
+     */
+    @PostMapping("/messages/stream")
+    public SseEmitter sendMessageStream(
+            @Valid @RequestBody SendMessageRequest request) {
+
+        String userId = SecurityUtils.getUserId();
+        return messageService.sendMessageStream(userId, request);
     }
 
     /**

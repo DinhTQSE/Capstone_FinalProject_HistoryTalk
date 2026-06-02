@@ -27,6 +27,12 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -183,6 +189,146 @@ public class MessageServiceImpl implements MessageService {
                 .promptTokens(promptToken)
                 .completionTokens(completionToken)
                 .build();
+    }
+
+    // ── POST /chat/messages/stream ─────────────────────────────────────────
+
+    public SseEmitter sendMessageStream(String userId, SendMessageRequest request) {
+        log.info("Streaming message in session={} user={}", request.getSessionId(), userId);
+
+        ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
+                UUID.fromString(request.getSessionId()), UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Chat session not found with ID: " + request.getSessionId()));
+
+        if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER && session.getUser().getToken() <= 0) {
+            throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
+        }
+
+        // Save user message immediately
+        Message userMsg = Message.builder()
+                .content(request.getContent())
+                .isFromAi(false)
+                .chatSession(session)
+                .build();
+        Message savedUserMsg = messageRepository.save(userMsg);
+
+        // Build history for AI
+        List<Message> existingMessages = messageRepository
+                .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId(), false);
+        long userMessageCount = existingMessages.stream().filter(m -> Boolean.FALSE.equals(m.getIsFromAi())).count();
+        boolean isFirstUserMessage = (userMessageCount == 1); // 1 because we just saved it
+
+        int MAX_HISTORY_MESSAGES = 5; // +1 to include current
+        int startIndex = Math.max(0, existingMessages.size() - MAX_HISTORY_MESSAGES);
+        List<Message> recentMessages = existingMessages.subList(startIndex, existingMessages.size() - 1); // exclude current
+
+        List<MessageHistoryItem> history = recentMessages.stream()
+                .map(m -> new MessageHistoryItem(
+                        Boolean.TRUE.equals(m.getIsFromAi()) ? "assistant" : "user",
+                        m.getContent()))
+                .toList();
+
+        CharacterPayload characterData = AiServiceClient.buildCharacterPayload(session.getCharacter());
+        ContextPayload contextData = AiServiceClient.buildContextPayload(session.getHistoricalContext());
+
+        SseEmitter emitter = new SseEmitter(180000L); // 3 minutes timeout
+
+        CompletableFuture.runAsync(() -> {
+            StringBuilder fullMessage = new StringBuilder();
+            AtomicInteger promptToken = new AtomicInteger(0);
+            AtomicInteger completionToken = new AtomicInteger(0);
+            String[] suggestedQuestions = new String[1];
+
+            aiServiceClient.streamChat(
+                session.getCharacter().getCharacterId().toString(),
+                session.getHistoricalContext().getContextId().toString(),
+                request.getContent(),
+                history,
+                characterData,
+                contextData,
+                // onData
+                line -> {
+                    try {
+                        if (line.startsWith("data: ")) {
+                            String jsonStr = line.substring(6);
+                            JsonNode node = objectMapper.readTree(jsonStr);
+                            String type = node.path("type").asText();
+                            if ("text".equals(type)) {
+                                String chunk = node.path("data").asText();
+                                fullMessage.append(chunk);
+                                emitter.send(SseEmitter.event().data(line));
+                            } else if ("metadata".equals(type)) {
+                                JsonNode data = node.path("data");
+                                promptToken.set(data.path("promptTokens").asInt());
+                                completionToken.set(data.path("completionTokens").asInt());
+                                JsonNode sqNode = data.path("suggestedQuestions");
+                                if (sqNode.isArray()) {
+                                    List<String> sqList = objectMapper.convertValue(sqNode, new TypeReference<List<String>>(){});
+                                    suggestedQuestions[0] = serializeSuggestedQuestions(sqList);
+                                }
+                                emitter.send(SseEmitter.event().data(line));
+                            } else if ("error".equals(type)) {
+                                emitter.send(SseEmitter.event().data(line));
+                            }
+                        }
+                    } catch (Exception ex) {
+                        log.error("Error processing SSE chunk: {}", ex.getMessage());
+                    }
+                },
+                // onComplete
+                () -> {
+                    try {
+                        savedUserMsg.setToken(promptToken.get());
+                        messageRepository.save(savedUserMsg);
+
+                        Message assistantMsg = Message.builder()
+                                .content(fullMessage.toString())
+                                .isFromAi(true)
+                                .suggestedQuestions(suggestedQuestions[0])
+                                .chatSession(session)
+                                .token(completionToken.get())
+                                .build();
+                        messageRepository.save(assistantMsg);
+
+                        int totalToken = promptToken.get() + completionToken.get();
+                        int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
+                        if (totalToken > 0 && session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
+                            userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                            remainingTokens = Math.max(0, remainingTokens - totalToken);
+                        }
+
+                        session.setLastMessageAt(LocalDateTime.now());
+                        chatSessionRepository.save(session);
+
+                        if (isFirstUserMessage) {
+                            aiServiceClient.generateTitleAsync(
+                                    session.getSessionId().toString(),
+                                    session.getCharacter().getCharacterId().toString(),
+                                    session.getHistoricalContext().getContextId().toString(),
+                                    request.getContent(),
+                                    fullMessage.toString(),
+                                    characterData,
+                                    contextData);
+                        }
+
+                        // Send final event to let client know remaining tokens
+                        emitter.send(SseEmitter.event().data("data: {\"type\":\"done\",\"remainingTokens\":" + remainingTokens + "}"));
+                        emitter.complete();
+                    } catch (Exception e) {
+                        log.error("Error completing stream: {}", e.getMessage());
+                        emitter.completeWithError(e);
+                    }
+                },
+                // onError
+                error -> {
+                    log.error("AI stream error", error);
+                    emitter.completeWithError(error);
+                }
+            );
+        });
+
+        return emitter;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

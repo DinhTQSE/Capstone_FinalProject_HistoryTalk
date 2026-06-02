@@ -1,7 +1,9 @@
 """Chat router — all AI chat endpoints live here."""
 
 import asyncio
+import json
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from history_talk_ai.presentation.chat.schemas import (
     ChatRequest,
@@ -107,6 +109,40 @@ async def chat(body: ChatRequest) -> ChatResponse:
     )
 
     return ChatResponse(data=ChatResponseData(message=message, suggestedQuestions=suggested_questions, tokenUsage=token_usage))
+
+
+@router.post(
+    "/chat/stream",
+    summary="Send a message and receive an AI character response as a stream",
+    description="Same as /chat but streams the response using Server-Sent Events (SSE).",
+)
+async def chat_stream(body: ChatRequest):
+    character, context = await _resolve_character_and_context(
+        body.characterId,
+        body.contextId,
+        body.characterData,
+        body.contextData,
+    )
+
+    async def event_generator():
+        try:
+            stream = llm_service.generate_reply_stream(
+                character=character,
+                context=context,
+                user_message=body.userMessage,
+                message_history=body.messageHistory,
+            )
+            async for chunk in stream:
+                if isinstance(chunk, dict):
+                    # Metadata chunk
+                    yield f"data: {json.dumps({'type': 'metadata', 'data': chunk})}\n\n"
+                else:
+                    # Text chunk
+                    yield f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ── POST /v1/ai/generate-title ────────────────────────────────────────────────

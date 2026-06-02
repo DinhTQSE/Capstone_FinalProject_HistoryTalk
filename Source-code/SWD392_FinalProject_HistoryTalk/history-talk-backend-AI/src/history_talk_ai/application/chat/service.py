@@ -60,6 +60,51 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[
         logger.error(f"Failed to call Ollama: {e}")
         raise
 
+async def _call_ollama_stream(messages: list[dict]) -> tuple:
+    """Make an async call to the Ollama endpoint with streaming enabled. Yields chunks and finally returns tokens."""
+    payload = {
+        "model": settings.LLM_MODEL,
+        "messages": messages,
+        "stream": True,
+        "options": {
+            "temperature": settings.LLM_TEMPERATURE,
+            "num_predict": settings.LLM_MAX_TOKENS,
+        }
+    }
+    
+    auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    try:
+        async with ollama_client.stream(
+            "POST",
+            _ollama_url("/api/chat"),
+            json=payload,
+            auth=auth,
+            timeout=120.0
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    chunk = data.get("message", {}).get("content", "")
+                    if chunk:
+                        yield chunk
+                    if data.get("done"):
+                        prompt_tokens = data.get("prompt_eval_count", 0)
+                        completion_tokens = data.get("eval_count", 0)
+                except json.JSONDecodeError:
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to stream from Ollama: {e}")
+        raise
+        
+    yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
+
 async def get_embedding_from_ollama(text: str) -> List[float]:
     """Get embedding vector for a given text from Ollama."""
     payload = {
@@ -174,6 +219,79 @@ async def generate_reply(
         logger.error(f"Failed to parse JSON from Ollama: {response_text}. Error: {e}")
         # Fallback if json parsing fails
         return response_text, [], prompt_tokens, completion_tokens
+
+async def generate_reply_stream(
+    character: CharacterData,
+    context: HistoricalContextData,
+    user_message: str,
+    message_history: List[MessageHistoryItem],
+):
+    """
+    Invoke the LLM in character-roleplay mode using streaming.
+    Yields text chunks. The final yield is a dict containing metadata.
+    """
+    entity_ids = [context.contextId, character.characterId]
+    rag_context = await retrieve_history_context(user_message, entity_ids)
+    
+    system_prompt = build_chat_system_prompt(character, context)
+    
+    if rag_context:
+        system_prompt += (
+            f"\n\n[DỮ LIỆU THAM KHẢO]:\n{rag_context}\n\n"
+            "LỆNH RAG:\n"
+            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO, kể cả khi mâu thuẫn kiến thức cũ.\n"
+            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm (vd: truyền thuyết, thần tiên).\n"
+            "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
+        )
+    
+    # We do NOT force JSON for streaming because streaming JSON is hard to parse continuously.
+    messages = [{"role": "system", "content": system_prompt}]
+    for item in message_history:
+        messages.append({"role": item.role, "content": item.content})
+    messages.append({"role": "user", "content": user_message})
+
+    full_message = ""
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    # Stream the message
+    stream_gen = _call_ollama_stream(messages)
+    async for chunk in stream_gen:
+        if isinstance(chunk, dict):
+            prompt_tokens = chunk.get("prompt_tokens", 0)
+            completion_tokens = chunk.get("completion_tokens", 0)
+        else:
+            full_message += chunk
+            yield chunk
+            
+    # Now that the message is done, generate suggested questions synchronously but fast
+    # By asking specifically for 3 suggested questions based on the last reply.
+    sq_prompt = (
+        "Dựa vào câu trả lời vừa rồi của bạn, hãy gợi ý 3 câu hỏi ngắn (mỗi câu dưới 10 từ) "
+        "mà người dùng có thể hỏi tiếp theo. CHỈ TRẢ VỀ JSON dạng: "
+        '{"suggestedQuestions": ["câu 1", "câu 2", "câu 3"]}'
+    )
+    sq_messages = messages + [
+        {"role": "assistant", "content": full_message},
+        {"role": "user", "content": sq_prompt}
+    ]
+    
+    sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=True)
+    suggested_questions = []
+    try:
+        clean_text = sq_text.strip()
+        if clean_text.startswith("```json"): clean_text = clean_text[7:]
+        if clean_text.endswith("```"): clean_text = clean_text[:-3]
+        parsed = json.loads(clean_text.strip())
+        suggested_questions = parsed.get("suggestedQuestions", [])[:3]
+    except Exception as e:
+        logger.error(f"Failed to parse suggested questions JSON: {sq_text}. Error: {e}")
+
+    yield {
+        "suggestedQuestions": suggested_questions,
+        "promptTokens": prompt_tokens + sq_pt,
+        "completionTokens": completion_tokens + sq_ct
+    }
 
 async def generate_session_title(
     character: CharacterData,

@@ -14,10 +14,16 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
@@ -44,11 +50,15 @@ public class AiServiceClient {
                                 .requestFactory(factory)
                                 .baseUrl(aiServiceUrl);
 
+                this.aiServiceUrlStr = aiServiceUrl;
+                this.basicAuthHeader = null;
+
                 // Add Basic Auth header if credentials are configured (e.g. Nginx auth_basic)
                 if (aiServiceUsername != null && !aiServiceUsername.isBlank()) {
                         String credentials = Base64.getEncoder().encodeToString(
                                         (aiServiceUsername + ":" + aiServicePassword).getBytes(StandardCharsets.UTF_8));
-                        builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + credentials);
+                        this.basicAuthHeader = "Basic " + credentials;
+                        builder.defaultHeader(HttpHeaders.AUTHORIZATION, this.basicAuthHeader);
                         log.info("AI service client configured with Basic Auth for user: {}", aiServiceUsername);
                 }
 
@@ -56,7 +66,12 @@ public class AiServiceClient {
                 this.chatSessionRepository = chatSessionRepository;
                 this.aiMetricsService = aiMetricsService;
                 this.objectMapper = objectMapper;
+                this.javaHttpClient = HttpClient.newBuilder().build();
         }
+
+        private final String aiServiceUrlStr;
+        private final String basicAuthHeader;
+        private final HttpClient javaHttpClient;
 
         // ── Inner payload types ────────────────────────────────────────────────
 
@@ -176,6 +191,62 @@ public class AiServiceClient {
                         log.error("AI service /chat call failed: {}", e.getMessage());
                         throw new SystemException("AI service unavailable: " + e.getMessage());
                 }
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/chat/stream asynchronously.
+         */
+        public void streamChat(
+                        String characterId,
+                        String contextId,
+                        String userMessage,
+                        List<MessageHistoryItem> messageHistory,
+                        CharacterPayload characterData,
+                        ContextPayload contextData,
+                        Consumer<String> onData,
+                        Runnable onComplete,
+                        Consumer<Throwable> onError) {
+            
+            ChatRequest requestPayload = new ChatRequest(characterId, contextId, userMessage,
+                            messageHistory, characterData, contextData);
+            try {
+                String requestBody = objectMapper.writeValueAsString(requestPayload);
+                HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                        .uri(URI.create(this.aiServiceUrlStr + "/v1/ai/chat/stream"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8));
+                
+                if (this.basicAuthHeader != null) {
+                    reqBuilder.header(HttpHeaders.AUTHORIZATION, this.basicAuthHeader);
+                }
+                
+                HttpRequest request = reqBuilder.build();
+                
+                javaHttpClient.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
+                    .thenAccept(response -> {
+                        if (response.statusCode() >= 400) {
+                            onError.accept(new SystemException("AI streaming failed with status " + response.statusCode()));
+                            return;
+                        }
+                        try (Stream<String> lines = response.body()) {
+                            lines.forEach(line -> {
+                                if (line != null && !line.isBlank()) {
+                                    onData.accept(line);
+                                }
+                            });
+                        } catch (Exception e) {
+                            onError.accept(e);
+                            return;
+                        }
+                        onComplete.run();
+                    })
+                    .exceptionally(ex -> {
+                        onError.accept(ex);
+                        return null;
+                    });
+            } catch (Exception e) {
+                onError.accept(e);
+            }
         }
 
         /**
