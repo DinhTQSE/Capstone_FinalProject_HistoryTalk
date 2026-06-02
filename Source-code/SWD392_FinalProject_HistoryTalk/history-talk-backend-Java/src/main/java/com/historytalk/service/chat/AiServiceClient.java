@@ -226,7 +226,11 @@ public class AiServiceClient {
                 javaHttpClient.sendAsync(request, HttpResponse.BodyHandlers.ofLines())
                     .thenAccept(response -> {
                         if (response.statusCode() >= 400) {
-                            onError.accept(new SystemException("AI streaming failed with status " + response.statusCode()));
+                            String errorBody = "";
+                            try (Stream<String> lines = response.body()) {
+                                errorBody = lines.collect(java.util.stream.Collectors.joining("\n"));
+                            } catch (Exception ignored) {}
+                            onError.accept(new SystemException("AI streaming failed with status " + response.statusCode() + ". Body: " + errorBody));
                             return;
                         }
                         try (Stream<String> lines = response.body()) {
