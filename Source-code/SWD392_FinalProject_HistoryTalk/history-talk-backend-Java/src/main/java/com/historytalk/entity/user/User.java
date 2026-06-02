@@ -81,6 +81,12 @@ public class User {
     @Column(name = "last_token_reset_at")
     private LocalDateTime lastTokenResetAt;
 
+    @Column(name = "password_reset_token_hash", length = 64)
+    private String passwordResetTokenHash;
+
+    @Column(name = "password_reset_expires_at")
+    private LocalDateTime passwordResetExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
