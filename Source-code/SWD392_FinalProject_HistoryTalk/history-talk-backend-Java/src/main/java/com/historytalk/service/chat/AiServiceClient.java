@@ -67,7 +67,9 @@ public class AiServiceClient {
                 this.chatSessionRepository = chatSessionRepository;
                 this.aiMetricsService = aiMetricsService;
                 this.objectMapper = objectMapper;
-                this.javaHttpClient = HttpClient.newBuilder().build();
+                this.javaHttpClient = HttpClient.newBuilder()
+                                .version(HttpClient.Version.HTTP_1_1)
+                                .build();
         }
 
         private final String aiServiceUrlStr;
