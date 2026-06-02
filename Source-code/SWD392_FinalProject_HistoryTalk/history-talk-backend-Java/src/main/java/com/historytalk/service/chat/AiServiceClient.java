@@ -61,6 +61,7 @@ public class AiServiceClient {
                         builder.defaultHeader(HttpHeaders.AUTHORIZATION, this.basicAuthHeader);
                         log.info("AI service client configured with Basic Auth for user: {}", aiServiceUsername);
                 }
+                this.basicAuthHeader = authHeader;
 
                 this.restClient = builder.build();
                 this.chatSessionRepository = chatSessionRepository;
