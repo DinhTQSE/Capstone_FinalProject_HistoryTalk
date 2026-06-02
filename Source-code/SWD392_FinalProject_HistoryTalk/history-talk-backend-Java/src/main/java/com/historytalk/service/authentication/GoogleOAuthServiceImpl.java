@@ -6,28 +6,34 @@ import com.historytalk.entity.user.User;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.service.notification.GoogleOAuthPasswordEmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class GoogleOAuthServiceImpl implements GoogleOAuthService {
 
-    private static final String GOOGLE_PASSWORD_PREFIX = "GOOGLE_OAUTH_";
+    private static final String GOOGLE_PASSWORD_PREFIX = "HT-GOOGLE-";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final GoogleOAuthPasswordEmailService passwordEmailService;
 
     @Override
     @Transactional
@@ -36,7 +42,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
         String displayName = extractDisplayName(oauth2User);
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseGet(() -> createGoogleUser(email, displayName));
+                .orElseGet(() -> createGoogleUserAndSendPasswordEmail(email, displayName));
 
         if (user.getDeletedAt() != null) {
             throw new UnauthorizedException("Account has been deactivated");
@@ -74,15 +80,50 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
         return StringUtils.hasText(name) ? name : null;
     }
 
-    private User createGoogleUser(String email, String displayName) {
+    private User createGoogleUserAndSendPasswordEmail(String email, String displayName) {
+        String temporaryPassword = generateTemporaryPassword();
+        User user = createGoogleUser(email, displayName, temporaryPassword);
+        sendTemporaryPasswordEmailAfterCommit(user, temporaryPassword);
+        return user;
+    }
+
+    private User createGoogleUser(String email, String displayName, String temporaryPassword) {
         String userName = generateUniqueUserName(email, displayName);
         User user = User.builder()
                 .userName(userName)
                 .email(email)
-                .password(passwordEncoder.encode(GOOGLE_PASSWORD_PREFIX + UUID.randomUUID()))
+                .password(passwordEncoder.encode(temporaryPassword))
                 .role(UserRole.CUSTOMER)
                 .build();
         return userRepository.save(user);
+    }
+
+    private String generateTemporaryPassword() {
+        byte[] randomBytes = new byte[18];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return GOOGLE_PASSWORD_PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    private void sendTemporaryPasswordEmailAfterCommit(User user, String temporaryPassword) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            sendTemporaryPasswordEmail(user, temporaryPassword);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendTemporaryPasswordEmail(user, temporaryPassword);
+            }
+        });
+    }
+
+    private void sendTemporaryPasswordEmail(User user, String temporaryPassword) {
+        try {
+            passwordEmailService.sendTemporaryPasswordEmail(user.getEmail(), user.getUserName(), temporaryPassword);
+        } catch (RuntimeException ex) {
+            log.warn("Could not send Google OAuth temporary password email for uid: {}", user.getUid());
+        }
     }
 
     private String generateUniqueUserName(String email, String displayName) {

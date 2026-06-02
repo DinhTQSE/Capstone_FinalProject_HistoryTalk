@@ -1,6 +1,7 @@
 package com.historytalk.controller.authentication;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.authentication.ForgotPasswordRequest;
 import com.historytalk.dto.authentication.LoginRequest;
 import com.historytalk.dto.authentication.LoginResponse;
 import com.historytalk.dto.authentication.LogoutResponse;
@@ -10,6 +11,7 @@ import com.historytalk.dto.authentication.RegisterRequest;
 import com.historytalk.dto.authentication.RegisterResponse;
 import com.historytalk.dto.authentication.RegisterStaffRequest;
 import com.historytalk.dto.authentication.RegisterStaffResponse;
+import com.historytalk.dto.authentication.ResetPasswordRequest;
 import com.historytalk.service.authentication.AuthService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -75,6 +77,26 @@ public class AuthController {
         log.info("POST /api/v1/auth/login - email: {}", request.getEmail());
         LoginResponse data = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(data, "Login successful"));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password", description = "Request a password reset link for an account email.")
+    public ResponseEntity<ApiResponse<?>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        log.info("POST /api/v1/auth/forgot-password");
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null, "If the email exists, a password reset link has been sent"));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Reset an account password with a valid reset token.")
+    public ResponseEntity<ApiResponse<?>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        log.info("POST /api/v1/auth/reset-password");
+        authService.resetPassword(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
     }
 
     @PostMapping("/google/login-url")

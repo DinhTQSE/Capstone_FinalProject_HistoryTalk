@@ -19,20 +19,30 @@ import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.service.notification.PasswordResetEmailService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +67,12 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final PasswordResetEmailService passwordResetEmailService;
+
+    @Value("${app.password-reset.token-expiration-minutes}")
+    private long passwordResetTokenExpirationMinutes;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Override
     @Transactional
@@ -156,6 +172,56 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
+    public void forgotPassword(String email) {
+        if (!StringUtils.hasText(email)) {
+            return;
+        }
+
+        String normalizedEmail = email.trim().toLowerCase();
+        java.util.Optional<User> userOptional = userRepository.findByEmailIgnoreCase(normalizedEmail);
+        if (userOptional.isEmpty() || userOptional.get().getDeletedAt() != null) {
+            return;
+        }
+
+        User user = userOptional.get();
+        String rawToken = generatePasswordResetToken();
+        user.setPasswordResetTokenHash(sha256Hex(rawToken));
+        user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(passwordResetTokenExpirationMinutes));
+        userRepository.save(user);
+
+        sendPasswordResetEmailAfterCommit(user, rawToken);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword, String confirmPassword) {
+        if (!StringUtils.hasText(token)) {
+            throw new UnauthorizedException("Invalid or expired password reset token");
+        }
+        if (!StringUtils.hasText(newPassword)) {
+            throw new InvalidRequestException("New password is required");
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            throw new InvalidRequestException("Password and confirmation password do not match");
+        }
+
+        User user = userRepository.findByPasswordResetTokenHash(sha256Hex(token))
+                .orElseThrow(() -> new UnauthorizedException("Invalid or expired password reset token"));
+
+        if (user.getDeletedAt() != null
+                || user.getPasswordResetExpiresAt() == null
+                || user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new UnauthorizedException("Invalid or expired password reset token");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordResetTokenHash(null);
+        user.setPasswordResetExpiresAt(null);
+        userRepository.save(user);
+    }
+
+    @Override
     public RefreshTokenResponse refreshToken(String refreshToken) {
         log.info("Refreshing token");
 
@@ -239,6 +305,43 @@ public class AuthServiceImpl implements AuthService {
         claims.put("uid", principal.getUid());
         claims.put("role", principal.getRole().name());
         return claims;
+    }
+
+    private String generatePasswordResetToken() {
+        byte[] randomBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    private String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 algorithm is not available", ex);
+        }
+    }
+
+    private void sendPasswordResetEmailAfterCommit(User user, String rawToken) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            sendPasswordResetEmail(user, rawToken);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendPasswordResetEmail(user, rawToken);
+            }
+        });
+    }
+
+    private void sendPasswordResetEmail(User user, String rawToken) {
+        try {
+            passwordResetEmailService.sendPasswordResetEmail(user.getEmail(), user.getUserName(), rawToken);
+        } catch (RuntimeException ex) {
+            log.warn("Could not send password reset email for uid: {}", user.getUid());
+        }
     }
 
     @Override

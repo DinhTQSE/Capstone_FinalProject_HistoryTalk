@@ -5,6 +5,7 @@ import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.service.notification.GoogleOAuthPasswordEmailService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +44,9 @@ class GoogleOAuthServiceImplTest {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private GoogleOAuthPasswordEmailService passwordEmailService;
 
     @InjectMocks
     private GoogleOAuthServiceImpl googleOAuthService;
@@ -67,6 +73,13 @@ class GoogleOAuthServiceImplTest {
         assertThat(userCaptor.getValue().getPassword()).isEqualTo("encoded-placeholder");
         assertThat(userCaptor.getValue().getRole()).isEqualTo(UserRole.CUSTOMER);
 
+        ArgumentCaptor<String> passwordCaptor = ArgumentCaptor.forClass(String.class);
+        verify(passwordEncoder).encode(passwordCaptor.capture());
+        String rawPassword = passwordCaptor.getValue();
+        assertThat(rawPassword).startsWith("HT-GOOGLE-");
+        assertThat(rawPassword.length()).isGreaterThan(25);
+        verify(passwordEmailService).sendTemporaryPasswordEmail("new.user@gmail.com", "new.user", rawPassword);
+
         assertThat(response.getAccessToken()).isEqualTo("access-token");
         assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
         assertThat(response.getTokenType()).isEqualTo("Bearer");
@@ -89,6 +102,29 @@ class GoogleOAuthServiceImplTest {
         assertThat(response.getUid()).isEqualTo(existing.getUid().toString());
         assertThat(response.getUserName()).isEqualTo("existing");
         assertThat(response.getRole()).isEqualTo("CONTENT_ADMIN");
+        verify(passwordEmailService, never()).sendTemporaryPasswordEmail(any(), any(), any());
+    }
+
+    @Test
+    void authenticateGoogleUser_continuesLoginWhenPasswordEmailFails() {
+        OAuth2User oauth2User = oauth2User("new.user@gmail.com", "New User");
+        User saved = user("new.user", "new.user@gmail.com", UserRole.CUSTOMER);
+
+        when(userRepository.findByEmailIgnoreCase("new.user@gmail.com")).thenReturn(Optional.empty());
+        when(userRepository.existsByUserNameIgnoreCase("new.user")).thenReturn(false);
+        when(passwordEncoder.encode(any(String.class))).thenReturn("encoded-placeholder");
+        when(userRepository.save(any(User.class))).thenReturn(saved);
+        doThrow(new RuntimeException("smtp down"))
+                .when(passwordEmailService)
+                .sendTemporaryPasswordEmail(eq("new.user@gmail.com"), eq("new.user"), any(String.class));
+        when(jwtService.generateAccessToken(eq("new.user@gmail.com"), anyMap())).thenReturn("access-token");
+        when(jwtService.generateRefreshToken("new.user@gmail.com")).thenReturn("refresh-token");
+        when(jwtService.getAccessTokenExpirationMs()).thenReturn(3600000L);
+
+        LoginResponse response = googleOAuthService.authenticateGoogleUser(oauth2User);
+
+        assertThat(response.getAccessToken()).isEqualTo("access-token");
+        assertThat(response.getEmail()).isEqualTo("new.user@gmail.com");
     }
 
     @Test
