@@ -108,7 +108,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
 async def get_embedding_from_ollama(text: str) -> List[float]:
     """Get embedding vector for a given text from Ollama."""
     payload = {
-        "model": "nomic-embed-text",
+        "model": "bge-m3",
         "prompt": text
     }
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None

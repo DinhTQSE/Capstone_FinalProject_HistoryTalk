@@ -191,7 +191,7 @@ async def generate_title(body: GenerateTitleRequest) -> GenerateTitleResponse:
     "/documents/process",
     summary="Process and index a document into VectorChunk (Supabase)",
     description=(
-        "Chunk the given document content, generate embeddings via Ollama (nomic-embed-text), "
+        "Chunk the given document content, generate embeddings via Ollama (bge-m3), "
         "and store the resulting VectorChunks in Supabase for future RAG retrieval."
     ),
 )
