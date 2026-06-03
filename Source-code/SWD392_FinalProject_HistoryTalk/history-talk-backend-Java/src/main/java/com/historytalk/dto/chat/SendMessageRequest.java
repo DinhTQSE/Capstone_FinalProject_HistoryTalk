@@ -18,4 +18,7 @@ public class SendMessageRequest {
     @Size(max = 4000, message = "content must not exceed 4000 characters")
     @JsonProperty("content")
     private String content;
+
+    @JsonProperty("messageType")
+    private String messageType;
 }
