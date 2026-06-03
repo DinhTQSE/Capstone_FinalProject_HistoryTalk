@@ -143,8 +143,17 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         logger.info(f"RAG retrieved {len(chunks)} chunks for entity_ids: {entity_ids}")
         if not chunks:
             return ""
-            
         texts = [chunk.get("content", "") for chunk in chunks if chunk.get("content")]
+        
+        # Log the actual RAG content
+        print("\n" + "="*50)
+        print("🔍 RAG RETRIEVED CONTENT:")
+        for i, text in enumerate(texts):
+            print(f"--- Chunk {i+1} ---")
+            print(text)
+        print("="*50 + "\n")
+        logger.info(f"RAG Context length: {sum(len(t) for t in texts)} characters")
+        
         return "\n\n".join(texts)
     except Exception as e:
         logger.error(f"Supabase RPC error: {e}")
