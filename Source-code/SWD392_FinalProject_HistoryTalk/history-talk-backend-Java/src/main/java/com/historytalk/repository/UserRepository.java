@@ -30,7 +30,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying
-    @Query("UPDATE User u SET u.token = u.token - :tokensToDeduct WHERE u.uid = :userId")
+    @Query("UPDATE User u SET u.token = CASE WHEN (u.token - :tokensToDeduct) < 0 THEN 0 ELSE (u.token - :tokensToDeduct) END WHERE u.uid = :userId")
     int deductTokens(@Param("userId") UUID userId, @Param("tokensToDeduct") Integer tokensToDeduct);
 
     @Query("SELECT COUNT(u) FROM User u")
