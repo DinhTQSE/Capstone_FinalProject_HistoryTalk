@@ -3,8 +3,12 @@ package com.historytalk.service.authentication;
 import com.historytalk.dto.authentication.LoginResponse;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;
+import com.historytalk.entity.payment.Tier;
+import com.historytalk.entity.payment.UserTier;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.payment.TierRepository;
+import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.notification.GoogleOAuthPasswordEmailService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +23,7 @@ import org.springframework.util.StringUtils;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,6 +36,8 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
+    private final TierRepository tierRepository;
+    private final UserTierRepository userTierRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GoogleOAuthPasswordEmailService passwordEmailService;
@@ -95,7 +102,29 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                 .password(passwordEncoder.encode(temporaryPassword))
                 .role(UserRole.CUSTOMER)
                 .build();
-        return userRepository.save(user);
+
+        java.util.Optional<Tier> freeTierOpt = tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free");
+        if (freeTierOpt.isPresent()) {
+            Tier freeTier = freeTierOpt.get();
+            user.setToken(freeTier.getLimitedToken());
+            user.setLastTokenResetAt(LocalDateTime.now());
+        }
+
+        User saved = userRepository.save(user);
+
+        if (freeTierOpt.isPresent()) {
+            Tier freeTier = freeTierOpt.get();
+            UserTier userTier = UserTier.builder()
+                    .user(saved)
+                    .tier(freeTier)
+                    .startTime(LocalDateTime.now())
+                    .endTime(LocalDateTime.now().plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120))
+                    .isActive(true)
+                    .build();
+            userTierRepository.save(userTier);
+        }
+
+        return saved;
     }
 
     private String generateTemporaryPassword() {

@@ -3,8 +3,12 @@ package com.historytalk.service.authentication;
 import com.historytalk.dto.authentication.LoginResponse;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;
+import com.historytalk.entity.payment.Tier;
+import com.historytalk.entity.payment.UserTier;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.payment.TierRepository;
+import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.service.notification.GoogleOAuthPasswordEmailService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +44,12 @@ class GoogleOAuthServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
+    private TierRepository tierRepository;
+
+    @Mock
+    private UserTierRepository userTierRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -58,6 +68,7 @@ class GoogleOAuthServiceImplTest {
 
         when(userRepository.findByEmailIgnoreCase("new.user@gmail.com")).thenReturn(Optional.empty());
         when(userRepository.existsByUserNameIgnoreCase("new.user")).thenReturn(false);
+        when(tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free")).thenReturn(Optional.of(Tier.builder().limitedToken(10).noMonth(0).build()));
         when(passwordEncoder.encode(any(String.class))).thenReturn("encoded-placeholder");
         when(userRepository.save(any(User.class))).thenReturn(saved);
         when(jwtService.generateAccessToken(eq("new.user@gmail.com"), anyMap())).thenReturn("access-token");
@@ -112,6 +123,7 @@ class GoogleOAuthServiceImplTest {
 
         when(userRepository.findByEmailIgnoreCase("new.user@gmail.com")).thenReturn(Optional.empty());
         when(userRepository.existsByUserNameIgnoreCase("new.user")).thenReturn(false);
+        when(tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free")).thenReturn(Optional.of(Tier.builder().limitedToken(10).noMonth(0).build()));
         when(passwordEncoder.encode(any(String.class))).thenReturn("encoded-placeholder");
         when(userRepository.save(any(User.class))).thenReturn(saved);
         doThrow(new RuntimeException("smtp down"))
