@@ -3,7 +3,7 @@
 # =============================================================================
 # --- Build stage ---
 # --- Stage 1: Build stage (Dùng image có sẵn Maven) ---
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+FROM maven:3.9.8-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
 
 # 1. Chỉ copy pom.xml để cache dependencies
@@ -15,7 +15,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # --- Stage 2: Runtime stage (Giữ nguyên như cũ) ---
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21.0.3_9-jre-alpine
 WORKDIR /app
 
 # --- Security: Run as non-root user ---
