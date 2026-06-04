@@ -22,9 +22,16 @@ public interface QuizService {
 
     PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, Pageable pageable);
 
+    // userId = null means admin mode (SYSTEM_ADMIN) — skip ownership check
+    QuizSessionDetailResponse getSessionDetail(String sessionId, UUID userId);
+
     // ==================== Staff ====================
 
     PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable, String role);
+
+    PaginatedResponse<QuizHistoryResponse> getAllUsersQuizHistory(Pageable pageable);
+
+    PaginatedResponse<QuizHistoryResponse> getQuizHistoryByUserId(String userId, Pageable pageable);
 
     QuizStaffResponse getQuizByIdForStaff(String quizId);
 

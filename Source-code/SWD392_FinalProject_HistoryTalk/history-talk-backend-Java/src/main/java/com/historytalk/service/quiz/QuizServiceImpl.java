@@ -19,6 +19,7 @@ import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
+import com.historytalk.repository.QuizAnswerDetailRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
@@ -54,6 +55,7 @@ public class QuizServiceImpl implements QuizService {
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
     private final QuizSessionRepository quizSessionRepository;
+    private final QuizAnswerDetailRepository quizAnswerDetailRepository;
     private final UserRepository userRepository;
     private final HistoricalContextRepository historicalContextRepository;
     private final ObjectMapper objectMapper;
@@ -205,6 +207,90 @@ public class QuizServiceImpl implements QuizService {
     public PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, Pageable pageable) {
         log.info("getQuizHistory: userId={}", userId);
         Page<QuizSession> page = quizSessionRepository.findCompletedByUserUid(userId, pageable);
+        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QuizSessionDetailResponse getSessionDetail(String sessionId, UUID userId) {
+        log.info("getSessionDetail: sessionId={}, userId={}", sessionId, userId);
+        UUID sessionUuid = parseUuid(sessionId, "sessionId");
+
+        QuizSession session = quizSessionRepository.findBySessionId(sessionUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz session not found: " + sessionId));
+
+        // Ownership check — skipped for admin (userId == null)
+        if (userId != null && !session.getUser().getUid().equals(userId)) {
+            throw new InvalidRequestException("You are not authorized to view this quiz session");
+        }
+
+        // Must be a completed session
+        if (session.getEndTime() == null) {
+            throw new InvalidRequestException("Session not completed yet");
+        }
+
+        Quiz quiz = session.getQuiz();
+
+        // Load answer details — keyed by questionId for O(1) lookup
+        List<QuizAnswerDetail> details = quizAnswerDetailRepository.findBySessionId(sessionUuid);
+        Map<UUID, QuizAnswerDetail> detailByQuestion = details.stream()
+                .collect(Collectors.toMap(
+                        d -> d.getQuestion().getQuestionId(),
+                        d -> d,
+                        (a, b) -> a  // keep first if duplicate (should not happen)
+                ));
+
+        // Iterate active questions in creation order
+        List<Question> questions = questionRepository.findActiveByQuizId(quiz.getQuizId());
+        List<QuizSessionDetailResponse.QuestionResultItem> items = questions.stream()
+                .map(q -> {
+                    QuizAnswerDetail detail = detailByQuestion.get(q.getQuestionId());
+                    return QuizSessionDetailResponse.QuestionResultItem.builder()
+                            .questionId(q.getQuestionId().toString())
+                            .content(q.getContent())
+                            .options(deserializeOptions(q.getOptions()))
+                            .correctAnswer(q.getCorrectAnswer() != null ? q.getCorrectAnswer() : -1)
+                            .selectedAnswer(detail != null ? detail.getSelectedOption() : null)
+                            .isCorrect(detail != null && Boolean.TRUE.equals(detail.getIsCorrect()))
+                            .explanation(q.getExplanation())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        int score = session.getScore() != null ? session.getScore().intValue() : 0;
+        int total = questions.size();
+        double percentage = total > 0 ? (double) score / total * 100.0 : 0.0;
+
+        return QuizSessionDetailResponse.builder()
+                .sessionId(session.getSessionId().toString())
+                .quizId(quiz.getQuizId().toString())
+                .quizTitle(quiz.getTitle())
+                .score(score)
+                .totalQuestions(total)
+                .percentage(percentage)
+                .limitedTime(session.getLimitedTime())
+                .startedAt(session.getStartTime() != null ? session.getStartTime().toString() : null)
+                .completedAt(session.getEndTime().toString())
+                .questions(items)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<QuizHistoryResponse> getAllUsersQuizHistory(Pageable pageable) {
+        log.info("getAllUsersQuizHistory");
+        Page<QuizSession> page = quizSessionRepository.findAllCompleted(pageable);
+        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<QuizHistoryResponse> getQuizHistoryByUserId(String userId, Pageable pageable) {
+        log.info("getQuizHistoryByUserId: userId={}", userId);
+        UUID uid = parseUuid(userId, "userId");
+        userRepository.findById(uid)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        Page<QuizSession> page = quizSessionRepository.findCompletedByUserUidForAdmin(uid, pageable);
         return toPaginatedResponse(page.map(this::mapToHistoryResponse));
     }
 

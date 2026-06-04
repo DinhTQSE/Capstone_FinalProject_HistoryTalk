@@ -14,6 +14,16 @@ import java.util.UUID;
 @Repository
 public interface QuizAnswerDetailRepository extends JpaRepository<QuizAnswerDetail, UUID> {
 
+    @Query("""
+            SELECT d FROM QuizAnswerDetail d
+            JOIN FETCH d.question q
+            WHERE d.quizSession.sessionId = :sessionId
+              AND d.deletedAt IS NULL
+              AND q.deletedAt IS NULL
+            ORDER BY q.createdAt ASC
+            """)
+    List<QuizAnswerDetail> findBySessionId(@Param("sessionId") UUID sessionId);
+
     @Query(value = """
             SELECT CAST(qad.question_id AS text) AS "questionId",
                    CAST(q.quiz_id AS text) AS "quizId",

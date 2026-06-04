@@ -29,6 +29,23 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     Page<QuizSession> findCompletedByUserUid(@Param("uid") UUID uid, Pageable pageable);
 
     @Query("""
+            SELECT s FROM QuizSession s
+            WHERE s.endTime IS NOT NULL
+              AND s.deletedAt IS NULL
+            ORDER BY s.endTime DESC
+            """)
+    Page<QuizSession> findAllCompleted(Pageable pageable);
+
+    @Query("""
+            SELECT s FROM QuizSession s
+            WHERE s.user.uid = :uid
+              AND s.endTime IS NOT NULL
+              AND s.deletedAt IS NULL
+            ORDER BY s.endTime DESC
+            """)
+    Page<QuizSession> findCompletedByUserUidForAdmin(@Param("uid") UUID uid, Pageable pageable);
+
+    @Query("""
             SELECT COUNT(s) FROM QuizSession s
             WHERE s.quiz.quizId = :quizId
             AND s.user.uid = :uid
