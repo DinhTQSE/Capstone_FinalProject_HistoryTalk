@@ -307,6 +307,7 @@ public class MessageServiceImpl implements MessageService {
                         if (totalToken > 0 && session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
                             userRepository.deductTokens(session.getUser().getUid(), totalToken);
                             remainingTokens = Math.max(0, remainingTokens - totalToken);
+                            session.getUser().setToken(remainingTokens);
                         }
 
                         session.setLastMessageAt(LocalDateTime.now());

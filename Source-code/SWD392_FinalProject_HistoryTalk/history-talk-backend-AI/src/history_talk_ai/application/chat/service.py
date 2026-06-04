@@ -1,6 +1,7 @@
 import json
 import uuid
 import logging
+import asyncio
 from typing import List
 import httpx
 from supabase import create_client, Client
@@ -281,6 +282,7 @@ async def generate_reply_stream(
             completion_tokens = chunk.get("completion_tokens", 0)
         else:
             full_message += chunk
+            await asyncio.sleep(0.05)  # SLOW DOWN YIELD SPEED (50ms per chunk)
             yield chunk
             
     suggested_questions = []
