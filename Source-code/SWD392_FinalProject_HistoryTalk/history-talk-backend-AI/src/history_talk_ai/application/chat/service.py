@@ -106,22 +106,32 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def get_embedding_from_ollama(text: str) -> List[float]:
-    """Get embedding vector for a given text from Ollama."""
+async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[float]:
+    """Get embedding vector for a given text from Ollama with retries."""
+    if not text or not text.strip():
+        return []
+        
     payload = {
         "model": "bge-m3",
         "prompt": text
     }
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
 
-    try:
-        response = await ollama_client.post(_ollama_url("/api/embeddings"), json=payload, auth=auth)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("embedding", [])
-    except Exception as e:
-        logger.error(f"Failed to get embedding from Ollama: {e}")
-        return []
+    for attempt in range(max_retries):
+        try:
+            response = await ollama_client.post(_ollama_url("/api/embeddings"), json=payload, auth=auth)
+            response.raise_for_status()
+            data = response.json()
+            embedding = data.get("embedding", [])
+            if embedding:
+                return embedding
+        except Exception as e:
+            logger.warning(f"Ollama embedding attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1.0 * (attempt + 1))  # Exponential backoff
+                
+    logger.error("All attempts to get embedding from Ollama failed.")
+    return []
 
 async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> str:
     """Retrieve history context from Supabase VectorChunk."""
@@ -420,25 +430,43 @@ async def process_document(request: ProcessDocumentRequest):
             while start < len(content) and content[start].isspace():
                 start += 1
     
-    for idx, chunk_text in enumerate(chunks):
-        embedding = await get_embedding_from_ollama(chunk_text)
+    # Generate embeddings concurrently for speed, but limit concurrency to avoid overwhelming Ollama
+    sem = asyncio.Semaphore(15) # Process maximum 15 chunks at a time
+
+    async def get_embedding_with_context(idx, chunk_text):
+        async with sem:
+            emb = await get_embedding_from_ollama(chunk_text)
+            return idx, chunk_text, emb
+
+    tasks = [get_embedding_with_context(idx, text) for idx, text in enumerate(chunks)]
+    results = await asyncio.gather(*tasks)
+
+    records = []
+    for idx, chunk_text, embedding in results:
         if not embedding:
             logger.warning(f"Failed to generate embedding for chunk {idx} of document {request.doc_id}")
             continue
             
-        try:
-            record = {
-                "chunk_id": str(uuid.uuid4()),
-                "doc_id": request.doc_id,
-                "entity_id": request.entity_id,
-                "content": chunk_text,
-                "embedding": embedding,
-                "sequence_number": idx + 1
-            }
-            supabase.schema(settings.SUPABASE_SCHEMA).table("vector_chunk").insert(record).execute()
-        except Exception as e:
-            logger.error(f"Failed to insert chunk {idx} into Supabase: {e}")
-            raise
+        records.append({
+            "chunk_id": str(uuid.uuid4()),
+            "doc_id": request.doc_id,
+            "entity_id": request.entity_id,
+            "content": chunk_text,
+            "embedding": embedding,
+            "sequence_number": idx + 1
+        })
+        
+    if records:
+        # Bulk insert in batches of 100 to avoid request size limits
+        batch_size = 100
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
+            try:
+                supabase.schema(settings.SUPABASE_SCHEMA).table("vector_chunk").insert(batch).execute()
+                logger.info(f"Inserted batch {i//batch_size + 1} ({len(batch)} chunks) for doc {request.doc_id}")
+            except Exception as e:
+                logger.error(f"Failed to insert batch {i//batch_size + 1} into Supabase: {e}")
+                raise
 
 async def delete_document(doc_id: str):
     """Delete all chunks for a document from Supabase."""
