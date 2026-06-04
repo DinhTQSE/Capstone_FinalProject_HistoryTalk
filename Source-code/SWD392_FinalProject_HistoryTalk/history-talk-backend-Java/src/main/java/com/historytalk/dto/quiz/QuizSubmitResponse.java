@@ -29,6 +29,12 @@ public class QuizSubmitResponse {
     /** score / totalQuestions * 100 */
     private double percentage;
 
+    //** start time */
+    private LocalDateTime startTime;
+
+    //** end time */
+    private LocalDateTime endTime;
+
     /** 0-based index positions of correctly answered questions */
     private List<Integer> correctAnswers;
 

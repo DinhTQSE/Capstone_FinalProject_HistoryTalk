@@ -137,12 +137,12 @@ public class QuizServiceImpl implements QuizService {
         }
 
         // Time limit check
-        if (session.getLimitedTime() != null && session.getStartTime() != null) {
-            LocalDateTime deadline = session.getStartTime().plusSeconds(session.getLimitedTime());
-            if (LocalDateTime.now().isAfter(deadline)) {
-                throw new InvalidRequestException("Time limit expired");
-            }
-        }
+        // if (session.getLimitedTime() != null && session.getStartTime() != null) {
+        //     LocalDateTime deadline = session.getStartTime().plusSeconds(session.getLimitedTime());
+        //     if (LocalDateTime.now().isAfter(deadline)) {
+        //         throw new InvalidRequestException("Time limit expired");
+        //     }
+        // }
 
         // Load ordered questions
         List<Question> questions = questionRepository.findActiveByQuizId(session.getQuiz().getQuizId());
@@ -197,6 +197,8 @@ public class QuizServiceImpl implements QuizService {
                 .score(score)
                 .totalQuestions(total)
                 .percentage(percentage)
+                .startTime(session.getStartTime())
+                .endTime(session.getEndTime())
                 .correctAnswers(correctAnswers)
                 .wrongAnswers(wrongAnswers)
                 .build();
