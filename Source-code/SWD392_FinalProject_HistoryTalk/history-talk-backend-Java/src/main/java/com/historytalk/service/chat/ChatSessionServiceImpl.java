@@ -100,7 +100,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                     "Hãy chào và giới thiệu ngắn gọn về bản thân.",
                     Collections.emptyList(),
                     characterData,
-                    contextData);
+                    contextData,
+                    false);
 
             String suggestedQuestionsJson = null;
             if (greeting.suggestedQuestions() != null && !greeting.suggestedQuestions().isEmpty()) {

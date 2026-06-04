@@ -167,6 +167,7 @@ async def generate_reply(
     context: HistoricalContextData,
     user_message: str,
     message_history: List[MessageHistoryItem],
+    skip_suggestions: bool = False,
 ) -> tuple[str, List[str], int, int]:
     """
     Invoke the LLM in character-roleplay mode.
@@ -192,13 +193,21 @@ async def generate_reply(
         )
     
     # Append instructions to force JSON output
-    json_instruction = (
-        "\n\nCHỈ TRẢ VỀ JSON:\n"
-        "{\n"
-        '  "message": "Câu trả lời",\n'
-        '  "suggestedQuestions": ["câu 1", "câu 2", "câu 3"]\n'
-        "}"
-    )
+    if skip_suggestions:
+        json_instruction = (
+            "\n\nCHỈ TRẢ VỀ JSON:\n"
+            "{\n"
+            '  "message": "Câu trả lời"\n'
+            "}"
+        )
+    else:
+        json_instruction = (
+            "\n\nCHỈ TRẢ VỀ JSON:\n"
+            "{\n"
+            '  "message": "Câu trả lời",\n'
+            '  "suggestedQuestions": ["câu 1", "câu 2", "câu 3"]\n'
+            "}"
+        )
     system_prompt += json_instruction
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -234,6 +243,7 @@ async def generate_reply_stream(
     context: HistoricalContextData,
     user_message: str,
     message_history: List[MessageHistoryItem],
+    skip_suggestions: bool = False,
 ):
     """
     Invoke the LLM in character-roleplay mode using streaming.
@@ -273,28 +283,32 @@ async def generate_reply_stream(
             full_message += chunk
             yield chunk
             
-    # Now that the message is done, generate suggested questions synchronously but fast
-    # By asking specifically for 3 suggested questions based on the last reply.
-    sq_prompt = (
-        "Dựa vào câu trả lời vừa rồi của bạn, hãy gợi ý 3 câu hỏi ngắn (mỗi câu dưới 10 từ) "
-        "mà người dùng có thể hỏi tiếp theo. CHỈ TRẢ VỀ JSON dạng: "
-        '{"suggestedQuestions": ["câu 1", "câu 2", "câu 3"]}'
-    )
-    sq_messages = messages + [
-        {"role": "assistant", "content": full_message},
-        {"role": "user", "content": sq_prompt}
-    ]
-    
-    sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=True)
     suggested_questions = []
-    try:
-        clean_text = sq_text.strip()
-        if clean_text.startswith("```json"): clean_text = clean_text[7:]
-        if clean_text.endswith("```"): clean_text = clean_text[:-3]
-        parsed = json.loads(clean_text.strip())
-        suggested_questions = parsed.get("suggestedQuestions", [])[:3]
-    except Exception as e:
-        logger.error(f"Failed to parse suggested questions JSON: {sq_text}. Error: {e}")
+    sq_pt = 0
+    sq_ct = 0
+
+    if not skip_suggestions:
+        # Now that the message is done, generate suggested questions synchronously but fast
+        # By asking specifically for 3 suggested questions based on the last reply.
+        sq_prompt = (
+            "Dựa vào câu trả lời vừa rồi của bạn, hãy gợi ý 3 câu hỏi ngắn (mỗi câu dưới 10 từ) "
+            "mà người dùng có thể hỏi tiếp theo. CHỈ TRẢ VỀ JSON dạng: "
+            '{"suggestedQuestions": ["câu 1", "câu 2", "câu 3"]}'
+        )
+        sq_messages = messages + [
+            {"role": "assistant", "content": full_message},
+            {"role": "user", "content": sq_prompt}
+        ]
+        
+        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=True)
+        try:
+            clean_text = sq_text.strip()
+            if clean_text.startswith("```json"): clean_text = clean_text[7:]
+            if clean_text.endswith("```"): clean_text = clean_text[:-3]
+            parsed = json.loads(clean_text.strip())
+            suggested_questions = parsed.get("suggestedQuestions", [])[:3]
+        except Exception as e:
+            logger.error(f"Failed to parse suggested questions JSON: {sq_text}. Error: {e}")
 
     yield {
         "suggestedQuestions": suggested_questions,

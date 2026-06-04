@@ -124,6 +124,9 @@ public class MessageServiceImpl implements MessageService {
         ContextPayload contextData = AiServiceClient.buildContextPayload(
                 session.getHistoricalContext());
 
+        // Determine whether to skip suggestions
+        boolean skipSuggestions = "VOICE".equalsIgnoreCase(request.getMessageType());
+
         // Call BE-Python
         AiChatResult aiResult = aiServiceClient.chat(
                 session.getCharacter().getCharacterId().toString(),
@@ -131,7 +134,8 @@ public class MessageServiceImpl implements MessageService {
                 request.getContent(),
                 history,
                 characterData,
-                contextData);
+                contextData,
+                skipSuggestions);
 
         // Serialize suggested questions to JSON string
         String suggestedQuestionsJson = serializeSuggestedQuestions(aiResult.suggestedQuestions());
@@ -237,6 +241,8 @@ public class MessageServiceImpl implements MessageService {
 
         SseEmitter emitter = new SseEmitter(180000L); // 3 minutes timeout
 
+        boolean skipSuggestions = "VOICE".equalsIgnoreCase(request.getMessageType());
+
         CompletableFuture.runAsync(() -> {
             StringBuilder fullMessage = new StringBuilder();
             AtomicInteger promptToken = new AtomicInteger(0);
@@ -250,6 +256,7 @@ public class MessageServiceImpl implements MessageService {
                 history,
                 characterData,
                 contextData,
+                skipSuggestions,
                 // onData
                 line -> {
                     try {

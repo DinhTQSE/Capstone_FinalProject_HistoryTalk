@@ -43,6 +43,10 @@ class ChatRequest(BaseModel):
         default=None,
         description="Pre-fetched context data (skips internal Java backend call if provided)",
     )
+    skipSuggestions: bool = Field(
+        default=False,
+        description="If True, skips generating suggested questions to save tokens and latency",
+    )
 
 
 class GenerateTitleRequest(BaseModel):

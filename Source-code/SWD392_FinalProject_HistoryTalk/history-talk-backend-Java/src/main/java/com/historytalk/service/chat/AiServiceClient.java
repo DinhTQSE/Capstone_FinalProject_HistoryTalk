@@ -116,7 +116,8 @@ public class AiServiceClient {
                         @JsonProperty("userMessage") String userMessage,
                         @JsonProperty("messageHistory") List<MessageHistoryItem> messageHistory,
                         @JsonProperty("characterData") CharacterPayload characterData,
-                        @JsonProperty("contextData") ContextPayload contextData) {
+                        @JsonProperty("contextData") ContextPayload contextData,
+                        @JsonProperty("skipSuggestions") boolean skipSuggestions) {
         }
 
         record ChatResponseData(
@@ -167,10 +168,11 @@ public class AiServiceClient {
                         String userMessage,
                         List<MessageHistoryItem> messageHistory,
                         CharacterPayload characterData,
-                        ContextPayload contextData) {
+                        ContextPayload contextData,
+                        boolean skipSuggestions) {
 
                 ChatRequest request = new ChatRequest(characterId, contextId, userMessage,
-                                messageHistory, characterData, contextData);
+                                messageHistory, characterData, contextData, skipSuggestions);
                 try {
                         ChatApiResponse response = restClient.post()
                                         .uri("/v1/ai/chat")
@@ -206,12 +208,13 @@ public class AiServiceClient {
                         List<MessageHistoryItem> messageHistory,
                         CharacterPayload characterData,
                         ContextPayload contextData,
+                        boolean skipSuggestions,
                         Consumer<String> onData,
                         Runnable onComplete,
                         Consumer<Throwable> onError) {
             
             ChatRequest requestPayload = new ChatRequest(characterId, contextId, userMessage,
-                            messageHistory, characterData, contextData);
+                            messageHistory, characterData, contextData, skipSuggestions);
             try {
                 String requestBody = objectMapper.writeValueAsString(requestPayload);
                 HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()

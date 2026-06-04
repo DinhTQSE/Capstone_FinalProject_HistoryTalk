@@ -95,6 +95,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
             context=context,
             user_message=body.userMessage,
             message_history=body.messageHistory,
+            skip_suggestions=body.skipSuggestions,
         )
     except Exception as exc:
         raise HTTPException(
@@ -131,6 +132,7 @@ async def chat_stream(body: ChatRequest):
                 context=context,
                 user_message=body.userMessage,
                 message_history=body.messageHistory,
+                skip_suggestions=body.skipSuggestions,
             )
             async for chunk in stream:
                 if isinstance(chunk, dict):

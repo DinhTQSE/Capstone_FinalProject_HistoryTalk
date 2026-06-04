@@ -92,7 +92,7 @@ class ChatSessionServiceImplTest {
             }
             return session;
         });
-        when(aiServiceClient.chat(anyString(), anyString(), anyString(), anyList(), any(), any()))
+        when(aiServiceClient.chat(anyString(), anyString(), anyString(), anyList(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(new AiServiceClient.AiChatResult("Xin chao", List.of(), null));
 
         ChatSessionResponse response = chatSessionService.createSession(userId.toString(), "USER", request);
