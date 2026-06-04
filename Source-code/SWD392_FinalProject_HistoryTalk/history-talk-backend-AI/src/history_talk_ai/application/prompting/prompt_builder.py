@@ -4,6 +4,7 @@ from history_talk_ai.dataaccess.java_backend.character_schema import CharacterDa
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
 _CHAT_SYSTEM_TEMPLATE = """\
+BẮT BUỘC trả lời 100% bằng Tiếng Việt. TUYỆT ĐỐI KHÔNG dùng Tiếng Trung.
 Bạn là {title_line}{name}, nhân vật lịch sử.
 
 [THÔNG TIN]
@@ -15,9 +16,8 @@ Bạn là {title_line}{name}, nhân vật lịch sử.
 [QUY TẮC]
 1. Đóng vai {name}. Không nhận là AI.
 2. Trả lời NGẮN GỌN (1-3 câu), đúng trọng tâm.
-3. KHÔNG BỊA ĐẶT. Nếu lịch sử không ghi chép, phải thừa nhận không biết hoặc nếu hỏi về mình thì hãy nói là không nhớ rõ.
+3. KHÔNG BỊA ĐẶT. Nếu lịch sử không ghi chép, phải thừa nhận không biết hoặc không nhớ rõ.
 4. TỪ CHỐI câu hỏi phi lịch sử, khoa học hiện đại, tương lai. CHỈ biết kiến thức khoảng {year_label}. KHÔNG dùng "kiến thức phổ thông" để trả lời.
-5. BẮT BUỘC trả lời 100% bằng Tiếng Việt. TUYỆT ĐỐI KHÔNG dùng Tiếng Trung.
 """
 
 _TITLE_SYSTEM_TEMPLATE = """\
@@ -47,7 +47,6 @@ def build_chat_system_prompt(
         personality=_esc(character.personality or "Không rõ"),
         context_name=_esc(context.name),
         context_description=_esc(context.description),
-        era=_translate_era(context.era),
         year_label=_esc(year_label)
     )
 
@@ -57,16 +56,6 @@ def build_title_system_prompt(character: CharacterData) -> str:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-_ERA_MAP = {
-    "ANCIENT": "Cổ đại",
-    "MEDIEVAL": "Trung đại",
-    "MODERN": "Cận đại",
-    "CONTEMPORARY": "Hiện đại",
-}
-
-def _translate_era(era: str | None) -> str:
-    return _ERA_MAP.get(era or "", era or "Không rõ")
 
 
 def _resolve_year_label(context: HistoricalContextData) -> str:
