@@ -22,6 +22,9 @@ public class MessageResponse {
     @JsonProperty("content")
     private String content;
 
+    @JsonProperty("messageType")
+    private String messageType;
+
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;
 }

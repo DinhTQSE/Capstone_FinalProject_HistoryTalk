@@ -104,6 +104,7 @@ public class MessageServiceImpl implements MessageService {
                 .content(request.getContent())
                 .isFromAi(false)
                 .chatSession(session)
+                .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
                 .build();
         Message savedUserMsg = messageRepository.save(userMsg);
 
@@ -155,6 +156,7 @@ public class MessageServiceImpl implements MessageService {
                 .suggestedQuestions(suggestedQuestionsJson)
                 .chatSession(session)
                 .token(completionToken)
+                .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
                 .build();
         Message savedAssistantMsg = messageRepository.save(assistantMsg);
 
@@ -210,6 +212,7 @@ public class MessageServiceImpl implements MessageService {
                 .content(request.getContent())
                 .isFromAi(false)
                 .chatSession(session)
+                .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
                 .build();
         Message savedUserMsg = messageRepository.save(userMsg);
 
@@ -288,6 +291,7 @@ public class MessageServiceImpl implements MessageService {
                                 .suggestedQuestions(suggestedQuestions[0])
                                 .chatSession(session)
                                 .token(completionToken.get())
+                                .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
                                 .build();
                         messageRepository.save(assistantMsg);
 
@@ -339,7 +343,8 @@ public class MessageServiceImpl implements MessageService {
                 .sessionId(message.getChatSession().getSessionId().toString())
                 .role(Boolean.TRUE.equals(message.getIsFromAi()) ? "ASSISTANT" : "USER")
                 .content(message.getContent())
-                                .createdAt(message.getCreatedAt())
+                .messageType(message.getMessageType() != null ? message.getMessageType() : "TEXT")
+                .createdAt(message.getCreatedAt())
                 .build();
     }
 

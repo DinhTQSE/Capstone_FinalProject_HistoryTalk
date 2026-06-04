@@ -44,7 +44,7 @@ class GoogleOAuthPasswordEmailServiceImplTest {
 
         String body = (String) sentMessage.getContent();
         assertTrue(body.contains("HT-GOOGLE-abc123"));
-        assertTrue(body.contains("PATCH /Historical-tell/api/v1/users/me/password"));
+        assertTrue(body.contains("Please change after signing in."));
         assertTrue(body.contains("not your Google password"));
     }
 

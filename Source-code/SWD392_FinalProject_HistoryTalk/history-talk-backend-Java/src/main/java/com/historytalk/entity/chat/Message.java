@@ -59,6 +59,9 @@ public class Message {
     @Column(name = "token")
     private Integer token;
 
+    @Column(name = "message_type", length = 50)
+    private String messageType;
+
     @PrePersist
     void ensureDefaults() {
         if (this.isFromAi == null) {
