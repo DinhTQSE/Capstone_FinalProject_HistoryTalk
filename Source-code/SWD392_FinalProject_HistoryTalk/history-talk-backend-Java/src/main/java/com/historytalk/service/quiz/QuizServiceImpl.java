@@ -197,6 +197,8 @@ public class QuizServiceImpl implements QuizService {
                 .score(score)
                 .totalQuestions(total)
                 .percentage(percentage)
+                .startTime(session.getStartTime())
+                .endTime(session.getEndTime())
                 .correctAnswers(correctAnswers)
                 .wrongAnswers(wrongAnswers)
                 .build();
