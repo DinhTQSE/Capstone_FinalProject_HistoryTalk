@@ -115,6 +115,23 @@ public class QuizController {
     }
 
     /**
+     * GET /quizzes/results/me/:sessionId
+     * Requires CUSTOMER role. Returns full answer breakdown for one of the caller's own sessions.
+     */
+    @GetMapping("/results/me/{sessionId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Get quiz session detail", description = "Returns the full per-question answer breakdown for one of the caller's own completed quiz sessions.")
+    public ResponseEntity<ApiResponse<QuizSessionDetailResponse>> getMySessionDetail(
+            @PathVariable String sessionId) {
+
+        log.info("GET /api/v1/quizzes/results/me/{}", sessionId);
+        UUID userId = UUID.fromString(SecurityUtils.getUserId());
+        QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, userId);
+        return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
+    }
+
+    /**
      * Safely extract userId from SecurityContext.
      * Returns null if the request is unauthenticated (public endpoints).
      */

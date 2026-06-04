@@ -195,4 +195,50 @@ public class StaffQuizController {
         QuizImportResponse data = quizService.importQuizzesFromCsv(file, userId);
         return ResponseEntity.ok(ApiResponse.success(data, "CSV import completed"));
     }
+
+    // ==================== Session History (SYSTEM_ADMIN only) ====================
+
+    /**
+     * GET /staff/quizzes/sessions[?userId=...]
+     * Without userId  → returns all users' completed sessions (paginated).
+     * With    userId  → returns that specific user's completed sessions (paginated).
+     */
+    @GetMapping("/sessions")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @Operation(
+            summary = "Get quiz history (admin)",
+            description = "Returns paginated completed quiz sessions. " +
+                    "Omit userId to get all users' history; provide userId to filter to one user."
+    )
+    public ResponseEntity<ApiResponse<PaginatedResponse<QuizHistoryResponse>>> getSessionHistory(
+            @RequestParam(required = false) String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        log.info("GET /api/v1/staff/quizzes/sessions userId={} page={} size={}", userId, page, size);
+        Pageable pageable = PageRequest.of(page, size);
+        PaginatedResponse<QuizHistoryResponse> data = userId != null
+                ? quizService.getQuizHistoryByUserId(userId, pageable)
+                : quizService.getAllUsersQuizHistory(pageable);
+        return ResponseEntity.ok(ApiResponse.success(data, "Quiz session history retrieved successfully"));
+    }
+
+    /**
+     * GET /staff/quizzes/sessions/:sessionId
+     * Returns the full answer breakdown for any completed session regardless of owner.
+     */
+    @GetMapping("/sessions/{sessionId}")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @Operation(
+            summary = "Get quiz session detail (admin)",
+            description = "Returns the full per-question answer breakdown for any completed quiz session."
+    )
+    public ResponseEntity<ApiResponse<QuizSessionDetailResponse>> getSessionDetail(
+            @PathVariable String sessionId) {
+
+        log.info("GET /api/v1/staff/quizzes/sessions/{}", sessionId);
+        // userId = null → admin mode, skip ownership check
+        QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, null);
+        return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
+    }
 }
