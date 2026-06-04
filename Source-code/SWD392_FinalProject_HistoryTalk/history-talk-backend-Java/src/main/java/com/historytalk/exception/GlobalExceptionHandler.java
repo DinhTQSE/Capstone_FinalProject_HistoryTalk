@@ -2,31 +2,25 @@ package com.historytalk.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.historytalk.dto.ApiResponse;
-import com.historytalk.dto.ValidationErrorResponse;
-import com.historytalk.dto.exception.InvalidArgumentResponse;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private ResponseEntity<ErrorResponse> buildErrorResponse(BaseException ex){
-        ErrorResponse errorResponse= ErrorResponse.builder()
+    private ResponseEntity<ErrorResponse> buildErrorResponse(BaseException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
                 .errorCode(ex.getErrorCode())
                 .message(ex.getMessage())
                 .status(ex.getHttpStatus())
@@ -36,12 +30,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse>handlerResourceNotFound(ResourceNotFoundException ex){
+    public ResponseEntity<ErrorResponse> handlerResourceNotFound(ResourceNotFoundException ex) {
         return buildErrorResponse(ex);
     }
 
     @ExceptionHandler(DataConflictException.class)
-    public ResponseEntity<ErrorResponse> handlerDataConflict(DataConflictException ex){
+    public ResponseEntity<ErrorResponse> handlerDataConflict(DataConflictException ex) {
         return buildErrorResponse(ex);
     }
 
@@ -63,6 +57,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
                 .errorCode(HttpStatus.BAD_REQUEST.value())
                 .message("Invalid argument: " + ex.getMessage())
                 .status(HttpStatus.BAD_REQUEST)
@@ -73,7 +68,7 @@ public class GlobalExceptionHandler {
 
     // Lỗi validate @NotNull, @Pattern, @Size
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<InvalidArgumentResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -83,21 +78,21 @@ public class GlobalExceptionHandler {
                         (existing, replacement) -> existing // nếu có trùng field thì giữ lỗi đầu tiên
                 ));
 
-        InvalidArgumentResponse errorResponse = new InvalidArgumentResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                errors,
-                HttpStatus.BAD_REQUEST,
-                LocalDateTime.now()
-        );
-
-        return ResponseEntity
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .errorCode(HttpStatus.BAD_REQUEST.value())
+                .message("Dữ liệu đầu vào không hợp lệ")
+                .errors(errors)
                 .status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse);
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     // Lỗi sai kiểu dữ liệu JSON khi mapping request sang DTO
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<InvalidArgumentResponse> handleInvalidFormat(HttpMessageNotReadableException ex) {
+    public ResponseEntity<ErrorResponse> handleInvalidFormat(HttpMessageNotReadableException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
 
         // Nếu lỗi là InvalidFormatException
@@ -112,14 +107,17 @@ public class GlobalExceptionHandler {
         } else {
             errors.put("requestBody", "Invalid JSON data");
         }
-        InvalidArgumentResponse response = new InvalidArgumentResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                errors,
-                HttpStatus.BAD_REQUEST,
-                LocalDateTime.now()
-        );
+        
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .errorCode(HttpStatus.BAD_REQUEST.value())
+                .message("Dữ liệu đầu vào không hợp lệ")
+                .errors(errors)
+                .status(HttpStatus.BAD_REQUEST)
+                .timestamp(LocalDateTime.now())
+                .build();
 
-        return ResponseEntity.badRequest().body(response);
+        return ResponseEntity.badRequest().body(errorResponse);
     }
 
 }

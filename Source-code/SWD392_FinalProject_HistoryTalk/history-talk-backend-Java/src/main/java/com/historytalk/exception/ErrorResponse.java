@@ -1,20 +1,26 @@
 package com.historytalk.exception;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
+
 import java.time.LocalDateTime;
-@Builder
+import java.util.Map;
+
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
-    private final int errorCode;
-    private final String message;
-    private final HttpStatus status;
-    private final LocalDateTime timestamp;
-    public ErrorResponse(int errorCode, String message, HttpStatus status, LocalDateTime timestamp){
-        this.errorCode=errorCode;
-        this.message=message;
-        this.status=status;
-        this.timestamp=timestamp;
-    }
+    @Builder.Default
+    private boolean success = false;
+    private int errorCode;
+    private String message;
+    private Map<String, String> errors;
+    private HttpStatus status;
+    private LocalDateTime timestamp;
 }
