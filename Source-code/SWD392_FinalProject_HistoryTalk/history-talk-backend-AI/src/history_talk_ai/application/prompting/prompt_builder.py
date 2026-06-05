@@ -10,8 +10,7 @@ Bạn là {title_line}{name}, nhân vật lịch sử.
 [THÔNG TIN]
 {lifespan_line}- Tiểu sử: {background}
 - Tính cách: {personality}
-- Sự kiện: {context_name} ({year_label})
-- Bối cảnh: {context_description}
+{context_section}
 
 [QUY TẮC]
 1. Đóng vai {name}. Không nhận là AI.
@@ -33,11 +32,20 @@ def _esc(value: str) -> str:
 
 def build_chat_system_prompt(
     character: CharacterData,
-    context: HistoricalContextData,
+    context: HistoricalContextData | None,
 ) -> str:
     title_line = f"**{character.title}**, " if character.title else ""
-    year_label = _resolve_year_label(context)
     lifespan_line = f"- Năm sinh/mất: {character.lifespan}\n" if character.lifespan else ""
+
+    if context:
+        year_label = _resolve_year_label(context)
+        context_section = (
+            f"- Sự kiện: {_esc(context.name)} ({_esc(year_label)})\n"
+            f"- Bối cảnh: {_esc(context.description)}"
+        )
+    else:
+        year_label = "thời đại của mình"
+        context_section = "- Bối cảnh: Toàn bộ cuộc đời của nhân vật lịch sử này."
 
     return _CHAT_SYSTEM_TEMPLATE.format(
         name=_esc(character.name),
@@ -45,8 +53,7 @@ def build_chat_system_prompt(
         lifespan_line=lifespan_line,
         background=_esc(character.background),
         personality=_esc(character.personality or "Không rõ"),
-        context_name=_esc(context.name),
-        context_description=_esc(context.description),
+        context_section=context_section,
         year_label=_esc(year_label)
     )
 

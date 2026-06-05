@@ -175,7 +175,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
 
 async def generate_reply(
     character: CharacterData,
-    context: HistoricalContextData,
+    context: HistoricalContextData | None,
     user_message: str,
     message_history: List[MessageHistoryItem],
     skip_suggestions: bool = False,
@@ -188,7 +188,9 @@ async def generate_reply(
     """
     # ── RAG Integration ──
     # Query both context documents and character documents
-    entity_ids = [context.contextId, character.characterId]
+    entity_ids = [character.characterId]
+    if context:
+        entity_ids.append(context.contextId)
     rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
@@ -251,7 +253,7 @@ async def generate_reply(
 
 async def generate_reply_stream(
     character: CharacterData,
-    context: HistoricalContextData,
+    context: HistoricalContextData | None,
     user_message: str,
     message_history: List[MessageHistoryItem],
     skip_suggestions: bool = False,
@@ -260,7 +262,9 @@ async def generate_reply_stream(
     Invoke the LLM in character-roleplay mode using streaming.
     Yields text chunks. The final yield is a dict containing metadata.
     """
-    entity_ids = [context.contextId, character.characterId]
+    entity_ids = [character.characterId]
+    if context:
+        entity_ids.append(context.contextId)
     rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
