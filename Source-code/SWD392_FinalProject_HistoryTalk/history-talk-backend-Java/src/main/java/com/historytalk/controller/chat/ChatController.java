@@ -34,11 +34,10 @@ public class ChatController {
      */
     @GetMapping("/sessions")
     public ResponseEntity<ApiResponse<List<ChatSessionResponse>>> getSessions(
-            @RequestParam String contextId,
             @RequestParam String characterId) {
 
         String userId = SecurityUtils.getUserId();
-        List<ChatSessionResponse> sessions = chatSessionService.getSessions(userId, contextId, characterId);
+        List<ChatSessionResponse> sessions = chatSessionService.getSessions(userId, characterId);
         return ResponseEntity.ok(ApiResponse.success(sessions, "Sessions retrieved successfully"));
     }
 

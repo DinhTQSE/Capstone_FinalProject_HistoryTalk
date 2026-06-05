@@ -30,16 +30,16 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
 
         List<ChatSession> sessions = chatSessionRepository.findAllByUserUid(UUID.fromString(userId), false);
 
-        // Group by contextId
+        // Group by characterId
         Map<String, List<ChatSession>> grouped = sessions.stream()
-                .filter(s -> s.getHistoricalContext() != null)
+                .filter(s -> s.getCharacter() != null)
                 .collect(Collectors.groupingBy(
-                        s -> s.getHistoricalContext().getContextId().toString()));
+                        s -> s.getCharacter().getCharacterId().toString()));
 
         // Build response groups, sorted by max lastMessageAt DESC
         return grouped.entrySet().stream()
                 .map(entry -> {
-                    String contextId = entry.getKey();
+                    String characterId = entry.getKey();
                     List<ChatSession> groupSessions = entry.getValue();
 
                     // Sort sessions within group by lastMessageAt DESC (null last)
@@ -50,13 +50,13 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
                             .map(this::mapToSessionItem)
                             .toList();
 
-                    String contextName = groupSessions.get(0).getHistoricalContext() != null 
-                            ? groupSessions.get(0).getHistoricalContext().getName() 
-                            : "[Deleted Context]";
+                    String characterName = groupSessions.get(0).getCharacter() != null 
+                            ? groupSessions.get(0).getCharacter().getName() 
+                            : "[Deleted Character]";
 
                     return ChatHistoryGroupResponse.builder()
-                            .contextId(contextId)
-                            .contextName(contextName)
+                            .contextId(characterId) // we hijack this field so FE doesn't break
+                            .contextName(characterName) // we hijack this field so FE doesn't break
                             .sessions(items)
                             .build();
                 })

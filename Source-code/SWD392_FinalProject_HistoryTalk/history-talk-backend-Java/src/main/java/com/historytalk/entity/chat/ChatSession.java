@@ -42,7 +42,7 @@ public class ChatSession {
     private Character character;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "context_id", nullable = false)
+    @JoinColumn(name = "context_id", nullable = true)
     private HistoricalContext historicalContext;
 
     @Builder.Default

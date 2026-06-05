@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CreateChatSessionRequest {
 
-    @NotBlank(message = "Yêu cầu contextId")
     @JsonProperty("contextId")
     private String contextId;
 

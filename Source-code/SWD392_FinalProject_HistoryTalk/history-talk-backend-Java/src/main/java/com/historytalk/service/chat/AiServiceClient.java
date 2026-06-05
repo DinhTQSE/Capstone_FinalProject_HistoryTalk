@@ -363,11 +363,19 @@ public class AiServiceClient {
                 if (!born.isEmpty() || !died.isEmpty()) {
                         lifespan = born + " - " + died;
                 }
+                String enhancedBackground = c.getBackground() != null ? c.getBackground() : "";
+                if (c.getHistoricalContexts() != null && !c.getHistoricalContexts().isEmpty()) {
+                        enhancedBackground += "\n\nCác sự kiện/bối cảnh lịch sử đã tham gia:\n";
+                        for (com.historytalk.entity.historicalContext.HistoricalContext ctx : c.getHistoricalContexts()) {
+                                enhancedBackground += "- " + ctx.getName() + ": " + (ctx.getDescription() != null ? ctx.getDescription() : "") + "\n";
+                        }
+                }
+
                 return new CharacterPayload(
                                 c.getCharacterId().toString(),
                                 c.getName(),
                                 c.getTitle(),
-                                c.getBackground(),
+                                enhancedBackground,
                                 c.getPersonality(),
                                 lifespan);
         }

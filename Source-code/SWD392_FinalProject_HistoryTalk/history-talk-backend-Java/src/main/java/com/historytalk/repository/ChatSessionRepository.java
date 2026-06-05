@@ -18,17 +18,15 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     @Query("""
                                                 SELECT cs FROM ChatSession cs
                                                 JOIN FETCH cs.character c
-                                                JOIN FETCH cs.historicalContext hc
+                                                LEFT JOIN FETCH cs.historicalContext hc
                                                 WHERE cs.user.uid = :userId
                                                         AND c.characterId = :characterId
-                                                        AND hc.contextId = :contextId
                                                         AND cs.deletedAt IS NULL
                                                 ORDER BY cs.lastMessageAt DESC NULLS LAST, cs.createdAt DESC
             """)
-    List<ChatSession> findByUserAndCharacterAndContext(
+    List<ChatSession> findByUserAndCharacter(
             @Param("userId") UUID userId,
-            @Param("characterId") UUID characterId,
-            @Param("contextId") UUID contextId);
+            @Param("characterId") UUID characterId);
 
     Optional<ChatSession> findBySessionIdAndUserUid(UUID sessionId, UUID userId);
 

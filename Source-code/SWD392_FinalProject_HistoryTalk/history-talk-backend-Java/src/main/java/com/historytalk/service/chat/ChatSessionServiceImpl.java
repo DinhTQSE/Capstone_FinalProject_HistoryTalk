@@ -45,13 +45,12 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public List<ChatSessionResponse> getSessions(String userId, String contextId, String characterId) {
-        log.info("Getting chat sessions for user={} context={} character={}", userId, contextId, characterId);
+    public List<ChatSessionResponse> getSessions(String userId, String characterId) {
+        log.info("Getting chat sessions for user={} character={}", userId, characterId);
 
-        List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacterAndContext(
+        List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacter(
                 UUID.fromString(userId),
-                UUID.fromString(characterId),
-                UUID.fromString(contextId));
+                UUID.fromString(characterId));
 
         return sessions.stream()
                 .map(this::mapToResponse)
@@ -72,11 +71,13 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
         }
 
-        HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + request.getContextId()));
-
-        if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
-            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + request.getContextId());
+        HistoricalContext context = null;
+        if (request.getContextId() != null && !request.getContextId().isBlank()) {
+            context = contextRepository.findById(UUID.fromString(request.getContextId()))
+                    .orElse(null);
+            if (context != null && !isStaffOrAdmin(userRole) && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
+                context = null; // Ignore if not visible
+            }
         }
 
         ChatSession session = ChatSession.builder()
@@ -92,11 +93,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         // Send greeting message via AI
         try {
             CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
-            ContextPayload contextData = AiServiceClient.buildContextPayload(context);
+            ContextPayload contextData = context != null ? AiServiceClient.buildContextPayload(context) : null;
 
             AiChatResult greeting = aiServiceClient.chat(
                     character.getCharacterId().toString(),
-                    context.getContextId().toString(),
+                    context != null ? context.getContextId().toString() : "",
                     "Hãy chào và giới thiệu ngắn gọn về bản thân.",
                     Collections.emptyList(),
                     characterData,
