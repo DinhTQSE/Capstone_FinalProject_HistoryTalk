@@ -130,7 +130,7 @@ public class MessageServiceImpl implements MessageService {
         // Call BE-Python
         AiChatResult aiResult = aiServiceClient.chat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
+                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
                 request.getContent(),
                 history,
                 characterData,
@@ -180,7 +180,7 @@ public class MessageServiceImpl implements MessageService {
             aiServiceClient.generateTitleAsync(
                     session.getSessionId().toString(),
                     session.getCharacter().getCharacterId().toString(),
-                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
+                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
                     request.getContent(),
                     aiResult.message(),
                     characterData,
@@ -199,6 +199,7 @@ public class MessageServiceImpl implements MessageService {
 
     // ── POST /chat/messages/stream ─────────────────────────────────────────
 
+    @Transactional
     public SseEmitter sendMessageStream(String userId, SendMessageRequest request) {
         log.info("Streaming message in session={} user={}", request.getSessionId(), userId);
 
@@ -251,7 +252,7 @@ public class MessageServiceImpl implements MessageService {
 
             aiServiceClient.streamChat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
+                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
                 request.getContent(),
                 history,
                 characterData,
@@ -317,7 +318,7 @@ public class MessageServiceImpl implements MessageService {
                             aiServiceClient.generateTitleAsync(
                                     session.getSessionId().toString(),
                                     session.getCharacter().getCharacterId().toString(),
-                                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
+                                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
                                     request.getContent(),
                                     fullMessage.toString(),
                                     characterData,
