@@ -26,17 +26,24 @@ router = APIRouter(prefix="/v1/ai", tags=["AI Chat"])
 
 async def _resolve_character_and_context(
     character_id: str,
-    context_id: str,
+    context_id: str | None,
     character_data: CharacterData | None,
     context_data: HistoricalContextData | None,
-) -> tuple[CharacterData, HistoricalContextData]:
+) -> tuple[CharacterData, HistoricalContextData | None]:
     """
     Return character + context data.
     Uses pre-fetched values when provided; otherwise fetches in parallel
     from the Java backend to minimise latency.
     """
     need_character = character_data is None
-    need_context = context_data is None
+    
+    # Only fetch context if context_id is provided, not empty, and not the fake UUID
+    is_valid_context_id = (
+        context_id is not None 
+        and context_id.strip() != "" 
+        and context_id != "00000000-0000-0000-0000-000000000000"
+    )
+    need_context = context_data is None and is_valid_context_id
 
     if need_character and need_context:
         try:
@@ -66,7 +73,7 @@ async def _resolve_character_and_context(
         except JavaBackendError as exc:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.message)
 
-    return character_data, context_data  # type: ignore[return-value]
+    return character_data, context_data
 
 
 # ── POST /v1/ai/chat ──────────────────────────────────────────────────────────

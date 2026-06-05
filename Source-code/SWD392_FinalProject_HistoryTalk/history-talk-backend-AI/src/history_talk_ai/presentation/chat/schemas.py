@@ -27,7 +27,7 @@ class MessageHistoryItem(BaseModel):
 
 class ChatRequest(BaseModel):
     characterId: str = Field(..., description="UUID of the character to roleplay as")
-    contextId: str = Field(..., description="UUID of the historical context")
+    contextId: Optional[str] = Field(None, description="UUID of the historical context")
     userMessage: str = Field(..., min_length=1, max_length=4000, description="The user's message")
     messageHistory: List[MessageHistoryItem] = Field(
         default_factory=list,
@@ -51,7 +51,7 @@ class ChatRequest(BaseModel):
 
 class GenerateTitleRequest(BaseModel):
     characterId: str
-    contextId: str
+    contextId: Optional[str] = None
     firstUserMessage: str
     firstAssistantMessage: str
     characterData: Optional[CharacterData] = None
