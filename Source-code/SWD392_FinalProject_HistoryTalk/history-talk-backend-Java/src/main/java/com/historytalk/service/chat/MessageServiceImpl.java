@@ -130,7 +130,7 @@ public class MessageServiceImpl implements MessageService {
         // Call BE-Python
         AiChatResult aiResult = aiServiceClient.chat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
+                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "00000000-0000-0000-0000-000000000000",
                 request.getContent(),
                 history,
                 characterData,
@@ -180,7 +180,7 @@ public class MessageServiceImpl implements MessageService {
             aiServiceClient.generateTitleAsync(
                     session.getSessionId().toString(),
                     session.getCharacter().getCharacterId().toString(),
-                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
+                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "00000000-0000-0000-0000-000000000000",
                     request.getContent(),
                     aiResult.message(),
                     characterData,
@@ -252,7 +252,7 @@ public class MessageServiceImpl implements MessageService {
 
             aiServiceClient.streamChat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
+                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "00000000-0000-0000-0000-000000000000",
                 request.getContent(),
                 history,
                 characterData,
@@ -318,7 +318,7 @@ public class MessageServiceImpl implements MessageService {
                             aiServiceClient.generateTitleAsync(
                                     session.getSessionId().toString(),
                                     session.getCharacter().getCharacterId().toString(),
-                                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : null,
+                                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "00000000-0000-0000-0000-000000000000",
                                     request.getContent(),
                                     fullMessage.toString(),
                                     characterData,

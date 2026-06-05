@@ -97,7 +97,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
             AiChatResult greeting = aiServiceClient.chat(
                     character.getCharacterId().toString(),
-                    context != null ? context.getContextId().toString() : null,
+                    context != null ? context.getContextId().toString() : "00000000-0000-0000-0000-000000000000",
                     "Hãy chào và giới thiệu ngắn gọn về bản thân.",
                     Collections.emptyList(),
                     characterData,
