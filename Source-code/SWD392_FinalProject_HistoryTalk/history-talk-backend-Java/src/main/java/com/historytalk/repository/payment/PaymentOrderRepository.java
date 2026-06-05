@@ -1,5 +1,6 @@
 package com.historytalk.repository.payment;
 
+import com.historytalk.entity.enums.PaymentFulfillmentStatus;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.repository.dashboard.DashboardPeriodRevenueProjection;
@@ -39,6 +40,27 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     List<PaymentOrder> findExpiredPendingOrders(
             @Param("status") PaymentOrderStatus status,
             @Param("now") LocalDateTime now
+    );
+
+    @Query("""
+        SELECT o
+        FROM PaymentOrder o
+        WHERE o.deletedAt IS NULL
+          AND o.status = :paidStatus
+          AND o.fulfillmentAttempts < :maxAttempts
+          AND (
+                o.fulfillmentStatus IN :retryStatuses
+                OR (o.fulfillmentStatus = :processingStatus AND o.fulfillmentLockedAt < :staleBefore)
+          )
+        ORDER BY COALESCE(o.updatedAt, o.createdAt) ASC, o.createdAt ASC
+    """)
+    List<PaymentOrder> findOrdersNeedingFulfillmentRetry(
+            @Param("paidStatus") PaymentOrderStatus paidStatus,
+            @Param("retryStatuses") List<PaymentFulfillmentStatus> retryStatuses,
+            @Param("processingStatus") PaymentFulfillmentStatus processingStatus,
+            @Param("staleBefore") LocalDateTime staleBefore,
+            @Param("maxAttempts") int maxAttempts,
+            Pageable pageable
     );
 
     /**

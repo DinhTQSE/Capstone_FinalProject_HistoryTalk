@@ -1,5 +1,6 @@
 package com.historytalk.entity.payment;
 
+import com.historytalk.entity.enums.PaymentFulfillmentStatus;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.user.User;
 import jakarta.persistence.*;
@@ -72,6 +73,24 @@ public class PaymentOrder {
 
     @Column(name = "expired_at")
     private LocalDateTime expiredAt;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fulfillment_status", length = 50, nullable = false)
+    private PaymentFulfillmentStatus fulfillmentStatus = PaymentFulfillmentStatus.PENDING;
+
+    @Column(name = "fulfilled_at")
+    private LocalDateTime fulfilledAt;
+
+    @Builder.Default
+    @Column(name = "fulfillment_attempts", nullable = false)
+    private Integer fulfillmentAttempts = 0;
+
+    @Column(name = "fulfillment_error", columnDefinition = "TEXT")
+    private String fulfillmentError;
+
+    @Column(name = "fulfillment_locked_at")
+    private LocalDateTime fulfillmentLockedAt;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;

@@ -1,26 +1,22 @@
 package com.historytalk.service.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.historytalk.entity.enums.PaymentFulfillmentStatus;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.enums.PaymentTransactionStatus;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.PaymentTransaction;
-import com.historytalk.entity.payment.Tier;
-import com.historytalk.entity.payment.UserTier;
-import com.historytalk.entity.user.User;
 import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.PaymentTransactionRepository;
-import com.historytalk.repository.payment.UserTierRepository;
-import com.historytalk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.model.webhooks.WebhookData;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -28,22 +24,9 @@ import java.util.Optional;
 public class PaymentWebhookService {
     private final PaymentOrderRepository paymentOrderRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
-    private final UserTierRepository userTierRepository;
-    private final UserRepository userRepository;
+    private final PaymentFulfillmentService paymentFulfillmentService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Main dispatcher — routes PayOS webhook events by their code field.
-     * PayOS signature verification is already done by payOS.webhooks().verify()
-     * in the controller using the configured checksumKey, so no additional
-     * HMAC check is needed here.
-     *
-     * PayOS event codes:
-     *   "00" → payment confirmed (PAID)
-     *   "01" → payment cancelled by user
-     *   "02" → payment link expired on PayOS side
-     *   anything else → treat as unhandled / log and ignore
-     */
     @Transactional
     public void handlePayOSWebhook(WebhookData data) {
         String code = data.getCode();
@@ -58,49 +41,47 @@ public class PaymentWebhookService {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // PAID
-    // -------------------------------------------------------------------------
-
     private void handlePaid(WebhookData data) {
         PaymentOrder order = lockOrder(data.getOrderCode());
-
-        if (PaymentOrderStatus.PAID == order.getStatus()) {
-            log.info("Order {} already PAID — skipping duplicate webhook", order.getOrderCode());
-            return;
-        }
 
         validatePayOSData(order, data);
         saveTransactionIfNotExists(order, data, PaymentTransactionStatus.SUCCESS);
 
-        order.setStatus(PaymentOrderStatus.PAID);
-        order.setPaidAt(LocalDateTime.now());
+        if (PaymentOrderStatus.PAID != order.getStatus()) {
+            order.setStatus(PaymentOrderStatus.PAID);
+            order.setPaidAt(LocalDateTime.now());
+        } else {
+            log.info("Order {} already marked PAID; checking fulfillment status={}",
+                    order.getOrderCode(), order.getFulfillmentStatus());
+        }
         paymentOrderRepository.save(order);
 
-        upgradeUserTier(order);
-        log.info("Order {} successfully marked as PAID", order.getOrderCode());
-    }
+        if (order.getFulfillmentStatus() != PaymentFulfillmentStatus.FULFILLED) {
+            boolean fulfilled = paymentFulfillmentService.fulfillLockedPaidOrder(order);
+            if (!fulfilled) {
+                log.warn("Order {} is PAID but fulfillment did not complete; scheduler will retry",
+                        order.getOrderCode());
+            }
+        }
 
-    // -------------------------------------------------------------------------
-    // CANCELLED / EXPIRED (from PayOS side)
-    // -------------------------------------------------------------------------
+        log.info("Order {} successfully processed as PAID", order.getOrderCode());
+    }
 
     private void handleCancelled(WebhookData data, String code) {
         PaymentOrder order = lockOrder(data.getOrderCode());
 
         if (PaymentOrderStatus.PAID == order.getStatus()) {
-            log.warn("Order {} is already PAID — ignoring cancellation webhook (code={})",
+            log.warn("Order {} is already PAID; ignoring cancellation webhook (code={})",
                     order.getOrderCode(), code);
             return;
         }
 
         if (PaymentOrderStatus.CANCELLED == order.getStatus()
                 || PaymentOrderStatus.EXPIRED == order.getStatus()) {
-            log.info("Order {} already terminal (status={}) — skipping", order.getOrderCode(), order.getStatus());
+            log.info("Order {} already terminal (status={}); skipping", order.getOrderCode(), order.getStatus());
             return;
         }
 
-        // code "02" = PayOS-side expiry; "01" = user cancelled
         PaymentOrderStatus newStatus = "02".equals(code)
                 ? PaymentOrderStatus.EXPIRED
                 : PaymentOrderStatus.CANCELLED;
@@ -112,10 +93,6 @@ public class PaymentWebhookService {
         log.info("Order {} set to {} (PayOS code={})", order.getOrderCode(), newStatus, code);
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
     private PaymentOrder lockOrder(Long orderCode) {
         return paymentOrderRepository
                 .findByOrderCodeForUpdate(orderCode)
@@ -124,19 +101,19 @@ public class PaymentWebhookService {
 
     private void validatePayOSData(PaymentOrder order, WebhookData data) {
         if (data.getAmount() == null) {
-            throw new RuntimeException("Số tiền PayOS bị null cho đơn hàng " + order.getOrderCode());
+            throw new RuntimeException("PayOS amount is null for order " + order.getOrderCode());
         }
 
         if (!data.getAmount().equals(order.getAmount().longValue())) {
             throw new RuntimeException(
-                    "Số tiền không khớp cho đơn hàng " + order.getOrderCode()
+                    "PayOS amount mismatch for order " + order.getOrderCode()
                             + ": expected " + order.getAmount() + ", got " + data.getAmount());
         }
 
         if (order.getPaymentLinkId() != null
                 && data.getPaymentLinkId() != null
                 && !order.getPaymentLinkId().equals(data.getPaymentLinkId())) {
-            throw new RuntimeException("Liên kết thanh toán không khớp cho đơn hàng " + order.getOrderCode());
+            throw new RuntimeException("PayOS payment link mismatch for order " + order.getOrderCode());
         }
     }
 
@@ -144,7 +121,7 @@ public class PaymentWebhookService {
                                             PaymentTransactionStatus txStatus) {
         if (data.getReference() != null
                 && paymentTransactionRepository.existsByReference(data.getReference())) {
-            log.info("Transaction with reference {} already exists — skipping", data.getReference());
+            log.info("Transaction with reference {} already exists; skipping", data.getReference());
             return;
         }
 
@@ -163,8 +140,11 @@ public class PaymentWebhookService {
                     .build();
 
             paymentTransactionRepository.save(transaction);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Payment transaction for reference {} already exists or violates uniqueness; skipping",
+                    data.getReference());
         } catch (Exception e) {
-            throw new RuntimeException("Không thể lưu giao dịch thanh toán cho đơn hàng " + order.getOrderCode(), e);
+            throw new RuntimeException("Cannot save payment transaction for order " + order.getOrderCode(), e);
         }
     }
 
@@ -179,49 +159,5 @@ public class PaymentWebhookService {
             log.warn("Could not parse PayOS transaction date '{}', using now", transactionDateTime);
             return LocalDateTime.now();
         }
-    }
-
-    private void upgradeUserTier(PaymentOrder order) {
-        User user = order.getUser();
-        Tier newTier = order.getTier();
-        LocalDateTime now = LocalDateTime.now();
-
-        // Check for any currently active paid subscription (pessimistic lock prevents race conditions)
-        Optional<UserTier> existingPaid = userTierRepository.findCurrentActiveByUidForUpdate(user.getUid(), now);
-
-        if (existingPaid.isPresent()) {
-            UserTier current = existingPaid.get();
-            if (current.getTier().getAmount() > 0) {
-                // Idempotency guard: a live paid subscription already exists.
-                // This should not normally happen (purchase guard in PaymentService blocks it),
-                // but webhooks can arrive out of order or be retried.
-                log.warn("User {} already has active paid sub '{}' until {}. Skipping duplicate webhook.",
-                        user.getUid(), current.getTier().getTitle(), current.getEndTime());
-                return;
-            }
-            // A free-tier row came back (amount = 0) — this means the query returned the free row
-            // because no paid row exists. That is fine — proceed to create the paid subscription.
-        }
-
-        // Create the new paid UserTier starting from now.
-        // The free-tier UserTier row is intentionally NOT deactivated — it remains as the
-        // permanent fallback so that when this paid sub expires, the user automatically
-        // reverts to free without any extra DB writes.
-        UserTier newSub = UserTier.builder()
-                .user(user)
-                .tier(newTier)
-                .startTime(now)
-                .endTime(now.plusMonths(newTier.getNoMonth()))
-                .isActive(true)
-                .build();
-        userTierRepository.save(newSub);
-
-        // Reset token balance to the new paid tier's allowance
-        user.setToken(newTier.getLimitedToken());
-        user.setLastTokenResetAt(now);
-        userRepository.save(user);
-
-        log.info("User {} subscribed to '{}' until {}, tokens reset to {}",
-                user.getUid(), newTier.getTitle(), newSub.getEndTime(), newTier.getLimitedToken());
     }
 }
