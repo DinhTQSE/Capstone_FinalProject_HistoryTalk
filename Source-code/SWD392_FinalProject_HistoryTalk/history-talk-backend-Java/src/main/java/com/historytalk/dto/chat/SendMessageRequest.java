@@ -10,12 +10,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class SendMessageRequest {
 
-    @NotBlank(message = "sessionId is required")
+    @NotBlank(message = "Yêu cầu sessionId")
     @JsonProperty("sessionId")
     private String sessionId;
 
-    @NotBlank(message = "content is required")
-    @Size(max = 4000, message = "content must not exceed 4000 characters")
+    @NotBlank(message = "Yêu cầu nội dung (content)")
+    @Size(max = 4000, message = "nội dung (content) không được vượt quá 4000 ký tự")
     @JsonProperty("content")
     private String content;
 

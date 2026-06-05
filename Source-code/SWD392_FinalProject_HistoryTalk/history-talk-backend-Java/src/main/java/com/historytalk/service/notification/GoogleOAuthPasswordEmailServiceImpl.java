@@ -31,7 +31,7 @@ public class GoogleOAuthPasswordEmailServiceImpl implements GoogleOAuthPasswordE
 
             mailSender.send(message);
         } catch (MessagingException | MailException ex) {
-            throw new IllegalStateException("Failed to send Google OAuth temporary password email", ex);
+            throw new IllegalStateException("Không thể gửi email mật khẩu tạm thời cho Google OAuth", ex);
         }
     }
 

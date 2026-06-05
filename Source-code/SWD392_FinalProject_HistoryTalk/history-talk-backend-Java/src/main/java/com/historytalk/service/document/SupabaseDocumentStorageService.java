@@ -57,9 +57,9 @@ public class SupabaseDocumentStorageService {
                     .toBodilessEntity();
             return new UploadedDocumentFile(objectPath);
         } catch (IOException ex) {
-            throw new SystemException("Failed to read PDF file: " + ex.getMessage());
+            throw new SystemException("Không thể đọc file PDF: " + ex.getMessage());
         } catch (RestClientException ex) {
-            throw new SystemException("Failed to upload PDF file to Supabase: " + ex.getMessage());
+            throw new SystemException("Không thể tải file PDF lên Supabase: " + ex.getMessage());
         }
     }
 
@@ -70,11 +70,11 @@ public class SupabaseDocumentStorageService {
                     .retrieve()
                     .body(byte[].class);
             if (bytes == null || bytes.length == 0) {
-                throw new SystemException("Downloaded PDF file is empty");
+                throw new SystemException("File PDF được tải xuống trống");
             }
             return new DownloadedDocumentFile(bytes, MediaType.APPLICATION_PDF_VALUE);
         } catch (RestClientException ex) {
-            throw new SystemException("Failed to download PDF file from Supabase: " + ex.getMessage());
+            throw new SystemException("Không thể tải file PDF từ Supabase: " + ex.getMessage());
         }
     }
 
@@ -86,7 +86,7 @@ public class SupabaseDocumentStorageService {
                     .retrieve()
                     .body(SignedUrlResponse.class);
             if (response == null || response.signedUrl() == null || response.signedUrl().isBlank()) {
-                throw new SystemException("Supabase did not return a signed PDF URL");
+                throw new SystemException("Supabase không trả về URL PDF có chữ ký");
             }
             String signedUrl = response.signedUrl();
             if (signedUrl.startsWith("/storage/v1/")) {
@@ -98,7 +98,7 @@ public class SupabaseDocumentStorageService {
             }
             return new DocumentPdfUrl(appendDownloadParam(signedUrl, downloadFileName), expiresInSeconds);
         } catch (RestClientException ex) {
-            throw new SystemException("Failed to create signed PDF URL from Supabase: " + ex.getMessage());
+            throw new SystemException("Không thể tạo URL PDF có chữ ký từ Supabase: " + ex.getMessage());
         }
     }
 
@@ -113,18 +113,18 @@ public class SupabaseDocumentStorageService {
 
     private void validatePdf(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new InvalidRequestException("PDF file must not be empty");
+            throw new InvalidRequestException("File PDF không được để trống");
         }
         if (file.getSize() > MAX_FILE_BYTES) {
-            throw new InvalidRequestException("PDF file size exceeds 50MB limit");
+            throw new InvalidRequestException("Kích thước file PDF vượt quá giới hạn 50MB");
         }
         String originalName = file.getOriginalFilename();
         if (originalName == null || !originalName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-            throw new InvalidRequestException("Only .pdf files are accepted");
+            throw new InvalidRequestException("Chỉ chấp nhận file .pdf");
         }
         String contentType = file.getContentType();
         if (contentType != null && !contentType.isBlank() && !"application/pdf".equalsIgnoreCase(contentType)) {
-            throw new InvalidRequestException("Only application/pdf files are accepted");
+            throw new InvalidRequestException("Chỉ chấp nhận file application/pdf");
         }
     }
 

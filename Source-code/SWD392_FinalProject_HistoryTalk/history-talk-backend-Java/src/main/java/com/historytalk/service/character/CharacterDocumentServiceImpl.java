@@ -107,14 +107,14 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
     public CharacterDocumentResponse getDocumentById(String docId, String userRole) {
         log.info("Fetching document: {}", docId);
         Document doc = documentRepository.findById(UUID.fromString(docId))
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
         if (doc.getEntityType() != EntityType.CHARACTER) {
-            throw new ResourceNotFoundException("Document not found: " + docId);
+            throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
         }
 
         if (!isStaffOrAdmin(userRole) && doc.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Document not found: " + docId);
+            throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
         }
 
         return mapToResponse(doc);
@@ -164,16 +164,16 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         log.info("Updating document: {} by user: {}", docId, userId);
         
         Document doc = documentRepository.findById(UUID.fromString(docId))
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
         if (doc.getEntityType() != EntityType.CHARACTER) {
-            throw new ResourceNotFoundException("Document not found: " + docId);
+            throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
         }
         
         // Staff/Admin can update any document
         if (!isStaffOrAdmin(userRole)) {
             log.warn("Unauthorized update attempt on document {} by user {}", docId, userId);
-            throw new InvalidRequestException("You do not have permission to update this document");
+            throw new InvalidRequestException("Bạn không có quyền cập nhật tài liệu này");
         }
         
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
@@ -214,16 +214,16 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         log.info("Deleting document: {} by user: {}", docId, userId);
         
         Document doc = documentRepository.findById(UUID.fromString(docId))
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
         if (doc.getEntityType() != EntityType.CHARACTER) {
-            throw new ResourceNotFoundException("Document not found: " + docId);
+            throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
         }
         
         // Staff/Admin can delete any document
         if (!isStaffOrAdmin(userRole)) {
             log.warn("Unauthorized delete attempt on document {} by user {}", docId, userId);
-            throw new InvalidRequestException("You do not have permission to delete this document");
+            throw new InvalidRequestException("Bạn không có quyền xóa tài liệu này");
         }
 
         documentRepository.delete(doc);

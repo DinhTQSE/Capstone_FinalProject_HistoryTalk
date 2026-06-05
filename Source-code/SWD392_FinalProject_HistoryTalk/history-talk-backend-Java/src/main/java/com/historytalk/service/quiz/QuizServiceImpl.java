@@ -128,19 +128,19 @@ public class QuizServiceImpl implements QuizService {
 
         // Ownership check
         if (!session.getUser().getUid().equals(userId)) {
-            throw new InvalidRequestException("You are not authorized to submit this quiz session");
+            throw new InvalidRequestException("Bạn không có quyền nộp bài cho phiên làm bài này");
         }
 
         // Already submitted check
         if (session.getEndTime() != null) {
-            throw new InvalidRequestException("Quiz already submitted");
+            throw new InvalidRequestException("Quiz đã được nộp");
         }
 
         // Time limit check
         // if (session.getLimitedTime() != null && session.getStartTime() != null) {
         //     LocalDateTime deadline = session.getStartTime().plusSeconds(session.getLimitedTime());
         //     if (LocalDateTime.now().isAfter(deadline)) {
-        //         throw new InvalidRequestException("Time limit expired");
+        //         throw new InvalidRequestException("Đã hết thời gian làm bài");
         //     }
         // }
 
@@ -223,12 +223,12 @@ public class QuizServiceImpl implements QuizService {
 
         // Ownership check — skipped for admin (userId == null)
         if (userId != null && !session.getUser().getUid().equals(userId)) {
-            throw new InvalidRequestException("You are not authorized to view this quiz session");
+            throw new InvalidRequestException("Bạn không có quyền xem phiên làm bài này");
         }
 
         // Must be a completed session
         if (session.getEndTime() == null) {
-            throw new InvalidRequestException("Session not completed yet");
+            throw new InvalidRequestException("Phiên làm bài chưa hoàn thành");
         }
 
         Quiz quiz = session.getQuiz();
@@ -322,7 +322,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("createQuiz: title={}, userId={}", request.getTitle(), userId);
 
         if (quizRepository.existsByTitleIgnoreCase(request.getTitle())) {
-            throw new DataConflictException("Quiz with this title already exists: " + request.getTitle());
+            throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + request.getTitle());
         }
 
         User user = userRepository.findById(userId)
@@ -365,7 +365,7 @@ public class QuizServiceImpl implements QuizService {
             String newTitle = request.getTitle().trim();
             if (!newTitle.equalsIgnoreCase(quiz.getTitle()) &&
                     quizRepository.existsByTitleIgnoreCaseAndQuizIdNot(newTitle, quiz.getQuizId())) {
-                throw new DataConflictException("Quiz with this title already exists: " + newTitle);
+                throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + newTitle);
             }
             quiz.setTitle(newTitle);
         }
@@ -431,7 +431,7 @@ public class QuizServiceImpl implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
         if (!question.getQuiz().getQuizId().equals(quizUuid)) {
-            throw new InvalidRequestException("Question does not belong to quiz: " + quizId);
+            throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
         if (request.getContent() != null && !request.getContent().isBlank()) {
@@ -462,7 +462,7 @@ public class QuizServiceImpl implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
         if (!question.getQuiz().getQuizId().equals(quizUuid)) {
-            throw new InvalidRequestException("Question does not belong to quiz: " + quizId);
+            throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
         questionRepository.delete(question);
@@ -488,11 +488,11 @@ public class QuizServiceImpl implements QuizService {
 
         // ── 1. Basic file validation ──────────────────────────────────────────
         if (file == null || file.isEmpty()) {
-            throw new InvalidRequestException("CSV file must not be empty");
+            throw new InvalidRequestException("File CSV không được để trống");
         }
         String originalName = file.getOriginalFilename();
         if (originalName == null || !originalName.toLowerCase().endsWith(".csv")) {
-            throw new InvalidRequestException("Only .csv files are accepted");
+            throw new InvalidRequestException("Chỉ chấp nhận file .csv");
         }
 
         // ── 2. Required CSV headers ───────────────────────────────────────────
@@ -520,7 +520,7 @@ public class QuizServiceImpl implements QuizService {
             for (String header : requiredHeaders) {
                 if (!parser.getHeaderMap().containsKey(header)) {
                     throw new InvalidRequestException(
-                            "CSV is missing required header column: '" + header + "'");
+                            "File CSV thiếu cột tiêu đề bắt buộc: '" + header + "'");
                 }
             }
 
@@ -536,11 +536,11 @@ public class QuizServiceImpl implements QuizService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to parse CSV file", e);
-            throw new SystemException("Failed to read CSV file: " + e.getMessage());
+            throw new SystemException("Không thể đọc file CSV: " + e.getMessage());
         }
 
         if (grouped.isEmpty()) {
-            throw new InvalidRequestException("CSV file contains no valid data rows");
+            throw new InvalidRequestException("File CSV không chứa hàng dữ liệu hợp lệ nào");
         }
 
         // ── 4. Process each quiz group ────────────────────────────────────────
@@ -604,7 +604,7 @@ public class QuizServiceImpl implements QuizService {
         try {
             contextUuid = UUID.fromString(contextIdStr);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("contextId is not a valid UUID: '" + contextIdStr + "'");
+            throw new InvalidRequestException("contextId không phải là UUID hợp lệ: '" + contextIdStr + "'");
         }
 
         HistoricalContext context = historicalContextRepository.findById(contextUuid)
@@ -615,7 +615,7 @@ public class QuizServiceImpl implements QuizService {
 
         // Duplicate-title check
         if (quizRepository.existsByTitleIgnoreCase(title)) {
-            throw new DataConflictException("Quiz with title '" + title + "' already exists");
+            throw new DataConflictException("Quiz với tiêu đề '" + title + "' already exists");
         }
 
         // Build and save the Quiz entity (draft by default)
@@ -636,7 +636,7 @@ public class QuizServiceImpl implements QuizService {
             String questionContent = row.get("questionContent").trim();
             if (questionContent.isBlank()) {
                 throw new InvalidRequestException(
-                        "Row " + rowNum + ": questionContent must not be empty");
+                        "Hàng " + rowNum + ": questionContent must not be empty");
             }
 
             List<String> options = Arrays.asList(
@@ -648,7 +648,7 @@ public class QuizServiceImpl implements QuizService {
             for (int o = 0; o < options.size(); o++) {
                 if (options.get(o).isBlank()) {
                     throw new InvalidRequestException(
-                            "Row " + rowNum + ": option" + (o + 1) + " must not be empty");
+                            "Hàng " + rowNum + ": option" + (o + 1) + " must not be empty");
                 }
             }
 
@@ -657,11 +657,11 @@ public class QuizServiceImpl implements QuizService {
                 correctAnswer = Integer.parseInt(row.get("correctAnswer").trim());
             } catch (NumberFormatException e) {
                 throw new InvalidRequestException(
-                        "Row " + rowNum + ": correctAnswer must be an integer (0-3)");
+                        "Hàng " + rowNum + ": correctAnswer must be an integer (0-3)");
             }
             if (correctAnswer < 0 || correctAnswer > 3) {
                 throw new InvalidRequestException(
-                        "Row " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctAnswer);
+                        "Hàng " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctAnswer);
             }
 
             String explanation = row.get("explanation").trim();
@@ -792,7 +792,7 @@ public class QuizServiceImpl implements QuizService {
             return objectMapper.writeValueAsString(options);
         } catch (Exception e) {
             log.error("Failed to serialize options", e);
-            throw new InvalidRequestException("Invalid options format");
+            throw new InvalidRequestException("Định dạng tùy chọn không hợp lệ");
         }
     }
 
@@ -810,7 +810,7 @@ public class QuizServiceImpl implements QuizService {
         try {
             return UUID.fromString(id);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid " + fieldName + " format: " + id);
+            throw new InvalidRequestException("Không hợp lệ " + fieldName + " không hợp lệ: " + id);
         }
     }
 
@@ -823,18 +823,18 @@ public class QuizServiceImpl implements QuizService {
         try {
             return EventEra.valueOf(era.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid era value: " + era + ". Valid values: ANCIENT, MEDIEVAL, MODERN, CONTEMPORARY");
+            throw new InvalidRequestException("Giá trị thời đại (era) không hợp lệ: " + era + ". Giá trị hợp lệ: ANCIENT, MEDIEVAL, MODERN, CONTEMPORARY");
         }
     }
 
     private QuizLevel parseLevel(String level) {
         if (level == null || level.isBlank()) {
-            throw new InvalidRequestException("Level is required");
+            throw new InvalidRequestException("Yêu cầu cấp độ (Level)");
         }
         try {
             return QuizLevel.valueOf(level.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid level value: " + level + ". Valid values: EASY, MEDIUM, HARD");
+            throw new InvalidRequestException("Giá trị cấp độ (level) không hợp lệ: " + level + ". Giá trị hợp lệ: EASY, MEDIUM, HARD");
         }
     }
 }

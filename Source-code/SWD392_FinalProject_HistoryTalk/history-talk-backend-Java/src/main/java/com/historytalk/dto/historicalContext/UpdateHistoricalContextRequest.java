@@ -16,11 +16,11 @@ import lombok.NoArgsConstructor;
 public class UpdateHistoricalContextRequest {
     
     @JsonProperty("name")
-    @Size(min = 3, max = 100, message = "Context name must be between 3 and 100 characters")
+    @Size(min = 3, max = 100, message = "Tên bối cảnh phải từ 3 đến 100 ký tự")
     private String name;
     
     @JsonProperty("description")
-    @Size(min = 10, max = 5000, message = "Context description must be between 10 and 5000 characters")
+    @Size(min = 10, max = 5000, message = "Mô tả bối cảnh phải từ 10 đến 5000 ký tự")
     private String description;
 
     @JsonProperty("era")
@@ -42,15 +42,15 @@ public class UpdateHistoricalContextRequest {
     private Boolean isBC;
 
     @JsonProperty("location")
-    @Size(max = 255, message = "Location must be at most 255 characters")
+    @Size(max = 255, message = "Địa điểm tối đa 255 ký tự")
     private String location;
 
     @JsonProperty("imageUrl")
-    @Size(max = 500, message = "Image URL must be at most 500 characters")
+    @Size(max = 500, message = "URL hình ảnh tối đa 500 ký tự")
     private String imageUrl;
 
     @JsonProperty("videoUrl")
-    @Size(max = 500, message = "Video URL must be at most 500 characters")
+    @Size(max = 500, message = "URL Video tối đa 500 ký tự")
     private String videoUrl;
 
     @JsonProperty("isPublished")

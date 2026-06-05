@@ -22,7 +22,7 @@ public class DocumentProcessorFactory {
     public DocumentProcessorStrategy getStrategy(DocumentType type) {
         DocumentProcessorStrategy strategy = strategies.get(type);
         if (strategy == null) {
-            throw new UnsupportedOperationException("Unsupported document type: " + type);
+            throw new UnsupportedOperationException("Loại tài liệu không được hỗ trợ: " + type);
         }
         return strategy;
     }

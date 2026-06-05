@@ -22,19 +22,19 @@ import java.util.List;
 @AllArgsConstructor
 public class CreateQuizRequest {
 
-    @NotBlank(message = "Title is required")
+    @NotBlank(message = "Yêu cầu tiêu đề")
     private String title;
 
-    @NotNull(message = "Context ID is required")
+    @NotNull(message = "Yêu cầu Context ID")
     private String contextId;
 
     /** Optional. Must match EventEra enum: ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY */
 //    private String era;
 
-    @NotNull(message = "Level is required")
+    @NotNull(message = "Yêu cầu cấp độ (Level)")
     private String level;
 
-    @NotEmpty(message = "At least one question is required")
+    @NotEmpty(message = "Yêu cầu ít nhất một câu hỏi")
     @Valid
     private List<QuestionRequest> questions;
 

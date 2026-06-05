@@ -50,7 +50,7 @@ public class CharacterServiceImpl implements CharacterService {
             try {
                 era = EventEra.valueOf(eraStr.trim().toUpperCase());
             } catch (IllegalArgumentException e) {
-                throw new InvalidRequestException("Invalid era value: " + eraStr);
+                throw new InvalidRequestException("Giá trị thời đại (era) không hợp lệ: " + eraStr);
             }
         }
         int pageSize = Math.min(limit, 20);
@@ -74,13 +74,13 @@ public class CharacterServiceImpl implements CharacterService {
         log.info("Fetching character with ID: {}", characterId);
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Character not found with id: " + characterId));
+                        "Không tìm thấy nhân vật với id: " + characterId));
 
         if (!isStaffOrAdmin(role) && !Boolean.TRUE.equals(character.getIsPublished())) {
-            throw new ResourceNotFoundException("Character not found with id: " + characterId);
+            throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
         }
         if (!isStaffOrAdmin(role) && character.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Character not found with id: " + characterId);
+            throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
         }
         return mapToResponse(character);
     }
@@ -101,7 +101,7 @@ public class CharacterServiceImpl implements CharacterService {
         log.info("Creating character: {} by user: {}", request.getName(), userId);
 
         if (characterRepository.existsByNameIgnoreCase(request.getName())) {
-            throw new InvalidRequestException("Character name already exists");
+            throw new InvalidRequestException("Tên nhân vật đã tồn tại");
         }
 
         Set<HistoricalContext> contexts = resolveContexts(request);
@@ -142,16 +142,16 @@ public class CharacterServiceImpl implements CharacterService {
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Character not found with id: " + characterId));
+                        "Không tìm thấy nhân vật với id: " + characterId));
 
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "You do not have permission to update this character");
+                    "Bạn không có quyền cập nhật nhân vật này");
         }
 
         if (request.getName() != null && !request.getName().isBlank()) {
             if (characterRepository.existsByNameIgnoreCaseAndCharacterIdNot(request.getName(), character.getCharacterId())) {
-                throw new InvalidRequestException("Character name already exists");
+                throw new InvalidRequestException("Tên nhân vật đã tồn tại");
             }
             character.setName(request.getName());
         }
@@ -194,11 +194,11 @@ public class CharacterServiceImpl implements CharacterService {
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Character not found with id: " + characterId));
+                        "Không tìm thấy nhân vật với id: " + characterId));
 
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "You do not have permission to delete this character");
+                    "Bạn không có quyền xóa nhân vật này");
         }
 
         characterRepository.delete(character);
@@ -211,11 +211,11 @@ public class CharacterServiceImpl implements CharacterService {
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Character not found with id: " + characterId));
+                        "Không tìm thấy nhân vật với id: " + characterId));
 
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "You do not have permission to soft delete this character");
+                    "Bạn không có quyền xóa mềm nhân vật này");
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
@@ -249,7 +249,7 @@ public class CharacterServiceImpl implements CharacterService {
     public void restoreCharacter(String characterId) {
         int updated = characterRepository.restoreById(UUID.fromString(characterId));
         if (updated == 0) {
-            throw new ResourceNotFoundException("Character not found with id: " + characterId);
+            throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
         }
     }
 
@@ -265,11 +265,11 @@ public class CharacterServiceImpl implements CharacterService {
         log.info("Adding context {} to character {} by user {}", contextId, characterId, userId);
 
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException("You do not have permission to modify character-context mapping");
+            throw new InvalidRequestException("Bạn không có quyền sửa đổi liên kết nhân vật - bối cảnh");
         }
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
-                .orElseThrow(() -> new ResourceNotFoundException("Character not found with id: " + characterId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId));
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical Context not found with id: " + contextId));
@@ -287,17 +287,17 @@ public class CharacterServiceImpl implements CharacterService {
         log.info("Removing context {} from character {} by user {}", contextId, characterId, userId);
 
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException("You do not have permission to modify character-context mapping");
+            throw new InvalidRequestException("Bạn không có quyền sửa đổi liên kết nhân vật - bối cảnh");
         }
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
-                .orElseThrow(() -> new ResourceNotFoundException("Character not found with id: " + characterId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId));
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical Context not found with id: " + contextId));
 
         if (!character.getHistoricalContexts().remove(context)) {
-            throw new ResourceNotFoundException("Character-context mapping not found");
+            throw new ResourceNotFoundException("Không tìm thấy liên kết giữa nhân vật và bối cảnh");
         }
 
         characterRepository.save(character);
@@ -308,7 +308,7 @@ public class CharacterServiceImpl implements CharacterService {
         log.info("Getting contexts of character {}", characterId);
 
         Character character = characterRepository.findById(UUID.fromString(characterId))
-                .orElseThrow(() -> new ResourceNotFoundException("Character not found with id: " + characterId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId));
 
         boolean includeDraftAndDeleted = isStaffOrAdmin(role);
         return character.getHistoricalContexts().stream()
@@ -389,7 +389,7 @@ public class CharacterServiceImpl implements CharacterService {
     private Set<HistoricalContext> resolveContexts(CreateCharacterRequest request) {
         if (request.getContextId() != null && !request.getContextId().isBlank()
                 && request.getContextIds() != null && !request.getContextIds().isEmpty()) {
-            throw new InvalidRequestException("Provide either contextId or contextIds, not both");
+            throw new InvalidRequestException("Vui lòng cung cấp contextId hoặc contextIds, không phải cả hai");
         }
 
         Set<String> ids = new HashSet<>();

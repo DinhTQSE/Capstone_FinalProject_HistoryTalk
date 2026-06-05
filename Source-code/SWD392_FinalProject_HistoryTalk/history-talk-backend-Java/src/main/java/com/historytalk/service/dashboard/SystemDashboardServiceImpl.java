@@ -525,10 +525,10 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         LocalDate resolvedFrom = from == null ? resolvedTo.minusDays(DEFAULT_RANGE_DAYS) : from;
 
         if (resolvedFrom.isAfter(resolvedTo)) {
-            throw new InvalidRequestException("from must be before or equal to to");
+            throw new InvalidRequestException("từ (from) phải trước hoặc bằng đến (to)");
         }
         if (resolvedFrom.plusDays(MAX_RANGE_DAYS).isBefore(resolvedTo)) {
-            throw new InvalidRequestException("Date range must not exceed " + MAX_RANGE_DAYS + " days");
+            throw new InvalidRequestException("Khoảng thời gian không được vượt quá " + MAX_RANGE_DAYS + " days");
         }
 
         return new DateRange(
@@ -545,7 +545,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         }
         String normalized = granularity.toLowerCase(Locale.ROOT).trim();
         if (!List.of("day", "week", "month").contains(normalized)) {
-            throw new InvalidRequestException("granularity must be day, week, or month");
+            throw new InvalidRequestException("granularity (đơn vị thời gian) phải là day, week hoặc month");
         }
         return normalized;
     }

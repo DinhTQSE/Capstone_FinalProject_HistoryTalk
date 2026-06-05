@@ -124,19 +124,19 @@ public class PaymentWebhookService {
 
     private void validatePayOSData(PaymentOrder order, WebhookData data) {
         if (data.getAmount() == null) {
-            throw new RuntimeException("PayOS amount is null for order " + order.getOrderCode());
+            throw new RuntimeException("Số tiền PayOS bị null cho đơn hàng " + order.getOrderCode());
         }
 
         if (!data.getAmount().equals(order.getAmount().longValue())) {
             throw new RuntimeException(
-                    "Amount mismatch for order " + order.getOrderCode()
+                    "Số tiền không khớp cho đơn hàng " + order.getOrderCode()
                             + ": expected " + order.getAmount() + ", got " + data.getAmount());
         }
 
         if (order.getPaymentLinkId() != null
                 && data.getPaymentLinkId() != null
                 && !order.getPaymentLinkId().equals(data.getPaymentLinkId())) {
-            throw new RuntimeException("Payment link mismatch for order " + order.getOrderCode());
+            throw new RuntimeException("Liên kết thanh toán không khớp cho đơn hàng " + order.getOrderCode());
         }
     }
 
@@ -164,7 +164,7 @@ public class PaymentWebhookService {
 
             paymentTransactionRepository.save(transaction);
         } catch (Exception e) {
-            throw new RuntimeException("Cannot save payment transaction for order " + order.getOrderCode(), e);
+            throw new RuntimeException("Không thể lưu giao dịch thanh toán cho đơn hàng " + order.getOrderCode(), e);
         }
     }
 

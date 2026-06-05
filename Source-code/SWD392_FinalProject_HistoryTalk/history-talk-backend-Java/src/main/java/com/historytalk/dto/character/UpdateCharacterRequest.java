@@ -14,26 +14,26 @@ import lombok.NoArgsConstructor;
 public class UpdateCharacterRequest {
 
     @JsonProperty("name")
-    @Size(min = 2, max = 100, message = "Character name must be between 2 and 100 characters")
+    @Size(min = 2, max = 100, message = "Tên nhân vật phải từ 2 đến 100 ký tự")
     private String name;
 
     @JsonProperty("title")
-    @Size(max = 150, message = "Title must not exceed 150 characters")
+    @Size(max = 150, message = "Tiêu đề không được vượt quá 150 ký tự")
     private String title;
 
     @JsonProperty("background")
     private String background;
 
     @JsonProperty("image")
-    @Size(max = 255, message = "Image URL must not exceed 255 characters")
+    @Size(max = 255, message = "URL hình ảnh không được vượt quá 255 ký tự")
     private String imageUrl;
 
     @JsonProperty("modelUrl")
-    @Size(max = 500, message = "3D model URL must not exceed 500 characters")
+    @Size(max = 500, message = "URL mô hình 3D không được vượt quá 500 ký tự")
     private String modelUrl;
 
     @JsonProperty("personality")
-    @Size(max = 500, message = "Personality must not exceed 500 characters")
+    @Size(max = 500, message = "Tính cách không được vượt quá 500 ký tự")
     private String personality;
 
     @JsonProperty("bornYear")

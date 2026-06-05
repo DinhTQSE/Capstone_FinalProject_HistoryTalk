@@ -16,25 +16,25 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateMyProfileRequest {
-    @Size(min = 3, max = 100, message = "Username must be between 3 and 100 characters")
+    @Size(min = 3, max = 100, message = "Tên đăng nhập phải từ 3 đến 100 ký tự")
     private String userName;
 
-    @Size(max = 150, message = "Full name must not exceed 150 characters")
+    @Size(max = 150, message = "Họ và tên không được vượt quá 150 ký tự")
     private String fullName;
 
-    @PastOrPresent(message = "Date of birth cannot be in the future")
+    @PastOrPresent(message = "Ngày sinh không thể ở tương lai")
     private LocalDate dob;
 
     private Gender gender;
 
-    @Size(max = 20, message = "Phone number must not exceed 20 characters")
+    @Size(max = 20, message = "Số điện thoại không được vượt quá 20 ký tự")
     @Pattern(regexp = "^(?:\\+84|0)(?:3[2-9]|5[6-9]|7[0-9]|8[1-9]|9[0-9])\\d{7}$|^$",
-            message = "Invalid Vietnamese phone number format")
+            message = "Định dạng số điện thoại Việt Nam không hợp lệ")
     private String phoneNumber;
 
-    @Size(max = 500, message = "Address must not exceed 500 characters")
+    @Size(max = 500, message = "Địa chỉ không được vượt quá 500 ký tự")
     private String address;
 
-    @Size(max = 500, message = "Avatar URL must not exceed 500 characters")
+    @Size(max = 500, message = "URL Avatar không được vượt quá 500 ký tự")
     private String avatarUrl;
 }

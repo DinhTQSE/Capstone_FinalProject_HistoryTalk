@@ -18,11 +18,11 @@ public class TextProcessorStrategy implements DocumentProcessorStrategy {
     @Override
     public String processContent(String content) {
         if (content == null || content.isBlank()) {
-            throw new IllegalArgumentException("Text content cannot be blank");
+            throw new IllegalArgumentException("Nội dung văn bản không được để trống");
         }
         long contentSize = content.getBytes(StandardCharsets.UTF_8).length;
         if (contentSize > MAX_CONTENT_BYTES) {
-            throw new IllegalArgumentException("Text content size exceeds 10MB limit");
+            throw new IllegalArgumentException("Kích thước nội dung văn bản vượt quá giới hạn 10MB");
         }
         return content.trim();
     }

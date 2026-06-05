@@ -25,7 +25,7 @@ public class UuidUtils {
         try {
             return UUID.fromString(uuidString);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid " + fieldName + " format. Must be a valid UUID: " + uuidString);
+            throw new InvalidRequestException("Không hợp lệ " + fieldName + " không hợp lệ. Phải là một UUID hợp lệ: " + uuidString);
         }
     }
 

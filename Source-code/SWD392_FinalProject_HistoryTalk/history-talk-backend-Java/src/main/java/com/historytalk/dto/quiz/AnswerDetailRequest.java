@@ -16,9 +16,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AnswerDetailRequest {
 
-    @NotNull(message = "Question ID is required")
+    @NotNull(message = "Yêu cầu Question ID")
     private String questionId;
 
-    @NotNull(message = "Selected answer is required")
+    @NotNull(message = "Yêu cầu chọn câu trả lời")
     private Integer selectedAnswer;
 }

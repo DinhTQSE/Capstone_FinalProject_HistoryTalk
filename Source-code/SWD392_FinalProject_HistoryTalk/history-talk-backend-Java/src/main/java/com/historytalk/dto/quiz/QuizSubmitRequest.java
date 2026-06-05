@@ -20,10 +20,10 @@ import java.util.List;
 @AllArgsConstructor
 public class QuizSubmitRequest {
 
-    @NotNull(message = "Session ID is required")
+    @NotNull(message = "Yêu cầu Session ID")
     private String sessionId;
 
-    @NotEmpty(message = "Answers list cannot be empty")
+    @NotEmpty(message = "Danh sách câu trả lời không được để trống")
     @Valid
     private List<AnswerDetailRequest> answers;
 }

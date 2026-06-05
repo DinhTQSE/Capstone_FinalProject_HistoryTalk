@@ -28,11 +28,11 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     @Transactional
     public DocumentFileResponse uploadPdfFile(String docId, MultipartFile file, String userId, String userRole) {
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException("You do not have permission to upload this document file");
+            throw new InvalidRequestException("Bạn không có quyền tải file tài liệu này lên");
         }
 
         Document doc = documentRepository.findById(UUID.fromString(docId))
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
         UploadedDocumentFile uploaded = supabaseDocumentStorageService.uploadPdf(
                 doc.getEntityType(),
@@ -52,14 +52,14 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     @Transactional(readOnly = true)
     public DownloadedDocumentFile downloadPdfFile(String docId, String userId, String userRole) {
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException("You do not have permission to download this document file");
+            throw new InvalidRequestException("Bạn không có quyền tải xuống file tài liệu này");
         }
 
         Document doc = documentRepository.findById(UUID.fromString(docId))
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
         if (doc.getDocumentType() != DocumentType.PDF || doc.getFileUrl() == null || doc.getFileUrl().isBlank()) {
-            throw new InvalidRequestException("Document does not have an uploaded PDF file");
+            throw new InvalidRequestException("Tài liệu không có file PDF nào được tải lên");
         }
 
         return supabaseDocumentStorageService.downloadPdf(doc.getFileUrl());
@@ -69,14 +69,14 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     @Transactional(readOnly = true)
     public DocumentPdfUrl createPdfUrl(String docId, String userId, String userRole) {
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException("You do not have permission to download this document file");
+            throw new InvalidRequestException("Bạn không có quyền tải xuống file tài liệu này");
         }
 
         Document doc = documentRepository.findById(UUID.fromString(docId))
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + docId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
         if (doc.getDocumentType() != DocumentType.PDF || doc.getFileUrl() == null || doc.getFileUrl().isBlank()) {
-            throw new InvalidRequestException("Document does not have an uploaded PDF file");
+            throw new InvalidRequestException("Tài liệu không có file PDF nào được tải lên");
         }
 
         return supabaseDocumentStorageService.createSignedPdfUrl(

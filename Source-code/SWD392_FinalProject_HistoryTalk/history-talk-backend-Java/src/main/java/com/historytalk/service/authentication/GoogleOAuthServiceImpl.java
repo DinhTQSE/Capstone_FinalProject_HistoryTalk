@@ -52,7 +52,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                 .orElseGet(() -> createGoogleUserAndSendPasswordEmail(email, displayName));
 
         if (user.getDeletedAt() != null) {
-            throw new UnauthorizedException("Account has been deactivated");
+            throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
         }
 
         UserPrincipal principal = new UserPrincipal(user);
@@ -77,7 +77,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
     private String extractRequiredEmail(OAuth2User oauth2User) {
         String email = oauth2User.getAttribute("email");
         if (!StringUtils.hasText(email)) {
-            throw new UnauthorizedException("Google account email is required");
+            throw new UnauthorizedException("Yêu cầu email tài khoản Google");
         }
         return email.toLowerCase();
     }

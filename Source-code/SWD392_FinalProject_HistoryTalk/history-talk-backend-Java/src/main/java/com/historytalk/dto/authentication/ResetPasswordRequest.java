@@ -13,13 +13,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "Reset token is required")
+    @NotBlank(message = "Yêu cầu Reset token")
     private String token;
 
-    @NotBlank(message = "New password is required")
-    @Size(min = 6, max = 100, message = "New password must be between 6 and 100 characters")
+    @NotBlank(message = "Yêu cầu mật khẩu mới")
+    @Size(min = 6, max = 100, message = "Mật khẩu mới phải từ 6 đến 100 ký tự")
     private String newPassword;
 
-    @NotBlank(message = "Confirmation password is required")
+    @NotBlank(message = "Yêu cầu xác nhận mật khẩu")
     private String confirmPassword;
 }

@@ -61,11 +61,11 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tier not found: " + tierId));
 
         if (!Boolean.TRUE.equals(tier.getIsActive()) || tier.getDeletedAt() != null) {
-            throw new InvalidRequestException("Tier is inactive or deleted");
+            throw new InvalidRequestException("Gói này không hoạt động hoặc đã bị xóa");
         }
 
         if (tier.getAmount() == null || tier.getAmount() <= 0) {
-            throw new InvalidRequestException("Free tier does not require payment");
+            throw new InvalidRequestException("Gói Free không yêu cầu thanh toán");
         }
 
         // Block purchase if user already has a live paid subscription
@@ -248,7 +248,7 @@ public class PaymentService {
 
         // 2. Ownership guard
         if (!order.getUser().getUid().equals(uid)) {
-            throw new InvalidRequestException("Order does not belong to this user");
+            throw new InvalidRequestException("Đơn hàng không thuộc về người dùng này");
         }
 
         PaymentOrderStatus current = order.getStatus();

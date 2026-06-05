@@ -66,17 +66,17 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId()));
 
         if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(character.getIsPublished(), character.getDeletedAt())) {
-            throw new ResourceNotFoundException("Character not found with ID: " + request.getCharacterId());
+            throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
         }
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + request.getContextId()));
 
         if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
-            throw new ResourceNotFoundException("Historical context not found with ID: " + request.getContextId());
+            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + request.getContextId());
         }
 
         ChatSession session = ChatSession.builder()

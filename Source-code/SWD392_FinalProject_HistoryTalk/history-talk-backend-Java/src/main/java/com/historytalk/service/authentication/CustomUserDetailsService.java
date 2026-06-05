@@ -28,7 +28,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
         if (user.getDeletedAt() != null) {
-            throw new DisabledException("Account has been deactivated");
+            throw new DisabledException("Tài khoản đã bị vô hiệu hóa");
         }
 
         return new UserPrincipal(user);

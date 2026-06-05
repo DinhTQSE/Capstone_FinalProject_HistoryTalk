@@ -182,7 +182,7 @@ public class AiServiceClient {
                                         .body(ChatApiResponse.class);
 
                         if (response == null || response.data() == null) {
-                                throw new SystemException("Empty response from AI service");
+                                throw new SystemException("Phản hồi trống từ dịch vụ AI");
                         }
 
                         log.info("Received from Python AI: tokenUsage={}", response.data().tokenUsage());
@@ -194,7 +194,7 @@ public class AiServiceClient {
                 } catch (RestClientException e) {
                         aiMetricsService.recordRequest("chat", "failure");
                         log.error("AI service /chat call failed: {}", e.getMessage());
-                        throw new SystemException("AI service unavailable: " + e.getMessage());
+                        throw new SystemException("Dịch vụ AI không khả dụng: " + e.getMessage());
                 }
         }
 

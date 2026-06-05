@@ -16,13 +16,13 @@ import lombok.NoArgsConstructor;
 @Builder
 public class UpdateCharacterDocumentRequest {
     
-    @Size(min = 3, max = 255, message = "Title must be between 3 and 255 characters")
+    @Size(min = 3, max = 255, message = "Tiêu đề phải từ 3 đến 255 ký tự")
     private String title;
     
-    @Size(min = 10, message = "Content must be at least 10 characters")
+    @Size(min = 10, message = "Nội dung phải có ít nhất 10 ký tự")
     private String content;
 
-    @Size(max = 500, message = "File URL must be at most 500 characters")
+    @Size(max = 500, message = "URL File tối đa 500 ký tự")
     private String fileUrl;
     
     private DocumentType type;

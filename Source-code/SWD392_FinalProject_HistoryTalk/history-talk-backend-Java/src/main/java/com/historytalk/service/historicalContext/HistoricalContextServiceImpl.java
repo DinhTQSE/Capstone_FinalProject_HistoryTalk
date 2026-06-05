@@ -77,11 +77,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         log.info("Fetching historical context with ID: {}", contextId);
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
-                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found with ID: "+contextId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: "+contextId));
 
         if (!isStaffOrAdmin(role)
                 && (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
-            throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
+            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
         
         return mapToResponse(context);
@@ -98,7 +98,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         // Check for duplicate name
         if (contextRepository.findByNameIgnoreCase(request.getName()).isPresent()) {
-            throw new InvalidRequestException("Historical context already existed");
+            throw new InvalidRequestException("Bối cảnh lịch sử đã tồn tại");
         }
 
         User user = userRepository.findById(UUID.fromString(userId))
@@ -138,13 +138,13 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Historical context not found with ID: "+contextId
+                        "Không tìm thấy bối cảnh lịch sử với ID: "+contextId
                 ));
         
         // Check if user has permission to update (staff/admin)
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "You do not have permission to update this historical context"
+                    "Bạn không có quyền cập nhật bối cảnh lịch sử này"
             );
         }
         
@@ -152,7 +152,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getName() != null && 
             !request.getName().equalsIgnoreCase(context.getName()) &&
             contextRepository.existsByNameIgnoreCaseAndContextIdNot(request.getName(), UUID.fromString(contextId))) {
-            throw new InvalidRequestException("Name already existed"+request.getName());
+            throw new InvalidRequestException("Tên đã tồn tại"+request.getName());
         }
         
         // Update fields
@@ -213,7 +213,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         // Check if user has permission to delete (staff/admin)
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "You do not have permission to delete this historical context"
+                    "Bạn không có quyền xóa bối cảnh lịch sử này"
             );
         }
         
@@ -235,7 +235,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "You do not have permission to soft delete this historical context"
+                    "Bạn không có quyền xóa mềm bối cảnh lịch sử này"
             );
         }
         
@@ -282,7 +282,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     public void restoreContext(String contextId) {
         int updated = contextRepository.restoreById(UUID.fromString(contextId));
         if (updated == 0) {
-            throw new ResourceNotFoundException("Historical context not found with ID: " + contextId);
+            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
     }
 

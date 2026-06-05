@@ -14,6 +14,6 @@ import java.util.List;
 @AllArgsConstructor
 public class BulkTrashActionRequest {
 
-    @NotEmpty(message = "ids is required")
+    @NotEmpty(message = "Yêu cầu ids")
     private List<String> ids;
 }

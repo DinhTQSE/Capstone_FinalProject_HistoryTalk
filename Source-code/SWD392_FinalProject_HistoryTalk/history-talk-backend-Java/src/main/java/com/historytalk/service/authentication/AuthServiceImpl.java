@@ -80,13 +80,13 @@ public class AuthServiceImpl implements AuthService {
         log.info("Registering new user: {}", request.getEmail());
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Password and confirmation password do not match");
+            throw new IllegalArgumentException("Mật khẩu và mật khẩu xác nhận không khớp");
         }
         if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new InvalidRequestException("Your email already existed");
+            throw new InvalidRequestException("Email của bạn đã tồn tại");
         }
         if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
-            throw new InvalidRequestException("Your username already existed");
+            throw new InvalidRequestException("Tên đăng nhập của bạn đã tồn tại");
         }
 
         User user = User.builder()
@@ -140,15 +140,15 @@ public class AuthServiceImpl implements AuthService {
                     )
             );
         } catch (BadCredentialsException ex) {
-            throw new UnauthorizedException("Invalid email or password");
+            throw new UnauthorizedException("Email hoặc mật khẩu không hợp lệ");
         }
 
         User user = userRepository.findByEmailIgnoreCase(request.getEmail())
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+                .orElseThrow(() -> new UnauthorizedException("Email hoặc mật khẩu không hợp lệ"));
 
         // Reject soft-deleted (deactivated) users
         if (user.getDeletedAt() != null) {
-            throw new UnauthorizedException("Account has been deactivated");
+            throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
         }
 
         UserPrincipal principal = new UserPrincipal(user);
@@ -197,22 +197,22 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void resetPassword(String token, String newPassword, String confirmPassword) {
         if (!StringUtils.hasText(token)) {
-            throw new UnauthorizedException("Invalid or expired password reset token");
+            throw new UnauthorizedException("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
         }
         if (!StringUtils.hasText(newPassword)) {
-            throw new InvalidRequestException("New password is required");
+            throw new InvalidRequestException("Yêu cầu mật khẩu mới");
         }
         if (!newPassword.equals(confirmPassword)) {
-            throw new InvalidRequestException("Password and confirmation password do not match");
+            throw new InvalidRequestException("Mật khẩu và mật khẩu xác nhận không khớp");
         }
 
         User user = userRepository.findByPasswordResetTokenHash(sha256Hex(token))
-                .orElseThrow(() -> new UnauthorizedException("Invalid or expired password reset token"));
+                .orElseThrow(() -> new UnauthorizedException("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"));
 
         if (user.getDeletedAt() != null
                 || user.getPasswordResetExpiresAt() == null
                 || user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new UnauthorizedException("Invalid or expired password reset token");
+            throw new UnauthorizedException("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -226,11 +226,11 @@ public class AuthServiceImpl implements AuthService {
         log.info("Refreshing token");
 
         if (!StringUtils.hasText(refreshToken) || !jwtService.isTokenValid(refreshToken)) {
-            throw new UnauthorizedException("Invalid or expired refresh token");
+            throw new UnauthorizedException("Refresh token không hợp lệ hoặc đã hết hạn");
         }
 
         if (BLACKLISTED_TOKENS.contains(refreshToken)) {
-            throw new UnauthorizedException("Refresh token has been revoked");
+            throw new UnauthorizedException("Refresh token đã bị thu hồi");
         }
 
         String email = jwtService.extractEmail(refreshToken);
@@ -253,7 +253,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout(String authorizationHeader) {
         if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
-            throw new UnauthorizedException("Invalid Authorization header format. Expected: Bearer <token>");
+            throw new UnauthorizedException("Định dạng header Authorization không hợp lệ. Mong đợi: Bearer <token>");
         }
         String token = authorizationHeader.substring(7);
         BLACKLISTED_TOKENS.add(token);
@@ -266,19 +266,19 @@ public class AuthServiceImpl implements AuthService {
         log.info("Registering new staff/admin account: {}", request.getEmail());
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new InvalidRequestException("Password and confirmation password do not match");
+            throw new InvalidRequestException("Mật khẩu và mật khẩu xác nhận không khớp");
         }
         if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new DataConflictException("Email already exists");
+            throw new DataConflictException("Email đã tồn tại");
         }
         if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
-            throw new DataConflictException("Username already exists");
+            throw new DataConflictException("Tên đăng nhập đã tồn tại");
         }
 
         UserRole role;
         role = parsePrivilegedRole(request.getRole());
         if (role == UserRole.CUSTOMER) {
-            throw new InvalidRequestException("Cannot register a privileged account with role CUSTOMER. Use the public register endpoint instead.");
+            throw new InvalidRequestException("Không thể đăng ký tài khoản đặc quyền với vai trò CUSTOMER. Vui lòng sử dụng endpoint đăng ký công khai.");
         }
 
         User user = User.builder()
@@ -318,7 +318,7 @@ public class AuthServiceImpl implements AuthService {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 algorithm is not available", ex);
+            throw new IllegalStateException("Thuật toán SHA-256 không khả dụng", ex);
         }
     }
 
@@ -353,7 +353,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Requesting user not found"));
                 
         if (!targetUserId.equals(staffId) && requestUser.getRole() != UserRole.SYSTEM_ADMIN) {
-            throw new InvalidRequestException("Only a SYSTEM_ADMIN can deactivate other user accounts.");
+            throw new InvalidRequestException("Chỉ SYSTEM_ADMIN mới có thể vô hiệu hóa tài khoản của người dùng khác.");
         }
         
         User targetUser = userRepository.findById(UUID.fromString(targetUserId))
@@ -393,7 +393,7 @@ public class AuthServiceImpl implements AuthService {
 
     private UserRole parsePrivilegedRole(String roleValue) {
         if (!StringUtils.hasText(roleValue)) {
-            throw new InvalidRequestException("Role is required. Must be CONTENT_ADMIN or SYSTEM_ADMIN");
+            throw new InvalidRequestException("Vai trò là bắt buộc. Phải là CONTENT_ADMIN hoặc SYSTEM_ADMIN");
         }
         String normalized = roleValue.trim().toUpperCase();
         if ("STAFF".equals(normalized)) {
@@ -404,7 +404,7 @@ public class AuthServiceImpl implements AuthService {
         try {
             return UserRole.valueOf(normalized);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid role: " + roleValue + ". Must be CONTENT_ADMIN or SYSTEM_ADMIN");
+            throw new InvalidRequestException("Vai trò không hợp lệ: " + roleValue + ". Must be CONTENT_ADMIN or SYSTEM_ADMIN");
         }
     }
 }

@@ -17,18 +17,18 @@ import lombok.NoArgsConstructor;
 @Builder
 public class CreateCharacterDocumentRequest {
     
-    @NotBlank(message = "Character ID is required")
+    @NotBlank(message = "Yêu cầu Character ID")
     private String characterId;
     
-    @NotBlank(message = "Title is required")
-    @Size(min = 3, max = 255, message = "Title must be between 3 and 255 characters")
+    @NotBlank(message = "Yêu cầu tiêu đề")
+    @Size(min = 3, max = 255, message = "Tiêu đề phải từ 3 đến 255 ký tự")
     private String title;
     
-    @NotBlank(message = "Content is required")
-    @Size(min = 10, message = "Content must be at least 10 characters")
+    @NotBlank(message = "Yêu cầu nội dung")
+    @Size(min = 10, message = "Nội dung phải có ít nhất 10 ký tự")
     private String content;
 
-    @Size(max = 500, message = "File URL must be at most 500 characters")
+    @Size(max = 500, message = "URL File tối đa 500 ký tự")
     private String fileUrl;
     
     private DocumentType type;

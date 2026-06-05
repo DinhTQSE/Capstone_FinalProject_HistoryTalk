@@ -37,7 +37,7 @@ public class PasswordResetEmailServiceImpl implements PasswordResetEmailService 
 
             mailSender.send(message);
         } catch (MessagingException | RuntimeException ex) {
-            throw new IllegalStateException("Failed to send password reset email", ex);
+            throw new IllegalStateException("Không thể gửi email đặt lại mật khẩu", ex);
         }
     }
 

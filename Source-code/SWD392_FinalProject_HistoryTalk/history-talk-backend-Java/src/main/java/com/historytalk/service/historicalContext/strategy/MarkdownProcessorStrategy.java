@@ -18,11 +18,11 @@ public class MarkdownProcessorStrategy implements DocumentProcessorStrategy {
     @Override
     public String processContent(String content) {
         if (content == null || content.isBlank()) {
-            throw new IllegalArgumentException("Markdown content cannot be blank");
+            throw new IllegalArgumentException("Nội dung Markdown không được để trống");
         }
         long contentSize = content.getBytes(StandardCharsets.UTF_8).length;
         if (contentSize > MAX_CONTENT_BYTES) {
-            throw new IllegalArgumentException("Markdown content size exceeds 10MB limit");
+            throw new IllegalArgumentException("Kích thước nội dung Markdown vượt quá giới hạn 10MB");
         }
         
         // Basic sanitization: remove script tags to prevent XSS

@@ -59,7 +59,7 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
                 .errorCode(HttpStatus.BAD_REQUEST.value())
-                .message("Invalid argument: " + ex.getMessage())
+                .message("Tham số không hợp lệ: " + ex.getMessage())
                 .status(HttpStatus.BAD_REQUEST)
                 .timestamp(LocalDateTime.now())
                 .build();
@@ -103,9 +103,9 @@ public class GlobalExceptionHandler {
             String invalidValue = String.valueOf(ife.getValue());
             String expectedType = ife.getTargetType().getSimpleName();
 
-            errors.put(fieldName, String.format("Value input '%s' Invalid, must be %s", invalidValue, expectedType));
+            errors.put(fieldName, String.format("Giá trị đầu vào '%s' không hợp lệ, phải là kiểu %s", invalidValue, expectedType));
         } else {
-            errors.put("requestBody", "Invalid JSON data");
+            errors.put("requestBody", "Dữ liệu JSON không hợp lệ");
         }
         
         ErrorResponse errorResponse = ErrorResponse.builder()

@@ -9,11 +9,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CreateChatSessionRequest {
 
-    @NotBlank(message = "contextId is required")
+    @NotBlank(message = "Yêu cầu contextId")
     @JsonProperty("contextId")
     private String contextId;
 
-    @NotBlank(message = "characterId is required")
+    @NotBlank(message = "Yêu cầu characterId")
     @JsonProperty("characterId")
     private String characterId;
 }

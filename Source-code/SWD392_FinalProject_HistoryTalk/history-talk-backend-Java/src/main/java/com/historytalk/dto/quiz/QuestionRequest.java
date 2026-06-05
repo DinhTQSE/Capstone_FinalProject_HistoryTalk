@@ -20,15 +20,15 @@ import java.util.List;
 @AllArgsConstructor
 public class QuestionRequest {
 
-    @NotBlank(message = "Question content is required")
+    @NotBlank(message = "Yêu cầu nội dung câu hỏi")
     private String content;
 
-    @NotNull(message = "Options are required")
-    @Size(min = 4, max = 4, message = "Exactly 4 options are required")
+    @NotNull(message = "Yêu cầu các tùy chọn")
+    @Size(min = 4, max = 4, message = "Bắt buộc phải có đúng 4 tùy chọn")
     private List<String> options;
 
     /** 0-based index of the correct option (0-3) */
-    @NotNull(message = "Correct answer is required")
+    @NotNull(message = "Yêu cầu câu trả lời đúng")
     private Integer correctAnswer;
 
     private String explanation;
