@@ -121,8 +121,8 @@ public class MessageServiceImpl implements MessageService {
 
         // Build payloads to pre-fill into AI request (avoids Python→Java callback)
         CharacterPayload characterData = AiServiceClient.buildCharacterPayload(session.getCharacter());
-        ContextPayload contextData = AiServiceClient.buildContextPayload(
-                session.getHistoricalContext());
+        ContextPayload contextData = session.getHistoricalContext() != null ? 
+                AiServiceClient.buildContextPayload(session.getHistoricalContext()) : null;
 
         // Determine whether to skip suggestions
         boolean skipSuggestions = "VOICE".equalsIgnoreCase(request.getMessageType());
@@ -130,7 +130,7 @@ public class MessageServiceImpl implements MessageService {
         // Call BE-Python
         AiChatResult aiResult = aiServiceClient.chat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getHistoricalContext().getContextId().toString(),
+                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
                 request.getContent(),
                 history,
                 characterData,
@@ -180,7 +180,7 @@ public class MessageServiceImpl implements MessageService {
             aiServiceClient.generateTitleAsync(
                     session.getSessionId().toString(),
                     session.getCharacter().getCharacterId().toString(),
-                    session.getHistoricalContext().getContextId().toString(),
+                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
                     request.getContent(),
                     aiResult.message(),
                     characterData,
@@ -237,7 +237,7 @@ public class MessageServiceImpl implements MessageService {
                 .toList();
 
         CharacterPayload characterData = AiServiceClient.buildCharacterPayload(session.getCharacter());
-        ContextPayload contextData = AiServiceClient.buildContextPayload(session.getHistoricalContext());
+        ContextPayload contextData = session.getHistoricalContext() != null ? AiServiceClient.buildContextPayload(session.getHistoricalContext()) : null;
 
         SseEmitter emitter = new SseEmitter(180000L); // 3 minutes timeout
 
@@ -251,7 +251,7 @@ public class MessageServiceImpl implements MessageService {
 
             aiServiceClient.streamChat(
                 session.getCharacter().getCharacterId().toString(),
-                session.getHistoricalContext().getContextId().toString(),
+                session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
                 request.getContent(),
                 history,
                 characterData,
@@ -317,7 +317,7 @@ public class MessageServiceImpl implements MessageService {
                             aiServiceClient.generateTitleAsync(
                                     session.getSessionId().toString(),
                                     session.getCharacter().getCharacterId().toString(),
-                                    session.getHistoricalContext().getContextId().toString(),
+                                    session.getHistoricalContext() != null ? session.getHistoricalContext().getContextId().toString() : "",
                                     request.getContent(),
                                     fullMessage.toString(),
                                     characterData,
