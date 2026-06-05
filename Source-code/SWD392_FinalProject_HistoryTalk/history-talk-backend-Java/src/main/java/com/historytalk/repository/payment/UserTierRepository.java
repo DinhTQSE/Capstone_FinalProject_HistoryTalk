@@ -12,6 +12,8 @@ import java.util.UUID;
 
 public interface UserTierRepository extends JpaRepository<UserTier, UUID> {
 
+    Optional<UserTier> findByPaymentOrder_OrderId(UUID orderId);
+
     /**
      * Returns the highest-priority active and non-expired subscription for a user.
      * Paid tiers (amount > 0) are preferred over free (amount = 0) via ORDER BY tier.amount DESC.

@@ -35,6 +35,10 @@ public class UserTier {
     @JoinColumn(name = "tier_id", nullable = false)
     private Tier tier;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_order_id")
+    private PaymentOrder paymentOrder;
+
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
 

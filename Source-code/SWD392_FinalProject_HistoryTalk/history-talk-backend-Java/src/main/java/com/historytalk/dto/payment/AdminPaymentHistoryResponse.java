@@ -33,6 +33,14 @@ public class AdminPaymentHistoryResponse {
 
     private String status;
 
+    private String fulfillmentStatus;
+
+    private String fulfilledAt;
+
+    private Integer fulfillmentAttempts;
+
+    private String fulfillmentError;
+
     private String paymentLinkId;
 
     private String createdAt;

@@ -1,6 +1,8 @@
-version: '3.8'
-
 services:
+  express-backend:
+    profiles:
+      - legacy-express
+
   historytalk-java:
     build:
       context: ./Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java
