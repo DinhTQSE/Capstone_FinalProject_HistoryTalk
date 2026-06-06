@@ -221,17 +221,19 @@ async def generate_reply(
     # Append instructions to force JSON output
     if skip_suggestions:
         json_instruction = (
-            "\n\nCHỈ TRẢ VỀ JSON:\n"
+            "\n\n[ĐỊNH DẠNG ĐẦU RA]\n"
+            "BẮT BUỘC trả về JSON. Cả câu trả lời PHẢI LÀ TIẾNG VIỆT 100%. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC:\n"
             "{\n"
-            '  "message": "Câu trả lời"\n'
+            '  "message": "Câu trả lời của bạn"\n'
             "}"
         )
     else:
         json_instruction = (
-            "\n\nCHỈ TRẢ VỀ JSON. Các câu hỏi gợi ý BẮT BUỘC phải viết bằng Tiếng Việt. KHÔNG dùng ngoại ngữ:\n"
+            "\n\n[ĐỊNH DẠNG ĐẦU RA]\n"
+            "BẮT BUỘC trả về JSON. Cả câu trả lời và câu hỏi gợi ý PHẢI LÀ TIẾNG VIỆT 100%. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC:\n"
             "{\n"
-            '  "message": "Câu trả lời",\n'
-            '  "suggestedQuestions": ["câu 1", "câu 2", "câu 3"]\n'
+            '  "message": "Câu trả lời của bạn",\n'
+            '  "suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]\n'
             "}"
         )
     system_prompt += json_instruction
@@ -331,9 +333,9 @@ async def generate_reply_stream(
         # Now that the message is done, generate suggested questions synchronously but fast
         # By asking specifically for 3 suggested questions based on the last reply.
         sq_prompt = (
-            "Dựa vào câu trả lời vừa rồi của bạn, hãy gợi ý 3 câu hỏi ngắn (mỗi câu dưới 10 từ) "
-            "mà người dùng có thể hỏi tiếp theo. Các câu hỏi BẮT BUỘC viết bằng Tiếng Việt. KHÔNG dùng ngoại ngữ. "
-            "CHỈ TRẢ VỀ JSON dạng: "
+            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
+            "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
             '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
         )
         sq_messages = messages + [
