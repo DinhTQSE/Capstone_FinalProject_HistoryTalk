@@ -204,7 +204,9 @@ async def generate_reply(
             if evt.id and evt.id not in entity_ids:
                 entity_ids.append(evt.id)
                 
-    rag_context = await retrieve_history_context(user_message, entity_ids)
+    rag_context = ""
+    if message_history:
+        rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
@@ -218,25 +220,7 @@ async def generate_reply(
             "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
         )
     
-    # Append instructions to force JSON output
-    if skip_suggestions:
-        json_instruction = (
-            "\n\n[ĐỊNH DẠNG ĐẦU RA]\n"
-            "BẮT BUỘC trả về JSON. Cả câu trả lời PHẢI LÀ TIẾNG VIỆT 100%. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC:\n"
-            "{\n"
-            '  "message": "Câu trả lời của bạn"\n'
-            "}"
-        )
-    else:
-        json_instruction = (
-            "\n\n[ĐỊNH DẠNG ĐẦU RA]\n"
-            "BẮT BUỘC trả về JSON. Cả câu trả lời và câu hỏi gợi ý PHẢI LÀ TIẾNG VIỆT 100%. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC:\n"
-            "{\n"
-            '  "message": "Câu trả lời của bạn",\n'
-            '  "suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]\n'
-            "}"
-        )
-    system_prompt += json_instruction
+    # No JSON instruction for the main message anymore, to keep roleplay pure.
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -247,24 +231,35 @@ async def generate_reply(
     # Append the new user turn
     messages.append({"role": "user", "content": user_message})
 
-    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=True)
+    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
-    try:
-        # Sometimes models wrap json in markdown fences
-        clean_text = response_text.strip()
-        if clean_text.startswith("```json"):
-            clean_text = clean_text[7:]
-        if clean_text.endswith("```"):
-            clean_text = clean_text[:-3]
+    suggested_questions = []
+    sq_pt = 0
+    sq_ct = 0
+    
+    if not skip_suggestions:
+        sq_prompt = (
+            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
+            "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
+            '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
+        )
+        sq_messages = messages + [
+            {"role": "assistant", "content": response_text},
+            {"role": "user", "content": sq_prompt}
+        ]
         
-        parsed = json.loads(clean_text.strip())
-        message = parsed.get("message", "")
-        suggested_questions = parsed.get("suggestedQuestions", [])
-        return message, suggested_questions[:3], prompt_tokens, completion_tokens
-    except Exception as e:
-        logger.error(f"Failed to parse JSON from Ollama: {response_text}. Error: {e}")
-        # Fallback if json parsing fails
-        return response_text, [], prompt_tokens, completion_tokens
+        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=True)
+        try:
+            clean_text = sq_text.strip()
+            if clean_text.startswith("```json"): clean_text = clean_text[7:]
+            if clean_text.endswith("```"): clean_text = clean_text[:-3]
+            parsed = json.loads(clean_text.strip())
+            suggested_questions = parsed.get("suggestedQuestions", [])[:3]
+        except Exception as e:
+            logger.error(f"Failed to parse suggested questions JSON: {sq_text}. Error: {e}")
+
+    return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct
 
 async def generate_reply_stream(
     character: CharacterData,
@@ -291,7 +286,9 @@ async def generate_reply_stream(
             if evt.id and evt.id not in entity_ids:
                 entity_ids.append(evt.id)
                 
-    rag_context = await retrieve_history_context(user_message, entity_ids)
+    rag_context = ""
+    if message_history:
+        rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
