@@ -34,5 +34,6 @@ class CharacterData(BaseModel):
 
     era: Optional[str] = None
     context: Optional[ContextSummary] = None
+    contexts: Optional[List[ContextSummary]] = None
     events: Optional[List[EventSummary]] = None
     createdBy: Optional[CreatedBy] = None

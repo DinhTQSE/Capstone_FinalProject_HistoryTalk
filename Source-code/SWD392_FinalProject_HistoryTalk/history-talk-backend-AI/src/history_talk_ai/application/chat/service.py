@@ -191,6 +191,17 @@ async def generate_reply(
     entity_ids = [character.characterId]
     if context:
         entity_ids.append(context.contextId)
+        
+    if character.contexts:
+        for ctx in character.contexts:
+            if ctx.contextId not in entity_ids:
+                entity_ids.append(ctx.contextId)
+                
+    if character.events:
+        for evt in character.events:
+            if evt.id and evt.id not in entity_ids:
+                entity_ids.append(evt.id)
+                
     rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
@@ -265,6 +276,17 @@ async def generate_reply_stream(
     entity_ids = [character.characterId]
     if context:
         entity_ids.append(context.contextId)
+        
+    if character.contexts:
+        for ctx in character.contexts:
+            if ctx.contextId not in entity_ids:
+                entity_ids.append(ctx.contextId)
+                
+    if character.events:
+        for evt in character.events:
+            if evt.id and evt.id not in entity_ids:
+                entity_ids.append(evt.id)
+                
     rag_context = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
