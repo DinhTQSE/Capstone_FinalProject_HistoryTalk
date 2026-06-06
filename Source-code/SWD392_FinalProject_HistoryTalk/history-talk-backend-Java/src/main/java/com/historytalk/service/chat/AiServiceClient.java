@@ -78,13 +78,19 @@ public class AiServiceClient {
 
         // ── Inner payload types ────────────────────────────────────────────────
 
+        public record ContextSummaryPayload(
+                        @JsonProperty("contextId") String contextId,
+                        @JsonProperty("name") String name) {
+        }
+
         public record CharacterPayload(
                         @JsonProperty("characterId") String characterId,
                         @JsonProperty("name") String name,
                         @JsonProperty("title") String title,
                         @JsonProperty("background") String background,
                         @JsonProperty("personality") String personality,
-                        @JsonProperty("lifespan") String lifespan) {
+                        @JsonProperty("lifespan") String lifespan,
+                        @JsonProperty("contexts") List<ContextSummaryPayload> contexts) {
         }
 
         public record ContextPayload(
@@ -364,10 +370,13 @@ public class AiServiceClient {
                         lifespan = born + " - " + died;
                 }
                 String enhancedBackground = c.getBackground() != null ? c.getBackground() : "";
+                List<ContextSummaryPayload> contexts = null;
                 if (c.getHistoricalContexts() != null && !c.getHistoricalContexts().isEmpty()) {
                         enhancedBackground += "\n\nCác sự kiện/bối cảnh lịch sử đã tham gia:\n";
+                        contexts = new java.util.ArrayList<>();
                         for (com.historytalk.entity.historicalContext.HistoricalContext ctx : c.getHistoricalContexts()) {
                                 enhancedBackground += "- " + ctx.getName() + ": " + (ctx.getDescription() != null ? ctx.getDescription() : "") + "\n";
+                                contexts.add(new ContextSummaryPayload(ctx.getContextId().toString(), ctx.getName()));
                         }
                 }
 
@@ -377,7 +386,8 @@ public class AiServiceClient {
                                 c.getTitle(),
                                 enhancedBackground,
                                 c.getPersonality(),
-                                lifespan);
+                                lifespan,
+                                contexts);
         }
 
         /**
