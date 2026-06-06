@@ -93,7 +93,8 @@ public class PaymentFulfillmentService {
                     .build();
             userTierRepository.save(newSub);
 
-            user.setToken(resolveLimitedToken(newTier));
+            int currentToken = user.getToken() == null ? 0 : user.getToken();
+            user.setToken(currentToken + resolveLimitedToken(newTier));
             user.setLastTokenResetAt(now);
             userRepository.save(user);
 
