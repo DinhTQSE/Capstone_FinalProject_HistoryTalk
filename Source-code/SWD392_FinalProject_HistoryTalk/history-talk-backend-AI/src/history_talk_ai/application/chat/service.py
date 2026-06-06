@@ -55,6 +55,7 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[
         data = response.json()
         content = data.get("message", {}).get("content", "")
         prompt_tokens = data.get("prompt_eval_count", 0)
+        prompt_tokens = max(1, prompt_tokens // 5) if prompt_tokens > 0 else 0
         completion_tokens = data.get("eval_count", 0)
         return content, prompt_tokens, completion_tokens
     except Exception as e:
@@ -97,6 +98,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
                         yield chunk
                     if data.get("done"):
                         prompt_tokens = data.get("prompt_eval_count", 0)
+                        prompt_tokens = max(1, prompt_tokens // 5) if prompt_tokens > 0 else 0
                         completion_tokens = data.get("eval_count", 0)
                 except json.JSONDecodeError:
                     continue
