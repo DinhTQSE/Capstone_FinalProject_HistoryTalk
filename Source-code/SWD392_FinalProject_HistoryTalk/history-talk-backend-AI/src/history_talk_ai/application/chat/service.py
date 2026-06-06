@@ -55,7 +55,7 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[
         data = response.json()
         content = data.get("message", {}).get("content", "")
         prompt_tokens = data.get("prompt_eval_count", 0)
-        prompt_tokens = max(1, prompt_tokens // 5) if prompt_tokens > 0 else 0
+        prompt_tokens = max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
         completion_tokens = data.get("eval_count", 0)
         return content, prompt_tokens, completion_tokens
     except Exception as e:
@@ -98,7 +98,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
                         yield chunk
                     if data.get("done"):
                         prompt_tokens = data.get("prompt_eval_count", 0)
-                        prompt_tokens = max(1, prompt_tokens // 5) if prompt_tokens > 0 else 0
+                        prompt_tokens = max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
                         completion_tokens = data.get("eval_count", 0)
                 except json.JSONDecodeError:
                     continue
@@ -146,7 +146,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
-                "match_limit": 2,
+                "match_limit": 5,
                 "filter_entity_ids": entity_ids
             }
         ).execute()
@@ -228,7 +228,7 @@ async def generate_reply(
         )
     else:
         json_instruction = (
-            "\n\nCHỈ TRẢ VỀ JSON:\n"
+            "\n\nCHỈ TRẢ VỀ JSON. Các câu hỏi gợi ý BẮT BUỘC phải viết bằng Tiếng Việt. KHÔNG dùng ngoại ngữ:\n"
             "{\n"
             '  "message": "Câu trả lời",\n'
             '  "suggestedQuestions": ["câu 1", "câu 2", "câu 3"]\n'
@@ -332,8 +332,9 @@ async def generate_reply_stream(
         # By asking specifically for 3 suggested questions based on the last reply.
         sq_prompt = (
             "Dựa vào câu trả lời vừa rồi của bạn, hãy gợi ý 3 câu hỏi ngắn (mỗi câu dưới 10 từ) "
-            "mà người dùng có thể hỏi tiếp theo. CHỈ TRẢ VỀ JSON dạng: "
-            '{"suggestedQuestions": ["câu 1", "câu 2", "câu 3"]}'
+            "mà người dùng có thể hỏi tiếp theo. Các câu hỏi BẮT BUỘC viết bằng Tiếng Việt. KHÔNG dùng ngoại ngữ. "
+            "CHỈ TRẢ VỀ JSON dạng: "
+            '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
         )
         sq_messages = messages + [
             {"role": "assistant", "content": full_message},
