@@ -1,5 +1,7 @@
 services:
   express-backend:
+    profiles:
+      - legacy-express
     build:
       context: ./Source-code/SWD392_FinalProject_HistoryTalk/wdp301-backend
       dockerfile: Dockerfile
