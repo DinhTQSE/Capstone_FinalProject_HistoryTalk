@@ -44,9 +44,10 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: GHCR_USERNAME,MY_PAT
           script: |
-            # Đăng nhập
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
+            # Đăng nhập GHCR trên server
+            echo "$MY_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             # CẬP NHẬT CẤU HÌNH MỚI NHẤT TỪ GITHUB
             cd /home/ec2-user/SWD392_FinalProject_HistoryTalk/
             git pull origin main
