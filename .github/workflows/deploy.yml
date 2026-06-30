@@ -48,7 +48,7 @@ jobs:
             # Đăng nhập
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
             # CẬP NHẬT CẤU HÌNH MỚI NHẤT TỪ GITHUB
-            cd /home/minhtringuyen/SWD392_FinalProject_HistoryTalk/
+            cd /home/ec2-user/SWD392_FinalProject_HistoryTalk/
             git pull origin main
            
             docker compose -f docker-compose.prod.yml pull
