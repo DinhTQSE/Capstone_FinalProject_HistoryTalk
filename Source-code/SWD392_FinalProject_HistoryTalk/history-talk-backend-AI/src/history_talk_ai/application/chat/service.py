@@ -348,7 +348,7 @@ async def generate_reply_stream(
         # By asking specifically for 3 suggested questions based on the last reply.
         sq_prompt = (
             "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT.\n"
             "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
             '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
         )
