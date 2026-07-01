@@ -364,12 +364,7 @@ async def generate_session_title(
     """Generate a short session title from the first exchange. Returns (title, prompt_tokens, completion_tokens)"""
     system_prompt = build_title_system_prompt(character)
     
-    json_instruction = (
-        "\n\nCHỈ TRẢ VỀ JSON:\n"
-        "{\n"
-        '  "title": "Tiêu đề dưới 8 từ"\n'
-        "}"
-    )
+    json_instruction = "\n\nCHỈ TRẢ VỀ 1 CÂU TIÊU ĐỀ NGẮN GỌN DƯỚI 8 TỪ. KHÔNG GIẢI THÍCH."
     system_prompt += json_instruction
     
     conversation_snippet = (
@@ -382,20 +377,12 @@ async def generate_session_title(
         {"role": "user", "content": conversation_snippet}
     ]
 
-    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=True)
+    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
-    try:
-        clean_text = response_text.strip()
-        if clean_text.startswith("```json"):
-            clean_text = clean_text[7:]
-        if clean_text.endswith("```"):
-            clean_text = clean_text[:-3]
-            
-        parsed = json.loads(clean_text.strip())
-        return parsed.get("title", "Cuộc trò chuyện mới"), prompt_tokens, completion_tokens
-    except Exception as e:
-        logger.error(f"Failed to parse JSON from Ollama title generation: {response_text}. Error: {e}")
-        return "Cuộc trò chuyện mới", prompt_tokens, completion_tokens
+    title = response_text.strip().strip('"').strip("'")
+    if title:
+        return title, prompt_tokens, completion_tokens
+    return "Cuộc trò chuyện mới", prompt_tokens, completion_tokens
 
 async def process_document(request: ProcessDocumentRequest):
     """Process a document by chunking, embedding, and storing in Supabase."""
