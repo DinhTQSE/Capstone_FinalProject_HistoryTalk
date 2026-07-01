@@ -222,15 +222,15 @@ async def generate_reply(
             "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
         )
     
-    # No JSON instruction for the main message anymore, to keep roleplay pure.
-    messages = []
+    # Đặt system prompt ở đầu hội thoại để AI hiểu ngữ cảnh mà không bị ngợp
+    messages = [{"role": "system", "content": system_prompt}]
     
     # Inject conversation history
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
-    # Inject system prompt into the very last user message for maximum attention
-    messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
+    # User message cuối cùng chỉ chứa nội dung người dùng hỏi
+    messages.append({"role": "user", "content": user_message})
 
     response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
@@ -304,13 +304,13 @@ async def generate_reply_stream(
             "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
         )
     
-    # We do NOT force JSON for streaming because streaming JSON is hard to parse continuously.
-    messages = []
+    # Đặt system prompt ở đầu hội thoại để AI hiểu ngữ cảnh mà không bị ngợp
+    messages = [{"role": "system", "content": system_prompt}]
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
-    # Inject system prompt into the very last user message for maximum attention
-    messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
+    # User message cuối cùng chỉ chứa nội dung người dùng hỏi
+    messages.append({"role": "user", "content": user_message})
 
     full_message = ""
     prompt_tokens = 0
