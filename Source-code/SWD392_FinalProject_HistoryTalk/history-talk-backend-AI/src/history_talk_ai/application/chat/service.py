@@ -222,14 +222,22 @@ async def generate_reply(
     
     # No JSON instruction for the main message anymore, to keep roleplay pure.
 
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = []
+    first_user_injected = False
 
     # Inject conversation history
     for item in message_history:
-        messages.append({"role": item.role, "content": item.content})
+        if item.role == "user" and not first_user_injected:
+            messages.append({"role": "user", "content": f"{system_prompt}\n\n{item.content}"})
+            first_user_injected = True
+        else:
+            messages.append({"role": item.role, "content": item.content})
 
     # Append the new user turn
-    messages.append({"role": "user", "content": user_message})
+    if not first_user_injected:
+        messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
+    else:
+        messages.append({"role": "user", "content": user_message})
 
     response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
@@ -240,7 +248,7 @@ async def generate_reply(
     if not skip_suggestions:
         sq_prompt = (
             "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT.\n"
             "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
             '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
         )
@@ -302,10 +310,19 @@ async def generate_reply_stream(
         )
     
     # We do NOT force JSON for streaming because streaming JSON is hard to parse continuously.
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = []
+    first_user_injected = False
     for item in message_history:
-        messages.append({"role": item.role, "content": item.content})
-    messages.append({"role": "user", "content": user_message})
+        if item.role == "user" and not first_user_injected:
+            messages.append({"role": "user", "content": f"{system_prompt}\n\n{item.content}"})
+            first_user_injected = True
+        else:
+            messages.append({"role": item.role, "content": item.content})
+            
+    if not first_user_injected:
+        messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
+    else:
+        messages.append({"role": "user", "content": user_message})
 
     full_message = ""
     prompt_tokens = 0
