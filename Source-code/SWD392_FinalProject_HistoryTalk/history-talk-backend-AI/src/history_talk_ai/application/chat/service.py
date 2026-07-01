@@ -221,15 +221,14 @@ async def generate_reply(
         )
     
     # No JSON instruction for the main message anymore, to keep roleplay pure.
-
-    messages = [{"role": "system", "content": system_prompt}]
-
+    messages = []
+    
     # Inject conversation history
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
-
-    # Append the new user turn
-    messages.append({"role": "user", "content": user_message})
+        
+    # Inject system prompt into the very last user message for maximum attention
+    messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
 
     response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
@@ -239,25 +238,27 @@ async def generate_reply(
     
     if not skip_suggestions:
         sq_prompt = (
-            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
-            "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
-            '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
+            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để người dùng hỏi tiếp.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG GIẢI THÍCH DÀI DÒNG.\n"
+            "Chỉ cần liệt kê 3 câu hỏi, mỗi câu một dòng, bắt đầu bằng dấu gạch ngang (-)."
         )
         sq_messages = messages + [
             {"role": "assistant", "content": response_text},
             {"role": "user", "content": sq_prompt}
         ]
         
-        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=True)
+        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=False)
         try:
-            clean_text = sq_text.strip()
-            if clean_text.startswith("```json"): clean_text = clean_text[7:]
-            if clean_text.endswith("```"): clean_text = clean_text[:-3]
-            parsed = json.loads(clean_text.strip())
-            suggested_questions = parsed.get("suggestedQuestions", [])[:3]
+            import re
+            lines = sq_text.strip().split('\n')
+            for line in lines:
+                clean_line = re.sub(r'^[-*•]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
+                clean_line = clean_line.strip('"').strip("'")
+                if clean_line and len(clean_line) > 5:
+                    suggested_questions.append(clean_line)
+            suggested_questions = suggested_questions[:3]
         except Exception as e:
-            logger.error(f"Failed to parse suggested questions JSON: {sq_text}. Error: {e}")
+            logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
 
     return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct
 
@@ -302,10 +303,12 @@ async def generate_reply_stream(
         )
     
     # We do NOT force JSON for streaming because streaming JSON is hard to parse continuously.
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = []
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
-    messages.append({"role": "user", "content": user_message})
+        
+    # Inject system prompt into the very last user message for maximum attention
+    messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
 
     full_message = ""
     prompt_tokens = 0
@@ -330,25 +333,27 @@ async def generate_reply_stream(
         # Now that the message is done, generate suggested questions synchronously but fast
         # By asking specifically for 3 suggested questions based on the last reply.
         sq_prompt = (
-            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
-            "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
-            '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
+            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để người dùng hỏi tiếp.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG GIẢI THÍCH DÀI DÒNG.\n"
+            "Chỉ cần liệt kê 3 câu hỏi, mỗi câu một dòng, bắt đầu bằng dấu gạch ngang (-)."
         )
         sq_messages = messages + [
             {"role": "assistant", "content": full_message},
             {"role": "user", "content": sq_prompt}
         ]
         
-        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=True)
+        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=False)
         try:
-            clean_text = sq_text.strip()
-            if clean_text.startswith("```json"): clean_text = clean_text[7:]
-            if clean_text.endswith("```"): clean_text = clean_text[:-3]
-            parsed = json.loads(clean_text.strip())
-            suggested_questions = parsed.get("suggestedQuestions", [])[:3]
+            import re
+            lines = sq_text.strip().split('\n')
+            for line in lines:
+                clean_line = re.sub(r'^[-*•]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
+                clean_line = clean_line.strip('"').strip("'")
+                if clean_line and len(clean_line) > 5:
+                    suggested_questions.append(clean_line)
+            suggested_questions = suggested_questions[:3]
         except Exception as e:
-            logger.error(f"Failed to parse suggested questions JSON: {sq_text}. Error: {e}")
+            logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
 
     yield {
         "suggestedQuestions": suggested_questions,
