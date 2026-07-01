@@ -222,22 +222,14 @@ async def generate_reply(
     
     # No JSON instruction for the main message anymore, to keep roleplay pure.
 
-    messages = []
-    first_user_injected = False
+    messages = [{"role": "system", "content": system_prompt}]
 
     # Inject conversation history
     for item in message_history:
-        if item.role == "user" and not first_user_injected:
-            messages.append({"role": "user", "content": f"{system_prompt}\n\n{item.content}"})
-            first_user_injected = True
-        else:
-            messages.append({"role": item.role, "content": item.content})
+        messages.append({"role": item.role, "content": item.content})
 
     # Append the new user turn
-    if not first_user_injected:
-        messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
-    else:
-        messages.append({"role": "user", "content": user_message})
+    messages.append({"role": "user", "content": user_message})
 
     response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
@@ -248,7 +240,7 @@ async def generate_reply(
     if not skip_suggestions:
         sq_prompt = (
             "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
             "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
             '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
         )
@@ -310,19 +302,10 @@ async def generate_reply_stream(
         )
     
     # We do NOT force JSON for streaming because streaming JSON is hard to parse continuously.
-    messages = []
-    first_user_injected = False
+    messages = [{"role": "system", "content": system_prompt}]
     for item in message_history:
-        if item.role == "user" and not first_user_injected:
-            messages.append({"role": "user", "content": f"{system_prompt}\n\n{item.content}"})
-            first_user_injected = True
-        else:
-            messages.append({"role": item.role, "content": item.content})
-            
-    if not first_user_injected:
-        messages.append({"role": "user", "content": f"{system_prompt}\n\n{user_message}"})
-    else:
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": item.role, "content": item.content})
+    messages.append({"role": "user", "content": user_message})
 
     full_message = ""
     prompt_tokens = 0
@@ -348,7 +331,7 @@ async def generate_reply_stream(
         # By asking specifically for 3 suggested questions based on the last reply.
         sq_prompt = (
             "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT.\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG DÙNG TIẾNG TRUNG QUỐC.\n"
             "CHỈ TRẢ VỀ ĐÚNG 1 ĐOẠN JSON NHƯ SAU:\n"
             '{"suggestedQuestions": ["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]}'
         )
