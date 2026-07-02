@@ -230,7 +230,7 @@ async def generate_reply(
             f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
             "LỆNH RAG:\n"
             "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm.\n"
+            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
             "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
@@ -245,9 +245,10 @@ async def generate_reply(
     
     if not skip_suggestions:
         sq_prompt = (
-            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG GIẢI THÍCH DÀI DÒNG.\n"
-            "Chỉ cần liệt kê 3 câu hỏi, mỗi câu một dòng, bắt đầu bằng dấu gạch ngang (-)."
+            "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
+            "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
+            "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
         )
         sq_messages = messages + [
             {"role": "assistant", "content": response_text},
@@ -259,7 +260,7 @@ async def generate_reply(
             import re
             lines = sq_text.strip().split('\n')
             for line in lines:
-                clean_line = re.sub(r'^[-*•]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
+                clean_line = re.sub(r'^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
                 clean_line = clean_line.strip('"').strip("'")
                 if clean_line and len(clean_line) > 5:
                     suggested_questions.append(clean_line)
@@ -315,7 +316,7 @@ async def generate_reply_stream(
             f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
             "LỆNH RAG:\n"
             "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm.\n"
+            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
             "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
@@ -345,9 +346,10 @@ async def generate_reply_stream(
         # Now that the message is done, generate suggested questions synchronously but fast
         # By asking specifically for 3 suggested questions based on the last reply.
         sq_prompt = (
-            "Dựa vào câu trả lời vừa rồi, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để người dùng hỏi tiếp.\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG GIẢI THÍCH DÀI DÒNG.\n"
-            "Chỉ cần liệt kê 3 câu hỏi, mỗi câu một dòng, bắt đầu bằng dấu gạch ngang (-)."
+            "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
+            "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
+            "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
+            "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
         )
         sq_messages = messages + [
             {"role": "assistant", "content": full_message},
@@ -359,7 +361,7 @@ async def generate_reply_stream(
             import re
             lines = sq_text.strip().split('\n')
             for line in lines:
-                clean_line = re.sub(r'^[-*•]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
+                clean_line = re.sub(r'^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
                 clean_line = clean_line.strip('"').strip("'")
                 if clean_line and len(clean_line) > 5:
                     suggested_questions.append(clean_line)
