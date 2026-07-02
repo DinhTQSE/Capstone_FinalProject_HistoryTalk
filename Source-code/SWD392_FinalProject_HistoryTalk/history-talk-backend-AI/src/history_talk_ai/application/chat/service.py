@@ -229,8 +229,8 @@ async def generate_reply(
         final_user_content = (
             f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
             "LỆNH RAG:\n"
-            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO.\n"
-            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm.\n"
+            "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
+            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm.\n"
             "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
@@ -314,8 +314,8 @@ async def generate_reply_stream(
         final_user_content = (
             f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
             "LỆNH RAG:\n"
-            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO.\n"
-            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm.\n"
+            "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
+            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm.\n"
             "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
