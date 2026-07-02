@@ -222,8 +222,12 @@ async def generate_reply(
             "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
         )
     
-    # Đặt system prompt ở đầu hội thoại để AI hiểu ngữ cảnh mà không bị ngợp
-    messages = [{"role": "system", "content": system_prompt}]
+    # Vistral không nhận diện role "system", nên ta bắt buộc phải đưa system prompt vào tin nhắn "user" ĐẦU TIÊN của đoạn chat.
+    # Đặt ở đầu để AI không bị lặp lại câu "Tôi đã hiểu..." ở mỗi lượt chat.
+    messages = [{
+        "role": "user", 
+        "content": f"{system_prompt}\n\n[Hãy bắt đầu đóng vai và chào tôi bằng một câu ngắn gọn]"
+    }]
     
     # Inject conversation history
     for item in message_history:
@@ -304,8 +308,12 @@ async def generate_reply_stream(
             "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
         )
     
-    # Đặt system prompt ở đầu hội thoại để AI hiểu ngữ cảnh mà không bị ngợp
-    messages = [{"role": "system", "content": system_prompt}]
+    # Vistral không nhận diện role "system", nên ta bắt buộc phải đưa system prompt vào tin nhắn "user" ĐẦU TIÊN của đoạn chat.
+    # Đặt ở đầu để AI không bị lặp lại câu "Tôi đã hiểu..." ở mỗi lượt chat.
+    messages = [{
+        "role": "user", 
+        "content": f"{system_prompt}\n\n[Hãy bắt đầu đóng vai và chào tôi bằng một câu ngắn gọn]"
+    }]
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
