@@ -212,29 +212,30 @@ async def generate_reply(
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    if rag_context:
-        print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
-        system_prompt += (
-            f"\n\n[DỮ LIỆU THAM KHẢO]:\n{rag_context}\n\n"
-            "LỆNH RAG:\n"
-            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO, kể cả khi mâu thuẫn kiến thức cũ.\n"
-            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm (vd: truyền thuyết, thần tiên).\n"
-            "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
-        )
-    
     # Vistral không nhận diện role "system", nên ta bắt buộc phải đưa system prompt vào tin nhắn "user" ĐẦU TIÊN của đoạn chat.
-    # Đặt ở đầu để AI không bị lặp lại câu "Tôi đã hiểu..." ở mỗi lượt chat.
     messages = [{
         "role": "user", 
-        "content": f"{system_prompt}\n\n[Hãy bắt đầu đóng vai và chào tôi bằng một câu ngắn gọn]"
+        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY, ĐÚNG TÍNH CÁCH NHÂN VẬT]"
     }]
     
     # Inject conversation history
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
-    # User message cuối cùng chỉ chứa nội dung người dùng hỏi
-    messages.append({"role": "user", "content": user_message})
+    # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
+    final_user_content = user_message
+    if rag_context:
+        print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
+        final_user_content = (
+            f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
+            "LỆNH RAG:\n"
+            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO.\n"
+            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm.\n"
+            "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n\n"
+            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
+        )
+        
+    messages.append({"role": "user", "content": final_user_content})
 
     response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
     
@@ -299,26 +300,27 @@ async def generate_reply_stream(
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    if rag_context:
-        system_prompt += (
-            f"\n\n[DỮ LIỆU THAM KHẢO]:\n{rag_context}\n\n"
-            "LỆNH RAG:\n"
-            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO, kể cả khi mâu thuẫn kiến thức cũ.\n"
-            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm (vd: truyền thuyết, thần tiên).\n"
-            "3. Nếu dữ liệu không đề cập, phải thừa nhận không biết."
-        )
-    
     # Vistral không nhận diện role "system", nên ta bắt buộc phải đưa system prompt vào tin nhắn "user" ĐẦU TIÊN của đoạn chat.
-    # Đặt ở đầu để AI không bị lặp lại câu "Tôi đã hiểu..." ở mỗi lượt chat.
     messages = [{
         "role": "user", 
-        "content": f"{system_prompt}\n\n[Hãy bắt đầu đóng vai và chào tôi bằng một câu ngắn gọn]"
+        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
     }]
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
-    # User message cuối cùng chỉ chứa nội dung người dùng hỏi
-    messages.append({"role": "user", "content": user_message})
+    # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
+    final_user_content = user_message
+    if rag_context:
+        final_user_content = (
+            f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
+            "LỆNH RAG:\n"
+            "1. Ưu tiên tuyệt đối DỮ LIỆU THAM KHẢO.\n"
+            "2. Bám sát dữ liệu, KHÔNG tự suy diễn thêm.\n"
+            "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n\n"
+            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
+        )
+        
+    messages.append({"role": "user", "content": final_user_content})
 
     full_message = ""
     prompt_tokens = 0
