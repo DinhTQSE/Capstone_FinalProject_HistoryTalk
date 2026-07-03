@@ -5,6 +5,8 @@ import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.user.AdminUpdateUserRequest;
 import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
+import com.historytalk.dto.user.BulkRestoreUsersRequest;
+import com.historytalk.dto.user.BulkRestoreUsersResponse;
 import com.historytalk.service.authentication.AuthService;
 import com.historytalk.service.user.UserService;
 import com.historytalk.utils.SecurityUtils;
@@ -89,5 +91,37 @@ public class AdminUserController {
         log.info("PATCH /api/v1/admin/users/{}/deactivate - by {}", userId, adminId);
         authService.softDeleteUser(userId, adminId);
         return ResponseEntity.ok(ApiResponse.success(null, "User account deactivated successfully"));
+    }
+
+    @PatchMapping("/{userId}/restore")
+    @Operation(summary = "Restore deactivated user")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> restoreUser(@PathVariable String userId) {
+        log.info("PATCH /api/v1/admin/users/{}/restore", userId);
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.restoreUser(userId),
+                "User account restored successfully"
+        ));
+    }
+
+    @PatchMapping("/restore/batch")
+    @Operation(summary = "Restore multiple deactivated users in batch")
+    public ResponseEntity<ApiResponse<BulkRestoreUsersResponse>> restoreUsersBatch(
+            @Valid @RequestBody BulkRestoreUsersRequest request) {
+        log.info("PATCH /api/v1/admin/users/restore/batch");
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.restoreUsersBatch(request.getUserIds()),
+                "Batch user restoration completed"
+        ));
+    }
+
+    @PatchMapping("/restore/all")
+    @Operation(summary = "Restore all deactivated users")
+    public ResponseEntity<ApiResponse<Integer>> restoreAllUsers() {
+        log.info("PATCH /api/v1/admin/users/restore/all");
+        int count = userService.restoreAllUsers();
+        return ResponseEntity.ok(ApiResponse.success(
+                count,
+                "All deactivated users restored successfully (" + count + " users restored)"
+        ));
     }
 }

@@ -4,6 +4,7 @@ import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.user.AdminUpdateUserRequest;
 import com.historytalk.dto.user.ChangePasswordRequest;
 import com.historytalk.dto.user.UpdateMyProfileRequest;
+import com.historytalk.dto.user.BulkRestoreUsersResponse;
 import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
 
@@ -21,4 +22,10 @@ public interface UserService {
     UserProfileResponse adminUpdateUser(String userId, AdminUpdateUserRequest request);
 
     UserProfileResponse updateUserRole(String userId, UpdateUserRoleRequest request);
+
+    UserProfileResponse restoreUser(String userId);
+
+    BulkRestoreUsersResponse restoreUsersBatch(java.util.List<String> userIds);
+
+    int restoreAllUsers();
 }
