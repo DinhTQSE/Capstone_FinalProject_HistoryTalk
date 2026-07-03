@@ -185,7 +185,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = userOptional.get();
-        String rawToken = generatePasswordResetToken();
+            String rawToken = generatePasswordResetToken();
         user.setPasswordResetTokenHash(sha256Hex(rawToken));
         user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(passwordResetTokenExpirationMinutes));
         userRepository.save(user);

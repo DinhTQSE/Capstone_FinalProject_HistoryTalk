@@ -1,6 +1,5 @@
 package com.historytalk.dto.user;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.enums.UserRole;
 import lombok.Builder;
@@ -11,7 +10,6 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserProfileResponse {
     private String uid;
     private String userName;

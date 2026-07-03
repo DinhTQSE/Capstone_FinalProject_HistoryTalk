@@ -6,6 +6,7 @@ import com.historytalk.dto.user.ChangePasswordRequest;
 import com.historytalk.dto.user.UpdateMyProfileRequest;
 import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
+import com.historytalk.dto.user.BulkRestoreUsersResponse;
 import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
@@ -25,6 +26,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -128,6 +130,54 @@ public class UserServiceImpl implements UserService {
         User user = loadUser(userId);
         user.setRole(request.getRole());
         return userMapper.toProfileResponse(userRepository.save(user), null, null);
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse restoreUser(String userId) {
+        User user = loadUser(userId);
+        if (user.getDeletedAt() == null) {
+            throw new InvalidRequestException("User account is already active");
+        }
+        user.setDeletedAt(null);
+        return userMapper.toProfileResponse(userRepository.save(user), null, null);
+    }
+
+    @Override
+    @Transactional
+    public BulkRestoreUsersResponse restoreUsersBatch(List<String> userIds) {
+        List<UUID> uids = userIds.stream()
+                .map(UUID::fromString)
+                .toList();
+
+        List<User> deactivatedUsers = userRepository.findAllById(uids).stream()
+                .filter(u -> u.getDeletedAt() != null)
+                .toList();
+
+        for (User user : deactivatedUsers) {
+            user.setDeletedAt(null);
+        }
+        userRepository.saveAll(deactivatedUsers);
+
+        List<String> restoredIds = deactivatedUsers.stream()
+                .map(u -> u.getUid().toString())
+                .toList();
+
+        List<String> failedIds = userIds.stream()
+                .filter(id -> !restoredIds.contains(id))
+                .toList();
+
+        return BulkRestoreUsersResponse.builder()
+                .restoredCount(deactivatedUsers.size())
+                .restoredUserIds(restoredIds)
+                .failedUserIds(failedIds)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public int restoreAllUsers() {
+        return userRepository.restoreAllUsers();
     }
 
     private User loadActiveUser(String userId) {
