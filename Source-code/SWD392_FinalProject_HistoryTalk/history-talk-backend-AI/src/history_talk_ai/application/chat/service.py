@@ -214,10 +214,10 @@ async def generate_reply(
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    # Qwen3.5 (qwen-vn) hỗ trợ cực tốt role "system", nên ta truyền thẳng vào đây.
+    # Gemma 2 không có system role chuẩn, ta bọc system prompt vào user message đầu tiên.
     messages = [{
-        "role": "system", 
-        "content": system_prompt
+        "role": "user", 
+        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
     }]
     
     # Inject conversation history
@@ -304,10 +304,10 @@ async def generate_reply_stream(
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    # Qwen3.5 (qwen-vn) hỗ trợ cực tốt role "system", nên ta truyền thẳng vào đây.
+    # Gemma 2 không có system role chuẩn, ta bọc system prompt vào user message đầu tiên.
     messages = [{
-        "role": "system", 
-        "content": system_prompt
+        "role": "user", 
+        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
     }]
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
