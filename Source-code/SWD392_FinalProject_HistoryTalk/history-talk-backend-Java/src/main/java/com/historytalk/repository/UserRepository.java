@@ -125,4 +125,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             ORDER BY users DESC, "tierTitle" ASC
             """, nativeQuery = true)
     List<DashboardTokenBalanceByTierProjection> countTokenBalanceByTier();
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE User u SET u.deletedAt = null WHERE u.deletedAt IS NOT NULL")
+    int restoreAllUsers();
 }

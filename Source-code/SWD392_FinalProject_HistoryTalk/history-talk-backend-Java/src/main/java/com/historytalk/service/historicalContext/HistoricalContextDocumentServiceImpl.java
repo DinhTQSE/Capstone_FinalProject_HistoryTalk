@@ -45,7 +45,6 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     private final UserRepository userRepository;
     private final DocumentProcessorFactory documentProcessorFactory;
     private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
-    
     /**
      * Get all documents
      */
