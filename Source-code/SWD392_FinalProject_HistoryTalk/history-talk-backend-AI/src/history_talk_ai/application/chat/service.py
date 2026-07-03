@@ -233,7 +233,7 @@ async def generate_reply(
             "LỆNH RAG:\n"
             "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
             "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
-            "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết.\n"
+            "3. Nếu dữ liệu không đề cập, hãy thừa nhận không biết hoặc nếu là câu hỏi về mình thì nói là ta không nhớ rõ.\n"
             "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
