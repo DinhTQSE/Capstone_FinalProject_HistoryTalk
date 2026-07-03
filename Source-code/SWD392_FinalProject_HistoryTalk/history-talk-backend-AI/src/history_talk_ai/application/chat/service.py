@@ -38,6 +38,7 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[
             "temperature": settings.LLM_TEMPERATURE,
             "num_predict": settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
+            "repeat_penalty": 1.15,
         }
     }
     
@@ -73,6 +74,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
             "temperature": settings.LLM_TEMPERATURE,
             "num_predict": settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
+            "repeat_penalty": 1.15,
         }
     }
     
