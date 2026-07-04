@@ -33,6 +33,21 @@ public interface UserTierRepository extends JpaRepository<UserTier, UUID> {
                                                @Param("now") LocalDateTime now);
 
     /**
+     * Returns all active and non-expired subscriptions for a user.
+     * Used for cumulative token calculations across multiple active packages.
+     */
+    @Query("""
+            SELECT ut FROM UserTier ut
+            JOIN FETCH ut.tier t
+            WHERE ut.user.uid = :uid
+              AND ut.isActive = true
+              AND ut.deletedAt IS NULL
+              AND ut.endTime > :now
+        """)
+    List<UserTier> findAllActiveByUid(@Param("uid") UUID uid,
+                                       @Param("now") LocalDateTime now);
+
+    /**
      * Pessimistic-write version of findCurrentActiveByUid.
      * Used exclusively in PaymentWebhookService to prevent concurrent double-activation.
      */

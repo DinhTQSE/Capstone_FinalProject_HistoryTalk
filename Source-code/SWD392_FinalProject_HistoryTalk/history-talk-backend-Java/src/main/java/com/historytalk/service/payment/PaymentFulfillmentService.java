@@ -74,14 +74,7 @@ public class PaymentFulfillmentService {
                 throw new IllegalStateException("Order tier is missing or deleted");
             }
 
-            Optional<UserTier> currentActive = userTierRepository.findCurrentActiveByUidForUpdate(user.getUid(), now);
-            if (currentActive.isPresent()
-                    && currentActive.get().getTier() != null
-                    && currentActive.get().getTier().getAmount() != null
-                    && currentActive.get().getTier().getAmount() > 0) {
-                throw new IllegalStateException(
-                        "User already has active paid subscription: " + currentActive.get().getId());
-            }
+            // User can have multiple active subscriptions (removed IllegalStateException block)
 
             UserTier newSub = UserTier.builder()
                     .user(user)

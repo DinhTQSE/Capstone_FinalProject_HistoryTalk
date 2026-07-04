@@ -51,14 +51,24 @@ public class UserServiceImpl implements UserService {
         Tier activeTier = activeSubOpt.map(UserTier::getTier).orElse(null);
         LocalDateTime subEndTime = activeSubOpt.map(UserTier::getEndTime).orElse(null);
 
-        // Daily token top-up based on whichever tier is currently active
+        // Daily token top-up based on ALL currently active tiers
         LocalDate today = LocalDate.now();
         if (user.getLastTokenResetAt() == null ||
                 !user.getLastTokenResetAt().toLocalDate().isEqual(today)) {
-            if (activeTier != null && activeTier.getLimitedToken() != null) {
-                user.setToken((user.getToken() == null ? 0 : user.getToken())
-                        + activeTier.getLimitedToken());
+            
+            List<UserTier> allActiveTiers = userTierRepository.findAllActiveByUid(uid, now);
+            int totalTokensToAdd = 0;
+            
+            for (UserTier ut : allActiveTiers) {
+                if (ut.getTier() != null && ut.getTier().getLimitedToken() != null) {
+                    totalTokensToAdd += ut.getTier().getLimitedToken();
+                }
             }
+
+            if (totalTokensToAdd > 0) {
+                user.setToken((user.getToken() == null ? 0 : user.getToken()) + totalTokensToAdd);
+            }
+            
             user.setLastTokenResetAt(now);
             user = userRepository.save(user);
         }
