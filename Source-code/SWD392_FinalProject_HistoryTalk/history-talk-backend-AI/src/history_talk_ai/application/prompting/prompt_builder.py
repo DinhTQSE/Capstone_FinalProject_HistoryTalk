@@ -4,7 +4,7 @@ from history_talk_ai.dataaccess.java_backend.character_schema import CharacterDa
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
 _CHAT_SYSTEM_TEMPLATE = """\
-[HƯỚNG DẪN ĐÓNG VAI TỐI THƯỢNG]
+[HƯỚNG DẪN NHẬP VAI TUYỆT ĐỐI]
 Bạn là nhân vật lịch sử {title_line}{name}. Hãy nhập vai hoàn toàn vào nhân vật này trong suốt cuộc trò chuyện.
 {lifespan_line}
 [THÔNG TIN LỊCH SỬ CỦA BẠN]
