@@ -59,13 +59,15 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
     @Transactional
     public ChatSessionResponse createSession(String userId, String userRole, CreateChatSessionRequest request) {
-        log.info("Creating chat session for user={} context={} character={}", userId, request.getContextId(), request.getCharacterId());
+        log.info("Creating chat session for user={} context={} character={}", userId, request.getContextId(),
+                request.getCharacterId());
 
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy nhân vật với ID: " + request.getCharacterId()));
 
         if (!isStaffOrAdmin(userRole) && !isPubliclyVisible(character.getIsPublished(), character.getDeletedAt())) {
             throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
@@ -75,7 +77,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         if (request.getContextId() != null && !request.getContextId().isBlank()) {
             context = contextRepository.findById(UUID.fromString(request.getContextId()))
                     .orElse(null);
-            if (context != null && !isStaffOrAdmin(userRole) && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
+            if (context != null && !isStaffOrAdmin(userRole)
+                    && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
                 context = null; // Ignore if not visible
             }
         }
@@ -102,7 +105,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                     Collections.emptyList(),
                     characterData,
                     contextData,
-                    false);
+                    true);
 
             String suggestedQuestionsJson = null;
             if (greeting.suggestedQuestions() != null && !greeting.suggestedQuestions().isEmpty()) {
@@ -110,6 +113,18 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                     suggestedQuestionsJson = objectMapper.writeValueAsString(greeting.suggestedQuestions());
                 } catch (Exception ex) {
                     log.warn("Failed to serialize greeting suggested questions: {}", ex.getMessage());
+                }
+            } else {
+                // Default generic questions since we skipped AI generation to speed up session
+                // creation
+                List<String> defaultQuestions = List.of(
+                        "Ngài có thể kể cho ta nghe về cuộc đời của ngài không?",
+                        "Chiến công hoặc sự kiện đáng nhớ nhất của ngài là gì?",
+                        "Ngài có thể chia sẻ thêm về bối cảnh lịch sử thời đó không?");
+                try {
+                    suggestedQuestionsJson = objectMapper.writeValueAsString(defaultQuestions);
+                } catch (Exception ex) {
+                    log.warn("Failed to serialize default suggested questions");
                 }
             }
 
@@ -213,12 +228,10 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && (
-                "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                        || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role)
-        );
+        return role != null && ("CONTENT_ADMIN".equalsIgnoreCase(role)
+                || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                || "STAFF".equalsIgnoreCase(role)
+                || "ADMIN".equalsIgnoreCase(role));
     }
 
     private boolean isPubliclyVisible(Boolean isPublished, LocalDateTime deletedAt) {
