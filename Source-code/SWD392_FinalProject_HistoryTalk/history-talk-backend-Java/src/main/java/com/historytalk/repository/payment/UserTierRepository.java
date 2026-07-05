@@ -89,10 +89,12 @@ public interface UserTierRepository extends JpaRepository<UserTier, UUID> {
             SELECT COUNT(ut)
             FROM UserTier ut
             JOIN ut.tier t
+            JOIN ut.user u
             WHERE ut.isActive = true
               AND ut.deletedAt IS NULL
               AND ut.endTime >= :now
               AND t.amount > 0
+              AND u.role = 'CUSTOMER'
         """)
     long countActiveSubscriptions(@Param("now") LocalDateTime now);
 
@@ -104,11 +106,13 @@ public interface UserTierRepository extends JpaRepository<UserTier, UUID> {
             SELECT COUNT(ut)
             FROM UserTier ut
             JOIN ut.tier t
+            JOIN ut.user u
             WHERE ut.isActive = true
               AND ut.deletedAt IS NULL
               AND ut.endTime >= :now
               AND ut.endTime < :until
               AND t.amount > 0
+              AND u.role = 'CUSTOMER'
         """)
     long countExpiringSoonSubscriptions(
             @Param("now") LocalDateTime now,

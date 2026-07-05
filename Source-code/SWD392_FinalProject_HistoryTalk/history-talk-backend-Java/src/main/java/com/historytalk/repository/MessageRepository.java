@@ -117,9 +117,14 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
                   AND ut.end_time > CURRENT_TIMESTAMP
                   AND t2.deleted_at IS NULL
             ) rt ON rt.uid = u.uid AND rt.rn = 1
-            LEFT JOIN tier t ON t.tier_id = rt.tier_id
+            LEFT JOIN tier t ON (
+                (rt.tier_id IS NOT NULL AND t.tier_id = rt.tier_id)
+                OR
+                (rt.tier_id IS NULL AND t.amount = 0)
+            )
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
+              AND t.deleted_at IS NULL
             GROUP BY u.uid, u.user_name, u.email, t.tier_id, t.title, u.token
             ORDER BY "totalTokens" DESC, "promptTokens" DESC, u.user_name ASC
             LIMIT :limit

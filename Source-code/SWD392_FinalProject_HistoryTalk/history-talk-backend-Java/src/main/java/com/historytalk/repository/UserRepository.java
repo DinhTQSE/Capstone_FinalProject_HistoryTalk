@@ -128,9 +128,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                    COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
             FROM "user" u
             LEFT JOIN ranked_tiers rt ON rt.uid = u.uid AND rt.rn = 1
-            LEFT JOIN tier t ON t.tier_id = rt.tier_id
+            LEFT JOIN tier t ON (
+                (rt.tier_id IS NOT NULL AND t.tier_id = rt.tier_id)
+                OR
+                (rt.tier_id IS NULL AND t.amount = 0)
+            )
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
+              AND t.deleted_at IS NULL
             GROUP BY t.tier_id, t.title
             ORDER BY users DESC, "tierTitle" ASC
             """, nativeQuery = true)

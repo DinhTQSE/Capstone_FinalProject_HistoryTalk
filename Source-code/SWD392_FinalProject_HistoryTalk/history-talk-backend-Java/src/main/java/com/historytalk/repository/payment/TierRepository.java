@@ -23,8 +23,23 @@ public interface TierRepository extends JpaRepository<Tier, UUID> {
              AND ut.deleted_at IS NULL
              AND ut.is_active = true
              AND ut.end_time > CURRENT_TIMESTAMP
+             AND t.amount > 0
             LEFT JOIN "user" u
-              ON u.uid = ut.uid
+              ON (
+                  (t.amount > 0 AND u.uid = ut.uid)
+                  OR
+                  (t.amount = 0 AND NOT EXISTS (
+                      SELECT 1
+                      FROM user_tier ut2
+                      JOIN tier t2 ON t2.tier_id = ut2.tier_id
+                      WHERE ut2.uid = u.uid
+                        AND ut2.deleted_at IS NULL
+                        AND ut2.is_active = true
+                        AND ut2.end_time > CURRENT_TIMESTAMP
+                        AND t2.deleted_at IS NULL
+                        AND t2.amount > 0
+                  ))
+              )
              AND u.deleted_at IS NULL
              AND u.role = 'CUSTOMER'
             WHERE t.deleted_at IS NULL
