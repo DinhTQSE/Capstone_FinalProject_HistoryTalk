@@ -16,10 +16,15 @@ public interface TierRepository extends JpaRepository<Tier, UUID> {
     @Query(value = """
             SELECT CAST(t.tier_id AS text) AS "tierId",
                    t.title AS "tierTitle",
-                   COUNT(u.uid) AS users
+                   COUNT(DISTINCT u.uid) AS users
             FROM tier t
+            LEFT JOIN user_tier ut
+              ON ut.tier_id = t.tier_id
+             AND ut.deleted_at IS NULL
+             AND ut.is_active = true
+             AND ut.end_time > CURRENT_TIMESTAMP
             LEFT JOIN "user" u
-              ON u.tier_id = t.tier_id
+              ON u.uid = ut.uid
              AND u.deleted_at IS NULL
              AND u.role = 'CUSTOMER'
             WHERE t.deleted_at IS NULL
@@ -29,23 +34,36 @@ public interface TierRepository extends JpaRepository<Tier, UUID> {
     List<DashboardTierUsersProjection> countCustomerUsersByTier();
 
     @Query(value = """
-            SELECT COUNT(*)
+            SELECT COUNT(DISTINCT u.uid)
             FROM "user" u
-            JOIN tier t ON t.tier_id = u.tier_id
+            JOIN user_tier ut ON ut.uid = u.uid
+            JOIN tier t ON t.tier_id = ut.tier_id
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
+              AND ut.deleted_at IS NULL
+              AND ut.is_active = true
+              AND ut.end_time > CURRENT_TIMESTAMP
               AND t.deleted_at IS NULL
               AND t.amount > 0
             """, nativeQuery = true)
     long countCurrentPaidCustomers();
 
     @Query(value = """
-            SELECT COUNT(*)
+            SELECT COUNT(DISTINCT u.uid)
             FROM "user" u
-            LEFT JOIN tier t ON t.tier_id = u.tier_id
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
-              AND (u.tier_id IS NULL OR t.amount = 0 OR t.deleted_at IS NOT NULL)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM user_tier ut
+                  JOIN tier t ON t.tier_id = ut.tier_id
+                  WHERE ut.uid = u.uid
+                    AND ut.deleted_at IS NULL
+                    AND ut.is_active = true
+                    AND ut.end_time > CURRENT_TIMESTAMP
+                    AND t.deleted_at IS NULL
+                    AND t.amount > 0
+              )
             """, nativeQuery = true)
     long countCurrentFreeCustomers();
 }

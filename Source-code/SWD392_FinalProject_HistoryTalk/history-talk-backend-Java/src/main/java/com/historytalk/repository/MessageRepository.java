@@ -107,9 +107,17 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
              AND m.deleted_at IS NULL
              AND m.created_at >= :from
              AND m.created_at < :to
-            LEFT JOIN tier t
-              ON t.tier_id = u.tier_id
-             AND t.deleted_at IS NULL
+            LEFT JOIN (
+                SELECT ut.uid, ut.tier_id,
+                       ROW_NUMBER() OVER(PARTITION BY ut.uid ORDER BY t2.amount DESC) as rn
+                FROM user_tier ut
+                JOIN tier t2 ON t2.tier_id = ut.tier_id
+                WHERE ut.deleted_at IS NULL
+                  AND ut.is_active = true
+                  AND ut.end_time > CURRENT_TIMESTAMP
+                  AND t2.deleted_at IS NULL
+            ) rt ON rt.uid = u.uid AND rt.rn = 1
+            LEFT JOIN tier t ON t.tier_id = rt.tier_id
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
             GROUP BY u.uid, u.user_name, u.email, t.tier_id, t.title, u.token

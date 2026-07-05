@@ -110,6 +110,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     DashboardTokenBalanceSummaryProjection getTokenBalanceSummary();
 
     @Query(value = """
+            WITH ranked_tiers AS (
+                SELECT ut.uid, ut.tier_id,
+                       ROW_NUMBER() OVER(PARTITION BY ut.uid ORDER BY t.amount DESC) as rn
+                FROM user_tier ut
+                JOIN tier t ON t.tier_id = ut.tier_id
+                WHERE ut.deleted_at IS NULL
+                  AND ut.is_active = true
+                  AND ut.end_time > CURRENT_TIMESTAMP
+                  AND t.deleted_at IS NULL
+            )
             SELECT CAST(t.tier_id AS text) AS "tierId",
                    COALESCE(t.title, 'free') AS "tierTitle",
                    COUNT(u.uid) AS users,
@@ -117,9 +127,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                    COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
                    COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
             FROM "user" u
-            LEFT JOIN tier t
-              ON t.tier_id = u.tier_id
-             AND t.deleted_at IS NULL
+            LEFT JOIN ranked_tiers rt ON rt.uid = u.uid AND rt.rn = 1
+            LEFT JOIN tier t ON t.tier_id = rt.tier_id
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
             GROUP BY t.tier_id, t.title
