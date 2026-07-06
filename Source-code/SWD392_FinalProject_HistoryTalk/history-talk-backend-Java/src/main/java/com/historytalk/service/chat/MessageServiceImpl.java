@@ -158,6 +158,7 @@ public class MessageServiceImpl implements MessageService {
                 .content(aiResult.message())
                 .isFromAi(true)
                 .suggestedQuestions(suggestedQuestionsJson)
+                .quotes(serializeSuggestedQuestions(aiResult.quotesUsed()))
                 .chatSession(session)
                 .token(completionToken)
                 .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
@@ -249,6 +250,7 @@ public class MessageServiceImpl implements MessageService {
             AtomicInteger promptToken = new AtomicInteger(0);
             AtomicInteger completionToken = new AtomicInteger(0);
             String[] suggestedQuestions = new String[1];
+            String[] quotesUsed = new String[1];
 
             aiServiceClient.streamChat(
                 session.getCharacter().getCharacterId().toString(),
@@ -273,11 +275,19 @@ public class MessageServiceImpl implements MessageService {
                                 JsonNode data = node.path("data");
                                 promptToken.set(data.path("promptTokens").asInt());
                                 completionToken.set(data.path("completionTokens").asInt());
+                                
                                 JsonNode sqNode = data.path("suggestedQuestions");
                                 if (sqNode.isArray()) {
                                     List<String> sqList = objectMapper.convertValue(sqNode, new TypeReference<List<String>>(){});
                                     suggestedQuestions[0] = serializeSuggestedQuestions(sqList);
                                 }
+                                
+                                JsonNode quNode = data.path("quotes_used");
+                                if (quNode.isArray()) {
+                                    List<String> quList = objectMapper.convertValue(quNode, new TypeReference<List<String>>(){});
+                                    quotesUsed[0] = serializeSuggestedQuestions(quList);
+                                }
+                                
                                 emitter.send(SseEmitter.event().data(jsonStr));
                             } else if ("error".equals(type)) {
                                 emitter.send(SseEmitter.event().data(jsonStr));
@@ -297,6 +307,7 @@ public class MessageServiceImpl implements MessageService {
                                 .content(fullMessage.toString())
                                 .isFromAi(true)
                                 .suggestedQuestions(suggestedQuestions[0])
+                                .quotes(quotesUsed[0])
                                 .chatSession(session)
                                 .token(completionToken.get())
                                 .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
@@ -353,6 +364,7 @@ public class MessageServiceImpl implements MessageService {
                 .role(Boolean.TRUE.equals(message.getIsFromAi()) ? "ASSISTANT" : "USER")
                 .content(message.getContent())
                 .messageType(message.getMessageType() != null ? message.getMessageType() : "TEXT")
+                .quotes(parseSuggestedQuestions(message.getQuotes()))
                 .createdAt(message.getCreatedAt())
                 .build();
     }

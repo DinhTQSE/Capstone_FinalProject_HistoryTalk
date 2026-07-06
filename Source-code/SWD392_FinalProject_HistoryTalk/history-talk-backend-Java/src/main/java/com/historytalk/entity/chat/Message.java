@@ -53,6 +53,9 @@ public class Message {
     @Column(name = "suggested_questions", columnDefinition = "TEXT")
     private String suggestedQuestions;
 
+    @Column(name = "quotes", columnDefinition = "TEXT")
+    private String quotes;
+
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
 

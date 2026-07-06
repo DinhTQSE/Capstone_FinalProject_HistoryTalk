@@ -25,6 +25,9 @@ public class MessageResponse {
     @JsonProperty("messageType")
     private String messageType;
 
+    @JsonProperty("quotes")
+    private java.util.List<String> quotes;
+
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;
 }

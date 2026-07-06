@@ -111,6 +111,7 @@ public class AiServiceClient {
         }
 
         public record AiChatResult(String message, List<String> suggestedQuestions,
+                        List<String> quotesUsed,
                         AiMetricsService.TokenUsage tokenUsage) {
         }
 
@@ -129,6 +130,7 @@ public class AiServiceClient {
         record ChatResponseData(
                         @JsonProperty("message") String message,
                         @JsonProperty("suggestedQuestions") List<String> suggestedQuestions,
+                        @JsonProperty("quotes_used") List<String> quotesUsed,
                         @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
         }
 
@@ -196,6 +198,7 @@ public class AiServiceClient {
                         aiMetricsService.recordRequest("chat", "success");
                         aiMetricsService.recordTokens(response.data().tokenUsage());
                         return new AiChatResult(response.data().message(), response.data().suggestedQuestions(),
+                                        response.data().quotesUsed(),
                                         response.data().tokenUsage());
                 } catch (RestClientException e) {
                         aiMetricsService.recordRequest("chat", "failure");
