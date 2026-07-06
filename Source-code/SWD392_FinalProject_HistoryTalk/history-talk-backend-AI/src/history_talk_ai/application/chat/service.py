@@ -139,42 +139,44 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
     logger.error("All attempts to get embedding from Ollama failed.")
     return []
 
-async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> str:
-    """Retrieve history context from Supabase VectorChunk."""
+async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> tuple[str, List[str]]:
+    """Retrieve history context from Supabase VectorChunk and rerank via Kaggle."""
     query_vector = await get_embedding_from_ollama(user_question)
     if not query_vector:
-        return ""
+        return "", []
         
     try:
         response = supabase.rpc(
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
-                "match_limit": 5,
+                "match_limit": 10, # Lấy nhiều hơn để rerank
                 "filter_entity_ids": entity_ids
             }
         ).execute()
         
         chunks = response.data
-        print(f"RAG retrieved {len(chunks)} chunks for entity_ids: {entity_ids}")
-        logger.info(f"RAG retrieved {len(chunks)} chunks for entity_ids: {entity_ids}")
         if not chunks:
-            return ""
+            return "", []
         texts = [chunk.get("content", "") for chunk in chunks if chunk.get("content")]
         
-        # Log the actual RAG content
-        print("\n" + "="*50)
-        print("🔍 RAG RETRIEVED CONTENT:")
-        for i, text in enumerate(texts):
-            print(f"--- Chunk {i+1} ---")
-            print(text)
-        print("="*50 + "\n")
-        logger.info(f"RAG Context length: {sum(len(t) for t in texts)} characters")
-        
-        return "\n\n".join(texts)
+        # Gọi sang Kaggle API để Rerank
+        try:
+            rerank_res = await ollama_client.post(
+                _ollama_url("/api/rerank").replace("11434", "8000"), # Giả sử Nginx route /api/rerank
+                json={"query": user_question, "documents": texts}
+            )
+            rerank_res.raise_for_status()
+            top_docs = rerank_res.json().get("top_docs", [])
+        except Exception as e:
+            logger.error(f"Rerank API failed: {e}. Fallback to top 2.")
+            top_docs = texts[:2]
+            
+        context_str = "\n\n".join(top_docs)
+        return context_str, top_docs
     except Exception as e:
         logger.error(f"Supabase RPC error: {e}")
-        return ""
+        return "", []
 
 
 # ── Public service functions ──────────────────────────────────────────────────
@@ -209,8 +211,9 @@ async def generate_reply(
                 entity_ids.append(evt.id)
                 
     rag_context = ""
+    quotes_used = []
     if message_history:
-        rag_context = await retrieve_history_context(user_message, entity_ids)
+        rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
@@ -299,8 +302,9 @@ async def generate_reply_stream(
                 entity_ids.append(evt.id)
                 
     rag_context = ""
+    quotes_used = []
     if message_history:
-        rag_context = await retrieve_history_context(user_message, entity_ids)
+        rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
@@ -376,7 +380,8 @@ async def generate_reply_stream(
     yield {
         "suggestedQuestions": suggested_questions,
         "promptTokens": prompt_tokens + sq_pt,
-        "completionTokens": completion_tokens + sq_ct
+        "completionTokens": completion_tokens + sq_ct,
+        "quotes_used": quotes_used
     }
 
 async def generate_session_title(
