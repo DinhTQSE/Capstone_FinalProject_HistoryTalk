@@ -1,0 +1,1 @@
+ALTER TABLE message ADD COLUMN quotes TEXT;
