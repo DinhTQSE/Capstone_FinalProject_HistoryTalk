@@ -2,6 +2,7 @@ import json
 import uuid
 import logging
 import asyncio
+import random
 from typing import List
 import httpx
 from supabase import create_client, Client
@@ -241,6 +242,15 @@ async def generate_reply(
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
         
+    # Xác suất 30% ép AI hỏi vặn lại
+    if random.random() < 0.3:
+        skip_suggestions = True
+        final_user_content += (
+            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
+            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. "
+            "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'. Ngươi phải hỏi câu gì mà ngươi biết câu trả lời để con nhận xét người kia trả lời đúng hay sai. Cuối câu hỏi đó phải có dấu '?'."
+        )
+
     messages.append({"role": "user", "content": final_user_content})
 
     response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
@@ -329,6 +339,15 @@ async def generate_reply_stream(
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
         
+    # Xác suất 30% ép AI hỏi vặn lại
+    if random.random() < 0.3:
+        skip_suggestions = True
+        final_user_content += (
+            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
+            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. "
+            "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'."
+        )
+
     messages.append({"role": "user", "content": final_user_content})
 
     full_message = ""
