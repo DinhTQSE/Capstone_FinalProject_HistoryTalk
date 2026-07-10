@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -72,6 +73,56 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public LoginResponse authenticateGoogleIdToken(String idToken) {
+        String verificationUrl = "https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken;
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            Map<String, Object> response = restTemplate.getForObject(verificationUrl, Map.class);
+            if (response == null || response.containsKey("error")) {
+                throw new UnauthorizedException("Invalid Google ID Token");
+            }
+            
+            String email = (String) response.get("email");
+            String name = (String) response.get("name");
+            
+            if (email == null || email.isBlank()) {
+                throw new UnauthorizedException("Google account email is required");
+            }
+            email = email.toLowerCase();
+            
+            String finalEmail = email;
+            User user = userRepository.findByEmailIgnoreCase(email)
+                    .orElseGet(() -> createGoogleUserAndSendPasswordEmail(finalEmail, name));
+            
+            if (user.getDeletedAt() != null) {
+                throw new UnauthorizedException("Account has been deactivated");
+            }
+            
+            UserPrincipal principal = new UserPrincipal(user);
+            Map<String, Object> claims = buildClaims(principal);
+            String accessToken = jwtService.generateAccessToken(user.getEmail(), claims);
+            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+            
+            log.info("Google ID Token login successful for uid: {}", user.getUid());
+            
+            return LoginResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .expiresIn(jwtService.getAccessTokenExpirationMs())
+                    .uid(user.getUid().toString())
+                    .userName(user.getUserName())
+                    .email(user.getEmail())
+                    .role(user.getRole().name())
+                    .build();
+        } catch (Exception e) {
+            log.error("Google ID Token verification failed: {}", e.getMessage());
+            throw new UnauthorizedException("Google authentication failed: " + e.getMessage());
+        }
     }
 
     private String extractRequiredEmail(OAuth2User oauth2User) {
