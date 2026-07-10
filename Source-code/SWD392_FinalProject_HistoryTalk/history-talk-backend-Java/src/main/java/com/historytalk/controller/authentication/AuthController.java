@@ -13,6 +13,7 @@ import com.historytalk.dto.authentication.RegisterStaffRequest;
 import com.historytalk.dto.authentication.RegisterStaffResponse;
 import com.historytalk.dto.authentication.ResetPasswordRequest;
 import com.historytalk.service.authentication.AuthService;
+import com.historytalk.service.authentication.GoogleOAuthService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -43,6 +44,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final GoogleOAuthService googleOAuthService;
 
     @PostMapping("/register")
     @Operation(summary = "Register a new user",
@@ -77,6 +79,16 @@ public class AuthController {
         log.info("POST /api/v1/auth/login - email: {}", request.getEmail());
         LoginResponse data = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(data, "Login successful"));
+    }
+
+    @PostMapping("/google")
+    @Operation(summary = "Authenticate with Google ID Token", description = "Verifies the Google ID Token and returns JWT tokens.")
+    public ResponseEntity<ApiResponse<LoginResponse>> googleLogin(
+            @RequestBody Map<String, String> requestBody) {
+        String idToken = requestBody.get("idToken");
+        log.info("POST /api/v1/auth/google");
+        LoginResponse data = googleOAuthService.authenticateGoogleIdToken(idToken);
+        return ResponseEntity.ok(ApiResponse.success(data, "Google login successful"));
     }
 
     @PostMapping("/forgot-password")
