@@ -9,8 +9,12 @@ class Settings(BaseSettings):
     # Request timeout in seconds when calling the Java backend
     JAVA_CLIENT_TIMEOUT: float = 10.0
 
-    # ── LLM (Ollama) ──────────────────────────────────────────────────────────
-    OLLAMA_BASE_URL: str
+    # ── LLM (Ollama / External) ───────────────────────────────────────────────
+    LLM_PROVIDER: str = "ollama"  # "ollama", "external" (OpenAI, Gemini, Groq, v.v.)
+    EXTERNAL_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    EXTERNAL_API_KEY: str = ""
+    
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_USERNAME: str = ""
     OLLAMA_PASSWORD: str = ""
     LLM_MODEL: str = "qwen2.5:14b"

@@ -113,6 +113,108 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
+async def _call_external(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+    """Make an async call to an external OpenAI-compatible API (e.g. OpenAI, Gemini, Groq)."""
+    headers = {
+        "Authorization": f"Bearer {settings.EXTERNAL_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": settings.LLM_MODEL,
+        "messages": messages,
+        "temperature": settings.LLM_TEMPERATURE,
+        "max_tokens": settings.LLM_MAX_TOKENS,
+        "stream": False,
+    }
+    
+    if expect_json:
+        payload["response_format"] = {"type": "json_object"}
+
+    try:
+        response = await ollama_client.post(
+            f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
+            json=payload,
+            headers=headers
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"].get("content", "")
+        usage = data.get("usage", {})
+        return content, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0)
+    except Exception as e:
+        logger.error(f"Failed to call external API: {e}")
+        raise
+
+async def _call_external_stream(messages: list[dict]) -> tuple:
+    """Make an async call to an external API with streaming enabled."""
+    headers = {
+        "Authorization": f"Bearer {settings.EXTERNAL_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": settings.LLM_MODEL,
+        "messages": messages,
+        "temperature": settings.LLM_TEMPERATURE,
+        "max_tokens": settings.LLM_MAX_TOKENS,
+        "stream": True,
+    }
+    
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    try:
+        async with ollama_client.stream(
+            "POST",
+            f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=120.0
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line or not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_str)
+                    choices = data.get("choices", [])
+                    if choices:
+                        delta = choices[0].get("delta", {})
+                        chunk = delta.get("content", "")
+                        if chunk:
+                            yield chunk
+                    # Some APIs send usage in the last chunk
+                    usage = data.get("usage")
+                    if usage:
+                        prompt_tokens = usage.get("prompt_tokens", 0)
+                        completion_tokens = usage.get("completion_tokens", 0)
+                except json.JSONDecodeError:
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to stream from external API: {e}")
+        raise
+        
+    yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
+
+async def _call_llm(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+    """Router to call either Ollama or External API based on settings."""
+    if settings.LLM_PROVIDER.lower() == "external":
+        return await _call_external(messages, expect_json)
+    return await _call_ollama(messages, expect_json)
+
+async def _call_llm_stream(messages: list[dict]) -> tuple:
+    """Router to stream from either Ollama or External API based on settings."""
+    if settings.LLM_PROVIDER.lower() == "external":
+        async for chunk in _call_external_stream(messages):
+            yield chunk
+    else:
+        async for chunk in _call_ollama_stream(messages):
+            yield chunk
+
 async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[float]:
     """Get embedding vector for a given text from Ollama with retries."""
     if not text or not text.strip():
@@ -253,7 +355,7 @@ async def generate_reply(
 
     messages.append({"role": "user", "content": final_user_content})
 
-    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
+    response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
     
     suggested_questions = []
     sq_pt = 0
@@ -271,7 +373,7 @@ async def generate_reply(
             {"role": "user", "content": sq_prompt}
         ]
         
-        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=False)
+        sq_text, sq_pt, sq_ct = await _call_llm(sq_messages, expect_json=False)
         try:
             import re
             lines = sq_text.strip().split('\n')
@@ -355,7 +457,7 @@ async def generate_reply_stream(
     completion_tokens = 0
 
     # Stream the message
-    stream_gen = _call_ollama_stream(messages)
+    stream_gen = _call_llm_stream(messages)
     async for chunk in stream_gen:
         if isinstance(chunk, dict):
             prompt_tokens = chunk.get("prompt_tokens", 0)
@@ -383,7 +485,7 @@ async def generate_reply_stream(
             {"role": "user", "content": sq_prompt}
         ]
         
-        sq_text, sq_pt, sq_ct = await _call_ollama(sq_messages, expect_json=False)
+        sq_text, sq_pt, sq_ct = await _call_llm(sq_messages, expect_json=False)
         try:
             import re
             lines = sq_text.strip().split('\n')
@@ -424,7 +526,7 @@ async def generate_session_title(
         {"role": "user", "content": conversation_snippet}
     ]
 
-    response_text, prompt_tokens, completion_tokens = await _call_ollama(messages, expect_json=False)
+    response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
     
     title = response_text.strip().strip('"').strip("'")
     if title:
