@@ -316,10 +316,10 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .videoUrl(context.getVideoUrl())
             .isPublished(context.getIsPublished())
             .status(buildStatus(context.getIsPublished(), context.getDeletedAt()))
-                .createdBy(HistoricalContextResponse.CreatedByInfo.builder()
+                .createdBy(context.getCreatedBy() != null ? HistoricalContextResponse.CreatedByInfo.builder()
                         .uid(context.getCreatedBy().getUid().toString())
                         .userName(context.getCreatedBy().getUserName())
-                        .build())
+                        .build() : null)
                 .createdDate(context.getCreatedDate())
                 .updatedDate(context.getUpdatedDate())
                 .build();
