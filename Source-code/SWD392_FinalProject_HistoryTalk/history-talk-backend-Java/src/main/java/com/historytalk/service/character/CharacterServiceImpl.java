@@ -335,7 +335,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .build())
             .collect(Collectors.toList());
 
-        List<CharacterResponse.ContextInfo> contexts = character.getHistoricalContexts().stream()
+        List<CharacterResponse.ContextInfo> contexts = character.getHistoricalContexts() == null ? List.of() : character.getHistoricalContexts().stream()
             .map(hc -> CharacterResponse.ContextInfo.builder()
                 .contextId(hc.getContextId().toString())
                 .name(hc.getName())
@@ -367,10 +367,10 @@ public class CharacterServiceImpl implements CharacterService {
                 .name(ctx.getName())
                 .build())
             .contexts(contexts)
-                .createdBy(CharacterResponse.StaffInfo.builder()
+                .createdBy(character.getCreatedBy() != null ? CharacterResponse.StaffInfo.builder()
                         .uid(character.getCreatedBy().getUid().toString())
                         .userName(character.getCreatedBy().getUserName())
-                        .build())
+                        .build() : null)
                 .createdDate(character.getCreatedDate())
                 .updatedDate(character.getUpdatedDate())
                 .build();
@@ -419,6 +419,7 @@ public class CharacterServiceImpl implements CharacterService {
     }
 
     private HistoricalContext resolvePrimaryContext(Character character) {
+        if (character.getHistoricalContexts() == null) return null;
         return character.getHistoricalContexts()
                 .stream()
                 .sorted(Comparator.comparing(HistoricalContext::getContextId))
