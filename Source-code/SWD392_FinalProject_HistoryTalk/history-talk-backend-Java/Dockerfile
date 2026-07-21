@@ -18,6 +18,11 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21.0.3_9-jre-alpine
 WORKDIR /app
 
+# Install Tesseract OCR and Vietnamese language data
+RUN apk update && \
+    apk add --no-cache tesseract-ocr tesseract-ocr-data-vie && \
+    rm -rf /var/cache/apk/*
+
 # --- Security: Run as non-root user ---
 RUN addgroup -S spring && adduser -S spring -G spring
 
