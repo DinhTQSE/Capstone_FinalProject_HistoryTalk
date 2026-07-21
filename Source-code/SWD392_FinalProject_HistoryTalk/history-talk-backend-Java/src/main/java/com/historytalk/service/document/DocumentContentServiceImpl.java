@@ -41,6 +41,7 @@ public class DocumentContentServiceImpl implements DocumentContentService {
 
         Document saved = documentRepository.save(doc);
         log.info("Document content saved for document {} with status {}", saved.getDocId(), saved.getStatus());
+        
         return mapToResponse(saved);
     }
 
