@@ -1,5 +1,6 @@
 package com.historytalk.entity.document;
 
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.DocumentType;
 import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.user.User;
@@ -61,6 +62,11 @@ public class Document {
     @Column(name = "document_type", length = 50, nullable = false)
     @Builder.Default
     private DocumentType documentType = DocumentType.TEXT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 50)
+    @Builder.Default
+    private ContentStatus status = ContentStatus.DRAFT;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by", nullable = false)
