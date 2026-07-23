@@ -349,7 +349,7 @@ async def generate_reply(
         skip_suggestions = True
         final_user_content += (
             "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi đơn giản ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
-            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. "
+            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. Nhằm mục đích người học trả lời cho nhân vật nghe chứ không phải câu hỏi để người học hỏi nhân vật!"
             "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'. Ngươi phải hỏi câu gì mà ngươi biết câu trả lời để con nhận xét người kia trả lời đúng hay sai. Cuối câu hỏi đó phải có dấu '?'."
         )
 
