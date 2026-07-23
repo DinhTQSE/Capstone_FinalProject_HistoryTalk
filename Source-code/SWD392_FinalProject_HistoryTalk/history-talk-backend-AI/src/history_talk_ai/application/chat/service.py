@@ -344,11 +344,11 @@ async def generate_reply(
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
         
-    # Xác suất 30% ép AI hỏi vặn lại
-    if random.random() < 0.3:
+    # Xác suất 30% ép AI hỏi vặn lại (chỉ khi không phải tin nhắn đầu tiên của session)
+    if message_history and random.random() < 0.3:
         skip_suggestions = True
         final_user_content += (
-            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
+            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi đơn giản ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
             "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. "
             "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'. Ngươi phải hỏi câu gì mà ngươi biết câu trả lời để con nhận xét người kia trả lời đúng hay sai. Cuối câu hỏi đó phải có dấu '?'."
         )
@@ -441,8 +441,8 @@ async def generate_reply_stream(
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
         
-    # Xác suất 30% ép AI hỏi vặn lại
-    if random.random() < 0.3:
+    # Xác suất 30% ép AI hỏi vặn lại (chỉ khi không phải tin nhắn đầu tiên của session)
+    if message_history and random.random() < 0.3:
         skip_suggestions = True
         final_user_content += (
             "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
