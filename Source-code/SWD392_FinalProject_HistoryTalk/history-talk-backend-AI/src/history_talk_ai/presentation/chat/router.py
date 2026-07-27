@@ -97,7 +97,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
     )
 
     try:
-        message, suggested_questions, prompt_tokens, completion_tokens = await llm_service.generate_reply(
+        message, suggested_questions, prompt_tokens, completion_tokens, quotes_used = await llm_service.generate_reply(
             character=character,
             context=context,
             user_message=body.userMessage,
@@ -116,7 +116,14 @@ async def chat(body: ChatRequest) -> ChatResponse:
         totalTokens=prompt_tokens + completion_tokens
     )
 
-    return ChatResponse(data=ChatResponseData(message=message, suggestedQuestions=suggested_questions, tokenUsage=token_usage))
+    return ChatResponse(
+        data=ChatResponseData(
+            message=message,
+            suggestedQuestions=suggested_questions,
+            quotes_used=quotes_used,
+            tokenUsage=token_usage,
+        )
+    )
 
 
 @router.post(

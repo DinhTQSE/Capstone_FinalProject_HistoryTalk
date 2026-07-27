@@ -290,12 +290,12 @@ async def generate_reply(
     user_message: str,
     message_history: List[MessageHistoryItem],
     skip_suggestions: bool = False,
-) -> tuple[str, List[str], int, int]:
+) -> tuple[str, List[str], int, int, List[str]]:
     """
     Invoke the LLM in character-roleplay mode.
 
     Returns:
-        (assistant_message, suggested_questions, prompt_tokens, completion_tokens)
+        (assistant_message, suggested_questions, prompt_tokens, completion_tokens, quotes_used)
     """
     # ── RAG Integration ──
     # Query both context documents and character documents
@@ -315,8 +315,7 @@ async def generate_reply(
                 
     rag_context = ""
     quotes_used = []
-    if message_history:
-        rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
+    rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     
@@ -386,7 +385,7 @@ async def generate_reply(
         except Exception as e:
             logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
 
-    return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct
+    return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct, quotes_used
 
 async def generate_reply_stream(
     character: CharacterData,
@@ -415,8 +414,7 @@ async def generate_reply_stream(
                 
     rag_context = ""
     quotes_used = []
-    if message_history:
-        rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
+    rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
     
     system_prompt = build_chat_system_prompt(character, context)
     

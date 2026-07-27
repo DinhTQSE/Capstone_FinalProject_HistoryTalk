@@ -76,6 +76,7 @@ class TokenUsage(BaseModel):
 class ChatResponseData(BaseModel):
     message: str
     suggestedQuestions: List[str] = Field(default_factory=list)
+    quotes_used: List[str] = Field(default_factory=list)
     tokenUsage: TokenUsage = Field(default_factory=TokenUsage)
 
 
