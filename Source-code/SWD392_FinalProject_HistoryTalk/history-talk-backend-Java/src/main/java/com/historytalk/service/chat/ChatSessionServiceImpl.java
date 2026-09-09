@@ -65,6 +65,10 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        if (user.getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER && (user.getToken() == null || user.getToken() <= 0)) {
+            throw new InvalidRequestException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
+        }
+
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy nhân vật với ID: " + request.getCharacterId()));
@@ -94,6 +98,9 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         log.info("Chat session created with ID={}", saved.getSessionId());
 
         // Send greeting message via AI
+        String greetingText = null;
+        List<String> suggestedQuestionsList = null;
+
         try {
             CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
             ContextPayload contextData = context != null ? AiServiceClient.buildContextPayload(context) : null;
@@ -107,40 +114,43 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                     contextData,
                     true);
 
-            String suggestedQuestionsJson = null;
-            if (greeting.suggestedQuestions() != null && !greeting.suggestedQuestions().isEmpty()) {
-                try {
-                    suggestedQuestionsJson = objectMapper.writeValueAsString(greeting.suggestedQuestions());
-                } catch (Exception ex) {
-                    log.warn("Failed to serialize greeting suggested questions: {}", ex.getMessage());
-                }
-            } else {
-                // Default generic questions since we skipped AI generation to speed up session
-                // creation
-                List<String> defaultQuestions = List.of(
-                        "Ngài có thể kể cho ta nghe về cuộc đời của ngài không?",
-                        "Chiến công hoặc sự kiện đáng nhớ nhất của ngài là gì?",
-                        "Ngài có thể chia sẻ thêm về bối cảnh lịch sử thời đó không?");
-                try {
-                    suggestedQuestionsJson = objectMapper.writeValueAsString(defaultQuestions);
-                } catch (Exception ex) {
-                    log.warn("Failed to serialize default suggested questions");
-                }
+            if (greeting != null && greeting.message() != null && !greeting.message().isBlank()) {
+                greetingText = greeting.message();
+                suggestedQuestionsList = greeting.suggestedQuestions();
             }
-
-            Message greetingMsg = Message.builder()
-                    .content(greeting.message())
-                    .isFromAi(true)
-                    .suggestedQuestions(suggestedQuestionsJson)
-                    .chatSession(saved)
-                    .build();
-            messageRepository.save(greetingMsg);
-
-            saved.setLastMessageAt(LocalDateTime.now());
-            chatSessionRepository.save(saved);
         } catch (Exception e) {
             log.warn("Failed to generate greeting for session {}: {}", saved.getSessionId(), e.getMessage());
         }
+
+        // Fallback greeting if AI fails or returns empty response
+        if (greetingText == null || greetingText.isBlank()) {
+            greetingText = "Xin chào, ta là " + character.getName() + ". Ngươi muốn biết điều gì về ta?";
+        }
+
+        if (suggestedQuestionsList == null || suggestedQuestionsList.isEmpty()) {
+            suggestedQuestionsList = List.of(
+                    "Ngài có thể kể cho ta nghe về cuộc đời của ngài không?",
+                    "Chiến công hoặc sự kiện đáng nhớ nhất của ngài là gì?",
+                    "Ngài có thể chia sẻ thêm về bối cảnh lịch sử thời đó không?");
+        }
+
+        String suggestedQuestionsJson = null;
+        try {
+            suggestedQuestionsJson = objectMapper.writeValueAsString(suggestedQuestionsList);
+        } catch (Exception ex) {
+            log.warn("Failed to serialize suggested questions: {}", ex.getMessage());
+        }
+
+        Message greetingMsg = Message.builder()
+                .content(greetingText)
+                .isFromAi(true)
+                .suggestedQuestions(suggestedQuestionsJson)
+                .chatSession(saved)
+                .build();
+        messageRepository.save(greetingMsg);
+
+        saved.setLastMessageAt(LocalDateTime.now());
+        chatSessionRepository.save(saved);
 
         return mapToResponse(saved);
     }
