@@ -229,11 +229,21 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
     for attempt in range(max_retries):
         try:
             response = await ollama_client.post(_ollama_url("/api/embeddings"), json=payload, auth=auth)
-            response.raise_for_status()
-            data = response.json()
-            embedding = data.get("embedding", [])
-            if embedding:
-                return embedding
+            if response.status_code == 404:
+                # Fallback to Ollama /api/embed endpoint
+                embed_payload = {"model": "bge-m3", "input": text}
+                response = await ollama_client.post(_ollama_url("/api/embed"), json=embed_payload, auth=auth)
+                response.raise_for_status()
+                data = response.json()
+                embeddings = data.get("embeddings", [])
+                if embeddings and isinstance(embeddings, list) and len(embeddings) > 0:
+                    return embeddings[0] if isinstance(embeddings[0], list) else embeddings
+            else:
+                response.raise_for_status()
+                data = response.json()
+                embedding = data.get("embedding", [])
+                if embedding:
+                    return embedding
         except Exception as e:
             logger.warning(f"Ollama embedding attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
@@ -539,58 +549,98 @@ async def process_document(request: ProcessDocumentRequest):
     except Exception as e:
         logger.error(f"Failed to delete old chunks for doc {request.doc_id}: {e}")
 
-    content = request.content
-    chunk_size = 600
-    overlap = 150
-    chunks = []
-    
-    if len(content) <= chunk_size:
-        chunks = [content]
+def _cosine_distance(vec1: List[float], vec2: List[float]) -> float:
+    """Calculate cosine distance between two vectors: 1.0 - cosine_similarity."""
+    if not vec1 or not vec2 or len(vec1) != len(vec2):
+        return 1.0
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+    norm_a = (sum(a * a for a in vec1)) ** 0.5
+    norm_b = (sum(b * b for b in vec2)) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 1.0
+    similarity = dot_product / (norm_a * norm_b)
+    return 1.0 - max(-1.0, min(1.0, similarity))
+
+async def _semantic_chunking(content: str, max_chunk_chars: int = 1200) -> List[str]:
+    """
+    Perform dynamic semantic boundary detection using sentence embeddings (BGE-M3).
+    Breakpoints are calculated dynamically when the cosine distance between consecutive 
+    sentence embeddings exceeds dynamic percentile variance thresholds.
+    (Reference: Vietnamese History RAG Paper - Section 3.2).
+    """
+    if not content or not content.strip():
+        return []
+
+    import re
+    raw_sentences = re.split(r'(?<=[.!?\n])\s+', content)
+    sentences = [s.strip() for s in raw_sentences if s and s.strip()]
+
+    if not sentences:
+        return [content]
+
+    if len(sentences) <= 2 or len(content) <= 500:
+        return [content]
+
+    sem = asyncio.Semaphore(10)
+    async def get_emb(s):
+        async with sem:
+            return await get_embedding_from_ollama(s)
+
+    embeddings = await asyncio.gather(*[get_emb(s) for s in sentences])
+
+    valid_sentences = []
+    valid_embeddings = []
+    for s, emb in zip(sentences, embeddings):
+        if emb:
+            valid_sentences.append(s)
+            valid_embeddings.append(emb)
+
+    if len(valid_sentences) <= 2:
+        return [content]
+
+    distances = []
+    for i in range(len(valid_embeddings) - 1):
+        dist = _cosine_distance(valid_embeddings[i], valid_embeddings[i + 1])
+        distances.append(dist)
+
+    if distances:
+        sorted_dists = sorted(distances)
+        pct_idx = int(len(sorted_dists) * 0.80)
+        threshold = max(0.35, sorted_dists[min(pct_idx, len(sorted_dists) - 1)])
     else:
-        start = 0
-        while start < len(content):
-            end = start + chunk_size
-            if end >= len(content):
-                chunks.append(content[start:])
-                break
-            
-            # Find the last period, newline, or space to avoid cutting words
-            last_period = content.rfind('.', start, end)
-            last_newline = content.rfind('\n', start, end)
-            last_space = content.rfind(' ', start, end)
-            
-            # Prefer splitting at a period or newline, otherwise space
-            split_at = max(last_period, last_newline)
-            if split_at <= start + chunk_size // 2: # If no good punctuation in the second half, fallback to space
-                split_at = last_space
-                
-            if split_at <= start: # Fallback if no space at all
-                split_at = end
-            else:
-                split_at += 1 # Include the space or punctuation in the current chunk
-                
-            chunks.append(content[start:split_at].strip())
-            
-            # Determine the start of the next chunk (overlap)
-            next_start = split_at - overlap
-            if next_start > start:
-                # Try to find a period to start the next chunk cleanly
-                period_after = content.find('.', next_start, split_at)
-                if period_after != -1 and period_after < split_at - 20:
-                    start = period_after + 1
-                else:
-                    # Fallback to the next space
-                    space_after = content.find(' ', next_start, split_at)
-                    if space_after != -1:
-                        start = space_after + 1
-                    else:
-                        start = next_start
-            else:
-                start = split_at
-                
-            # Strip leading spaces for the next chunk's start
-            while start < len(content) and content[start].isspace():
-                start += 1
+        threshold = 0.35
+
+    chunks = []
+    current_chunk_sentences = [valid_sentences[0]]
+    current_len = len(valid_sentences[0])
+
+    for i in range(len(distances)):
+        dist = distances[i]
+        next_sentence = valid_sentences[i + 1]
+
+        if dist >= threshold or (current_len + len(next_sentence) > max_chunk_chars):
+            chunks.append(" ".join(current_chunk_sentences))
+            current_chunk_sentences = [next_sentence]
+            current_len = len(next_sentence)
+        else:
+            current_chunk_sentences.append(next_sentence)
+            current_len += len(next_sentence) + 1
+
+    if current_chunk_sentences:
+        chunks.append(" ".join(current_chunk_sentences))
+
+    return chunks
+
+async def process_document(request: ProcessDocumentRequest):
+    """Process a document by semantic chunking, embedding, and storing in Supabase."""
+    # Delete old chunks for this doc_id to handle upserts properly
+    try:
+        supabase.schema(settings.SUPABASE_SCHEMA).table("vector_chunk").delete().eq("doc_id", request.doc_id).execute()
+    except Exception as e:
+        logger.error(f"Failed to delete old chunks for doc {request.doc_id}: {e}")
+
+    content = request.content
+    chunks = await _semantic_chunking(content)
     
     # Generate embeddings concurrently for speed, but limit concurrency to avoid overwhelming Ollama
     sem = asyncio.Semaphore(15) # Process maximum 15 chunks at a time
