@@ -2,9 +2,9 @@ package com.historytalk.service.gamification;
 
 import com.historytalk.dto.gamification.CreateTierRequest;
 import com.historytalk.dto.gamification.TierResponse;
-import com.historytalk.entity.gamification.Tier;
+import com.historytalk.entity.payment.Tier;
 import com.historytalk.exception.ResourceNotFoundException;
-import com.historytalk.repository.gamification.TierRepository;
+import com.historytalk.repository.payment.TierRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,25 +27,25 @@ public class TierServiceImpl implements TierService {
             if (tierRepository.count() == 0) {
                 List<Tier> defaultTiers = List.of(
                         Tier.builder()
-                                .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+                                .tierId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
                                 .title("free")
-                                .amount(0.0)
+                                .amount(0)
                                 .noMonth(1)
                                 .limitedToken(20)
                                 .isActive(true)
                                 .build(),
                         Tier.builder()
-                                .id(UUID.fromString("00000000-0000-0000-0000-000000000002"))
+                                .tierId(UUID.fromString("00000000-0000-0000-0000-000000000002"))
                                 .title("plus")
-                                .amount(49000.0)
+                                .amount(49000)
                                 .noMonth(1)
                                 .limitedToken(100)
                                 .isActive(true)
                                 .build(),
                         Tier.builder()
-                                .id(UUID.fromString("00000000-0000-0000-0000-000000000003"))
+                                .tierId(UUID.fromString("00000000-0000-0000-0000-000000000003"))
                                 .title("pro")
-                                .amount(99000.0)
+                                .amount(99000)
                                 .noMonth(1)
                                 .limitedToken(999)
                                 .isActive(true)
@@ -80,7 +80,7 @@ public class TierServiceImpl implements TierService {
     public TierResponse createTier(CreateTierRequest request) {
         Tier tier = Tier.builder()
                 .title(request.getTitle())
-                .amount(request.getAmount())
+                .amount(request.getAmount() != null ? request.getAmount().intValue() : 0)
                 .noMonth(request.getNoMonth())
                 .limitedToken(request.getLimitedToken())
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
@@ -95,7 +95,7 @@ public class TierServiceImpl implements TierService {
         Tier tier = tierRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói hội viên: " + id));
         if (request.getTitle() != null && !request.getTitle().isBlank()) tier.setTitle(request.getTitle());
-        if (request.getAmount() != null) tier.setAmount(request.getAmount());
+        if (request.getAmount() != null) tier.setAmount(request.getAmount().intValue());
         if (request.getNoMonth() != null) tier.setNoMonth(request.getNoMonth());
         if (request.getLimitedToken() != null) tier.setLimitedToken(request.getLimitedToken());
         if (request.getIsActive() != null) tier.setIsActive(request.getIsActive());
@@ -113,9 +113,9 @@ public class TierServiceImpl implements TierService {
 
     private TierResponse mapToResponse(Tier t) {
         return TierResponse.builder()
-                .id(t.getId())
+                .id(t.getTierId())
                 .title(t.getTitle())
-                .amount(t.getAmount())
+                .amount(t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
                 .noMonth(t.getNoMonth())
                 .limitedToken(t.getLimitedToken())
                 .isActive(t.getIsActive())
