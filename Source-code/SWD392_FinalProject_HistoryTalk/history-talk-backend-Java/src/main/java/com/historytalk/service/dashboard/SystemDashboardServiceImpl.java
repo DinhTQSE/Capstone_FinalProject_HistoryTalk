@@ -98,6 +98,20 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
         DashboardSystemHealthResponse health = getSystemHealth();
 
+        List<DashboardOverviewResponse.TopCharacterOverview> topCharacters = messageRepository
+                .findTopCharactersForDashboard(10)
+                .stream()
+                .map(c -> DashboardOverviewResponse.TopCharacterOverview.builder()
+                        .characterId(c.getCharacterId())
+                        .name(c.getName())
+                        .title(c.getTitle() != null ? c.getTitle() : "")
+                        .imageUrl(c.getImageUrl() != null ? c.getImageUrl() : "")
+                        .totalMessages(nullSafe(c.getTotalMessages()))
+                        .userMessages(nullSafe(c.getUserMessages()))
+                        .aiMessages(nullSafe(c.getAiMessages()))
+                        .build())
+                .toList();
+
         return DashboardOverviewResponse.builder()
                 .users(DashboardOverviewResponse.UserOverview.builder()
                         .total(userRepository.countAllUsers())
@@ -120,6 +134,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                         .messages(messageRepository.countCurrent())
                         .messagesToday(messageRepository.countCreatedBetween(todayStart, tomorrowStart))
                         .build())
+                .topCharacters(topCharacters)
                 .systemHealth(DashboardOverviewResponse.SystemHealthOverview.builder()
                         .status(health.getStatus())
                         .lastCheckedAt(health.getLastCheckedAt())

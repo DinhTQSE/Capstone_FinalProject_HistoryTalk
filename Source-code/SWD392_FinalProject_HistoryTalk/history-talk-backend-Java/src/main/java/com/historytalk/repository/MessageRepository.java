@@ -133,4 +133,22 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT CAST(c.character_id AS text) AS "characterId",
+                   c.name AS name,
+                   COALESCE(c.title, '') AS title,
+                   COALESCE(c.image_url, '') AS "imageUrl",
+                   COUNT(m.message_id) AS "totalMessages",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN 1 ELSE 0 END), 0) AS "userMessages",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN 1 ELSE 0 END), 0) AS "aiMessages"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id AND cs.deleted_at IS NULL
+            JOIN character c ON c.character_id = cs.character_id AND c.deleted_at IS NULL
+            WHERE m.deleted_at IS NULL
+            GROUP BY c.character_id, c.name, c.title, c.image_url
+            ORDER BY "totalMessages" DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<com.historytalk.repository.dashboard.DashboardTopCharacterProjection> findTopCharactersForDashboard(@Param("limit") int limit);
 }

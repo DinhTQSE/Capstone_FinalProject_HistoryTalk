@@ -165,4 +165,12 @@ public class SystemDashboardController {
                 "Token usage analytics retrieved successfully"
         ));
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/test-notification")
+    @Operation(summary = "Send a test push notification", description = "Simulates push notification delivery for testing")
+    public ResponseEntity<ApiResponse<Void>> testNotification(
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody com.historytalk.dto.dashboard.TestNotificationRequest request) {
+        log.info("POST /api/v1/system-admin/dashboard/test-notification - type: {}", request.getType());
+        return ResponseEntity.ok(ApiResponse.success(null, "Test notification sent"));
+    }
 }

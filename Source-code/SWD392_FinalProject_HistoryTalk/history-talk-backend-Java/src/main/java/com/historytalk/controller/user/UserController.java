@@ -4,6 +4,7 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.user.ChangePasswordRequest;
 import com.historytalk.dto.user.UpdateMyProfileRequest;
 import com.historytalk.dto.user.UserProfileResponse;
+import com.historytalk.service.gamification.GamificationService;
 import com.historytalk.service.user.UserService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,6 +32,8 @@ public class UserController {
 
     private final UserService userService;
 
+    private final GamificationService gamificationService;
+
     @GetMapping("/me")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @Operation(summary = "Get current user profile")
@@ -40,6 +44,16 @@ public class UserController {
                 userService.getMyProfile(userId),
                 "User profile retrieved successfully"
         ));
+    }
+
+    @PostMapping("/me/daily-check-in")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @Operation(summary = "Perform daily check-in for streak & token bonus")
+    public ResponseEntity<ApiResponse<com.historytalk.dto.gamification.DailyCheckInResponse>> dailyCheckIn() {
+        String userId = SecurityUtils.getUserId();
+        log.info("POST /api/v1/users/me/daily-check-in - user {}", userId);
+        com.historytalk.dto.gamification.DailyCheckInResponse data = gamificationService.dailyCheckIn(userId);
+        return ResponseEntity.ok(ApiResponse.success(data, "Daily check-in successful"));
     }
 
     @PatchMapping("/me")

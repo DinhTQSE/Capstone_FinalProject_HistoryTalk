@@ -44,6 +44,7 @@ public class MessageServiceImpl implements MessageService {
     private final AiServiceClient aiServiceClient;
     private final ObjectMapper objectMapper;
     private final com.historytalk.repository.UserRepository userRepository;
+    private final com.historytalk.service.gamification.GamificationService gamificationService;
 
     // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
@@ -175,6 +176,9 @@ public class MessageServiceImpl implements MessageService {
         // Update session lastMessageAt
         session.setLastMessageAt(LocalDateTime.now());
         chatSessionRepository.save(session);
+
+        // Record quest progress for CHAT
+        gamificationService.recordProgress(userId, com.historytalk.entity.enums.QuestType.CHAT);
 
         // Async title generation on first user message
         if (isFirstUserMessage) {
@@ -324,6 +328,9 @@ public class MessageServiceImpl implements MessageService {
 
                         session.setLastMessageAt(LocalDateTime.now());
                         chatSessionRepository.save(session);
+
+                        // Record quest progress for CHAT
+                        gamificationService.recordProgress(userId, com.historytalk.entity.enums.QuestType.CHAT);
 
                         if (isFirstUserMessage) {
                             aiServiceClient.generateTitleAsync(

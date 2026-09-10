@@ -111,6 +111,18 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
     }
 
+    @PostMapping("/reset-password/{token}")
+    @Operation(summary = "Reset password with path token", description = "Reset an account password using the token in path parameter (Express compatibility).")
+    public ResponseEntity<ApiResponse<?>> resetPasswordWithPathToken(
+            @PathVariable String token,
+            @RequestBody Map<String, String> requestBody) {
+
+        log.info("POST /api/v1/auth/reset-password/{}", token);
+        String password = requestBody.getOrDefault("password", requestBody.get("newPassword"));
+        authService.resetPassword(token, password, password);
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
+    }
+
     @PostMapping("/google/login-url")
     @Operation(summary = "Get Google login URL", description = "Returns backend Google OAuth2 authorization URL.")
     public ResponseEntity<ApiResponse<Map<String, String>>> googleLoginUrl() {

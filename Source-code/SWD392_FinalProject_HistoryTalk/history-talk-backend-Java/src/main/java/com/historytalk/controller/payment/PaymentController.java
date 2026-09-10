@@ -100,4 +100,15 @@ public class PaymentController {
         PayOSReturnResponse response = paymentService.handlePayOSReturn(uid, request);
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
+
+    @GetMapping({"/payos/order/{orderCode}", "/payos/orders/{orderCode}"})
+    public ResponseEntity<ApiResponse<?>> getPayOSOrderInfo(@PathVariable Long orderCode) {
+        UUID uid = UUID.fromString(SecurityUtils.getUserId());
+        var history = paymentService.getMyPaymentHistory(uid);
+        var order = history.stream()
+                .filter(h -> h.getOrderCode() != null && h.getOrderCode().equals(orderCode))
+                .findFirst()
+                .orElse(null);
+        return ResponseEntity.ok(ApiResponse.success(order, "Order info retrieved successfully"));
+    }
 }

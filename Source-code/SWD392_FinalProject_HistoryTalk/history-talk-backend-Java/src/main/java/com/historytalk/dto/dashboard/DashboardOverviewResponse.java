@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,7 +19,22 @@ public class DashboardOverviewResponse {
     private RoleOverview roles;
     private ContentOverview content;
     private ChatOverview chat;
+    private List<TopCharacterOverview> topCharacters;
     private SystemHealthOverview systemHealth;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class TopCharacterOverview {
+        private String characterId;
+        private String name;
+        private String title;
+        private String imageUrl;
+        private long totalMessages;
+        private long userMessages;
+        private long aiMessages;
+    }
 
     @Data
     @NoArgsConstructor
