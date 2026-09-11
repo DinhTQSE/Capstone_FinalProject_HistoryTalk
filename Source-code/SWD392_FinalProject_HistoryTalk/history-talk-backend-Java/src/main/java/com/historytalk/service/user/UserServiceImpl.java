@@ -7,14 +7,19 @@ import com.historytalk.dto.user.UpdateMyProfileRequest;
 import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
 import com.historytalk.dto.user.BulkRestoreUsersResponse;
+import com.historytalk.dto.user.UserDashboardResponse;
 import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
+import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.mapper.user.UserMapper;
+import com.historytalk.repository.MessageRepository;
+import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
 import com.historytalk.repository.payment.UserTierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -26,7 +31,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,6 +45,8 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final UserTierRepository userTierRepository;
+    private final QuizSessionRepository quizSessionRepository;
+    private final MessageRepository messageRepository;
 
     @Override
     @Transactional
@@ -188,6 +197,99 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public int restoreAllUsers() {
         return userRepository.restoreAllUsers();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserDashboardResponse getUserDashboard(String userId) {
+        User user = loadActiveUser(userId);
+        UUID uid = user.getUid();
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Learning Analytics
+        List<QuizSession> completedSessions = quizSessionRepository
+                .findCompletedByUserUid(uid, PageRequest.of(0, 100))
+                .getContent();
+
+        long totalQuizzesAttempted = completedSessions.size();
+        double totalScore = 0.0;
+        Map<String, Long> eraDistribution = new HashMap<>();
+
+        for (QuizSession s : completedSessions) {
+            double sessionPercentage = 0.0;
+            if (s.getScore() != null) {
+                int questionCount = (s.getQuiz() != null && s.getQuiz().getQuestions() != null && !s.getQuiz().getQuestions().isEmpty())
+                        ? s.getQuiz().getQuestions().size() : 1;
+                sessionPercentage = s.getScore() <= questionCount ? (s.getScore() * 100.0 / questionCount) : s.getScore().doubleValue();
+            }
+            totalScore += sessionPercentage;
+
+            if (s.getQuiz() != null && s.getQuiz().getHistoricalContext() != null && s.getQuiz().getHistoricalContext().getEra() != null) {
+                String era = s.getQuiz().getHistoricalContext().getEra().name();
+                eraDistribution.put(era, eraDistribution.getOrDefault(era, 0L) + 1);
+            }
+        }
+
+        double averageQuizScore = totalQuizzesAttempted > 0 ? totalScore / totalQuizzesAttempted : 0.0;
+
+        List<UserDashboardResponse.RecentQuizItem> recentQuizzes = completedSessions.stream()
+                .limit(5)
+                .map(s -> {
+                    double pct = 0.0;
+                    if (s.getScore() != null) {
+                        int qCount = (s.getQuiz() != null && s.getQuiz().getQuestions() != null && !s.getQuiz().getQuestions().isEmpty())
+                                ? s.getQuiz().getQuestions().size() : 1;
+                        pct = s.getScore() <= qCount ? (s.getScore() * 100.0 / qCount) : s.getScore().doubleValue();
+                    }
+                    return UserDashboardResponse.RecentQuizItem.builder()
+                            .sessionId(s.getSessionId().toString())
+                            .quizTitle(s.getQuiz() != null ? s.getQuiz().getTitle() : "Unknown")
+                            .percentage(Math.round(pct * 10.0) / 10.0)
+                            .completedAt(s.getEndTime())
+                            .build();
+                })
+                .toList();
+
+        UserDashboardResponse.LearningAnalytics learning = UserDashboardResponse.LearningAnalytics.builder()
+                .totalQuizzesAttempted(totalQuizzesAttempted)
+                .averageScorePercentage(Math.round(averageQuizScore * 10.0) / 10.0)
+                .eraDistribution(eraDistribution)
+                .recentQuizzes(recentQuizzes)
+                .build();
+
+        // 2. AI Usage Analytics
+        Optional<UserTier> activeSubOpt = userTierRepository.findCurrentActiveByUid(uid, now);
+        String tierTitle = activeSubOpt.map(ut -> ut.getTier().getTitle()).orElse("free");
+
+        DashboardTokenSummaryProjection tokenSummary = messageRepository.sumTokensForUser(uid);
+        long promptTokens = tokenSummary != null && tokenSummary.getPromptTokens() != null ? tokenSummary.getPromptTokens() : 0L;
+        long completionTokens = tokenSummary != null && tokenSummary.getCompletionTokens() != null ? tokenSummary.getCompletionTokens() : 0L;
+        long totalTokensUsed = tokenSummary != null && tokenSummary.getTotalTokens() != null ? tokenSummary.getTotalTokens() : 0L;
+
+        List<UserDashboardResponse.TopCharacterItem> topCharacters = messageRepository
+                .findTopCharactersForUser(uid, 3)
+                .stream()
+                .map(tc -> UserDashboardResponse.TopCharacterItem.builder()
+                        .characterId(tc.getCharacterId())
+                        .name(tc.getName() != null ? tc.getName() : "Unknown Character")
+                        .messageCount(tc.getMessageCount() != null ? tc.getMessageCount() : 0L)
+                        .tokenUsed(tc.getTokenUsed() != null ? tc.getTokenUsed() : 0L)
+                        .build())
+                .toList();
+
+        UserDashboardResponse.AiUsageAnalytics aiUsage = UserDashboardResponse.AiUsageAnalytics.builder()
+                .currentBalance(user.getToken() != null ? user.getToken() : 0)
+                .tier(tierTitle)
+                .totalTokensUsed(totalTokensUsed)
+                .promptTokens(promptTokens)
+                .completionTokens(completionTokens)
+                .topCharacters(topCharacters)
+                .build();
+
+        return UserDashboardResponse.builder()
+                .learning(learning)
+                .aiUsage(aiUsage)
+                .build();
     }
 
     private User loadActiveUser(String userId) {

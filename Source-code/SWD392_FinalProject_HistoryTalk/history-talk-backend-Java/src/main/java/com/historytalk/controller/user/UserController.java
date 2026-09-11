@@ -46,6 +46,18 @@ public class UserController {
         ));
     }
 
+    @GetMapping("/me/dashboard")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @Operation(summary = "Get authenticated user's personalized dashboard analytics")
+    public ResponseEntity<ApiResponse<com.historytalk.dto.user.UserDashboardResponse>> getMyDashboard() {
+        String userId = SecurityUtils.getUserId();
+        log.info("GET /api/v1/users/me/dashboard - user {}", userId);
+        return ResponseEntity.ok(ApiResponse.success(
+                userService.getUserDashboard(userId),
+                "User dashboard retrieved successfully"
+        ));
+    }
+
     @PostMapping("/me/daily-check-in")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
     @Operation(summary = "Perform daily check-in for streak & token bonus")
