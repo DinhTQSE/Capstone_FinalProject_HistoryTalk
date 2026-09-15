@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class PdfExtractionResponse {
+    private String fileUrl;
     private String rawText;
     private int pageCount;
 }

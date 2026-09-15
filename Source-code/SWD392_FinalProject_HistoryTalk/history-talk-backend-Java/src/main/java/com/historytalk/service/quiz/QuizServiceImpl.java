@@ -9,8 +9,10 @@ import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
+import com.historytalk.entity.quiz.QuestionReport;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizAnswerDetail;
+import com.historytalk.entity.quiz.QuizRating;
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
@@ -18,8 +20,10 @@ import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.HistoricalContextRepository;
+import com.historytalk.repository.QuestionReportRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizAnswerDetailRepository;
+import com.historytalk.repository.QuizRatingRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
@@ -58,15 +62,25 @@ public class QuizServiceImpl implements QuizService {
     private final QuizAnswerDetailRepository quizAnswerDetailRepository;
     private final UserRepository userRepository;
     private final HistoricalContextRepository historicalContextRepository;
+    private final QuizRatingRepository quizRatingRepository;
+    private final QuestionReportRepository questionReportRepository;
     private final ObjectMapper objectMapper;
 
     // ==================== Customer ====================
 
     @Override
     @Transactional(readOnly = true)
-    public List<QuizCustomerResponse> getAllQuizzesForCustomer(String search, UUID userId) {
-        log.info("getAllQuizzesForCustomer: search={}", search);
-        List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search));
+    public List<QuizCustomerResponse> getAllQuizzesForCustomer(String search, String contextId, UUID userId) {
+        log.info("getAllQuizzesForCustomer: search={}, contextId={}", search, contextId);
+        UUID contextUuid = null;
+        if (contextId != null && !contextId.isBlank()) {
+            try {
+                contextUuid = UUID.fromString(contextId);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid contextId format: {}", contextId);
+            }
+        }
+        List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search), contextUuid);
         return quizzes.stream()
                 .map(q -> {
                     long playCount = userId != null
@@ -825,6 +839,116 @@ public class QuizServiceImpl implements QuizService {
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException("Giá trị thời đại (era) không hợp lệ: " + era + ". Giá trị hợp lệ: ANCIENT, MEDIEVAL, MODERN, CONTEMPORARY");
         }
+    }
+
+    // ==================== Rating & Reports ====================
+
+    @Override
+    @Transactional
+    public QuizRatingResponse rateQuiz(String quizId, int value, UUID userId) {
+        if (value < 1 || value > 5) {
+            throw new InvalidRequestException("Đánh giá phải từ 1 đến 5 sao");
+        }
+        UUID quizUuid = parseUuid(quizId, "quizId");
+        Quiz quiz = quizRepository.findById(quizUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz với ID: " + quizId));
+
+        com.historytalk.entity.user.User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng"));
+
+        QuizRating rating = quizRatingRepository.findByQuizQuizIdAndUserUid(quizUuid, userId)
+                .orElseGet(() -> QuizRating.builder()
+                        .quiz(quiz)
+                        .user(user)
+                        .build());
+
+        rating.setRatingValue(value);
+        quizRatingRepository.save(rating);
+
+        Double avg = quizRatingRepository.getAverageRatingByQuizId(quizUuid);
+        long count = quizRatingRepository.countByQuizId(quizUuid);
+
+        return QuizRatingResponse.builder()
+                .rating(avg != null ? Math.round(avg * 10.0) / 10.0 : value)
+                .ratingCount(count)
+                .myRating(value)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MyRatingResponse getMyRating(String quizId, UUID userId) {
+        UUID quizUuid = parseUuid(quizId, "quizId");
+        Integer myRating = null;
+        if (userId != null) {
+            myRating = quizRatingRepository.findByQuizQuizIdAndUserUid(quizUuid, userId)
+                    .map(QuizRating::getRatingValue)
+                    .orElse(null);
+        }
+        return MyRatingResponse.builder().myRating(myRating).build();
+    }
+
+    @Override
+    @Transactional
+    public void reportQuestion(String questionId, String reason, UUID userId) {
+        UUID questionUuid = parseUuid(questionId, "questionId");
+        Question question = questionRepository.findById(questionUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi với ID: " + questionId));
+
+        com.historytalk.entity.user.User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng"));
+
+        QuestionReport report = QuestionReport.builder()
+                .question(question)
+                .quiz(question.getQuiz())
+                .reportedBy(user)
+                .reason(reason)
+                .status("OPEN")
+                .build();
+
+        questionReportRepository.save(report);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<QuestionReportResponse> getQuestionReports(String status, Pageable pageable) {
+        Page<QuestionReport> page = questionReportRepository.findAllByStatus(
+                (status != null && !status.isBlank()) ? status.toUpperCase() : null, pageable);
+
+        List<QuestionReportResponse> content = page.getContent().stream()
+                .map(r -> QuestionReportResponse.builder()
+                        .reportId(r.getReportId().toString())
+                        .questionId(r.getQuestion().getQuestionId().toString())
+                        .questionContent(r.getQuestion().getContent())
+                        .quizId(r.getQuiz().getQuizId().toString())
+                        .quizTitle(r.getQuiz().getTitle())
+                        .reportedBy(r.getReportedBy().getUserName() != null ? r.getReportedBy().getUserName() : r.getReportedBy().getEmail())
+                        .reason(r.getReason())
+                        .status(r.getStatus())
+                        .createdAt(r.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        return PaginatedResponse.<QuestionReportResponse>builder()
+                .content(content)
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .currentPage(page.getNumber() + 1)
+                .pageSize(page.getSize())
+                .hasNext(page.hasNext())
+                .hasPrevious(page.hasPrevious())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void resolveQuestionReport(String reportId) {
+        UUID reportUuid = parseUuid(reportId, "reportId");
+        QuestionReport report = questionReportRepository.findById(reportUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + reportId));
+
+        report.setStatus("RESOLVED");
+        questionReportRepository.save(report);
     }
 
     private QuizLevel parseLevel(String level) {

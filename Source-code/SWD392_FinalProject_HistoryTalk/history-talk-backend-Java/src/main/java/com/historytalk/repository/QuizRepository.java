@@ -23,11 +23,12 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     @Query("""
             SELECT q FROM Quiz q
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
+            AND (:contextId IS NULL OR q.historicalContext.contextId = :contextId)
             AND q.isPublished = true
             AND q.deletedAt IS NULL
             ORDER BY q.title ASC
             """)
-    List<Quiz> findAllActiveForCustomer(@Param("search") String search);
+    List<Quiz> findAllActiveForCustomer(@Param("search") String search, @Param("contextId") UUID contextId);
 
     /**
      * Customer — single published quiz by ID.

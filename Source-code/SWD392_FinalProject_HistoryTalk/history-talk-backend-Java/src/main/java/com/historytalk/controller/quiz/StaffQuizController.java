@@ -241,4 +241,27 @@ public class StaffQuizController {
         QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, null);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
     }
+
+    @GetMapping("/reports")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @Operation(summary = "Get question reports", description = "Get list of reported quiz questions.")
+    public ResponseEntity<ApiResponse<PaginatedResponse<QuestionReportResponse>>> getQuestionReports(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        log.info("GET /api/v1/staff/quizzes/reports status={} page={} size={}", status, page, size);
+        Pageable pageable = PageRequest.of(page, size);
+        PaginatedResponse<QuestionReportResponse> data = quizService.getQuestionReports(status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(data, "Question reports retrieved successfully"));
+    }
+
+    @PatchMapping("/reports/{reportId}/resolve")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @Operation(summary = "Resolve question report", description = "Mark a reported question issue as resolved.")
+    public ResponseEntity<ApiResponse<Void>> resolveQuestionReport(
+            @PathVariable String reportId) {
+        log.info("PATCH /api/v1/staff/quizzes/reports/{}/resolve", reportId);
+        quizService.resolveQuestionReport(reportId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Question report resolved successfully"));
+    }
 }
