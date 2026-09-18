@@ -16,6 +16,7 @@ import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.service.map.MapPinService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final UserRepository userRepository;
         private final DocumentRepository documentRepository;
         private final ChatSessionRepository chatSessionRepository;
+        private final MapPinService mapPinService;
     
     /**
      * Get all historical contexts with pagination and search
@@ -262,11 +264,14 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 if (quiz.getQuestions() != null) {
                     quiz.getQuestions().forEach(q -> q.setDeletedAt(now));
                 }
-                // Note: QuizSessions aren't directly fetched via Quiz mapping usually, 
-                // but handled in @Where or soft-deleted individually. 
+                // Note: QuizSessions aren't directly fetched via Quiz mapping usually,
+                // but handled in @Where or soft-deleted individually.
                 // Currently Quiz entity does not map quizSessions.
             });
         }
+
+        // Cascade to Map Pins (admin + user pins for this context)
+        mapPinService.softDeleteAllPinsForContext(contextId);
         
         log.info("Historical context soft-deleted successfully with ID: {}", contextId);
     }
