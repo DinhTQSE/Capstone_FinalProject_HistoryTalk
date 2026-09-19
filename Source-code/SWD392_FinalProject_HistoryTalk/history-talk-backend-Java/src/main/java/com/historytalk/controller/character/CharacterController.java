@@ -29,6 +29,7 @@ import java.util.List;
 public class CharacterController {
 
     private final CharacterService characterService;
+    private final com.historytalk.service.character.CharacterDocumentService characterDocumentService;
 
     @GetMapping
     @Operation(summary = "Get all characters", description = "Retrieve paginated characters, optionally filtered by search keyword and era")
@@ -150,5 +151,18 @@ public class CharacterController {
         String role = SecurityUtils.getRoleName();
         List<CharacterResponse.ContextInfo> contexts = characterService.getContextsOfCharacter(characterId, role);
         return ResponseEntity.ok(ApiResponse.success(contexts, "Character contexts retrieved successfully"));
+    }
+
+    /**
+     * GET /v1/characters/{characterId}/documents
+     * Alias shortcut route matching Express BE
+     */
+    @GetMapping("/{characterId}/documents")
+    @Operation(summary = "Get documents by character ID (shortcut)", description = "Retrieve all documents belonging to a character")
+    public ResponseEntity<ApiResponse<?>> getCharacterDocumentsAlias(@PathVariable String characterId) {
+        log.info("GET /v1/characters/{}/documents", characterId);
+        String role = SecurityUtils.getRoleName();
+        var documents = characterDocumentService.getDocumentsByCharacterId(characterId, role);
+        return ResponseEntity.ok(ApiResponse.success(documents, "Character documents retrieved successfully"));
     }
 }

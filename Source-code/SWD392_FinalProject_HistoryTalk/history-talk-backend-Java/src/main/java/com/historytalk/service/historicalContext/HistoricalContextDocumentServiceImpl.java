@@ -64,7 +64,22 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> getDocumentsByContextId(String contextId, String userRole) {
         log.info("Fetching documents for context: {}", contextId);
-        boolean includeDeleted = isStaffOrAdmin(userRole);
+        boolean isStaffOrAdmin = isStaffOrAdmin(userRole);
+        
+        // If caller is customer/public, verify parent context exists, is published, and not deleted
+        if (!isStaffOrAdmin) {
+            java.util.Optional<com.historytalk.entity.historicalContext.HistoricalContext> contextOpt = 
+                    contextRepository.findById(UUID.fromString(contextId));
+            if (contextOpt.isEmpty()) {
+                return java.util.Collections.emptyList();
+            }
+            com.historytalk.entity.historicalContext.HistoricalContext context = contextOpt.get();
+            if (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null) {
+                return java.util.Collections.emptyList();
+            }
+        }
+
+        boolean includeDeleted = isStaffOrAdmin;
         return documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
             UUID.fromString(contextId), EntityType.CONTEXT, includeDeleted)
             .stream()

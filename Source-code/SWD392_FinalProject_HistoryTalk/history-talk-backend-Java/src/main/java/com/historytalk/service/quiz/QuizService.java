@@ -12,7 +12,7 @@ public interface QuizService {
 
     // ==================== Customer ====================
 
-    List<QuizCustomerResponse> getAllQuizzesForCustomer(String search, UUID userId);
+    List<QuizCustomerResponse> getAllQuizzesForCustomer(String search, String contextId, UUID userId);
 
     QuizCustomerResponse getQuizByIdForCustomer(String quizId, UUID userId);
 
@@ -48,6 +48,18 @@ public interface QuizService {
     void updateQuestion(String quizId, String questionId, QuestionRequest request);
 
     void deleteQuestion(String quizId, String questionId);
+
+    // ==================== Rating & Reports ====================
+
+    QuizRatingResponse rateQuiz(String quizId, int value, UUID userId);
+
+    MyRatingResponse getMyRating(String quizId, UUID userId);
+
+    void reportQuestion(String questionId, String reason, UUID userId);
+
+    PaginatedResponse<QuestionReportResponse> getQuestionReports(String status, Pageable pageable);
+
+    void resolveQuestionReport(String reportId);
 
     // ==================== Import ====================
 
