@@ -16,6 +16,7 @@ import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.service.map.MapFocusService;
 import com.historytalk.service.map.MapPinService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final DocumentRepository documentRepository;
         private final ChatSessionRepository chatSessionRepository;
         private final MapPinService mapPinService;
+        private final MapFocusService mapFocusService;
     
     /**
      * Get all historical contexts with pagination and search
@@ -272,6 +274,9 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
         // Cascade to Map Pins (admin + user pins for this context)
         mapPinService.softDeleteAllPinsForContext(contextId);
+
+        // Cascade to Map Focus points
+        mapFocusService.softDeleteAllFocusesForContext(contextId);
         
         log.info("Historical context soft-deleted successfully with ID: {}", contextId);
     }
