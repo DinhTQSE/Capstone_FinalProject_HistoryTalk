@@ -125,11 +125,22 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-documents/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/quizzes/**").permitAll()
 
+                        // Interactive Map: GET is public (admin pins visible to all);
+                        // POST and DELETE require authentication (role enforced in service layer)
+                        .requestMatchers(HttpMethod.POST,   "/api/v1/historical-contexts/*/map-pins").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/historical-contexts/*/map-pins/*").authenticated()
+
                         .requestMatchers("/api/v1/chat/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/quizzes/**").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/quizzes/**").authenticated()
 
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex
+                        // Return JSON 401 instead of redirecting to OAuth2 login page
+                        // for unauthenticated API requests.
+                        .authenticationEntryPoint(new RestAuthenticationEntryPoint())
+                        .accessDeniedHandler(new CustomAccessDeniedHandler())
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(authorization -> authorization
