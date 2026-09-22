@@ -6,6 +6,7 @@ import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.*;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
+import com.historytalk.entity.enums.QuestType;
 import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
@@ -27,6 +28,7 @@ import com.historytalk.repository.QuizRatingRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.service.gamification.GamificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.csv.CSVFormat;
@@ -65,6 +67,7 @@ public class QuizServiceImpl implements QuizService {
     private final QuizRatingRepository quizRatingRepository;
     private final QuestionReportRepository questionReportRepository;
     private final ObjectMapper objectMapper;
+    private final GamificationService gamificationService;
 
     // ==================== Customer ====================
 
@@ -202,6 +205,7 @@ public class QuizServiceImpl implements QuizService {
         session.setEndTime(LocalDateTime.now());
         session.setScore((float) score);
         quizSessionRepository.save(session);
+        gamificationService.recordProgress(userId.toString(), QuestType.QUIZ);
 
         int total = questions.size();
         double percentage = total > 0 ? (double) score / total * 100.0 : 0.0;

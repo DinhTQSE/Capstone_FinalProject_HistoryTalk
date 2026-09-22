@@ -7,6 +7,8 @@ import com.historytalk.dto.historicalContext.HistoricalContextResponse;
 import com.historytalk.dto.historicalContext.UpdateHistoricalContextRequest;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
+import com.historytalk.entity.enums.QuestType;
+import com.historytalk.service.gamification.GamificationService;
 import com.historytalk.service.historicalContext.HistoricalContextService;
 import com.historytalk.utils.SecurityUtils;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +33,7 @@ public class HistoricalContextController {
     
     private final HistoricalContextService contextService;
     private final com.historytalk.service.historicalContext.HistoricalContextDocumentService contextDocumentService;
+    private final GamificationService gamificationService;
     
     /**
      * GET /v1/historical-contexts
@@ -71,6 +74,10 @@ public class HistoricalContextController {
         
         String role = SecurityUtils.getRoleName();
         var response = contextService.getContextById(contextId, role);
+        String userId = SecurityUtils.getUserId();
+        if (userId != null) {
+            gamificationService.recordProgress(userId, QuestType.READ_CONTEXT);
+        }
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,
