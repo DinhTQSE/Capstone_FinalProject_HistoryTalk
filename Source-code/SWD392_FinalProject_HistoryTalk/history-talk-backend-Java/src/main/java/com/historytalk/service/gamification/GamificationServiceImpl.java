@@ -257,6 +257,18 @@ public class GamificationServiceImpl implements GamificationService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<String> getStudyDays(String userId, int year, int month) {
+        UUID userUid = UUID.fromString(userId);
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
+        return checkInRepository.findAllDatesInRange(userUid, from, to)
+                .stream()
+                .map(LocalDate::toString)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<DailyQuest> staffListQuests() {
         return questRepository.findAllByOrderByOrderIndexAsc();
     }
