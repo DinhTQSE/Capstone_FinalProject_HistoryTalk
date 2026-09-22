@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.payos.exception.ForbiddenException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -96,23 +97,28 @@ public class MapPinServiceImpl implements MapPinService {
         String pinOwnerType;
         String pinType;
 
-        if (isAdminRole(role)) {
-            // Admin: context may be draft; pinType is required and validated
-            pinOwnerType = PIN_OWNER_ADMIN;
-            if (request.getPinType() == null || !VALID_PIN_TYPES.contains(request.getPinType().toUpperCase())) {
-                throw new InvalidRequestException(
-                        "pinType phải là ALLIED_FORCE hoặc ENEMY_FORCE cho pin của admin");
-            }
-            pinType = request.getPinType().toUpperCase();
-        } else {
+//        if (isAdminRole(role)) {
+//            // Admin: context may be draft; pinType is required and validated
+//            pinOwnerType = PIN_OWNER_ADMIN;
+//            if (request.getPinType() == null || !VALID_PIN_TYPES.contains(request.getPinType().toUpperCase())) {
+//                throw new InvalidRequestException(
+//                        "pinType phải là ALLIED_FORCE hoặc ENEMY_FORCE cho pin của admin");
+//            }
+//            pinType = request.getPinType().toUpperCase();
+//        } else {
             // Regular user: context must be published; pinType is ignored
-            if (!Boolean.TRUE.equals(context.getIsPublished())) {
-                throw new ResourceNotFoundException(
-                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
-            }
-            pinOwnerType = PIN_OWNER_USER;
-            pinType = null;
+//            if (!Boolean.TRUE.equals(context.getIsPublished())) {
+//                throw new ResourceNotFoundException(
+//                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+//            }
+//            pinOwnerType = PIN_OWNER_USER;
+//            pinType = null;
+//        }
+        if(!isAdminRole(role)){
+            throw new ForbiddenException("Bạn cần là admin để sử dụng tính năng này");
         }
+        pinOwnerType = PIN_OWNER_ADMIN;
+        pinType = null;
 
         MapPin pin = MapPin.builder()
                 .historicalContext(context)
