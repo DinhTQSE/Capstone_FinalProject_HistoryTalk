@@ -1,15 +1,14 @@
 # HistoryTalk Business Onboarding Guide
 
-Last updated: 2026-05-19
+Last updated: 2026-09-10
 
-This document helps a new developer understand the HistoryTalk product from the business side before going deep into controllers, services, repositories, or AI integration. It is based on the service documents under:
+> [!IMPORTANT]
+> For the complete and authoritative master specification covering all 8 business domains, data flow diagrams, database enums, gamification rules, PayOS payments, and developer onboarding instructions, see **[BUSINESS_DOMAIN_SPECIFICATION.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/BUSINESS_DOMAIN_SPECIFICATION.md)**.
 
-```text
-docs/services/history-talk-backend
-docs/services/history-talk-backend-ai
-```
+This document serves as a high-level business primer for new developers joining the HistoryTalk project before exploring controllers, services, or AI integration.
 
-Use this as the business companion to `docs/DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md`.
+Use this alongside [DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/DOMAIN_AND_TECHNICAL_TRANSFER_GUIDE.md) and [BUSINESS_DOMAIN_SPECIFICATION.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/BUSINESS_DOMAIN_SPECIFICATION.md).
+
 
 ## 1. Product Summary
 
