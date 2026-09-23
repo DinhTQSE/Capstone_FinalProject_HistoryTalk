@@ -28,4 +28,6 @@ public interface UserService {
     BulkRestoreUsersResponse restoreUsersBatch(java.util.List<String> userIds);
 
     int restoreAllUsers();
+
+    com.historytalk.dto.user.UserDashboardResponse getUserDashboard(String userId);
 }

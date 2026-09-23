@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -35,13 +36,14 @@ public class QuizController {
      * playCount is per-user if authenticated, 0 if not.
      */
     @GetMapping
-    @Operation(summary = "List active quizzes", description = "Returns all active quizzes. Optionally filter by search term.")
+    @Operation(summary = "List active quizzes", description = "Returns all active quizzes. Optionally filter by search term and contextId.")
     public ResponseEntity<ApiResponse<List<QuizCustomerResponse>>> getAllQuizzes(
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String contextId) {
 
-        log.info("GET /api/v1/quizzes search={}", search);
+        log.info("GET /api/v1/quizzes search={}, contextId={}", search, contextId);
         UUID userId = resolveUserId();
-        List<QuizCustomerResponse> data = quizService.getAllQuizzesForCustomer(search, userId);
+        List<QuizCustomerResponse> data = quizService.getAllQuizzesForCustomer(search, contextId, userId);
         return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
     }
 
@@ -129,6 +131,46 @@ public class QuizController {
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, userId);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
+    }
+
+    @PostMapping("/{quizId}/rating")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Rate a quiz", description = "Submit a star rating (1-5) for a quiz.")
+    public ResponseEntity<ApiResponse<QuizRatingResponse>> rateQuiz(
+            @PathVariable String quizId,
+            @RequestBody Map<String, Integer> payload) {
+        log.info("POST /api/v1/quizzes/{}/rating", quizId);
+        UUID userId = UUID.fromString(SecurityUtils.getUserId());
+        int value = payload.getOrDefault("value", 5);
+        QuizRatingResponse data = quizService.rateQuiz(quizId, value, userId);
+        return ResponseEntity.ok(ApiResponse.success(data, "Quiz rated successfully"));
+    }
+
+    @GetMapping("/{quizId}/rating/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Get user's rating for a quiz", description = "Get current user's star rating for a quiz.")
+    public ResponseEntity<ApiResponse<MyRatingResponse>> getMyRating(
+            @PathVariable String quizId) {
+        log.info("GET /api/v1/quizzes/{}/rating/me", quizId);
+        UUID userId = resolveUserId();
+        MyRatingResponse data = quizService.getMyRating(quizId, userId);
+        return ResponseEntity.ok(ApiResponse.success(data, "Rating retrieved successfully"));
+    }
+
+    @PostMapping("/questions/{questionId}/report")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Report question issue", description = "Report an issue or error with a quiz question.")
+    public ResponseEntity<ApiResponse<Void>> reportQuestion(
+            @PathVariable String questionId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        log.info("POST /api/v1/quizzes/questions/{}/report", questionId);
+        UUID userId = UUID.fromString(SecurityUtils.getUserId());
+        String reason = payload != null ? payload.get("reason") : null;
+        quizService.reportQuestion(questionId, reason, userId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Question reported successfully"));
     }
 
     /**

@@ -11,7 +11,10 @@ public interface GamificationService {
     ClaimQuestResponse claimQuestReward(String userId, String questId);
     DailyCheckInResponse dailyCheckIn(String userId);
     void recordProgress(String userId, QuestType questType);
-    
+
+    /** Trả về danh sách các ngày đã học (ISO string yyyy-MM-dd) trong tháng/năm chỉ định. */
+    List<String> getStudyDays(String userId, int year, int month);
+
     // Staff/Admin methods
     List<DailyQuest> staffListQuests();
     DailyQuest staffGetQuest(String questId);

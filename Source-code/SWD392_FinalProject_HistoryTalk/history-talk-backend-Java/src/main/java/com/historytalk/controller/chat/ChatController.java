@@ -34,7 +34,8 @@ public class ChatController {
      */
     @GetMapping("/sessions")
     public ResponseEntity<ApiResponse<List<ChatSessionResponse>>> getSessions(
-            @RequestParam String characterId) {
+            @RequestParam(required = false) String characterId,
+            @RequestParam(required = false) String contextId) {
 
         String userId = SecurityUtils.getUserId();
         List<ChatSessionResponse> sessions = chatSessionService.getSessions(userId, characterId);

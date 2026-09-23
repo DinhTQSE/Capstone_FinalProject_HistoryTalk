@@ -151,4 +151,34 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             LIMIT :limit
             """, nativeQuery = true)
     List<com.historytalk.repository.dashboard.DashboardTopCharacterProjection> findTopCharactersForDashboard(@Param("limit") int limit);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE cs.uid = :uid
+              AND cs.deleted_at IS NULL
+              AND m.deleted_at IS NULL
+            """, nativeQuery = true)
+    DashboardTokenSummaryProjection sumTokensForUser(@Param("uid") UUID uid);
+
+    @Query(value = """
+            SELECT CAST(cs.character_id AS text) AS "characterId",
+                   c.name AS name,
+                   COUNT(m.message_id) AS "messageCount",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "tokenUsed"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id AND cs.deleted_at IS NULL
+            JOIN character c ON c.character_id = cs.character_id AND c.deleted_at IS NULL
+            WHERE cs.uid = :uid
+              AND m.deleted_at IS NULL
+            GROUP BY cs.character_id, c.name
+            ORDER BY "messageCount" DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<com.historytalk.repository.dashboard.DashboardUserTopCharacterProjection> findTopCharactersForUser(
+            @Param("uid") UUID uid,
+            @Param("limit") int limit);
 }
