@@ -5,8 +5,12 @@ import com.historytalk.repository.dashboard.DashboardTierUsersProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import org.springframework.stereotype.Repository;
+
 import java.util.List;
 import java.util.UUID;
+
+@Repository("paymentTierRepository")
 public interface TierRepository extends JpaRepository<Tier, UUID> {
     List<Tier> findByIsActiveTrueAndDeletedAtIsNull();
     java.util.Optional<Tier> findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull(String title);

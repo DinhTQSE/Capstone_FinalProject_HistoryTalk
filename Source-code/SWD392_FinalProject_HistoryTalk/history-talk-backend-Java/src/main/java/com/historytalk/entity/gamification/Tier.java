@@ -5,7 +5,7 @@ import lombok.*;
 
 import java.util.UUID;
 
-@Entity
+@Entity(name = "GamificationTier")
 @Table(name = "tier", schema = "historical_schema")
 @Getter
 @Setter

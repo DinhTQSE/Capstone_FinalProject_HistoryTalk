@@ -1,0 +1,150 @@
+# =============================================================================
+# HistoryTalk Java Backend - Environment Configuration Example
+# Copy this file to application.properties or set environment variables in runtime
+# =============================================================================
+
+spring.application.name=history-talk-backend
+server.port=8080
+
+spring.mvc.servlet.path=/Historical-tell
+
+# =============================================================================
+# Database Configuration (PostgreSQL)
+# =============================================================================
+DB_URL=jdbc:postgresql://localhost:5432/historytalk_db
+DB_USER=postgres
+DB_PASSWORD=your_postgres_password
+DB_SCHEMA=historical_schema
+
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASSWORD}
+spring.datasource.hikari.schema=${DB_SCHEMA}
+spring.jpa.properties.hibernate.default_schema=${DB_SCHEMA}
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.show-sql=true
+logging.level.org.hibernate.SQL=DEBUG
+
+# Hikari Connection Pool Settings
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.minimum-idle=2
+
+# =============================================================================
+# Flyway Database Migration
+# =============================================================================
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+spring.flyway.baseline-on-migrate=false
+spring.flyway.schemas=${DB_SCHEMA}
+spring.flyway.out-of-order=true
+
+# =============================================================================
+# JWT Authentication & Tokens
+# =============================================================================
+# Secret Key must be at least 256 bits (32 chars / base64 string)
+JWT_SECRET=your_super_secret_jwt_key_must_be_at_least_32_characters_long
+JWT_EXPIRATION_MS=86400000
+JWT_REFRESH_EXPIRATION_MS=604800000
+
+jwt.secret=${JWT_SECRET}
+jwt.expiration=${JWT_EXPIRATION_MS}
+jwt.refreshExpiration=${JWT_REFRESH_EXPIRATION_MS}
+
+# =============================================================================
+# PayOS Payment Gateway Integration
+# =============================================================================
+PAYOS_CLIENT_ID=your_payos_client_id
+PAYOS_API_KEY=your_payos_api_key
+PAYOS_CHECKSUM_KEY=your_payos_checksum_key
+PAYOS_RETURN_URL=http://localhost:5173/payment/success
+PAYOS_CANCEL_URL=http://localhost:5173/payment/cancel
+
+payos.client-id=${PAYOS_CLIENT_ID}
+payos.api-key=${PAYOS_API_KEY}
+payos.checksum-key=${PAYOS_CHECKSUM_KEY}
+payos.return-url=${PAYOS_RETURN_URL}
+payos.cancel-url=${PAYOS_CANCEL_URL}
+
+# =============================================================================
+# Python AI Service Connection
+# =============================================================================
+AI_SERVICE_URL=http://localhost:8001
+
+# =============================================================================
+# Google OAuth2 Client Integration
+# =============================================================================
+GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+FRONTEND_OAUTH_SUCCESS_URL=http://localhost:5173/oauth2/success
+FRONTEND_OAUTH_FAILURE_URL=http://localhost:5173/oauth2/failure
+
+spring.security.oauth2.client.registration.google.client-id=${GOOGLE_CLIENT_ID}
+spring.security.oauth2.client.registration.google.client-secret=${GOOGLE_CLIENT_SECRET}
+spring.security.oauth2.client.registration.google.scope=openid,profile,email
+spring.security.oauth2.client.registration.google.redirect-uri={baseUrl}/Historical-tell/login/oauth2/code/{registrationId}
+
+app.oauth2.success-redirect-url=${FRONTEND_OAUTH_SUCCESS_URL}
+app.oauth2.failure-redirect-url=${FRONTEND_OAUTH_FAILURE_URL}
+
+server.forward-headers-strategy=native
+server.use-forward-headers=true
+
+# =============================================================================
+# Supabase Storage & Document Processor
+# =============================================================================
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_STORAGE_BUCKET=documents
+
+spring.servlet.multipart.max-file-size=50MB
+spring.servlet.multipart.max-request-size=50MB
+supabase.url=${SUPABASE_URL}
+supabase.service-role-key=${SUPABASE_SERVICE_ROLE_KEY}
+supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET}
+
+# =============================================================================
+# Mail / SMTP & Password Reset
+# =============================================================================
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
+MAIL_FROM=your_email@gmail.com
+FRONTEND_PASSWORD_RESET_URL=http://localhost:5173/reset-password
+PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES=15
+
+spring.mail.host=${MAIL_HOST}
+spring.mail.port=${MAIL_PORT}
+spring.mail.username=${MAIL_USERNAME}
+spring.mail.password=${MAIL_PASSWORD}
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+app.mail.from=${MAIL_FROM}
+app.password-reset.frontend-url=${FRONTEND_PASSWORD_RESET_URL}
+app.password-reset.token-expiration-minutes=${PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES}
+
+# =============================================================================
+# Tesseract OCR & Media Specs
+# =============================================================================
+tesseract.datapath=classpath:tessdata
+tesseract.language=vie
+tesseract.dpi=300
+tesseract.ocr-quality-threshold=100
+
+media.upload.2d.max-size-mb=10
+media.upload.3d.max-size-mb=100
+media.upload.allowed-2d-formats=jpg,jpeg,png,webp,gif
+media.upload.allowed-3d-formats=glb,gltf,obj,fbx
+media.upload.url-expires-seconds=300
+media.view.url-expires-seconds=3600
+media.thumbnail.default-width=300
+media.thumbnail.default-height=300
+
+# =============================================================================
+# Swagger / OpenAPI Endpoint Paths
+# =============================================================================
+springdoc.api-docs.path=/api/v1/api-docs
+springdoc.swagger-ui.path=/api/v1/swagger-ui
+springdoc.swagger-ui.enabled=true
+springdoc.enable-kotlin=false
