@@ -53,6 +53,14 @@ public class UpdateHistoricalContextRequest {
     @Size(max = 500, message = "URL Video tối đa 500 ký tự")
     private String videoUrl;
 
+    /**
+     * Optional. Full battleMap object to persist. Pass null to explicitly clear the battle map.
+     * If the field is absent from the JSON body, the existing value is preserved (null-check pattern).
+     * Validated against the isBattleMap schema in service before saving.
+     */
+    @JsonProperty("battleMap")
+    private Object battleMap;
+
     @JsonProperty("isPublished")
     private Boolean isPublished;
 }

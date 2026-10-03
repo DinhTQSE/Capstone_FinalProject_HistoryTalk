@@ -5,8 +5,10 @@ import com.historytalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -70,6 +72,18 @@ public class MapPin {
      */
     @Column(name = "pin_year", nullable = false)
     private Integer pinYear;
+
+    /**
+     * GeoJSON LineString representing the movement/route arrow for this pin.
+     * An empty coordinates array ({"type":"LineString","coordinates":[]}) means
+     * no path is drawn — the pin is a point only.
+     * Use 2 coordinate pairs [lon, lat] for a straight arrow;
+     * 3+ pairs for a curved path.
+     * Stored as raw JSON; the DB CHECK constraint enforces type = 'LineString'.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "path_geojson", columnDefinition = "jsonb", nullable = false)
+    private String pathGeoJson;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -34,4 +34,14 @@ public class CreateMapPinRequest {
     /** The exact year on the context timeline this pin belongs to. */
     @NotNull(message = "Pin year is required")
     private Integer pinYear;
+
+    /**
+     * GeoJSON LineString for the route/movement arrow of this pin.
+     * Example: {"type":"LineString","coordinates":[[106.81,20.94],[106.82,20.95]]}
+     * - 2 coordinate pairs = straight arrow.
+     * - 3+ pairs = curved arrow.
+     * - Empty coordinates ({"type":"LineString","coordinates":[]}) = point pin only.
+     * If omitted, the server defaults to an empty LineString.
+     */
+    private Object pathGeoJson;
 }
