@@ -8,8 +8,10 @@ import com.historytalk.entity.character.Character;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -73,6 +75,7 @@ public class HistoricalContext {
      * Validated against the isBattleMap schema in the service layer before saving.
      * Only CONTENT_ADMIN / SYSTEM_ADMIN may write this field.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "battle_map", columnDefinition = "jsonb")
     private String battleMap;
 
