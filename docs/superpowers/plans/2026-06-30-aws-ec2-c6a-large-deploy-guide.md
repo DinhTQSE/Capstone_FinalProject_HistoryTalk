@@ -641,3 +641,4 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate
 - [ ] **Bước 12:** Deploy thủ công thành công, `docker compose ps` thấy tất cả containers `healthy`.
 - [ ] **Bước 13:** HTTPS hoạt động, Caddy tự cấp SSL từ Let's Encrypt, Swagger UI load được.
 - [ ] **Bước 14:** GitHub Actions pipeline chạy end-to-end thành công.
+//this comment has no effect on the project just a note
