@@ -38,4 +38,11 @@ public class MapPinResponse {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    /**
+     * GeoJSON LineString for the route/movement arrow.
+     * FE uses this to render straight or curved arrows on the map.
+     * Empty coordinates = point pin only (no arrow).
+     */
+    private Object pathGeoJson;
 }

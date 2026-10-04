@@ -1,5 +1,8 @@
 package com.historytalk.service.historicalContext;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.historicalContext.CreateHistoricalContextRequest;
 import com.historytalk.dto.historicalContext.HistoricalContextResponse;
 import com.historytalk.dto.PaginatedResponse;
@@ -26,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -40,6 +45,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final ChatSessionRepository chatSessionRepository;
         private final MapPinService mapPinService;
         private final MapFocusService mapFocusService;
+        private final ObjectMapper objectMapper;
     
     /**
      * Get all historical contexts with pagination and search
@@ -121,6 +127,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .imageUrl(request.getImageUrl())
                 .videoUrl(request.getVideoUrl())
                 .isPublished(!Boolean.TRUE.equals(request.getIsDraft() != null ? request.getIsDraft() : true))
+                .battleMap(serializeBattleMap(request.getBattleMap()))
                 .createdBy(user)
                 .build();
 
@@ -195,6 +202,16 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         }
         if (request.getIsPublished() != null) {
             context.setIsPublished(request.getIsPublished());
+        }
+        // battleMap: use a special sentinel check — only update when the key is
+        // explicitly present in the request (non-absent). Since Jackson maps
+        // absent JSON keys to null, we treat null as "do not change" here.
+        // To explicitly clear the battle map, the client sends {"battleMap": null}
+        // but because Jackson cannot distinguish absent from null for Object fields,
+        // we instead always apply the value when battleMap is provided.
+        // For now: if request supplies battleMap (even null), write it.
+        if (request.getBattleMap() != null) {
+            context.setBattleMap(serializeBattleMap(request.getBattleMap()));
         }
         HistoricalContext updatedContext = contextRepository.save(context);
         log.info("Historical context updated successfully with ID: {}", contextId);
@@ -324,6 +341,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .location(context.getLocation())
                 .imageUrl(context.getImageUrl())
                 .videoUrl(context.getVideoUrl())
+                .battleMap(deserializeJson(context.getBattleMap()))
             .isPublished(context.getIsPublished())
             .status(buildStatus(context.getIsPublished(), context.getDeletedAt()))
                 .createdBy(context.getCreatedBy() != null ? HistoricalContextResponse.CreatedByInfo.builder()
@@ -382,4 +400,97 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             }
             return ContentStatus.ACTIVE;
         }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // battleMap JSON helpers
+    // ────────────────────────────────────────────────────────────────────────
+
+    private static final Set<String> VALID_BATTLE_MAP_MODES = Set.of("custom", "image");
+
+    private static final Set<String> VALID_SYMBOL_TYPES = Set.of(
+            "arrow", "flank", "march", "retreat",
+            "infantry", "cavalry", "archer", "artillery", "armor",
+            "navy", "airforce", "headquarters", "fort", "camp",
+            "defenseLine", "stakes", "ambush", "clash", "victory",
+            "destroyed", "step", "label"
+    );
+
+    /**
+     * Validates and serialises a battleMap Object (from the request DTO) into
+     * the JSON string stored in the DB column.
+     *
+     * @param raw The object supplied by the admin (may be a Map, String, or null).
+     * @return JSON string ready for DB storage, or null if raw is null.
+     * @throws InvalidRequestException if the object violates the isBattleMap contract.
+     */
+    private String serializeBattleMap(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            String json = raw instanceof String s ? s : objectMapper.writeValueAsString(raw);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map =
+                    objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+
+            // version must be 1
+            Object version = map.get("version");
+            if (!Integer.valueOf(1).equals(version) && !"1".equals(String.valueOf(version))) {
+                throw new InvalidRequestException("battleMap.version phải là 1");
+            }
+
+            // mode must be 'custom' or 'image'
+            Object mode = map.get("mode");
+            if (mode == null || !VALID_BATTLE_MAP_MODES.contains(mode.toString())) {
+                throw new InvalidRequestException(
+                        "battleMap.mode phải là 'custom' hoặc 'image'. Nhận: " + mode);
+            }
+
+            // imageUrl must be a non-blank string
+            Object imageUrl = map.get("imageUrl");
+            if (imageUrl == null || imageUrl.toString().isBlank()) {
+                throw new InvalidRequestException("battleMap.imageUrl không được để trống");
+            }
+
+            // imageSource max 500 chars
+            Object imageSource = map.get("imageSource");
+            if (imageSource != null && imageSource.toString().length() > 500) {
+                throw new InvalidRequestException("battleMap.imageSource tối đa 500 ký tự");
+            }
+
+            // Validate symbols if present
+            Object symbolsRaw = map.get("symbols");
+            if (symbolsRaw instanceof java.util.List<?> symbols) {
+                for (Object sym : symbols) {
+                    if (sym instanceof Map<?, ?> symMap) {
+                        Object symType = symMap.get("type");
+                        if (symType != null && !VALID_SYMBOL_TYPES.contains(symType.toString())) {
+                            throw new InvalidRequestException(
+                                    "battleMap.symbols[].type không hợp lệ: " + symType);
+                        }
+                    }
+                }
+            }
+
+            return json;
+        } catch (JsonProcessingException ex) {
+            throw new InvalidRequestException("battleMap không phải JSON hợp lệ: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Deserialises a stored JSON string back to an Object so Jackson serialises it
+     * as a real JSON object (not a JSON-escaped string) in the HTTP response.
+     */
+    private Object deserializeJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Object>() {});
+        } catch (JsonProcessingException ex) {
+            log.warn("Could not deserialize battleMap — returning raw string: {}", ex.getMessage());
+            return json;
+        }
+    }
 }

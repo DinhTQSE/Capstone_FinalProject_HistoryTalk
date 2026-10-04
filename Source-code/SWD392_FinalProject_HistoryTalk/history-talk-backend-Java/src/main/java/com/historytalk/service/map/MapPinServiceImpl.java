@@ -1,5 +1,8 @@
 package com.historytalk.service.map;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.map.CreateMapPinRequest;
 import com.historytalk.dto.map.MapPinResponse;
 import com.historytalk.entity.historicalContext.HistoricalContext;
@@ -31,9 +34,13 @@ public class MapPinServiceImpl implements MapPinService {
 
     private static final Set<String> VALID_PIN_TYPES = Set.of("ALLIED_FORCE", "ENEMY_FORCE");
 
+    /** Empty GeoJSON LineString — used as default when the caller omits pathGeoJson. */
+    private static final String EMPTY_LINE_STRING = "{\"type\":\"LineString\",\"coordinates\":[]}";
+
     private final MapPinRepository    mapPinRepository;
     private final HistoricalContextRepository contextRepository;
     private final UserRepository      userRepository;
+    private final ObjectMapper        objectMapper;
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET – role-aware pin loading
@@ -130,6 +137,7 @@ public class MapPinServiceImpl implements MapPinService {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .pinYear(request.getPinYear())
+                .pathGeoJson(serializePathGeoJson(request.getPathGeoJson()))
                 .build();
 
         MapPin saved = mapPinRepository.save(pin);
@@ -208,6 +216,7 @@ public class MapPinServiceImpl implements MapPinService {
                 .latitude(pin.getLatitude())
                 .longitude(pin.getLongitude())
                 .pinYear(pin.getPinYear())
+                .pathGeoJson(deserializeJson(pin.getPathGeoJson()))
                 .createdAt(pin.getCreatedAt())
                 .updatedAt(pin.getUpdatedAt())
                 .build();
@@ -227,6 +236,48 @@ public class MapPinServiceImpl implements MapPinService {
             return UUID.fromString(value);
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException("Invalid " + label + " ID format: " + value);
+        }
+    }
+
+    /**
+     * Serialise the caller-supplied pathGeoJson (Object or already-String) to a JSON
+     * string stored in the DB.  Validates that {@code type == "LineString"}.  If the
+     * caller omits the field (null), defaults to an empty LineString.
+     */
+    private String serializePathGeoJson(Object raw) {
+        if (raw == null) {
+            return EMPTY_LINE_STRING;
+        }
+        try {
+            String json = raw instanceof String s ? s : objectMapper.writeValueAsString(raw);
+            // Validate: the DB CHECK requires type = 'LineString'
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> map =
+                    objectMapper.readValue(json, new TypeReference<java.util.Map<String, Object>>() {});
+            Object type = map.get("type");
+            if (!"LineString".equals(type)) {
+                throw new InvalidRequestException(
+                        "pathGeoJson phải là GeoJSON LineString (type=\"LineString\"). Nhận: " + type);
+            }
+            return json;
+        } catch (JsonProcessingException ex) {
+            throw new InvalidRequestException("pathGeoJson không phải JSON hợp lệ: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Deserialise a JSON string from the DB back to an Object so the FE
+     * receives a proper JSON object rather than an escaped string.
+     */
+    private Object deserializeJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Object>() {});
+        } catch (JsonProcessingException ex) {
+            log.warn("Could not deserialize pathGeoJson — returning raw string: {}", ex.getMessage());
+            return json;
         }
     }
 }
