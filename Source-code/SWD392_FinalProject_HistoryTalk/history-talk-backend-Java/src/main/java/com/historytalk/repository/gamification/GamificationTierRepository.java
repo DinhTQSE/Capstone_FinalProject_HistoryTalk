@@ -1,6 +1,6 @@
 package com.historytalk.repository.gamification;
 
-import com.historytalk.entity.gamification.Tier;
+import com.historytalk.entity.payment.Tier;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
