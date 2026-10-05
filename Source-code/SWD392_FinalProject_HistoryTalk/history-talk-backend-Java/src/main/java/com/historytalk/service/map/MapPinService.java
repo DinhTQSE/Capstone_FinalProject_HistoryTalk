@@ -2,6 +2,7 @@ package com.historytalk.service.map;
 
 import com.historytalk.dto.map.CreateMapPinRequest;
 import com.historytalk.dto.map.MapPinResponse;
+import com.historytalk.dto.map.UpdateMapPinRequest;
 
 import java.util.List;
 
@@ -32,6 +33,15 @@ public interface MapPinService {
      * Throws ResourceNotFoundException on any mismatch (no info leakage).
      */
     void deletePin(String contextId, String pinId, String callerId, String role);
+
+    /**
+     * Partially update a map pin. Only non-null fields in the request are applied.
+     * - Admin role: can update any ADMIN pin on this context.
+     * - User role:  can only update their own USER pin.
+     * Throws ResourceNotFoundException on any mismatch (no info leakage).
+     */
+    MapPinResponse updatePin(String contextId, String pinId, UpdateMapPinRequest request,
+                             String callerId, String role);
 
     /**
      * Soft-delete all non-deleted pins for a context.
