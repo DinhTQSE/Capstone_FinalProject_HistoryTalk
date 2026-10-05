@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.map.CreateMapPinRequest;
 import com.historytalk.dto.map.MapPinResponse;
+import com.historytalk.dto.map.UpdateMapPinRequest;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.map.MapPin;
 import com.historytalk.entity.user.User;
@@ -181,6 +182,77 @@ public class MapPinServiceImpl implements MapPinService {
 
         mapPinRepository.delete(pin);
         log.info("Map pin hard-deleted: pinId={}", pinId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUT – role-aware partial update
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public MapPinResponse updatePin(String contextId, String pinId, UpdateMapPinRequest request,
+                                    String callerId, String role) {
+        log.info("updatePin pinId={} contextId={} role={}", pinId, contextId, role);
+
+        UUID pinUuid = parseUuid(pinId, "pin");
+        UUID ctxUuid = parseUuid(contextId, "context");
+
+        MapPin pin = mapPinRepository.findByPinIdAndDeletedAtIsNull(pinUuid)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy map pin với ID: " + pinId));
+
+        // Verify pin belongs to the given context
+        if (!pin.getHistoricalContext().getContextId().equals(ctxUuid)) {
+            throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
+        }
+
+        // Ownership check — same 404-on-mismatch pattern as deletePin
+        if (isAdminRole(role)) {
+            // Admins can only update ADMIN pins
+            if (!PIN_OWNER_ADMIN.equals(pin.getPinOwnerType())) {
+                throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
+            }
+        } else {
+            // Regular users can only update their own USER pins
+            if (!PIN_OWNER_USER.equals(pin.getPinOwnerType())
+                    || !pin.getCreatedBy().getUid().toString().equals(callerId)) {
+                throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
+            }
+        }
+
+        // Partial update — only apply fields that were explicitly sent (non-null)
+        if (request.getDescription() != null) {
+            // Empty string "" is the signal to clear the description
+            pin.setDescription(request.getDescription().isEmpty() ? null : request.getDescription());
+        }
+
+        if (request.getLabel() != null) {
+            String trimmedLabel = request.getLabel().trim();
+            if (trimmedLabel.isEmpty()) {
+                throw new InvalidRequestException("label không được rỗng khi được cung cấp");
+            }
+            pin.setLabel(trimmedLabel);
+        }
+
+        if (request.getLatitude() != null) {
+            pin.setLatitude(request.getLatitude());
+        }
+
+        if (request.getLongitude() != null) {
+            pin.setLongitude(request.getLongitude());
+        }
+
+        if (request.getPinYear() != null) {
+            pin.setPinYear(request.getPinYear());
+        }
+
+        if (request.getPathGeoJson() != null) {
+            pin.setPathGeoJson(serializePathGeoJson(request.getPathGeoJson()));
+        }
+
+        MapPin saved = mapPinRepository.save(pin);
+        log.info("Map pin updated: pinId={}", saved.getPinId());
+        return mapToResponse(saved);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

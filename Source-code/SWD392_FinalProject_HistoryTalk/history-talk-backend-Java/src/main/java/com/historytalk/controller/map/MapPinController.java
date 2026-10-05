@@ -3,6 +3,7 @@ package com.historytalk.controller.map;
 import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.map.CreateMapPinRequest;
 import com.historytalk.dto.map.MapPinResponse;
+import com.historytalk.dto.map.UpdateMapPinRequest;
 import com.historytalk.service.map.MapPinService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -93,6 +94,42 @@ public class MapPinController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                              .body(ApiResponse.success(data, "Map pin created successfully"));
+    }
+
+    /**
+     * PUT /api/v1/historical-contexts/{contextId}/map-pins/{pinId}
+     *
+     * Partially updates a pin. Only the fields present in the request body are changed;
+     * omitted fields keep their current value. Ownership enforced in service layer:
+     * - Admin: can update any ADMIN pin on this context.
+     * - User: can only update their own USER pin.
+     * Returns 404 on any mismatch (no info leakage).
+     */
+    @PutMapping("/{pinId}")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(
+            summary = "Partially update a map pin",
+            description = """
+                    Partial update — only fields included in the body are changed.
+                    Omitting a field keeps the current value.
+                    Sending description="" clears the description (stores null).
+                    Admins can update any ADMIN pin on this context.
+                    Users can only update their own USER pins.
+                    Returns 404 if the pin is not found or the caller is not the owner.
+                    """)
+    public ResponseEntity<ApiResponse<MapPinResponse>> updatePin(
+            @PathVariable String contextId,
+            @PathVariable String pinId,
+            @Valid @RequestBody UpdateMapPinRequest request) {
+
+        log.info("PUT map-pin pinId={} contextId={}", pinId, contextId);
+
+        String callerId = SecurityUtils.getUserId();
+        String role     = SecurityUtils.getRoleName();
+
+        MapPinResponse data = mapPinService.updatePin(contextId, pinId, request, callerId, role);
+
+        return ResponseEntity.ok(ApiResponse.success(data, "Map pin updated successfully"));
     }
 
     /**
