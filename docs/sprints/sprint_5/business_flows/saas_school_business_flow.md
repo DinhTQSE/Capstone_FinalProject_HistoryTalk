@@ -4,7 +4,14 @@
 
 ---
 
-## 1. LUỒNG NGHIỆP VỤ ONBOARDING TRƯỜNG HỌC & TOKEN ALLOCATION
+## 📑 TÀI LIỆU LUỒNG NGHIỆP VỤ CHI TIẾT
+
+👉 **Xem tài liệu chi tiết từng bước (Step-by-step & Sequence Diagrams):**  
+📄 **[saas_classroom_and_token_allocation_business_flow.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_5/business_flows/saas_classroom_and_token_allocation_business_flow.md)**
+
+---
+
+## 1. TỔNG QUAN LUỒNG ONBOARDING TRƯỜNG HỌC & TOKEN ALLOCATION
 
 ```mermaid
 sequenceDiagram
@@ -31,14 +38,18 @@ sequenceDiagram
 
 ---
 
-## 2. LUỒNG QUẢN LÝ LỚP HỌC & SINH MÃ CLASS CODE
+## 2. TỔNG QUAN LUỒNG QUẢN LÝ LỚP HỌC & SINH MÃ CLASS CODE THÔNG MINH
 
 ```mermaid
 flowchart TD
     A["Bắt đầu: Giáo viên / School Admin"] --> B["Tạo Lớp học mới: Tên lớp, Năm học, Teacher ID"]
-    B --> C["Hệ thống tự động sinh Class Code ngẫu nhiên (ví dụ: HIS10A1-2026)"]
-    C --> D{"Kiểm tra trùng Tên lớp trong cùng Trường?"}
-    D -- "Có trùng" --> E["Trả lỗi 400 Bad Request: Class name exists"]
-    D -- "Không trùng" --> F["Lưu bản ghi Classroom thành công"]
-    F --> G["Hiển thị Lớp trong Dashboard Giáo viên & School Admin"]
+    B --> C["Hệ thống chuẩn hóa tên lớp & ghép mã trường: {school_code}-{clean_class_name}-{academic_year}"]
+    C --> D{"Kiểm tra trùng Tên lớp trong cùng Trường & Năm học?"}
+    D -- "Có trùng" --> E["Trả lỗi 400 Bad Request: Class name exists in academic year"]
+    D -- "Không trùng" --> F{"Mã Class Code có bị va chạm?"}
+    F -- "Có va chạm" --> G["Tự động thêm hậu tố ngẫu nhiên 3 ký tự (VD: CVA-10A1-2026-X89)"]
+    F -- "Không va chạm" --> H["Giữ nguyên mã chuẩn: CVA-10A1-2026"]
+    G --> I["Lưu bản ghi Classroom thành công"]
+    H --> I
+    I --> J["Gán Teacher phụ trách & cho phép học sinh tham gia"]
 ```

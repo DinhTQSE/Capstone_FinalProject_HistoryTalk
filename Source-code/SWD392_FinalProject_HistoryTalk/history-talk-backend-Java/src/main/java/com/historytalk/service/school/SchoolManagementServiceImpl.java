@@ -42,6 +42,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
             throw new DataConflictException("School code " + normalizedCode + " already exists in the system");
         }
 
+        String trimmedName = request.getName().trim();
+        if (schoolRepository.existsByNameIgnoreCase(trimmedName)) {
+            throw new DataConflictException("Tên trường học \"" + trimmedName + "\" đã tồn tại trong hệ thống");
+        }
+
         if (Boolean.FALSE.equals(request.getLocalHistoryPolicyAccepted())) {
             throw new InvalidRequestException("School must agree to the local history content terms and conditions");
         }
