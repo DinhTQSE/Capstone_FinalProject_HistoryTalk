@@ -24,6 +24,8 @@ public class UserPrincipal implements UserDetails {
     private final String password;
     private final UserRole role;
     private final Collection<? extends GrantedAuthority> authorities;
+    private final java.util.UUID schoolId;
+    private final String schoolCode;
 
     public UserPrincipal(User user) {
         this.uid = user.getUid().toString();
@@ -32,6 +34,8 @@ public class UserPrincipal implements UserDetails {
         this.password = user.getPassword();
         this.role = user.getRole();
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+        this.schoolId = user.getSchool() != null ? user.getSchool().getId() : null;
+        this.schoolCode = user.getSchool() != null ? user.getSchool().getSchoolCode() : null;
     }
 
     /** JWT subject is the user's email */

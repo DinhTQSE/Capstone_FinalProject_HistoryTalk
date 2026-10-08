@@ -75,3 +75,9 @@ src/main/resources/standbyMigration
 
 Source-code/SWD392_FinalProject_HistoryTalk/wdp301-backend
 .env.*
+
+# Scratch and temporary scripts
+scratch/
+
+# Raw database dumps in source directories (standard seeds are maintained in docs/database/)
+**/history-talk-backend-Java/docs/*.sql

@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * Tier subscription plan (e.g. free, plus, pro).
  */
-@Entity
+@Entity(name = "PaymentTier")
 @Table(name = "tier", schema = "historical_schema")
 @Getter
 @Setter

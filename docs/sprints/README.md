@@ -11,11 +11,13 @@ Tất cả các kế hoạch phát triển, User Stories (được đặt tên t
 ```
 docs/sprints/
 ├── README.md                                                   <-- Master Sprints Index
+├── sprint_agent_guide_template.md                              <-- 🤖 Guide & Coding Conventions cho Agent & Devs
 ├── sprint_5/                                                   <-- Sprint 5 (04/10/2026 – 10/10/2026)
 │   ├── README.md                                               <-- Sprint 5 Overview & Roadmap
 │   ├── user_stories/
 │   │   ├── saas_roles_and_account_management.md                <-- Task: Roles, Accounts & Security
-│   │   └── saas_classroom_management.md                        <-- Task: Classroom & Token Allocation
+│   │   ├── saas_classroom_management.md                        <-- Task: Classroom & Token Allocation
+│   │   └── student_import_template.csv                         <-- File mẫu import học sinh
 │   └── business_flows/
 │       └── saas_school_business_flow.md                        <-- Flows: Onboarding & Token Allocation
 └── sprint_6/                                                   <-- Sprint 6 (11/10/2026 – 17/10/2026)

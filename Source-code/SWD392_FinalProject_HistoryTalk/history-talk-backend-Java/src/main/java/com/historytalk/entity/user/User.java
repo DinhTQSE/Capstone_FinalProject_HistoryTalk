@@ -69,6 +69,20 @@ public class User {
     @Column(name = "role", length = 50, nullable = false)
     private UserRole role;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "school_id")
+    private com.historytalk.entity.school.School school;
+
+    @Column(name = "student_code", length = 50)
+    private String studentCode;
+
+    @Builder.Default
+    @Column(name = "must_change_password", nullable = false)
+    private Boolean mustChangePassword = false;
+
+    @Column(name = "subject_department", length = 100)
+    private String subjectDepartment;
+
 
 
     @Builder.Default

@@ -16,25 +16,34 @@
 
 ## Project Structure & Module Organization
 - Monorepo root: `Source-code/SWD392_FinalProject_HistoryTalk/`.
-- Java backend: `history-talk-backend/` (Spring Boot, Java 21).
-- AI backend: `history-talk-backend-AI/` (FastAPI, LangChain).
+- Java backend: `history-talk-backend-Java/` (Spring Boot 3.2.x, Java 21, Maven).
+- AI backend: `history-talk-backend-AI/` (FastAPI, Uvicorn, Pydantic settings, Supabase client).
+- Monitoring: `monitoring/` (Prometheus/Grafana Docker Compose and dashboards).
+- `wdp301-backend/` currently has no committed source files; verify before treating it as an active service.
 - Shared docs: `docs/services/` and planning artifacts under `docs/superpowers/plans/`.
-- Java code follows 3-layer layout in `src/main/java/com/historytalk/`:
-  - `presentation/<domain>/` (controllers + DTOs)
-  - `application/<domain>/` (services + mappers)
-  - `dataaccess/<domain>/` (entities + repositories)
-  - `common/` (cross-cutting config, security, exceptions, utils)
+- Service-specific legacy docs may still exist under each service's `docs/`; new service docs should go under the root `docs/services/...` paths above.
+- Java code uses package groups under `src/main/java/com/historytalk/`:
+  - `controller/<domain>/` for REST controllers
+  - `service/<domain>/` for business logic and integrations
+  - `repository/` and `repository/<domain>/` for Spring Data repositories and projections
+  - `entity/<domain>/` for JPA entities and enums
+  - `dto/<domain>/` for request/response models
+  - `mapper/<domain>/`, `config/`, `security/`, `exception/`, and `utils/` for supporting code
 - Python code uses `src/history_talk_ai/` with equivalent `presentation/`, `application/`, `dataaccess/`, `common/` layers.
 
 ## Build, Test, and Development Commands
+- Java commands must be run from `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-Java/`.
 - Java compile check: `mvn -q -DskipTests compile`
+- Java tests: `mvn test`
 - Java full build: `mvn clean install`
 - Run Java service: `mvn spring-boot:run`
+- Optional Java helper scripts: `scripts/start-local.ps1` and `scripts/install-maven.ps1`.
+- AI commands must be run from `Source-code/SWD392_FinalProject_HistoryTalk/history-talk-backend-AI/`.
 - Python setup (AI service): `python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt`
 - Run AI service:
   - `python main.py`
   - or `uvicorn history_talk_ai.main:app --reload --port 8001 --app-dir src`
-- Optional helper scripts: `history-talk-backend/scripts/start-local.ps1` and `install-maven.ps1`.
+- Monitoring stack: from `Source-code/SWD392_FinalProject_HistoryTalk/monitoring/`, run `docker compose -f docker-compose.monitoring.yml up`.
 
 ## Coding Style & Naming Conventions
 - Use 4-space indentation in Java and Python.
@@ -45,11 +54,12 @@
 
 ## Testing Guidelines
 - Java test stack is available via `spring-boot-starter-test` and `spring-security-test`.
-- Current repo has no committed `src/test` or `tests/` suites; add tests with each new feature/fix.
+- Java tests are committed under `history-talk-backend-Java/src/test/java/...`; add focused tests with each new Java feature/fix.
+- No Python `tests/` suite is currently committed for the AI service; add pytest-style tests for new Python behavior when practical.
 - Naming:
   - Java: `src/test/java/.../*Test.java`
   - Python: `tests/test_*.py` (pytest style)
-- Minimum validation before PR: `mvn clean install`, run both services, verify changed endpoints in Swagger (`:8080/Historical-tell/api/v1/swagger-ui`, `:8001/docs`).
+- Minimum validation before PR: run the changed service's test/build command, run affected services when practical, and verify changed endpoints in Swagger (`http://localhost:8080/Historical-tell/api/v1/swagger-ui`, `http://localhost:8001/docs`).
 
 ## Commit & Pull Request Guidelines
 - Prefer Conventional Commit style used in history: `type(scope): description` (e.g., `refactor(java): ...`, `docs: ...`, `fix(java): ...`).
