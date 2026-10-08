@@ -58,6 +58,14 @@ public class HistoricalContextResponse {
     @JsonProperty("videoUrl")
     private String videoUrl;
 
+    /**
+     * Nullable battle-map overlay object as defined in map-api.md §5.
+     * Deserialized from raw JSON stored in DB; FE receives a proper JSON object.
+     * null = no battle map configured for this context.
+     */
+    @JsonProperty("battleMap")
+    private Object battleMap;
+
     @JsonProperty("isPublished")
     private Boolean isPublished;
 

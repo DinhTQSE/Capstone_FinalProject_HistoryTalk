@@ -129,6 +129,7 @@ public class SecurityConfig {
                         // POST and DELETE require authentication (role enforced in service layer)
                         .requestMatchers(HttpMethod.POST,   "/api/v1/historical-contexts/*/map-pins").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/historical-contexts/*/map-pins/*").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/*/map-pins").permitAll()
 
                         .requestMatchers("/api/v1/chat/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/quizzes/**").authenticated()

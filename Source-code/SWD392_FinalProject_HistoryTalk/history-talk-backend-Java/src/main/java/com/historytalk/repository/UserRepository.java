@@ -28,6 +28,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByUserNameIgnoreCase(String userName);
 
+    Optional<User> findBySchoolIdAndStudentCodeIgnoreCase(UUID schoolId, String studentCode);
+
+    boolean existsBySchoolIdAndStudentCodeIgnoreCase(UUID schoolId, String studentCode);
+
+    org.springframework.data.domain.Page<User> findBySchoolIdAndRole(UUID schoolId, UserRole role, org.springframework.data.domain.Pageable pageable);
+
+    long countBySchoolIdAndRole(UUID schoolId, UserRole role);
+
+    @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = :role AND (:search IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
+    org.springframework.data.domain.Page<User> searchTeachers(@Param("schoolId") UUID schoolId, @Param("role") UserRole role, @Param("search") String search, org.springframework.data.domain.Pageable pageable);
+
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE User u SET u.token = CASE WHEN (u.token - :tokensToDeduct) < 0 THEN 0 ELSE (u.token - :tokensToDeduct) END WHERE u.uid = :userId")

@@ -1,0 +1,6 @@
+student_code,full_name,email,dob,gender,phone_number,class_code,password,additional_token
+HS1001,Nguyễn Văn An,,2009-03-15,MALE,0912345671,HIS10A1-2026,,0
+HS1002,Trần Thị Mai,,2009-07-22,FEMALE,0912345672,HIS10A1-2026,,0
+HS1003,Lê Hoàng Nam,nam.lh@gmail.com,2009-11-05,MALE,0912345673,HIS10A2-2026,StudentPass@2026,5000
+HS1004,Phạm Quỳnh Anh,,2009-01-30,FEMALE,,HIS10A2-2026,,0
+HS1005,Vũ Minh Đức,,2009-09-18,MALE,,HIS10A3-2026,,0

@@ -55,6 +55,15 @@ public class CreateHistoricalContextRequest {
     @Size(max = 500, message = "URL Video tối đa 500 ký tự")
     private String videoUrl;
 
+    /**
+     * Optional. Full battleMap object (version, mode, imageUrl, factions[], symbols[]).
+     * See map-api.md §5 for the full schema.
+     * If null, no battle map is stored. Validated in service before persisting.
+     * Only CONTENT_ADMIN / SYSTEM_ADMIN are permitted to set this.
+     */
+    @JsonProperty("battleMap")
+    private Object battleMap;
+
     @JsonProperty("isPublished")
     private Boolean isPublished = false;
 
