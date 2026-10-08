@@ -23,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/school-admin/students")
 @RequiredArgsConstructor
-@Tag(name = "SaaS Student Management", description = "APIs dành cho School Admin quản lý và Import Học sinh hàng loạt (US-SP5-04)")
+@Tag(name = "SaaS Student Management", description = "Endpoints for School Admin to manage and bulk-import students (US-SP5-04)")
 public class SchoolAdminStudentController {
 
     @Qualifier("SCHOOL_WIDE_IMPORT")
@@ -34,7 +34,7 @@ public class SchoolAdminStudentController {
 
     @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    @Operation(summary = "Import hàng loạt tài khoản Học sinh qua file CSV/Excel (US-SP5-04)")
+    @Operation(summary = "Bulk import student accounts via CSV file (US-SP5-04)")
     public ResponseEntity<ApiResponse<StudentImportResultDto>> importStudents(
             @RequestPart("file") MultipartFile file,
             @RequestParam(name = "defaultInitialToken", required = false) Integer defaultInitialToken,
@@ -54,7 +54,7 @@ public class SchoolAdminStudentController {
 
         StudentImportResultDto result = studentImportProcessor.processImport(file, context);
 
-        String message = String.format("Import hoàn tất: %d thành công, %d lỗi. Đã phân bổ %,d Tokens.",
+        String message = String.format("Import completed: %d succeeded, %d failed. Allocated %,d tokens.",
                 result.getSuccessCount(), result.getFailureCount(), result.getTotalTokensAllocated());
 
         return ResponseEntity.ok(ApiResponse.success(result, message));

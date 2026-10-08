@@ -39,11 +39,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         String normalizedCode = request.getSchoolCode().trim().toUpperCase();
 
         if (schoolRepository.existsBySchoolCodeIgnoreCase(normalizedCode)) {
-            throw new DataConflictException("Mã trường " + normalizedCode + " đã tồn tại trên hệ thống");
+            throw new DataConflictException("School code " + normalizedCode + " already exists in the system");
         }
 
         if (Boolean.FALSE.equals(request.getLocalHistoryPolicyAccepted())) {
-            throw new InvalidRequestException("Trường học bắt buộc phải đồng ý với điều khoản nội dung lịch sử địa phương");
+            throw new InvalidRequestException("School must agree to the local history content terms and conditions");
         }
 
         int totalQuota = request.getPackageType().getTokens();
@@ -61,7 +61,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .build();
 
         School savedSchool = schoolRepository.save(school);
-        log.info("Đã tạo trường học mới: {} ({}) với quota: {} tokens", savedSchool.getName(), savedSchool.getSchoolCode(), totalQuota);
+        log.info("Created new school: {} ({}) with quota: {} tokens", savedSchool.getName(), savedSchool.getSchoolCode(), totalQuota);
 
         return mapToSchoolResponse(savedSchool);
     }
@@ -70,7 +70,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional(readOnly = true)
     public SchoolResponse getSchoolById(UUID schoolId) {
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
         return mapToSchoolResponse(school);
     }
 
@@ -78,11 +78,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional
     public SchoolAdminResponse createSchoolAdmin(CreateSchoolAdminRequest request) {
         School school = schoolRepository.findById(request.getSchoolId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + request.getSchoolId()));
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + request.getSchoolId()));
 
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new DataConflictException("Email " + normalizedEmail + " đã được sử dụng bởi tài khoản khác");
+            throw new DataConflictException("Email " + normalizedEmail + " is already in use by another account");
         }
 
         String baseUserName = school.getSchoolCode().toLowerCase() + "_admin";
@@ -107,7 +107,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .build();
 
         User savedUser = userRepository.save(schoolAdmin);
-        log.info("Đã cấp tài khoản School Admin: {} cho trường: {}", savedUser.getUserName(), school.getName());
+        log.info("Created School Admin account: {} for school: {}", savedUser.getUserName(), school.getName());
 
         return SchoolAdminResponse.builder()
                 .uid(savedUser.getUid())

@@ -39,11 +39,11 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public TeacherResponse createTeacher(CreateTeacherRequest request, UUID schoolId) {
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
 
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new DataConflictException("Email " + normalizedEmail + " đã được sử dụng");
+            throw new DataConflictException("Email " + normalizedEmail + " is already in use");
         }
 
         String baseUserName = school.getSchoolCode().toLowerCase() + "_gv_";
@@ -68,7 +68,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .build();
 
         User saved = userRepository.save(teacher);
-        log.info("Đã tạo Giáo viên mới: {} ({}) cho trường: {}", saved.getFullName(), saved.getUserName(), school.getName());
+        log.info("Created new teacher: {} ({}) for school: {}", saved.getFullName(), saved.getUserName(), school.getName());
 
         TeacherResponse response = mapToTeacherResponse(saved);
         response.setInitialPassword(rawPassword);
@@ -100,14 +100,14 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public TeacherResponse updateTeacherStatus(UUID teacherId, UUID schoolId, boolean active) {
         User teacher = userRepository.findById(teacherId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherId));
+                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with ID: " + teacherId));
 
         if (teacher.getSchool() == null || !teacher.getSchool().getId().equals(schoolId)) {
-            throw new ResourceNotFoundException("Giáo viên không thuộc trường của bạn");
+            throw new ResourceNotFoundException("Teacher does not belong to your school");
         }
 
         if (teacher.getRole() != UserRole.TEACHER) {
-            throw new ResourceNotFoundException("Tài khoản không phải là Giáo viên");
+            throw new ResourceNotFoundException("Account is not a teacher");
         }
 
         if (active) {
@@ -117,7 +117,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
         }
 
         User updated = userRepository.save(teacher);
-        log.info("Cập nhật trạng thái giáo viên {}: active={}", updated.getUserName(), active);
+        log.info("Updated teacher status for {}: active={}", updated.getUserName(), active);
         return mapToTeacherResponse(updated);
     }
 

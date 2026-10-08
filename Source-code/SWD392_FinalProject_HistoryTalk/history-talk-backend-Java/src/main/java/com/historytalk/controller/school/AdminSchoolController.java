@@ -20,34 +20,34 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@Tag(name = "SaaS School Administration", description = "APIs dành cho System Admin quản lý Trường học & cấp tài khoản School Admin")
+@Tag(name = "SaaS School Administration", description = "Endpoints for System Admin to manage schools and school admin accounts (US-SP5-01, US-SP5-02)")
 public class AdminSchoolController {
 
     private final SchoolManagementService schoolManagementService;
 
     @PostMapping("/schools")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    @Operation(summary = "Tạo Trường học mới & Gán gói Enterprise Token (US-SP5-01)")
+    @Operation(summary = "Create school and assign enterprise token package (US-SP5-01)")
     public ResponseEntity<ApiResponse<SchoolResponse>> createSchool(@Valid @RequestBody CreateSchoolRequest request) {
         SchoolResponse response = schoolManagementService.createSchool(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Khởi tạo Trường học và Gói Hạn mức Token thành công"));
+                .body(ApiResponse.success(response, "School and token quota initialized successfully"));
     }
 
     @GetMapping("/schools/{id}")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    @Operation(summary = "Xem thông tin chi tiết Trường học theo ID")
+    @Operation(summary = "Get school details by ID")
     public ResponseEntity<ApiResponse<SchoolResponse>> getSchoolById(@PathVariable UUID id) {
         SchoolResponse response = schoolManagementService.getSchoolById(id);
-        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin Trường học thành công"));
+        return ResponseEntity.ok(ApiResponse.success(response, "School details retrieved successfully"));
     }
 
     @PostMapping("/school-admins")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    @Operation(summary = "Cấp Tài khoản School Admin & Security RBAC Setup (US-SP5-02)")
+    @Operation(summary = "Create School Admin account and setup RBAC (US-SP5-02)")
     public ResponseEntity<ApiResponse<SchoolAdminResponse>> createSchoolAdmin(@Valid @RequestBody CreateSchoolAdminRequest request) {
         SchoolAdminResponse response = schoolManagementService.createSchoolAdmin(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Cấp tài khoản School Admin thành công"));
+                .body(ApiResponse.success(response, "School Admin account created successfully"));
     }
 }

@@ -14,18 +14,18 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateTeacherRequest {
 
-    @NotBlank(message = "Họ và tên không được để trống")
-    @Size(min = 2, max = 150, message = "Họ và tên từ 2 đến 150 ký tự")
+    @NotBlank(message = "Full name must not be blank")
+    @Size(min = 2, max = 150, message = "Full name must be between 2 and 150 characters")
     private String fullName;
 
-    @NotBlank(message = "Email không được để trống")
-    @Email(message = "Email không đúng định dạng")
+    @NotBlank(message = "Email must not be blank")
+    @Email(message = "Email is invalid")
     private String email;
 
-    @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
+    @Size(max = 20, message = "Phone number must not exceed 20 characters")
     private String phoneNumber;
 
-    @NotBlank(message = "Tổ môn giảng dạy không được để trống")
-    @Size(max = 100, message = "Tổ bộ môn tối đa 100 ký tự")
+    @NotBlank(message = "Subject department must not be blank")
+    @Size(max = 100, message = "Subject department must not exceed 100 characters")
     private String subjectDepartment;
 }

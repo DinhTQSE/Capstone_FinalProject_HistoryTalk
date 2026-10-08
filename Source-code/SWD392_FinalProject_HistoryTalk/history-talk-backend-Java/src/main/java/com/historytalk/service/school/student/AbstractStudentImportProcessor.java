@@ -51,42 +51,42 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
     @Transactional
     public StudentImportResultDto processImport(MultipartFile file, StudentImportContext context) {
         if (file == null || file.isEmpty()) {
-            throw new InvalidRequestException("File upload không được để trống");
+            throw new InvalidRequestException("Upload file must not be empty");
         }
 
         School school = schoolRepository.findById(context.getSchoolId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + context.getSchoolId()));
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + context.getSchoolId()));
 
         StudentImportResultDto resultDto = StudentImportResultDto.builder()
                 .errors(new ArrayList<>())
                 .successfulAccounts(new ArrayList<>())
                 .build();
 
-        // Bước 1: Parse Records từ File
+        // Step 1: Parse Records from file
         List<StudentImportRowDto> rawRows = parseRecords(file);
         resultDto.setTotalRows(rawRows.size());
 
         if (rawRows.isEmpty()) {
-            throw new InvalidRequestException("File không chứa dòng dữ liệu nào");
+            throw new InvalidRequestException("The file contains no data rows");
         }
 
-        // Bước 2: Validate cơ bản từng dòng
+        // Step 2: Validate each row
         List<StudentImportRowDto> validRows = validateRows(rawRows, context, resultDto);
 
-        // Bước 3: Đa hình - Resolve Classrooms
+        // Step 3: Polymorphic - Resolve Classrooms
         resolveClassrooms(validRows, context, resultDto);
 
-        // Bước 4: Đa hình - Kiểm tra & trừ Token Quota
+        // Step 4: Polymorphic - Verify & deduct Token Quota
         verifyAndDeductQuota(validRows, context, school);
 
-        // Bước 5: Persist Accounts & Sinh mật khẩu
+        // Step 5: Persist Accounts & Generate Passwords
         persistAccounts(validRows, context, school, resultDto);
 
         resultDto.setSuccessCount(resultDto.getSuccessfulAccounts().size());
         resultDto.setFailureCount(resultDto.getErrors().size());
         resultDto.setRemainingSchoolTokens(school.getUnallocatedTokenQuota());
 
-        log.info("Hoàn tất import học sinh trường {}: {} thành công, {} lỗi",
+        log.info("Finished student import for school {}: {} succeeded, {} failed",
                 school.getSchoolCode(), resultDto.getSuccessCount(), resultDto.getFailureCount());
 
         return resultDto;
@@ -95,7 +95,7 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
     protected List<StudentImportRowDto> parseRecords(MultipartFile file) {
         String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
         if (!originalName.endsWith(".csv")) {
-            throw new InvalidRequestException("Định dạng file không hỗ trợ. Vui lòng upload file .csv chuẩn");
+            throw new InvalidRequestException("Unsupported file format. Please upload a valid .csv file");
         }
 
         List<StudentImportRowDto> rows = new ArrayList<>();
@@ -152,8 +152,8 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                         .build());
             }
         } catch (Exception e) {
-            log.error("Lỗi khi đọc file CSV: {}", e.getMessage(), e);
-            throw new InvalidRequestException("Không thể đọc file CSV. Vui lòng kiểm tra encoding UTF-8 và format file");
+            log.error("Error reading CSV file: {}", e.getMessage(), e);
+            throw new InvalidRequestException("Could not read CSV file. Please verify UTF-8 encoding and file format");
         }
 
         return rows;
@@ -172,25 +172,25 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
             boolean hasError = false;
 
             if (row.getFullName() == null || row.getFullName().trim().isEmpty()) {
-                addError(resultDto, row.getRowNumber(), row.getStudentCode(), "full_name", "Họ và tên không được để trống");
+                addError(resultDto, row.getRowNumber(), row.getStudentCode(), "full_name", "Full name must not be blank");
                 hasError = true;
             }
 
             if (row.getDob() == null) {
-                addError(resultDto, row.getRowNumber(), row.getStudentCode(), "dob", "Ngày sinh không đúng định dạng YYYY-MM-DD");
+                addError(resultDto, row.getRowNumber(), row.getStudentCode(), "dob", "Date of birth format is invalid (expected YYYY-MM-DD)");
                 hasError = true;
             }
 
             if (row.getStudentCode() != null && !row.getStudentCode().trim().isEmpty()) {
                 String code = row.getStudentCode().trim();
                 if (!STUDENT_CODE_PATTERN.matcher(code).matches()) {
-                    addError(resultDto, row.getRowNumber(), code, "student_code", "Mã học sinh chỉ chứa chữ cái, số, gạch ngang/dưới (2-30 ký tự)");
+                    addError(resultDto, row.getRowNumber(), code, "student_code", "Student code must contain only letters, numbers, hyphens or underscores (2-30 characters)");
                     hasError = true;
                 } else if (!seenStudentCodes.add(code.toLowerCase())) {
-                    addError(resultDto, row.getRowNumber(), code, "student_code", "Mã học sinh bị trùng lặp trong nội bộ file");
+                    addError(resultDto, row.getRowNumber(), code, "student_code", "Duplicate student code within the file");
                     hasError = true;
                 } else if (userRepository.existsBySchoolIdAndStudentCodeIgnoreCase(context.getSchoolId(), code)) {
-                    addError(resultDto, row.getRowNumber(), code, "student_code", "Mã học sinh đã tồn tại trong trường");
+                    addError(resultDto, row.getRowNumber(), code, "student_code", "Student code already exists in this school");
                     hasError = true;
                 }
             }
@@ -198,10 +198,10 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
             if (row.getEmail() != null && !row.getEmail().trim().isEmpty()) {
                 String em = row.getEmail().trim().toLowerCase();
                 if (!seenEmails.add(em)) {
-                    addError(resultDto, row.getRowNumber(), row.getStudentCode(), "email", "Email bị trùng lặp trong nội bộ file");
+                    addError(resultDto, row.getRowNumber(), row.getStudentCode(), "email", "Duplicate email within the file");
                     hasError = true;
                 } else if (userRepository.existsByEmailIgnoreCase(em)) {
-                    addError(resultDto, row.getRowNumber(), row.getStudentCode(), "email", "Email đã được sử dụng trên hệ thống");
+                    addError(resultDto, row.getRowNumber(), row.getStudentCode(), "email", "Email already in use across the system");
                     hasError = true;
                 }
             }

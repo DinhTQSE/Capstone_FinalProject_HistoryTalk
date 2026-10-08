@@ -53,13 +53,13 @@ public class SchoolWideImportProcessor extends AbstractStudentImportProcessor {
         int availableTokens = school.getUnallocatedTokenQuota();
         if (availableTokens < totalTokensNeeded) {
             throw new InvalidRequestException(String.format(
-                    "Quỹ Token chưa phân bổ của trường không đủ: Đợt import này yêu cầu %,d Tokens nhưng trường chỉ còn %,d Tokens khả dụng.",
+                    "Insufficient unallocated token quota: Import requires %,d tokens but the school only has %,d available tokens.",
                     totalTokensNeeded, availableTokens));
         }
 
         school.setUnallocatedTokenQuota(availableTokens - totalTokensNeeded);
         schoolRepository.save(school);
-        log.info("Đã trừ %,d Tokens từ quỹ trường {}. Quỹ còn lại: %,d Tokens",
+        log.info("Deducted %,d tokens from school {} quota. Remaining quota: %,d tokens",
                 totalTokensNeeded, school.getSchoolCode(), school.getUnallocatedTokenQuota());
     }
 }

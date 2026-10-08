@@ -16,27 +16,27 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateSchoolRequest {
 
-    @NotBlank(message = "Tên trường không được để trống")
-    @Size(max = 255, message = "Tên trường tối đa 255 ký tự")
+    @NotBlank(message = "School name must not be blank")
+    @Size(max = 255, message = "School name must not exceed 255 characters")
     private String name;
 
-    @NotBlank(message = "Mã trường không được để trống")
-    @Size(min = 2, max = 50, message = "Mã trường từ 2 đến 50 ký tự")
+    @NotBlank(message = "School code must not be blank")
+    @Size(min = 2, max = 50, message = "School code must be between 2 and 50 characters")
     private String schoolCode;
 
-    @Size(max = 500, message = "Địa chỉ tối đa 500 ký tự")
+    @Size(max = 500, message = "Address must not exceed 500 characters")
     private String address;
 
-    @NotBlank(message = "Email liên hệ không được để trống")
-    @Email(message = "Email liên hệ không đúng định dạng")
+    @NotBlank(message = "Contact email must not be blank")
+    @Email(message = "Contact email is invalid")
     private String contactEmail;
 
-    @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
+    @Size(max = 20, message = "Contact phone must not exceed 20 characters")
     private String contactPhone;
 
-    @NotNull(message = "Gói Enterprise không được để trống")
+    @NotNull(message = "Package type must not be null")
     private EnterprisePackage packageType;
 
-    @NotNull(message = "Bắt buộc xác nhận điều khoản nội dung lịch sử địa phương")
+    @NotNull(message = "Local history policy acceptance is required")
     private Boolean localHistoryPolicyAccepted;
 }

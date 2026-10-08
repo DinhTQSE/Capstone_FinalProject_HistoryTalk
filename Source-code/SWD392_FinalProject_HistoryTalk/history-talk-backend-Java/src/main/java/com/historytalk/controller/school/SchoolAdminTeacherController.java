@@ -25,26 +25,26 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/school-admin/teachers")
 @RequiredArgsConstructor
-@Tag(name = "SaaS Teacher Management", description = "APIs dành cho School Admin quản lý Giáo viên trong trường (US-SP5-03)")
+@Tag(name = "SaaS Teacher Management", description = "Endpoints for School Admin to manage teachers within their school (US-SP5-03)")
 public class SchoolAdminTeacherController {
 
     private final TeacherManagementService teacherManagementService;
 
     @PostMapping
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    @Operation(summary = "Tạo tài khoản Giáo viên mới trong trường")
+    @Operation(summary = "Create teacher account for school")
     public ResponseEntity<ApiResponse<TeacherResponse>> createTeacher(
             @Valid @RequestBody CreateTeacherRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         
         TeacherResponse response = teacherManagementService.createTeacher(request, principal.getSchoolId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Tạo tài khoản Giáo viên thành công"));
+                .body(ApiResponse.success(response, "Teacher account created successfully"));
     }
 
     @GetMapping
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    @Operation(summary = "Xem danh sách Giáo viên trong trường có tìm kiếm và phân trang")
+    @Operation(summary = "Get list of teachers with search and pagination")
     public ResponseEntity<ApiResponse<PaginatedResponse<TeacherResponse>>> getTeachers(
             @RequestParam(required = false) String search,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
@@ -52,12 +52,12 @@ public class SchoolAdminTeacherController {
         
         PaginatedResponse<TeacherResponse> response = teacherManagementService.getTeachers(
                 principal.getSchoolId(), search, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách Giáo viên thành công"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Teachers retrieved successfully"));
     }
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    @Operation(summary = "Cập nhật trạng thái hoạt động (ACTIVE / INACTIVE) của Giáo viên")
+    @Operation(summary = "Update teacher active status (ACTIVE / INACTIVE)")
     public ResponseEntity<ApiResponse<TeacherResponse>> updateTeacherStatus(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateTeacherStatusRequest request,
@@ -65,7 +65,9 @@ public class SchoolAdminTeacherController {
         
         TeacherResponse response = teacherManagementService.updateTeacherStatus(
                 id, principal.getSchoolId(), request.getActive());
-        String msg = Boolean.TRUE.equals(request.getActive()) ? "Kích hoạt tài khoản Giáo viên thành công" : "Khóa tài khoản Giáo viên thành công";
+        String msg = Boolean.TRUE.equals(request.getActive()) 
+                ? "Teacher account activated successfully" 
+                : "Teacher account deactivated successfully";
         return ResponseEntity.ok(ApiResponse.success(response, msg));
     }
 }

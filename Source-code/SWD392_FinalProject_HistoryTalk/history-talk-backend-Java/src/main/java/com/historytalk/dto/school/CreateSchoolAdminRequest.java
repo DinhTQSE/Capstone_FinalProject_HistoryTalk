@@ -17,17 +17,17 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateSchoolAdminRequest {
 
-    @NotNull(message = "School ID không được để trống")
+    @NotNull(message = "School ID must not be null")
     private UUID schoolId;
 
-    @NotBlank(message = "Họ và tên không được để trống")
-    @Size(min = 2, max = 150, message = "Họ và tên từ 2 đến 150 ký tự")
+    @NotBlank(message = "Full name must not be blank")
+    @Size(min = 2, max = 150, message = "Full name must be between 2 and 150 characters")
     private String fullName;
 
-    @NotBlank(message = "Email không được để trống")
-    @Email(message = "Email không đúng định dạng")
+    @NotBlank(message = "Email must not be blank")
+    @Email(message = "Email is invalid")
     private String email;
 
-    @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
+    @Size(max = 20, message = "Phone number must not exceed 20 characters")
     private String phoneNumber;
 }
