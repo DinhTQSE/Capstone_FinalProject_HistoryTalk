@@ -126,8 +126,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/quizzes/**").permitAll()
 
                         // Interactive Map: GET is public (admin pins visible to all);
-                        // POST and DELETE require authentication (role enforced in service layer)
+                        // POST, PUT and DELETE require authentication (role enforced in service layer)
                         .requestMatchers(HttpMethod.POST,   "/api/v1/historical-contexts/*/map-pins").authenticated()
+                        .requestMatchers(HttpMethod.PUT,    "/api/v1/historical-contexts/*/map-pins/*").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/historical-contexts/*/map-pins/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/*/map-pins").permitAll()
 
