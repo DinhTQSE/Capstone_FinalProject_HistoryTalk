@@ -124,6 +124,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     public SchoolResponse createSchool(CreateSchoolRequest request) {
         String finalSchoolCode = resolveOrGenerateSchoolCode(request.getSchoolCode(), request.getName(), request.getAddress());
 
+        String trimmedName = request.getName().trim();
+        if (schoolRepository.existsByNameIgnoreCase(trimmedName)) {
+            throw new DataConflictException("Tên trường học \"" + trimmedName + "\" đã tồn tại trong hệ thống");
+        }
+
         if (Boolean.FALSE.equals(request.getLocalHistoryPolicyAccepted())) {
             throw new InvalidRequestException("School must agree to the local history content terms and conditions");
         }
