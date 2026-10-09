@@ -8,10 +8,11 @@
 
 | Story ID | Tên User Story | Actor | Developer | API Endpoint chính |
 | :--- | :--- | :--- | :--- | :--- |
-| **`US-SP5-01`** | Quản lý Trường học & Gói Hạn mức Token Tổng | `System Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/admin/schools` |
+| **`US-SP5-01`** | Quản lý Trường học & Gói Hạn mức Token Tổng | `System Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/admin/schools`<br>`GET /api/v1/admin/schools`<br>`GET /api/v1/admin/schools/{id}` |
 | **`US-SP5-02`** | Cấp Tài khoản School Admin & Security RBAC | `System Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/admin/school-admins` |
 | **`US-SP5-03`** | Quản lý Tài khoản Giáo viên trong Trường | `School Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/school-admin/teachers` |
 | **`US-SP5-04`** | Tạo lẻ & Import Excel Hàng loạt Tài khoản Học sinh | `School Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/school-admin/students/import-excel` |
+| **`US-SP5-05`** | Giám sát & Tra cứu Hạn mức Token Trường học | `School Admin` | 🟢 Khải (KhaiVDD) | `GET /api/v1/school-admin/token-quota` |
 
 ---
 
@@ -22,11 +23,21 @@
 * **Thời gian thực hiện:** 04/10/2026 – 05/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là System Admin, tôi muốn tạo thông tin Trường học mới và gán Gói Enterprise Token cố định cho toàn trường, để thiết lập hợp đồng dịch vụ SaaS B2B với nhà trường.
+  Là System Admin, tôi muốn tạo thông tin Trường học mới, gán Gói Enterprise Token cố định cho toàn trường, tra cứu danh sách và xem chi tiết trường học để thiết lập và quản lý các hợp đồng dịch vụ SaaS B2B với nhà trường.
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/admin/schools` tiếp nhận: Tên trường, Mã trường (`school_code` duy nhất), Địa chỉ, Email liên hệ đại diện, Gói Enterprise (`ENTERPRISE_SMALL`: 5M Tokens/tháng, `ENTERPRISE_MEDIUM`: 20M Tokens/tháng, `ENTERPRISE_LARGE`: 50M Tokens/tháng).
-  2. Lưu số Token tổng vào trường `total_school_token_quota` và khởi tạo số Token dư chưa phân bổ `unallocated_token_quota = total_school_token_quota`.
-  3. Kiểm tra điều khoản Policy miễn trừ trách nhiệm về Nội dung Lịch sử Địa phương được chấp nhận trong hợp đồng trường.
+  1. API `POST /api/v1/admin/schools` tiếp nhận: Tên trường, Mã trường (`school_code` - tùy chọn), Địa chỉ, Email liên hệ đại diện, Gói Enterprise (`ENTERPRISE_SMALL`: 5M Tokens/tháng, `ENTERPRISE_MEDIUM`: 20M Tokens/tháng, `ENTERPRISE_LARGE`: 50M Tokens/tháng).
+  2. **Cơ chế Định danh Mã Trường học (Hybrid School Code Generation & Anti-Collision)**:
+     - **Thủ công (Custom School Code):** Nếu System Admin nhập sẵn `school_code` (ví dụ dùng Mã định danh Sở GD&ĐT hoặc tên viết tắt quen thuộc như `LHP`, `AMS`), hệ thống chuẩn hóa Uppercase, validate định dạng regex `^[A-Za-z0-9_-]{2,30}$` và kiểm tra trùng lặp trên toàn hệ thống (báo lỗi `409 Data Conflict` nếu mã tùy chỉnh đã bị sử dụng).
+     - **Tự động sinh (Auto-generated from School Name & Address):** Nếu để trống `school_code`, hệ thống **tự động kết hợp Tên trường và Địa chỉ**:
+       * **Bóc tách Tên trường (Name Acronym):** Loại bỏ các định từ phổ biến (`"Trường"`, `"THPT"`, `"THCS"`, `"Tiểu học"`, `"Phổ thông"`, `"Chuyên"`), lấy các chữ cái đầu không dấu: *"THPT Lê Hồng Phong"* $\rightarrow$ `LHP`; *"THCS Nguyễn Tất Thành"* $\rightarrow$ `NTT`.
+       * **Bóc tách Địa chỉ (Location Acronym):** Phân tích tỉnh/thành phố từ địa chỉ trường (dựa vào đoạn cuối địa chỉ hoặc danh sách alias tỉnh/thành chuẩn): *"TP. Hồ Chí Minh"* $\rightarrow$ `HCM`; *"Nam Định"* $\rightarrow$ `ND`; *"Hà Nội"* $\rightarrow$ `HN`; *"Đà Nẵng"* $\rightarrow$ `DN`.
+       * **Định dạng Mã cơ sở:** `{TÊN_VIẾT_TẮT}-{ĐỊA_CHỈ}` $\rightarrow$ Ví dụ: Trường THPT Lê Hồng Phong tại TP.HCM sinh ra `LHP-HCM`; Trường THPT Lê Hồng Phong tại Nam Định sinh ra `LHP-ND`. (Nếu không có địa chỉ thì dùng `{TÊN_VIẾT_TẮT}`).
+       * **Cơ chế chống trùng lặp (Anti-Collision Sequence):** Nếu trong hệ thống đã tồn tại trường có mã trùng (ví dụ có 2 trường THPT Lê Hồng Phong cùng ở TP.HCM đăng ký), hệ thống **tự động tăng hậu tố sequence theo gạch nối**: `{BASE_CODE}-01`, `{BASE_CODE}-02`, `{BASE_CODE}-03`... (VD: Trường thứ 1 nhận `LHP-HCM`, trường thứ 2 nhận `LHP-HCM-01`, trường thứ 3 nhận `LHP-HCM-02`), đảm bảo các trường đăng ký sau **không bao giờ bị lỗi trùng mã hay bị chặn đăng ký**.
+  3. Lưu số Token tổng vào trường `total_school_token_quota` và khởi tạo số Token dư chưa phân bổ `unallocated_token_quota = total_school_token_quota`.
+  4. Kiểm tra điều khoản Policy miễn trừ trách nhiệm về Nội dung Lịch sử Địa phương được chấp nhận trong hợp đồng trường (`localHistoryPolicyAccepted = true`).
+  5. **Tra cứu & Quản lý Danh sách Trường học:**
+     - API `GET /api/v1/admin/schools`: Hỗ trợ tìm kiếm theo từ khóa (`search` - tên trường, mã trường, contact email), phân trang chuẩn `page`, `size`, `sortBy`, `sortDirection` trả về `PaginatedApiResponse<SchoolResponse>` (gồm mảng `data` và metadata `pagination`).
+     - API `GET /api/v1/admin/schools/{id}`: Trả về chi tiết trường học gồm hạn mức token tổng, token chưa phân bổ, địa chỉ, trạng thái hoạt động.
 
 ---
 
@@ -41,6 +52,15 @@
   2. Bổ sung `SCHOOL_ADMIN`, `TEACHER`, `SCHOOL_STUDENT` vào Enum `UserRole`.
   3. Cấu hình Spring Security: `School Admin` chỉ truy cập và chỉnh sửa được các tài nguyên có `school_id` khớp với tài khoản của mình.
   4. Tự động mã hóa mật khẩu tạm thời bằng BCrypt và gửi Email kích hoạt cho School Admin.
+* **Quy tắc Sinh Tên tài khoản & Mật khẩu khởi tạo (Account Credentials Generation Rules):**
+  - **Quy tắc sinh `username`:**
+    * Format: `{school_code}_admin` (toàn bộ chữ thường, không dấu, khoảng trắng đổi thành gạch dưới. Ví dụ: trường mã `LHP` $\rightarrow$ `lhp_admin`, trường mã `LHP-HCM` $\rightarrow$ `lhp_hcm_admin`).
+    * Cơ chế chống trùng (Anti-collision Sequence): Nếu trường tạo thêm tài khoản admin, tự động tăng hậu tố sequence: `{school_code}_admin_1`, `{school_code}_admin_2`...
+  - **Quy tắc sinh `initialPassword`:**
+    * Format: Chuỗi 10 ký tự an toàn bắt đầu bằng prefix cố định `Ht@` kèm 7 ký tự ngẫu nhiên (chữ hoa, chữ thường, số, ký tự đặc biệt. VD: `Ht@KyLZBGU`, `Ht@9xP2mQ!z`).
+    * Mã hóa bằng BCrypt trước khi lưu database.
+    * Gán cờ `must_change_password = true` để bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên.
+    * Trả về mật khẩu khởi tạo dạng plaintext trong response (`initialPassword`) để System Admin bàn giao cho nhà trường.
 
 ---
 
@@ -52,9 +72,18 @@
   Là School Admin, tôi muốn tạo mới, cập nhật thông tin và khóa tài khoản các Giáo viên thuộc trường mình, để cấp quyền cho Giáo viên quản lý lớp học.
 * **Acceptance Criteria (AC):**
   1. API `POST /api/v1/school-admin/teachers` tạo user có role `TEACHER` thuộc cùng `school_id`.
-  2. Yêu cầu nhập: Họ tên, Email, Số điện thoại, Tổ môn giảng dạy.
+  2. Yêu cầu nhập: Họ tên, Email, Số điện thoại.
   3. API `GET /api/v1/school-admin/teachers` danh sách giáo viên trong trường có tìm kiếm và phân trang.
   4. API `PUT /api/v1/school-admin/teachers/{id}/status` cho phép chuyển trạng thái `ACTIVE` / `INACTIVE`.
+* **Quy tắc Sinh Tên tài khoản & Mật khẩu khởi tạo (Teacher Credentials Generation Rules):**
+  - **Quy tắc sinh `username`:**
+    * Format: `{school_code}_gv_{4_chữ_số_ngẫu_nhiên}` (toàn bộ chữ thường, không dấu. Ví dụ: `lhp_hcm_gv_1042`, `lhp_gv_7153`).
+    * Cơ chế kiểm tra chống trùng: Hệ thống thực hiện kiểm tra `existsByUserNameIgnoreCase` trong database trước khi lưu, đảm bảo tên đăng nhập là duy nhất 100% trên toàn hệ thống.
+  - **Quy tắc sinh `initialPassword`:**
+    * Format: Chuỗi 10 ký tự an toàn bắt đầu bằng prefix `Ht@` (VD: `Ht@nAScTPY`).
+    * Mã hóa bằng BCrypt trước khi lưu database.
+    * Gán cờ `must_change_password = true`.
+    * Trả về `initialPassword` trong response tạo mới để School Admin bàn giao cho giáo viên.
 
 ---
 
@@ -74,7 +103,7 @@
   | `full_name` | String (2 - 150) | **Có** | Họ và tên đầy đủ của học sinh. Hỗ trợ tiếng Việt Unicode UTF-8. |
   | `email` | String (tối đa 100) | **Không (Tùy chọn)** | Email học sinh hoặc phụ huynh (chỉ để lưu trữ hồ sơ liên lạc nếu trường có sẵn). Học sinh chưa có sẽ tự liên kết Gmail cá nhân ở lần đăng nhập đầu tiên (First Login Onboarding). |
   | `dob` | Date (`YYYY-MM-DD`) | **Có** | Ngày sinh của học sinh theo định dạng chuẩn ISO (VD: `2009-03-15`). |
-  | `gender` | Enum String | Không | Giới tính: `MALE`, `FEMALE`, hoặc `OTHER`. Mặc định nếu trống: `OTHER`. |
+  | `gender` | Enum String | Không (Tùy chọn) | Giới tính: `MALE` hoặc `FEMALE`. Nếu để trống sẽ lưu null, không bắt buộc. |
   | `phone_number` | String (10 số) | Không | Số điện thoại học sinh hoặc phụ huynh (định dạng SĐT Việt Nam, VD: `0912345671`). |
   | `class_code` | String | Không (Case 1) / Có (Case 2) | Mã lớp học muốn phân vào ngay (VD: `HIS10A1-2026`). Có trong template toàn trường; không cần trong template theo lớp. |
   | `password` | String (6 - 50) | Không | **Mật khẩu khởi tạo**: <br>- **Nếu để trống**: Hệ thống **tự động generate mật khẩu ngẫu nhiên** (VD: `{student_code}@2026` hoặc chuỗi 8 ký tự an toàn `Ht@xxxxxx`). <br>- **Nếu nhập sẵn**: Hệ thống kiểm tra độ dài tối thiểu và mã hóa BCrypt. Đánh dấu cờ `must_change_password = true` khi đăng nhập lần đầu. |
@@ -106,6 +135,27 @@
   4. Trả về kết quả import:
      - Trả về thống kê số lượng thành công / thất bại.
      - Xuất kèm/cho phép download file kết quả import chứa danh sách tài khoản (`student_code`, `user_name`, `email`, `class_code`) kèm **Mật khẩu khởi tạo ban đầu (Plaintext Initial Password)** để nhà trường in/phát cho học sinh đăng nhập lần đầu.
+
+---
+
+### 🆔 US-SP5-05: Giám sát & Tra cứu Hạn mức Token Trường học (School Token Quota Monitoring)
+* **Actor:** `School Admin`
+* **Thời gian thực hiện:** 08/10/2026 – 09/10/2026
+* **Phụ trách:** 🟢 Khải (KhaiVDD)
+* **User Story:**  
+  Là School Admin, tôi muốn theo dõi gói dịch vụ Enterprise hiện tại, số lượng token tổng, số token đã phân bổ và số token còn dư chưa phân bổ của trường mình, để nắm rõ tình trạng tài nguyên và có kế hoạch phân bổ token hợp lý cho học sinh/giáo viên trước mỗi đợt import tài khoản.
+* **Acceptance Criteria (AC):**
+  1. API `GET /api/v1/school-admin/token-quota` bảo mật bằng RBAC role `SCHOOL_ADMIN`, tự động trích xuất `school_id` an toàn từ ngữ cảnh đăng nhập.
+  2. Trả về thông tin hạn mức token trường học:
+     - `schoolId`, `schoolName`, `schoolCode`
+     - `packageType` (VD: `ENTERPRISE_SMALL`, `ENTERPRISE_MEDIUM`, `ENTERPRISE_LARGE`)
+     - `totalSchoolTokenQuota` (Tổng hạn mức theo gói)
+     - `unallocatedTokenQuota` (Số token còn lại chưa phân bổ)
+     - `allocatedTokenQuota` (Số token đã phân bổ = `total - unallocated`)
+     - `usagePercentage` (Tỷ lệ đã sử dụng/phân bổ dạng %)
+  3. Bọc kết quả bằng `ApiResponse<SchoolTokenQuotaResponse>` chuẩn.
+
+---
 
 * **Kiến trúc Kỹ thuật & Nguyên tắc Triển khai (Technical Design & Guidelines for Devs):**
   1. **Pattern xử lý đa hình (Template Method Pattern)**:

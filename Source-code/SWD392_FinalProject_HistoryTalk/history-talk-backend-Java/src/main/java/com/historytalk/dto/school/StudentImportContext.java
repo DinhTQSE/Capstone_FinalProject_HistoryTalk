@@ -18,6 +18,6 @@ public class StudentImportContext {
     private String schoolCode;
     private UUID operatorId;
     private UserRole operatorRole;
-    private UUID targetClassroomId; // Null nếu là toàn trường
+    private String classCode; // Mã lớp học nếu import theo lớp (Case 1), null nếu là toàn trường (Case 2)
     private Integer defaultInitialToken;
 }

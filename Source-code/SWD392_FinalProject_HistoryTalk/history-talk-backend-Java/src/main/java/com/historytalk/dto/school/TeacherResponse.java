@@ -19,7 +19,6 @@ public class TeacherResponse {
     private String fullName;
     private String email;
     private String phoneNumber;
-    private String subjectDepartment;
     private Boolean active;
     private String initialPassword; // Trả về khi tạo mới
     private LocalDateTime createdAt;

@@ -3,10 +3,15 @@ package com.historytalk.controller.school;
 import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.school.StudentImportContext;
 import com.historytalk.dto.school.StudentImportResultDto;
-import com.historytalk.entity.enums.UserRole;
+import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
+import com.historytalk.exception.UnauthorizedException;
+import com.historytalk.repository.UserRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.school.student.StudentImportProcessor;
+import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,6 +33,7 @@ public class SchoolAdminStudentController {
 
     @Qualifier("SCHOOL_WIDE_IMPORT")
     private final StudentImportProcessor studentImportProcessor;
+    private final UserRepository userRepository;
 
     @Value("${historytalk.saas.student.default-initial-token:10000}")
     private Integer configuredDefaultToken;
@@ -37,6 +43,9 @@ public class SchoolAdminStudentController {
     @Operation(summary = "Bulk import student accounts via CSV file (US-SP5-04)")
     public ResponseEntity<ApiResponse<StudentImportResultDto>> importStudents(
             @RequestPart("file") MultipartFile file,
+            @Parameter(description = "Class code when importing for a specific class (Case 1: classroom template without class_code column)")
+            @RequestParam(name = "classCode", required = false) String classCode,
+            @Parameter(description = "Default initial token for each student (default: 10000)")
             @RequestParam(name = "defaultInitialToken", required = false) Integer defaultInitialToken,
             @AuthenticationPrincipal UserPrincipal principal) {
 
@@ -44,11 +53,14 @@ public class SchoolAdminStudentController {
                 ? defaultInitialToken
                 : configuredDefaultToken;
 
+        User schoolAdmin = resolveSchoolAdmin(principal);
+
         StudentImportContext context = StudentImportContext.builder()
-                .schoolId(principal.getSchoolId())
-                .schoolCode(principal.getSchoolCode())
-                .operatorId(UUID.fromString(principal.getUid()))
-                .operatorRole(UserRole.SCHOOL_ADMIN)
+                .schoolId(schoolAdmin.getSchool().getId())
+                .schoolCode(schoolAdmin.getSchool().getSchoolCode())
+                .operatorId(schoolAdmin.getUid())
+                .operatorRole(schoolAdmin.getRole())
+                .classCode(classCode)
                 .defaultInitialToken(effectiveDefaultToken)
                 .build();
 
@@ -58,5 +70,22 @@ public class SchoolAdminStudentController {
                 result.getSuccessCount(), result.getFailureCount(), result.getTotalTokensAllocated());
 
         return ResponseEntity.ok(ApiResponse.success(result, message));
+    }
+
+    private User resolveSchoolAdmin(UserPrincipal principal) {
+        if (principal != null && principal.getSchoolId() != null) {
+            return userRepository.findById(UUID.fromString(principal.getUid()))
+                    .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+        }
+        String userId = SecurityUtils.getUserId();
+        if (userId == null) {
+            throw new UnauthorizedException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
+        }
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+        if (user.getSchool() == null) {
+            throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");
+        }
+        return user;
     }
 }

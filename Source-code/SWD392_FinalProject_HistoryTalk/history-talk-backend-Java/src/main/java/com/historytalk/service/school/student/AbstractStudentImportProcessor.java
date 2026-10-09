@@ -244,11 +244,14 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
             int extraToken = row.getAdditionalToken() != null ? Math.max(0, row.getAdditionalToken()) : 0;
             int totalTokens = baseToken + extraToken;
 
-            Gender gender = Gender.OTHER;
-            if (row.getGender() != null) {
-                try {
-                    gender = Gender.valueOf(row.getGender().trim().toUpperCase());
-                } catch (IllegalArgumentException ignored) {}
+            Gender gender = null;
+            if (row.getGender() != null && !row.getGender().trim().isEmpty()) {
+                String g = row.getGender().trim().toUpperCase();
+                if ("MALE".equals(g)) {
+                    gender = Gender.MALE;
+                } else if ("FEMALE".equals(g)) {
+                    gender = Gender.FEMALE;
+                }
             }
 
             User student = User.builder()
