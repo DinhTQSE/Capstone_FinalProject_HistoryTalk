@@ -36,8 +36,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countBySchoolIdAndRole(UUID schoolId, UserRole role);
 
-    @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = :role AND (:search IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
-    org.springframework.data.domain.Page<User> searchTeachers(@Param("schoolId") UUID schoolId, @Param("role") UserRole role, @Param("search") String search, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<User> findBySchoolIdAndRoleAndFullNameContainingIgnoreCaseOrSchoolIdAndRoleAndEmailContainingIgnoreCase(
+            UUID schoolId1, UserRole role1, String fullName,
+            UUID schoolId2, UserRole role2, String email,
+            org.springframework.data.domain.Pageable pageable
+    );
 
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying

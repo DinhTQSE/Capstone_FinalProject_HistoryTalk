@@ -60,7 +60,6 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .password(passwordEncoder.encode(rawPassword))
                 .fullName(request.getFullName().trim())
                 .phoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null)
-                .subjectDepartment(request.getSubjectDepartment().trim())
                 .role(UserRole.TEACHER)
                 .school(school)
                 .mustChangePassword(true)
@@ -78,8 +77,16 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<TeacherResponse> getTeachers(UUID schoolId, String search, Pageable pageable) {
-        String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
-        Page<User> teacherPage = userRepository.searchTeachers(schoolId, UserRole.TEACHER, cleanSearch, pageable);
+        Page<User> teacherPage;
+        if (search != null && !search.trim().isEmpty()) {
+            String keyword = search.trim();
+            teacherPage = userRepository.findBySchoolIdAndRoleAndFullNameContainingIgnoreCaseOrSchoolIdAndRoleAndEmailContainingIgnoreCase(
+                    schoolId, UserRole.TEACHER, keyword,
+                    schoolId, UserRole.TEACHER, keyword,
+                    pageable);
+        } else {
+            teacherPage = userRepository.findBySchoolIdAndRole(schoolId, UserRole.TEACHER, pageable);
+        }
 
         List<TeacherResponse> content = teacherPage.getContent().stream()
                 .map(this::mapToTeacherResponse)
@@ -128,9 +135,8 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
-                .subjectDepartment(user.getSubjectDepartment())
                 .active(user.getDeletedAt() == null)
-                .createdAt(user.getCreatedAt())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }
 

@@ -25,20 +25,6 @@ public class SchoolWideImportProcessor extends AbstractStudentImportProcessor {
     }
 
     @Override
-    protected void resolveClassrooms(
-            List<StudentImportRowDto> rows,
-            StudentImportContext context,
-            StudentImportResultDto resultDto) {
-        // Trong kịch bản toàn trường (School-Wide), mã lớp được lưu trực tiếp theo từng dòng
-        // để hỗ trợ phân học sinh vào lớp.
-        for (StudentImportRowDto row : rows) {
-            if (row.getClassCode() != null) {
-                row.setClassCode(row.getClassCode().trim().toUpperCase());
-            }
-        }
-    }
-
-    @Override
     protected void verifyAndDeductQuota(
             List<StudentImportRowDto> rows,
             StudentImportContext context,

@@ -73,13 +73,10 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
         // Step 2: Validate each row
         List<StudentImportRowDto> validRows = validateRows(rawRows, context, resultDto);
 
-        // Step 3: Polymorphic - Resolve Classrooms
-        resolveClassrooms(validRows, context, resultDto);
-
-        // Step 4: Polymorphic - Verify & deduct Token Quota
+        // Step 3: Polymorphic - Verify & deduct Token Quota
         verifyAndDeductQuota(validRows, context, school);
 
-        // Step 5: Persist Accounts & Generate Passwords
+        // Step 4: Persist Accounts & Generate Passwords
         persistAccounts(validRows, context, school, resultDto);
 
         resultDto.setSuccessCount(resultDto.getSuccessfulAccounts().size());
@@ -118,7 +115,6 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                 String dobStr = getRecordValue(record, "dob");
                 String gender = getRecordValue(record, "gender");
                 String phoneNumber = getRecordValue(record, "phone_number");
-                String classCode = getRecordValue(record, "class_code");
                 String password = getRecordValue(record, "password");
                 String additionalTokenStr = getRecordValue(record, "additional_token");
 
@@ -146,7 +142,6 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                         .dob(dob)
                         .gender(gender)
                         .phoneNumber(phoneNumber)
-                        .classCode(classCode)
                         .password(password)
                         .additionalToken(additionalToken)
                         .build());
@@ -244,11 +239,14 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
             int extraToken = row.getAdditionalToken() != null ? Math.max(0, row.getAdditionalToken()) : 0;
             int totalTokens = baseToken + extraToken;
 
-            Gender gender = Gender.OTHER;
-            if (row.getGender() != null) {
-                try {
-                    gender = Gender.valueOf(row.getGender().trim().toUpperCase());
-                } catch (IllegalArgumentException ignored) {}
+            Gender gender = null;
+            if (row.getGender() != null && !row.getGender().trim().isEmpty()) {
+                String g = row.getGender().trim().toUpperCase();
+                if ("MALE".equals(g)) {
+                    gender = Gender.MALE;
+                } else if ("FEMALE".equals(g)) {
+                    gender = Gender.FEMALE;
+                }
             }
 
             User student = User.builder()
@@ -274,7 +272,6 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                     .userName(userName)
                     .fullName(saved.getFullName())
                     .email(email)
-                    .classCode(row.getClassCode())
                     .allocatedToken(totalTokens)
                     .initialPassword(rawPassword)
                     .build());
@@ -299,6 +296,5 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
     }
 
     // Các bước ĐA HÌNH
-    protected abstract void resolveClassrooms(List<StudentImportRowDto> rows, StudentImportContext context, StudentImportResultDto resultDto);
     protected abstract void verifyAndDeductQuota(List<StudentImportRowDto> rows, StudentImportContext context, School school);
 }

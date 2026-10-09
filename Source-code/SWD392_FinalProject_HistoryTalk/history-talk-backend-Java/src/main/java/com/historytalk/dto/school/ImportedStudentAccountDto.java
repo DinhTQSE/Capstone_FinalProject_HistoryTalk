@@ -18,7 +18,6 @@ public class ImportedStudentAccountDto {
     private String userName;
     private String fullName;
     private String email;
-    private String classCode;
     private Integer allocatedToken;
     private String initialPassword; // Plaintext để in/phát cho học sinh
 }

@@ -1,6 +1,8 @@
 package com.historytalk.repository.school;
 
 import com.historytalk.entity.school.School;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,5 +16,7 @@ public interface SchoolRepository extends JpaRepository<School, UUID> {
 
     boolean existsBySchoolCodeIgnoreCase(String schoolCode);
 
-    boolean existsByNameIgnoreCase(String name);
+    Page<School> findByNameContainingIgnoreCaseOrSchoolCodeContainingIgnoreCaseOrContactEmailContainingIgnoreCase(
+            String name, String schoolCode, String contactEmail, Pageable pageable
+    );
 }

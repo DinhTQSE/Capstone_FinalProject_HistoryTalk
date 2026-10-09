@@ -20,8 +20,7 @@ public class CreateSchoolRequest {
     @Size(max = 255, message = "School name must not exceed 255 characters")
     private String name;
 
-    @NotBlank(message = "School code must not be blank")
-    @Size(min = 2, max = 50, message = "School code must be between 2 and 50 characters")
+    @Size(max = 50, message = "School code must not exceed 50 characters")
     private String schoolCode;
 
     @Size(max = 500, message = "Address must not exceed 500 characters")
