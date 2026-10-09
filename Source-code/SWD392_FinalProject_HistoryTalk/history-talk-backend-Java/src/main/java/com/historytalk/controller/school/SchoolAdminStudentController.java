@@ -43,8 +43,6 @@ public class SchoolAdminStudentController {
     @Operation(summary = "Bulk import student accounts via CSV file (US-SP5-04)")
     public ResponseEntity<ApiResponse<StudentImportResultDto>> importStudents(
             @RequestPart("file") MultipartFile file,
-            @Parameter(description = "Class code when importing for a specific class (Case 1: classroom template without class_code column)")
-            @RequestParam(name = "classCode", required = false) String classCode,
             @Parameter(description = "Default initial token for each student (default: 10000)")
             @RequestParam(name = "defaultInitialToken", required = false) Integer defaultInitialToken,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -60,7 +58,6 @@ public class SchoolAdminStudentController {
                 .schoolCode(schoolAdmin.getSchool().getSchoolCode())
                 .operatorId(schoolAdmin.getUid())
                 .operatorRole(schoolAdmin.getRole())
-                .classCode(classCode)
                 .defaultInitialToken(effectiveDefaultToken)
                 .build();
 

@@ -383,14 +383,16 @@ interface PaginatedApiResponse<T> {
 * **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
 * **Content-Type:** `multipart/form-data`
 * **Form-data Parameters:**
-  - `file` *(bắt buộc, File .csv)*: File CSV danh sách học sinh.
-  - `classCode` *(tùy chọn, string)*: Mã lớp học (VD: `HIS10A1-2026`). Dùng cho **Case 1 (Import theo Lớp)** khi file CSV không có cột `class_code`. Toàn bộ học sinh trong file sẽ được tự động phân vào lớp này.
+  - `file` *(bắt buộc, File .csv)*: File CSV danh sách học sinh của trường.
   - `defaultInitialToken` *(tùy chọn, number)*: Mức token sàn cấp cho mỗi học sinh (VD: `10000`). Nếu không truyền, hệ thống tự động lấy mặc định là `10000`.
-* **2 Loại File Mẫu CSV:**
-  - **Case 1 (Theo Lớp học):** `docs/sprints/sprint_5/user_stories/student_import_classroom_template.csv` (hoặc bản mẫu 10 học sinh: `docs/sprints/sprint_5/user_stories/student_import_classroom_10_students.csv`). File này **không có cột `class_code`**; FE gửi mã lớp qua param `classCode`.
-  - **Case 2 (Toàn Trường):** `docs/sprints/sprint_5/user_stories/student_import_school_template.csv`. File này **có cột `class_code`** ở từng dòng; FE không cần gửi param `classCode`.
+* **File Mẫu CSV Chuẩn:**
+  - `docs/sprints/sprint_5/user_stories/student_import_template.csv` (hoặc bản mẫu 10 học sinh: `docs/sprints/sprint_5/user_stories/student_import_classroom_10_students.csv`).
+  - Định dạng header:
+    ```csv
+    student_code,full_name,email,dob,gender,phone_number,password,additional_token
+    ```
 * **Cơ Chế Nghiệp Vụ Cần Biết Khi Hiển Thị:**
-  1. **Phân bổ mã lớp (Class Code Resolution):** Ưu tiên `class_code` riêng của từng dòng nếu có; nếu dòng để trống sẽ tự động lấy từ param `classCode` truyền ngoài.
+  1. **Tạo tài khoản học sinh toàn trường:** API phục vụ việc khởi tạo danh tính (`SCHOOL_STUDENT`) và phân bổ Token từ quỹ trường. Việc gán học sinh vào từng Lớp học cụ thể được thực hiện độc lập tại Sprint 6 (Class Roster Association).
   2. **Shadow SaaS Email:** Nếu cột `email` trong file bị để trống, hệ thống tự động gán email ảo `{username}@saas.historytalk.vn` để học sinh có thể đổi Gmail cá nhân khi đăng nhập lần đầu.
   3. **Atomic Quota Check:** Backend kiểm tra tổng số token cần cấp $\sum \text{token} \le \text{unallocatedTokenQuota}$. Nếu vượt quá số dư của trường, request sẽ bị từ chối kèm lỗi `400 INSUFFICIENT_TOKEN_QUOTA`.
 * **Response (200 OK):**
@@ -402,30 +404,25 @@ interface PaginatedApiResponse<T> {
       "successCount": 2,
       "failureCount": 0,
       "totalTokensAllocated": 25000,
-      "rows": [
+      "remainingSchoolTokens": 4975000,
+      "successfulAccounts": [
         {
-          "rowNumber": 2,
+          "uid": "1a2b3c4d-...",
           "studentCode": "LHP_HS2600001",
           "userName": "lhp_hcm_hs_lhphs2600001",
-          "email": "lhp_hcm_hs_lhphs2600001@saas.historytalk.vn",
           "fullName": "Nguyễn Hoàng Nam",
-          "classCode": "HIS10A1",
-          "initialPassword": "Ht@x8Kp9#z",
-          "allocatedTokens": 10000,
-          "status": "SUCCESS",
-          "errorMessage": null
+          "email": "lhp_hcm_hs_lhphs2600001@saas.historytalk.vn",
+          "allocatedToken": 10000,
+          "initialPassword": "LHP_HS2600001@2026"
         },
         {
-          "rowNumber": 3,
+          "uid": "2b3c4d5e-...",
           "studentCode": "LHP_HS2600002",
           "userName": "lhp_hcm_hs_lhphs2600002",
-          "email": "le.an@gmail.com",
           "fullName": "Lê Thảo An",
-          "classCode": "HIS10A1",
-          "initialPassword": "Ht@m3Wq7$r",
-          "allocatedTokens": 15000,
-          "status": "SUCCESS",
-          "errorMessage": null
+          "email": "le.an@gmail.com",
+          "allocatedToken": 15000,
+          "initialPassword": "StudentPass@2026"
         }
       ],
       "errors": []

@@ -93,9 +93,8 @@
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
   Là School Admin, tôi muốn tạo lẻ từng học sinh hoặc upload file CSV/Excel danh sách học sinh theo mẫu chuẩn, để khởi tạo tài khoản `SCHOOL_STUDENT` cho học sinh toàn trường kèm mật khẩu được tự sinh hoặc thiết lập sẵn.
-* **File Template Mẫu (2 Loại Template):**
-  - **Case 1 (Theo Lớp học - Giáo viên/Admin):** [student_import_classroom_template.csv](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/student_import_classroom_template.csv) *(File tinh gọn, không có cột `class_code` do lớp đã được xác định qua ngữ cảnh)*.
-  - **Case 2 (Toàn Trường - School Admin):** [student_import_school_template.csv](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/student_import_school_template.csv) *(Có cột `class_code` để phân học sinh vào từng lớp tương ứng trong trường)*.
+* **File Template Mẫu Chuẩn:**
+  - [student_import_template.csv](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/student_import_template.csv) *(hoặc bản mẫu 10 học sinh: [student_import_classroom_10_students.csv](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/student_import_classroom_10_students.csv))*.
 * **Quy chuẩn Fields trong Template:**
   | Tên Cột (Header) | Kiểu Dữ Liệu | Bắt buộc | Mô tả & Ràng buộc Validation |
   | :--- | :--- | :---: | :--- |
@@ -105,7 +104,6 @@
   | `dob` | Date (`YYYY-MM-DD`) | **Có** | Ngày sinh của học sinh theo định dạng chuẩn ISO (VD: `2009-03-15`). |
   | `gender` | Enum String | Không (Tùy chọn) | Giới tính: `MALE` hoặc `FEMALE`. Nếu để trống sẽ lưu null, không bắt buộc. |
   | `phone_number` | String (10 số) | Không | Số điện thoại học sinh hoặc phụ huynh (định dạng SĐT Việt Nam, VD: `0912345671`). |
-  | `class_code` | String | Không (Case 1) / Có (Case 2) | Mã lớp học muốn phân vào ngay (VD: `HIS10A1-2026`). Có trong template toàn trường; không cần trong template theo lớp. |
   | `password` | String (6 - 50) | Không | **Mật khẩu khởi tạo**: <br>- **Nếu để trống**: Hệ thống **tự động generate mật khẩu ngẫu nhiên** (VD: `{student_code}@2026` hoặc chuỗi 8 ký tự an toàn `Ht@xxxxxx`). <br>- **Nếu nhập sẵn**: Hệ thống kiểm tra độ dài tối thiểu và mã hóa BCrypt. Đánh dấu cờ `must_change_password = true` khi đăng nhập lần đầu. |
   | `additional_token` | Integer (>= 0) | Không | **Token Bổ Sung Riêng (Extra Token)**: <br>- Số token sàn cơ bản đã được nhập trên UI (`default_initial_token`, VD: `10000`). <br>- **Cột này trong file chỉ là token cộng thêm**: Nếu để trống hoặc `0` $\rightarrow$ Nhận đúng mức sàn từ UI (`10000`). Nếu điền giá trị (VD: `5000`) $\rightarrow$ Nhận tổng = `10000 + 5000 = 15000` Tokens. |
 
@@ -134,7 +132,7 @@
      - Quy trình First Login Onboarding: Học sinh đăng nhập bằng `username` + mật khẩu tạm, bắt buộc đổi mật khẩu và được gợi ý nhập Gmail cá nhân xác thực qua OTP để ghi đè email chính thức.
   4. Trả về kết quả import:
      - Trả về thống kê số lượng thành công / thất bại.
-     - Xuất kèm/cho phép download file kết quả import chứa danh sách tài khoản (`student_code`, `user_name`, `email`, `class_code`) kèm **Mật khẩu khởi tạo ban đầu (Plaintext Initial Password)** để nhà trường in/phát cho học sinh đăng nhập lần đầu.
+     - Xuất kèm/cho phép download file kết quả import chứa danh sách tài khoản (`student_code`, `user_name`, `email`) kèm **Mật khẩu khởi tạo ban đầu (Plaintext Initial Password)** để nhà trường in/phát cho học sinh đăng nhập lần đầu.
 
 ---
 

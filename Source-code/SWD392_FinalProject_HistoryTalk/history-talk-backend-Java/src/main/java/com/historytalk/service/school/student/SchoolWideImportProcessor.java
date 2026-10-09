@@ -25,25 +25,6 @@ public class SchoolWideImportProcessor extends AbstractStudentImportProcessor {
     }
 
     @Override
-    protected void resolveClassrooms(
-            List<StudentImportRowDto> rows,
-            StudentImportContext context,
-            StudentImportResultDto resultDto) {
-        String defaultClassCode = (context.getClassCode() != null && !context.getClassCode().trim().isEmpty())
-                ? context.getClassCode().trim().toUpperCase()
-                : null;
-
-        for (StudentImportRowDto row : rows) {
-            if (row.getClassCode() != null && !row.getClassCode().trim().isEmpty()) {
-                row.setClassCode(row.getClassCode().trim().toUpperCase());
-            } else if (defaultClassCode != null) {
-                // Fallback về classCode được truyền từ ngữ cảnh lớp (Case 1: theo lớp)
-                row.setClassCode(defaultClassCode);
-            }
-        }
-    }
-
-    @Override
     protected void verifyAndDeductQuota(
             List<StudentImportRowDto> rows,
             StudentImportContext context,

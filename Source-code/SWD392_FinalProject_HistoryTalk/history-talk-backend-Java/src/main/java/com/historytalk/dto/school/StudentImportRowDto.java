@@ -20,7 +20,6 @@ public class StudentImportRowDto {
     private LocalDate dob;
     private String gender;
     private String phoneNumber;
-    private String classCode;
     private String password;
     private Integer additionalToken;
 }
