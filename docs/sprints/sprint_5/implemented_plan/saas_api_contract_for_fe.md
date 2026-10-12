@@ -366,7 +366,6 @@ interface PaginatedApiResponse<T> {
       "fullName": "Trần Thị Lịch Sử",
       "email": "teacher.tran@thpt-lehongphong.edu.vn",
       "phoneNumber": "0918765432",
-      "subjectDepartment": "Lịch sử",
       "active": false,
       "initialPassword": null,
       "createdAt": "2026-10-09T06:28:00Z"
