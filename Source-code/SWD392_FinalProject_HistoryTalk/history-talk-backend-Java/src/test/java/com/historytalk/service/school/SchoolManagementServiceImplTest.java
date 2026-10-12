@@ -195,5 +195,28 @@ class SchoolManagementServiceImplTest {
         assertThat(response.getAllocatedTokenQuota()).isEqualTo(1500000L);
         assertThat(response.getUsagePercentage()).isEqualTo(30.0);
     }
+
+    @Test
+    void createSchool_shouldAllowDuplicateSchoolNamesInDifferentLocations() {
+        CreateSchoolRequest quyNhonSchool = CreateSchoolRequest.builder()
+                .name("Trường THPT Lê Hồng Phong")
+                .address("Thành phố Quy Nhơn, Tỉnh Bình Định")
+                .contactEmail("admin@lhpqn.edu.vn")
+                .packageType(EnterprisePackage.ENTERPRISE_SMALL)
+                .localHistoryPolicyAccepted(true)
+                .build();
+
+        when(schoolRepository.existsBySchoolCodeIgnoreCase("LHP-BDH")).thenReturn(false);
+        when(schoolRepository.save(any(School.class))).thenAnswer(invocation -> {
+            School s = invocation.getArgument(0);
+            s.setId(UUID.randomUUID());
+            return s;
+        });
+
+        SchoolResponse response = schoolManagementService.createSchool(quyNhonSchool);
+
+        assertThat(response.getName()).isEqualTo("Trường THPT Lê Hồng Phong");
+        assertThat(response.getSchoolCode()).isEqualTo("LHP-BDH");
+    }
 }
 
