@@ -23,6 +23,7 @@ public class SchoolAdminResponse {
     private UserRole role;
     private UUID schoolId;
     private String schoolName;
+    private Boolean active;
     private String initialPassword; // Plaintext trả về 1 lần duy nhất cho System Admin
     private LocalDateTime createdAt;
 }

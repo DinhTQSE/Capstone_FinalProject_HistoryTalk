@@ -218,5 +218,122 @@ class SchoolManagementServiceImplTest {
         assertThat(response.getName()).isEqualTo("Trường THPT Lê Hồng Phong");
         assertThat(response.getSchoolCode()).isEqualTo("LHP-BDH");
     }
+
+    @Test
+    void getSchoolAdmins_shouldReturnPaginatedSchoolAdmins() {
+        UUID schoolId = UUID.randomUUID();
+        School school = School.builder().id(schoolId).name("THPT Lê Hồng Phong").build();
+        com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
+                .uid(UUID.randomUUID())
+                .userName("lhp_admin")
+                .email("admin@lhp.edu.vn")
+                .fullName("Nguyễn Văn Admin")
+                .role(com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN)
+                .school(school)
+                .build();
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<com.historytalk.entity.user.User> page = new org.springframework.data.domain.PageImpl<>(
+                java.util.List.of(admin), pageable, 1);
+
+        when(schoolRepository.existsById(schoolId)).thenReturn(true);
+        when(userRepository.searchSchoolUsersWithFilter(schoolId, com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN, true, "admin", pageable))
+                .thenReturn(page);
+
+        com.historytalk.dto.PaginatedResponse<com.historytalk.dto.school.SchoolAdminResponse> result =
+                schoolManagementService.getSchoolAdmins(schoolId, "admin", true, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getUserName()).isEqualTo("lhp_admin");
+        assertThat(result.getContent().get(0).getActive()).isTrue();
+    }
+
+    @Test
+    void updateSchoolAdmin_shouldUpdateProfileSuccessfully() {
+        UUID adminId = UUID.randomUUID();
+        com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
+                .uid(adminId)
+                .userName("lhp_admin")
+                .email("old@lhp.edu.vn")
+                .fullName("Old Name")
+                .role(com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN)
+                .build();
+
+        com.historytalk.dto.school.UpdateSchoolAdminRequest request = com.historytalk.dto.school.UpdateSchoolAdminRequest.builder()
+                .fullName("New Name")
+                .email("new@lhp.edu.vn")
+                .phoneNumber("0987654321")
+                .build();
+
+        when(userRepository.findById(adminId)).thenReturn(java.util.Optional.of(admin));
+        when(userRepository.existsByEmailIgnoreCaseAndUidNot("new@lhp.edu.vn", adminId)).thenReturn(false);
+        when(userRepository.save(any(com.historytalk.entity.user.User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.historytalk.dto.school.SchoolAdminResponse response = schoolManagementService.updateSchoolAdmin(adminId, request);
+
+        assertThat(response.getFullName()).isEqualTo("New Name");
+        assertThat(response.getEmail()).isEqualTo("new@lhp.edu.vn");
+        assertThat(response.getPhoneNumber()).isEqualTo("0987654321");
+    }
+
+    @Test
+    void updateSchoolAdminStatus_shouldToggleDeletedAt() {
+        UUID adminId = UUID.randomUUID();
+        com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
+                .uid(adminId)
+                .userName("lhp_admin")
+                .role(com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN)
+                .deletedAt(null)
+                .build();
+
+        when(userRepository.findById(adminId)).thenReturn(java.util.Optional.of(admin));
+        when(userRepository.save(any(com.historytalk.entity.user.User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.historytalk.dto.school.SchoolAdminResponse response = schoolManagementService.updateSchoolAdminStatus(adminId, false);
+
+        assertThat(response.getActive()).isFalse();
+        assertThat(admin.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    void deleteSchoolAdmin_shouldSoftDeleteUser() {
+        UUID adminId = UUID.randomUUID();
+        com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
+                .uid(adminId)
+                .userName("lhp_admin")
+                .role(com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN)
+                .build();
+
+        when(userRepository.findById(adminId)).thenReturn(java.util.Optional.of(admin));
+
+        schoolManagementService.deleteSchoolAdmin(adminId);
+
+        assertThat(admin.getDeletedAt()).isNotNull();
+        verify(userRepository).save(admin);
+    }
+
+    @Test
+    void resetSchoolAdminPassword_shouldGenerateNewPasswordAndRequireChange() {
+        UUID adminId = UUID.randomUUID();
+        com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
+                .uid(adminId)
+                .userName("lhp_admin")
+                .email("admin@lhp.edu.vn")
+                .fullName("Nguyễn Văn Admin")
+                .role(com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN)
+                .mustChangePassword(false)
+                .build();
+
+        when(userRepository.findById(adminId)).thenReturn(java.util.Optional.of(admin));
+        when(passwordEncoder.encode(any(String.class))).thenReturn("encoded-new-pwd");
+
+        com.historytalk.dto.school.ResetPasswordResponse response = schoolManagementService.resetSchoolAdminPassword(adminId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getInitialPassword()).startsWith("Ht@");
+        assertThat(admin.getMustChangePassword()).isTrue();
+        assertThat(admin.getPassword()).isEqualTo("encoded-new-pwd");
+        verify(userRepository).save(admin);
+    }
 }
 

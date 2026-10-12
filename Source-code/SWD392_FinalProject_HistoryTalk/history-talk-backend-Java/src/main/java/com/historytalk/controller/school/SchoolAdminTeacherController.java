@@ -4,7 +4,9 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.PaginatedApiResponse;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.school.CreateTeacherRequest;
+import com.historytalk.dto.school.ResetPasswordResponse;
 import com.historytalk.dto.school.TeacherResponse;
+import com.historytalk.dto.school.UpdateTeacherRequest;
 import com.historytalk.dto.school.UpdateTeacherStatusRequest;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
@@ -52,10 +54,12 @@ public class SchoolAdminTeacherController {
 
     @GetMapping
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    @Operation(summary = "Get list of teachers with search and pagination (US-SP5-03)")
+    @Operation(summary = "Get list of teachers with search, active filter, and pagination (US-SP5-03)")
     public ResponseEntity<PaginatedApiResponse<TeacherResponse>> getTeachers(
             @Parameter(description = "Keyword to search teacher by full name, username, or email")
             @RequestParam(required = false) String search,
+            @Parameter(description = "Filter by active status (true: active, false: inactive)")
+            @RequestParam(required = false) Boolean active,
             @Parameter(description = "Page number (0-indexed, default: 0)")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Number of items per page (default: 10)")
@@ -75,8 +79,21 @@ public class SchoolAdminTeacherController {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(direction, safeSortBy));
 
         PaginatedResponse<TeacherResponse> response = teacherManagementService.getTeachers(
-                schoolId, search, pageable);
+                schoolId, search, active, pageable);
         return ResponseEntity.ok(PaginatedApiResponse.of(response, "Teachers retrieved successfully"));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "Update teacher profile (US-SP5-03)")
+    public ResponseEntity<ApiResponse<TeacherResponse>> updateTeacher(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateTeacherRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        
+        UUID schoolId = resolveSchoolId(principal);
+        TeacherResponse response = teacherManagementService.updateTeacher(id, schoolId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Teacher profile updated successfully"));
     }
 
     @PutMapping("/{id}/status")
@@ -94,6 +111,30 @@ public class SchoolAdminTeacherController {
                 ? "Teacher account activated successfully" 
                 : "Teacher account deactivated successfully";
         return ResponseEntity.ok(ApiResponse.success(response, msg));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "Soft delete teacher account (US-SP5-03)")
+    public ResponseEntity<ApiResponse<Void>> deleteTeacher(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        
+        UUID schoolId = resolveSchoolId(principal);
+        teacherManagementService.deleteTeacher(id, schoolId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Teacher account deleted successfully"));
+    }
+
+    @PostMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "Reset teacher password (US-SP5-03)")
+    public ResponseEntity<ApiResponse<ResetPasswordResponse>> resetTeacherPassword(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        
+        UUID schoolId = resolveSchoolId(principal);
+        ResetPasswordResponse response = teacherManagementService.resetTeacherPassword(id, schoolId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Teacher password reset successfully"));
     }
 
     private UUID resolveSchoolId(UserPrincipal principal) {
