@@ -3,9 +3,11 @@ package com.historytalk.service.school;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.school.CreateSchoolAdminRequest;
 import com.historytalk.dto.school.CreateSchoolRequest;
+import com.historytalk.dto.school.ResetPasswordResponse;
 import com.historytalk.dto.school.SchoolAdminResponse;
 import com.historytalk.dto.school.SchoolResponse;
 import com.historytalk.dto.school.SchoolTokenQuotaResponse;
+import com.historytalk.dto.school.UpdateSchoolAdminRequest;
 import com.historytalk.entity.enums.EnterprisePackage;
 import com.historytalk.entity.enums.SchoolStatus;
 import com.historytalk.entity.enums.UserRole;
@@ -218,17 +220,135 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         User savedUser = userRepository.save(schoolAdmin);
         log.info("Created School Admin account: {} for school: {}", savedUser.getUserName(), school.getName());
 
-        return SchoolAdminResponse.builder()
-                .uid(savedUser.getUid())
-                .userName(savedUser.getUserName())
-                .email(savedUser.getEmail())
-                .fullName(savedUser.getFullName())
-                .phoneNumber(savedUser.getPhoneNumber())
-                .role(savedUser.getRole())
-                .schoolId(school.getId())
-                .schoolName(school.getName())
+        SchoolAdminResponse response = mapToSchoolAdminResponse(savedUser);
+        response.setInitialPassword(rawPassword);
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<SchoolAdminResponse> getSchoolAdmins(UUID schoolId, String search, Boolean active, Pageable pageable) {
+        if (!schoolRepository.existsById(schoolId)) {
+            throw new ResourceNotFoundException("School not found with ID: " + schoolId);
+        }
+
+        String keyword = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        Page<User> adminPage = userRepository.searchSchoolUsersWithFilter(
+                schoolId, UserRole.SCHOOL_ADMIN, active, keyword, pageable);
+
+        List<SchoolAdminResponse> content = adminPage.getContent().stream()
+                .map(this::mapToSchoolAdminResponse)
+                .toList();
+
+        return PaginatedResponse.<SchoolAdminResponse>builder()
+                .content(content)
+                .totalElements(adminPage.getTotalElements())
+                .totalPages(adminPage.getTotalPages())
+                .currentPage(adminPage.getNumber())
+                .pageSize(adminPage.getSize())
+                .hasNext(adminPage.hasNext())
+                .hasPrevious(adminPage.hasPrevious())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public SchoolAdminResponse updateSchoolAdmin(UUID adminId, UpdateSchoolAdminRequest request) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+
+        if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
+            throw new ResourceNotFoundException("Account is not a School Admin");
+        }
+
+        String newEmail = request.getEmail().trim().toLowerCase();
+        if (!newEmail.equalsIgnoreCase(admin.getEmail()) && userRepository.existsByEmailIgnoreCaseAndUidNot(newEmail, adminId)) {
+            throw new DataConflictException("Email " + newEmail + " is already in use by another account");
+        }
+
+        admin.setFullName(request.getFullName().trim());
+        admin.setEmail(newEmail);
+        admin.setPhoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null);
+
+        User saved = userRepository.save(admin);
+        log.info("Updated School Admin profile for: {}", saved.getUserName());
+        return mapToSchoolAdminResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public SchoolAdminResponse updateSchoolAdminStatus(UUID adminId, boolean active) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+
+        if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
+            throw new ResourceNotFoundException("Account is not a School Admin");
+        }
+
+        if (active) {
+            admin.setDeletedAt(null);
+        } else {
+            admin.setDeletedAt(java.time.LocalDateTime.now());
+        }
+
+        User saved = userRepository.save(admin);
+        log.info("Updated School Admin status for {}: active={}", saved.getUserName(), active);
+        return mapToSchoolAdminResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteSchoolAdmin(UUID adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+
+        if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
+            throw new ResourceNotFoundException("Account is not a School Admin");
+        }
+
+        admin.setDeletedAt(java.time.LocalDateTime.now());
+        userRepository.save(admin);
+        log.info("Soft-deleted School Admin: {}", admin.getUserName());
+    }
+
+    @Override
+    @Transactional
+    public ResetPasswordResponse resetSchoolAdminPassword(UUID adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+
+        if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
+            throw new ResourceNotFoundException("Account is not a School Admin");
+        }
+
+        String rawPassword = generateRandomPassword(10);
+        admin.setPassword(passwordEncoder.encode(rawPassword));
+        admin.setMustChangePassword(true);
+        userRepository.save(admin);
+
+        log.info("Reset password for School Admin: {}", admin.getUserName());
+        return ResetPasswordResponse.builder()
+                .uid(admin.getUid())
+                .userName(admin.getUserName())
+                .fullName(admin.getFullName())
+                .email(admin.getEmail())
                 .initialPassword(rawPassword)
-                .createdAt(savedUser.getCreatedAt() != null ? savedUser.getCreatedAt() : java.time.LocalDateTime.now())
+                .message("Password reset successfully. Please deliver this temporary password to the School Admin.")
+                .build();
+    }
+
+    private SchoolAdminResponse mapToSchoolAdminResponse(User user) {
+        return SchoolAdminResponse.builder()
+                .uid(user.getUid())
+                .userName(user.getUserName())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phoneNumber(user.getPhoneNumber())
+                .role(user.getRole())
+                .schoolId(user.getSchool() != null ? user.getSchool().getId() : null)
+                .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
+                .active(user.getDeletedAt() == null)
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }
 
