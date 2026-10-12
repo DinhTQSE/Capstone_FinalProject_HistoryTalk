@@ -9,9 +9,9 @@
 | Story ID | Tên User Story | Actor | Developer | API Endpoint chính |
 | :--- | :--- | :--- | :--- | :--- |
 | **`US-SP5-01`** | Quản lý Trường học & Gói Hạn mức Token Tổng | `System Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/admin/schools`<br>`GET /api/v1/admin/schools`<br>`GET /api/v1/admin/schools/{id}` |
-| **`US-SP5-02`** | Cấp Tài khoản School Admin & Security RBAC | `System Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/admin/school-admins` |
-| **`US-SP5-03`** | Quản lý Tài khoản Giáo viên trong Trường | `School Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/school-admin/teachers` |
-| **`US-SP5-04`** | Tạo lẻ & Import Excel Hàng loạt Tài khoản Học sinh | `School Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/school-admin/students/import-excel` |
+| **`US-SP5-02`** | Quản lý Toàn diện School Admin (CRUD, Khóa & Reset Mật khẩu) | `System Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/admin/school-admins`<br>`GET /api/v1/admin/schools/{schoolId}/school-admins`<br>`PUT /api/v1/admin/school-admins/{id}`<br>`PUT /api/v1/admin/school-admins/{id}/status`<br>`DELETE /api/v1/admin/school-admins/{id}`<br>`POST /api/v1/admin/school-admins/{id}/reset-password` |
+| **`US-SP5-03`** | Quản lý Toàn diện Giáo viên (CRUD, Khóa & Reset Mật khẩu) | `School Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/school-admin/teachers`<br>`GET /api/v1/school-admin/teachers`<br>`PUT /api/v1/school-admin/teachers/{id}`<br>`PUT /api/v1/school-admin/teachers/{id}/status`<br>`DELETE /api/v1/school-admin/teachers/{id}`<br>`POST /api/v1/school-admin/teachers/{id}/reset-password` |
+| **`US-SP5-04`** | Quản lý Toàn diện Học sinh (Danh sách, CRUD, Reset Mật khẩu & Bulk Import) | `School Admin` | 🟢 Khải (KhaiVDD) | `POST /api/v1/school-admin/students/import-excel`<br>`GET /api/v1/school-admin/students`<br>`GET /api/v1/school-admin/students/{id}`<br>`PUT /api/v1/school-admin/students/{id}`<br>`PUT /api/v1/school-admin/students/{id}/status`<br>`DELETE /api/v1/school-admin/students/{id}`<br>`POST /api/v1/school-admin/students/{id}/reset-password` |
 | **`US-SP5-05`** | Giám sát & Tra cứu Hạn mức Token Trường học | `School Admin` | 🟢 Khải (KhaiVDD) | `GET /api/v1/school-admin/token-quota` |
 
 ---
@@ -41,17 +41,25 @@
 
 ---
 
-### 🆔 US-SP5-02: Cấp Tài khoản School Admin & Security RBAC Setup
+### 🆔 US-SP5-02: Quản lý Toàn diện School Admin (CRUD, Khóa & Reset Mật khẩu)
 * **Actor:** `System Admin`
 * **Thời gian thực hiện:** 05/10/2026 – 06/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là System Admin, tôi muốn tạo tài khoản `School Admin` gắn liền với một `school_id` cụ thể và thiết lập kiểm soát phân quyền RBAC, để bàn giao quyền quản trị trường cho phía đại diện nhà trường.
+  Là System Admin, tôi muốn tạo mới, tra cứu danh sách, cập nhật thông tin, khóa/xóa tài khoản và đặt lại mật khẩu cho các tài khoản `School Admin` của từng trường học, để quản lý toàn diện các bên đại diện trường học trên nền tảng SaaS.
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/admin/school-admins` tạo user có role `SCHOOL_ADMIN` liên kết với `school_id`.
-  2. Bổ sung `SCHOOL_ADMIN`, `TEACHER`, `SCHOOL_STUDENT` vào Enum `UserRole`.
-  3. Cấu hình Spring Security: `School Admin` chỉ truy cập và chỉnh sửa được các tài nguyên có `school_id` khớp với tài khoản của mình.
-  4. Tự động mã hóa mật khẩu tạm thời bằng BCrypt và gửi Email kích hoạt cho School Admin.
+  1. API `POST /api/v1/admin/school-admins`: Tạo user có role `SCHOOL_ADMIN` liên kết với `school_id`. Tự động sinh `username` và `initialPassword`.
+  2. API `GET /api/v1/admin/schools/{schoolId}/school-admins`: Xem danh sách tài khoản School Admin thuộc một trường học cụ thể, hỗ trợ tìm kiếm (`search` theo họ tên, username, email) và phân trang chuẩn (`page`, `size`, `sortBy`, `sortDirection`).
+  3. API `PUT /api/v1/admin/school-admins/{id}`: Cập nhật thông tin cơ bản của School Admin (`fullName`, `phoneNumber`, `email`). Validate trùng lặp email nếu email bị thay đổi.
+  4. API `PUT /api/v1/admin/school-admins/{id}/status`: Cập nhật trạng thái hoạt động: Khóa (`active = false`) hoặc Mở khóa (`active = true`).
+  5. API `DELETE /api/v1/admin/school-admins/{id}`: Xóa tài khoản School Admin theo cơ chế **Soft Delete** (cập nhật trường `deleted_at = LocalDateTime.now()`, bảo toàn lịch sử dữ liệu).
+  6. API `POST /api/v1/admin/school-admins/{id}/reset-password`: Đặt lại mật khẩu ngẫu nhiên cho School Admin:
+     - Hệ thống sinh mật khẩu ngẫu nhiên an toàn format `Ht@xxxxxxx` (10 ký tự).
+     - Mã hóa BCrypt và lưu vào database.
+     - Đặt cờ `must_change_password = true`.
+     - Trả về `initialPassword` dạng plaintext trong response để System Admin bàn giao cho trường.
+  7. Bổ sung `SCHOOL_ADMIN`, `TEACHER`, `SCHOOL_STUDENT` vào Enum `UserRole`.
+  8. Cấu hình Spring Security RBAC: `School Admin` chỉ truy cập và chỉnh sửa được các tài nguyên có `school_id` khớp với tài khoản của mình.
 * **Quy tắc Sinh Tên tài khoản & Mật khẩu khởi tạo (Account Credentials Generation Rules):**
   - **Quy tắc sinh `username`:**
     * Format: `{school_code}_admin` (toàn bộ chữ thường, không dấu, khoảng trắng đổi thành gạch dưới. Ví dụ: trường mã `LHP` $\rightarrow$ `lhp_admin`, trường mã `LHP-HCM` $\rightarrow$ `lhp_hcm_admin`).
@@ -64,17 +72,23 @@
 
 ---
 
-### 🆔 US-SP5-03: Quản lý Tài khoản Giáo viên trong Trường (Teacher Management)
+### 🆔 US-SP5-03: Quản lý Toàn diện Giáo viên (CRUD, Khóa & Reset Mật khẩu)
 * **Actor:** `School Admin`
 * **Thời gian thực hiện:** 06/10/2026 – 07/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là School Admin, tôi muốn tạo mới, cập nhật thông tin và khóa tài khoản các Giáo viên thuộc trường mình, để cấp quyền cho Giáo viên quản lý lớp học.
+  Là School Admin, tôi muốn tạo mới, tra cứu danh sách, cập nhật thông tin cá nhân, khóa/xóa tài khoản và đặt lại mật khẩu cho các Giáo viên thuộc trường mình, để quản lý nhân sự giảng dạy và hỗ trợ giáo viên khi gặp sự cố đăng nhập.
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/school-admin/teachers` tạo user có role `TEACHER` thuộc cùng `school_id`.
-  2. Yêu cầu nhập: Họ tên, Email, Số điện thoại.
-  3. API `GET /api/v1/school-admin/teachers` danh sách giáo viên trong trường có tìm kiếm và phân trang.
-  4. API `PUT /api/v1/school-admin/teachers/{id}/status` cho phép chuyển trạng thái `ACTIVE` / `INACTIVE`.
+  1. API `POST /api/v1/school-admin/teachers`: Tạo user có role `TEACHER` thuộc cùng `school_id`. Tự động sinh `username` và `initialPassword`.
+  2. API `GET /api/v1/school-admin/teachers`: Tra cứu danh sách giáo viên trong trường có tìm kiếm (`search` theo họ tên, username, email) và phân trang chuẩn.
+  3. API `PUT /api/v1/school-admin/teachers/{id}`: Cập nhật thông tin giáo viên (`fullName`, `phoneNumber`, `email`). Validate trùng lặp email nếu email bị thay đổi.
+  4. API `PUT /api/v1/school-admin/teachers/{id}/status`: Chuyển trạng thái hoạt động: Kích hoạt (`active = true`) hoặc Vô hiệu hóa (`active = false`).
+  5. API `DELETE /api/v1/school-admin/teachers/{id}`: Xóa tài khoản giáo viên theo cơ chế **Soft Delete** (`deleted_at = LocalDateTime.now()`). Ràng buộc bảo mật: Chỉ cho phép thao tác trên giáo viên thuộc cùng trường với School Admin.
+  6. API `POST /api/v1/school-admin/teachers/{id}/reset-password`: Đặt lại mật khẩu cho giáo viên:
+     - Hệ thống sinh mật khẩu ngẫu nhiên an toàn format `Ht@xxxxxxx` (10 ký tự).
+     - Mã hóa BCrypt và lưu vào database.
+     - Đặt cờ `must_change_password = true`.
+     - Trả về `initialPassword` dạng plaintext trong response để School Admin bàn giao.
 * **Quy tắc Sinh Tên tài khoản & Mật khẩu khởi tạo (Teacher Credentials Generation Rules):**
   - **Quy tắc sinh `username`:**
     * Format: `{school_code}_gv_{4_chữ_số_ngẫu_nhiên}` (toàn bộ chữ thường, không dấu. Ví dụ: `lhp_hcm_gv_1042`, `lhp_gv_7153`).
@@ -87,12 +101,12 @@
 
 ---
 
-### 🆔 US-SP5-04: Tạo lẻ & Import Excel/CSV Hàng loạt Tài khoản Học sinh (Student Bulk Import)
+### 🆔 US-SP5-04: Quản lý Toàn diện Học sinh (Danh sách, CRUD, Reset Mật khẩu & Bulk Import)
 * **Actor:** `School Admin`
 * **Thời gian thực hiện:** 07/10/2026 – 08/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là School Admin, tôi muốn tạo lẻ từng học sinh hoặc upload file CSV/Excel danh sách học sinh theo mẫu chuẩn, để khởi tạo tài khoản `SCHOOL_STUDENT` cho học sinh toàn trường kèm mật khẩu được tự sinh hoặc thiết lập sẵn.
+  Là School Admin, tôi muốn upload file CSV/Excel danh sách học sinh theo mẫu chuẩn để khởi tạo tài khoản hàng loạt; đồng thời tra cứu danh sách học sinh toàn trường, xem chi tiết, sửa thông tin, khóa/xóa tài khoản và đặt lại mật khẩu cho học sinh khi quên để hỗ trợ công tác quản lý học sinh và vận hành năm học.
 * **File Template Mẫu Chuẩn:**
   - [student_import_template.csv](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/student_import_template.csv) *(hoặc bản mẫu 10 học sinh: [student_import_classroom_10_students.csv](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/student_import_classroom_10_students.csv))*.
 * **Quy chuẩn Fields trong Template:**
@@ -133,6 +147,18 @@
   4. Trả về kết quả import:
      - Trả về thống kê số lượng thành công / thất bại.
      - Xuất kèm/cho phép download file kết quả import chứa danh sách tài khoản (`student_code`, `user_name`, `email`) kèm **Mật khẩu khởi tạo ban đầu (Plaintext Initial Password)** để nhà trường in/phát cho học sinh đăng nhập lần đầu.
+  5. API `GET /api/v1/school-admin/students`: Xem danh sách học sinh của trường:
+     - Hỗ trợ tìm kiếm từ khóa (`search`: tìm kiếm theo `studentCode`, `fullName`, `userName`, `email`).
+     - Hỗ trợ lọc theo trạng thái (`active = true/false`).
+     - Phân trang chuẩn (`page`, `size`, `sortBy`, `sortDirection`).
+  6. API `GET /api/v1/school-admin/students/{id}`: Xem chi tiết thông tin hồ sơ học sinh (họ tên, mã HS, username, email, ngày sinh, giới tính, SĐT, số token khả dụng, trạng thái, ngày tạo...).
+  7. API `PUT /api/v1/school-admin/students/{id}`: Cập nhật thông tin học sinh (`fullName`, `dob`, `gender`, `phoneNumber`, `email`). Validate trùng lặp email nếu email thay đổi.
+  8. API `PUT /api/v1/school-admin/students/{id}/status`: Cập nhật trạng thái hoạt động: Khóa (`active = false`) hoặc Mở khóa (`active = true`).
+  9. API `DELETE /api/v1/school-admin/students/{id}`: Xóa tài khoản học sinh theo cơ chế **Soft Delete** (`deleted_at = LocalDateTime.now()`). Ràng buộc bảo mật: Học sinh phải thuộc cùng `school_id` của School Admin đang đăng nhập.
+  10. API `POST /api/v1/school-admin/students/{id}/reset-password`: Đặt lại mật khẩu cho học sinh:
+     - Hệ thống sinh mật khẩu an toàn format `Ht@xxxxxxx` hoặc định dạng `{student_code}@2026`.
+     - Mã hóa BCrypt, lưu vào database, gán `must_change_password = true`.
+     - Trả về `initialPassword` dạng plaintext trong response để School Admin bàn giao.
 
 ---
 
