@@ -235,6 +235,163 @@ interface PaginatedApiResponse<T> {
 
 ---
 
+#### 1.5. Danh Sách School Admin Của Một Trường (Tìm Kiếm, Lọc Trạng Thái, Phân Trang)
+* **Method & Endpoint:** `GET /api/v1/admin/schools/{schoolId}/school-admins`
+* **Authorization:** `Bearer Token` (`ROLE_SYSTEM_ADMIN`)
+* **Path Variable:** `schoolId` *(UUID của trường học)*
+* **Query Parameters:**
+  - `search` *(string, tùy chọn)*: Tìm kiếm theo họ tên, tên đăng nhập (`userName`) hoặc email.
+  - `active` *(boolean, tùy chọn)*: Lọc theo trạng thái hoạt động (`true`: đang hoạt động, `false`: đã bị khóa/xóa). Để trống để lấy tất cả.
+  - `page` *(number, mặc định `0`)*: Chỉ số trang (bắt đầu từ 0).
+  - `size` *(number, mặc định `10`)*: Số bản ghi mỗi trang.
+  - `sortBy` *(string, mặc định `createdAt`)*: Trường sắp xếp (`fullName`, `userName`, `email`, `createdAt`).
+  - `sortDirection` *(string, mặc định `desc`)*: Chiều sắp xếp (`asc` hoặc `desc`).
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "School Admins retrieved successfully",
+    "data": [
+      {
+        "uid": "a1b2c3d4-0000-0000-0000-112233445566",
+        "userName": "lhp_hcm_admin",
+        "email": "hieutruong@thpt-lehongphong.edu.vn",
+        "fullName": "Nguyễn Văn Hiệu Trưởng",
+        "phoneNumber": "0901234567",
+        "role": "SCHOOL_ADMIN",
+        "schoolId": "e4b2d184-7a91-4c11-9a74-d4b97d2643a1",
+        "schoolName": "Trường THPT Lê Hồng Phong",
+        "active": true,
+        "createdAt": "2026-10-09T06:25:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 0,
+      "size": 10,
+      "totalElements": 1,
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrevious": false
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 1.6. Cập Nhật Thông Tin School Admin
+* **Method & Endpoint:** `PUT /api/v1/admin/school-admins/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SYSTEM_ADMIN`)
+* **Path Variable:** `id` *(UUID của tài khoản School Admin)*
+* **Request Body:**
+  ```json
+  {
+    "fullName": "Nguyễn Văn Hiệu Trưởng Cập Nhật",
+    "email": "hieutruong.moi@thpt-lehongphong.edu.vn",
+    "phoneNumber": "0988776655"
+  }
+  ```
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "School Admin updated successfully",
+    "data": {
+      "uid": "a1b2c3d4-0000-0000-0000-112233445566",
+      "userName": "lhp_hcm_admin",
+      "email": "hieutruong.moi@thpt-lehongphong.edu.vn",
+      "fullName": "Nguyễn Văn Hiệu Trưởng Cập Nhật",
+      "phoneNumber": "0988776655",
+      "role": "SCHOOL_ADMIN",
+      "schoolId": "e4b2d184-7a91-4c11-9a74-d4b97d2643a1",
+      "schoolName": "Trường THPT Lê Hồng Phong",
+      "active": true,
+      "createdAt": "2026-10-09T06:25:00Z"
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 1.7. Khóa / Mở Khóa Tài Khoản School Admin
+* **Method & Endpoint:** `PUT /api/v1/admin/school-admins/{id}/status`
+* **Authorization:** `Bearer Token` (`ROLE_SYSTEM_ADMIN`)
+* **Path Variable:** `id` *(UUID của School Admin)*
+* **Request Body:**
+  ```json
+  {
+    "active": false
+  }
+  ```
+  *(Gửi `false` để vô hiệu hóa/khóa tài khoản; gửi `true` để mở khóa kích hoạt lại).*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "School Admin status updated successfully",
+    "data": {
+      "uid": "a1b2c3d4-0000-0000-0000-112233445566",
+      "userName": "lhp_hcm_admin",
+      "email": "hieutruong@thpt-lehongphong.edu.vn",
+      "fullName": "Nguyễn Văn Hiệu Trưởng",
+      "phoneNumber": "0901234567",
+      "role": "SCHOOL_ADMIN",
+      "schoolId": "e4b2d184-7a91-4c11-9a74-d4b97d2643a1",
+      "schoolName": "Trường THPT Lê Hồng Phong",
+      "active": false,
+      "createdAt": "2026-10-09T06:25:00Z"
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 1.8. Xóa (Soft Delete) Tài Khoản School Admin
+* **Method & Endpoint:** `DELETE /api/v1/admin/school-admins/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SYSTEM_ADMIN`)
+* **Path Variable:** `id` *(UUID của School Admin)*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "School Admin account deleted successfully",
+    "data": null,
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 1.9. Đặt Lại Mật Khẩu (Reset Password) Cho School Admin
+* **Method & Endpoint:** `POST /api/v1/admin/school-admins/{id}/reset-password`
+* **Authorization:** `Bearer Token` (`ROLE_SYSTEM_ADMIN`)
+* **Path Variable:** `id` *(UUID của School Admin)*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "School Admin password reset successfully",
+    "data": {
+      "uid": "a1b2c3d4-0000-0000-0000-112233445566",
+      "userName": "lhp_hcm_admin",
+      "fullName": "Nguyễn Văn Hiệu Trưởng",
+      "email": "hieutruong@thpt-lehongphong.edu.vn",
+      "initialPassword": "Ht@v8P!nK4",
+      "message": "Password reset successfully. Please deliver this temporary password to the School Admin."
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
 ### 🏫 PHÂN HỆ 2: SCHOOL ADMIN (`/api/v1/school-admin/**`)
 
 ---
@@ -275,6 +432,7 @@ interface PaginatedApiResponse<T> {
 * **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
 * **Query Parameters:**
   - `search` *(string, tùy chọn)*: Tìm kiếm theo họ tên, tên tài khoản (`userName`), hoặc email.
+  - `active` *(boolean, tùy chọn)*: Lọc theo trạng thái hoạt động (`true`: đang hoạt động, `false`: đã bị khóa/xóa). Để trống để lấy tất cả.
   - `page` *(number, mặc định `0`)*: Chỉ số trang.
   - `size` *(number, mặc định `10`)*: Số giáo viên mỗi trang.
   - `sortBy` *(string, mặc định `createdAt`)*: Trường sắp xếp (`fullName`, `userName`, `email`, `createdAt`).
@@ -377,7 +535,276 @@ interface PaginatedApiResponse<T> {
 
 ---
 
-#### 2.5. Import Hàng Loạt Tài Khoản Học Sinh Bằng File CSV
+#### 2.5. Cập Nhật Thông Tin Giáo Viên
+* **Method & Endpoint:** `PUT /api/v1/school-admin/teachers/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của tài khoản giáo viên)*
+* **Request Body:**
+  ```json
+  {
+    "fullName": "Trần Thị Lịch Sử Cập Nhật",
+    "email": "teacher.tran.moi@thpt-lehongphong.edu.vn",
+    "phoneNumber": "0988776655"
+  }
+  ```
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Teacher profile updated successfully",
+    "data": {
+      "uid": "b2c3d4e5-1111-2222-3333-444455556666",
+      "userName": "lhp_hcm_gv_1042",
+      "fullName": "Trần Thị Lịch Sử Cập Nhật",
+      "email": "teacher.tran.moi@thpt-lehongphong.edu.vn",
+      "phoneNumber": "0988776655",
+      "active": true,
+      "createdAt": "2026-10-09T06:28:00Z"
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.6. Xóa (Soft Delete) Tài Khoản Giáo Viên
+* **Method & Endpoint:** `DELETE /api/v1/school-admin/teachers/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của giáo viên)*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Teacher account deleted successfully",
+    "data": null,
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.7. Đặt Lại Mật Khẩu (Reset Password) Cho Giáo Viên
+* **Method & Endpoint:** `POST /api/v1/school-admin/teachers/{id}/reset-password`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của giáo viên)*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Teacher password reset successfully",
+    "data": {
+      "uid": "b2c3d4e5-1111-2222-3333-444455556666",
+      "userName": "lhp_hcm_gv_1042",
+      "fullName": "Trần Thị Lịch Sử",
+      "email": "teacher.tran@thpt-lehongphong.edu.vn",
+      "initialPassword": "Ht@q7P!mK9",
+      "message": "Teacher password reset successfully. Please deliver this temporary password to the teacher."
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.8. Tra Cứu Danh Sách Học Sinh (Tìm Kiếm, Lọc Trạng Thái, Phân Trang)
+* **Method & Endpoint:** `GET /api/v1/school-admin/students`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Query Parameters:**
+  - `search` *(string, tùy chọn)*: Tìm kiếm theo mã học sinh (`studentCode`), họ tên, tên đăng nhập (`userName`), hoặc email.
+  - `active` *(boolean, tùy chọn)*: Lọc theo trạng thái hoạt động (`true`: đang hoạt động, `false`: đã bị khóa/xóa). Để trống để lấy tất cả.
+  - `page` *(number, mặc định `0`)*: Chỉ số trang (bắt đầu từ 0).
+  - `size` *(number, mặc định `10`)*: Số học sinh mỗi trang.
+  - `sortBy` *(string, mặc định `createdAt`)*: Trường sắp xếp (`studentCode`, `fullName`, `userName`, `email`, `token`, `createdAt`).
+  - `sortDirection` *(string, mặc định `desc`)*: Chiều sắp xếp (`asc` hoặc `desc`).
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Students retrieved successfully",
+    "data": [
+      {
+        "uid": "1a2b3c4d-9999-8888-7777-666655554444",
+        "studentCode": "LHP_HS2600001",
+        "userName": "lhp_hcm_hs_lhphs2600001",
+        "fullName": "Nguyễn Hoàng Nam",
+        "email": "hs001@saas.historytalk.vn",
+        "dob": "2008-05-20",
+        "gender": "MALE",
+        "phoneNumber": "0911222333",
+        "token": 10000,
+        "active": true,
+        "schoolId": "e4b2d184-7a91-4c11-9a74-d4b97d2643a1",
+        "schoolName": "Trường THPT Lê Hồng Phong",
+        "createdAt": "2026-10-09T06:35:00Z",
+        "updatedAt": null
+      }
+    ],
+    "pagination": {
+      "page": 0,
+      "size": 10,
+      "totalElements": 1,
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrevious": false
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.9. Xem Chi Tiết Học Sinh Theo ID
+* **Method & Endpoint:** `GET /api/v1/school-admin/students/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của học sinh)*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Student details retrieved successfully",
+    "data": {
+      "uid": "1a2b3c4d-9999-8888-7777-666655554444",
+      "studentCode": "LHP_HS2600001",
+      "userName": "lhp_hcm_hs_lhphs2600001",
+      "fullName": "Nguyễn Hoàng Nam",
+      "email": "hs001@saas.historytalk.vn",
+      "dob": "2008-05-20",
+      "gender": "MALE",
+      "phoneNumber": "0911222333",
+      "token": 10000,
+      "active": true,
+      "schoolId": "e4b2d184-7a91-4c11-9a74-d4b97d2643a1",
+      "schoolName": "Trường THPT Lê Hồng Phong",
+      "createdAt": "2026-10-09T06:35:00Z",
+      "updatedAt": null
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.10. Cập Nhật Thông Tin Học Sinh
+* **Method & Endpoint:** `PUT /api/v1/school-admin/students/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của học sinh)*
+* **Request Body:**
+  ```json
+  {
+    "fullName": "Nguyễn Hoàng Nam Cập Nhật",
+    "dob": "2008-05-20",
+    "gender": "MALE",
+    "phoneNumber": "0988112233",
+    "email": "nam.nguyen@gmail.com"
+  }
+  ```
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Student profile updated successfully",
+    "data": {
+      "uid": "1a2b3c4d-9999-8888-7777-666655554444",
+      "studentCode": "LHP_HS2600001",
+      "userName": "lhp_hcm_hs_lhphs2600001",
+      "fullName": "Nguyễn Hoàng Nam Cập Nhật",
+      "email": "nam.nguyen@gmail.com",
+      "dob": "2008-05-20",
+      "gender": "MALE",
+      "phoneNumber": "0988112233",
+      "token": 10000,
+      "active": true,
+      "schoolId": "e4b2d184-7a91-4c11-9a74-d4b97d2643a1",
+      "schoolName": "Trường THPT Lê Hồng Phong",
+      "createdAt": "2026-10-09T06:35:00Z",
+      "updatedAt": "2026-10-12T09:00:00Z"
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.11. Khóa / Mở Khóa Tài Khoản Học Sinh
+* **Method & Endpoint:** `PUT /api/v1/school-admin/students/{id}/status`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của học sinh)*
+* **Request Body:**
+  ```json
+  {
+    "active": false
+  }
+  ```
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Student account deactivated successfully",
+    "data": {
+      "uid": "1a2b3c4d-9999-8888-7777-666655554444",
+      "studentCode": "LHP_HS2600001",
+      "userName": "lhp_hcm_hs_lhphs2600001",
+      "fullName": "Nguyễn Hoàng Nam",
+      "email": "hs001@saas.historytalk.vn",
+      "active": false,
+      "createdAt": "2026-10-09T06:35:00Z"
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.12. Xóa (Soft Delete) Tài Khoản Học Sinh
+* **Method & Endpoint:** `DELETE /api/v1/school-admin/students/{id}`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của học sinh)*
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Student account deleted successfully",
+    "data": null,
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.13. Đặt Lại Mật Khẩu (Reset Password) Cho Học Sinh
+* **Method & Endpoint:** `POST /api/v1/school-admin/students/{id}/reset-password`
+* **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
+* **Path Variable:** `id` *(UUID của học sinh)*
+* **Mô tả:** Hệ thống sẽ tự động khôi phục mật khẩu học sinh về định dạng chuẩn `{studentCode}@2026` (VD: `LHP_HS2600001@2026`) và kích hoạt yêu cầu đổi mật khẩu khi đăng nhập lại.
+* **Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Student password reset successfully",
+    "data": {
+      "uid": "1a2b3c4d-9999-8888-7777-666655554444",
+      "userName": "lhp_hcm_hs_lhphs2600001",
+      "fullName": "Nguyễn Hoàng Nam",
+      "email": "hs001@saas.historytalk.vn",
+      "initialPassword": "LHP_HS2600001@2026",
+      "message": "Student password reset successfully. Default pattern is {studentCode}@2026."
+    },
+    "timestamp": "2026-10-12T09:00:00Z",
+    "errorCode": null
+  }
+  ```
+
+---
+
+#### 2.14. Import Hàng Loạt Tài Khoản Học Sinh Bằng File CSV
 * **Method & Endpoint:** `POST /api/v1/school-admin/students/import-excel`
 * **Authorization:** `Bearer Token` (`ROLE_SCHOOL_ADMIN`)
 * **Content-Type:** `multipart/form-data`
