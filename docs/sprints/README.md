@@ -12,6 +12,13 @@ Tất cả các kế hoạch phát triển, User Stories (được đặt tên t
 docs/sprints/
 ├── README.md                                                   <-- Master Sprints Index
 ├── sprint_agent_guide_template.md                              <-- 🤖 Guide & Coding Conventions cho Agent & Devs
+├── sprint_0/                                                   <-- Sprint 0 (13/10/2026 – 19/10/2026)
+│   ├── README.md                                               <-- Sprint 0 Overview (Dual-Token & Global RBAC)
+│   ├── user_stories/
+│   │   ├── auth_and_dual_token_security.md                     <-- Task: Dual-Token, RTR & Session Invalidation
+│   │   └── global_rbac_and_account_matrix.md                   <-- Task: 27-Feature RBAC Matrix & Prefix Security
+│   └── business_flows/
+│       └── authentication_and_rbac_flows.md                    <-- Flows: Login, RTR & RBAC Authorization
 ├── sprint_5/                                                   <-- Sprint 5 (04/10/2026 – 10/10/2026)
 │   ├── README.md                                               <-- Sprint 5 Overview & Roadmap
 │   ├── user_stories/
@@ -34,17 +41,24 @@ docs/sprints/
 
 ## 🔗 QUẢN LÝ LỘ TRÌNH CHI TIẾT CỦA TỪNG SPRINT
 
-1. 📂 **[Sprint 5 (04/10/2026 – 10/10/2026)](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_5/README.md):**
+0. 📂 **[Sprint 0 (13/10/2026 – 19/10/2026)](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/README.md):**
+   * **Nội dung:** Nâng cấp Kiến trúc Xác thực Dual-Token (Access Token 15p + Refresh Token Rotation & Reuse Detection), Xóa bỏ Blacklist ảo, Chuẩn hóa Ma trận Phân quyền RBAC 27 tính năng và Bộ lọc Controller Security.
+   * **Tài liệu Tasks:**
+     * 📄 [auth_and_dual_token_security.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/user_stories/auth_and_dual_token_security.md)
+     * 📄 [global_rbac_and_account_matrix.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/user_stories/global_rbac_and_account_matrix.md)
+     * 🔄 [authentication_and_rbac_flows.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/business_flows/authentication_and_rbac_flows.md)
+
+1. 📂 **[Sprint 5 (04/10/2026 – 10/10/2026)](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/README.md):**
    * **Nội dung:** Fundamental SaaS Architecture, Security RBAC, School Onboarding, Enterprise Token Allocation Engine, Classroom Management & Class Code Generation.
    * **Tài liệu Tasks:**
-     * 📄 [saas_roles_and_account_management.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_5/user_stories/saas_roles_and_account_management.md)
-     * 📄 [saas_classroom_management.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_5/user_stories/saas_classroom_management.md)
-     * 🔄 [saas_school_business_flow.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_5/business_flows/saas_school_business_flow.md)
+     * 📄 [saas_roles_and_account_management.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/saas_roles_and_account_management.md)
+     * 📄 [saas_classroom_management.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/user_stories/saas_classroom_management.md)
+     * 🔄 [saas_school_business_flow.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_5/business_flows/saas_school_business_flow.md)
 
-2. 📂 **[Sprint 6 (11/10/2026 – 17/10/2026)](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_6/README.md):**
+2. 📂 **[Sprint 6 (11/10/2026 – 17/10/2026)](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/README.md):**
    * **Nội dung:** Class Roster Association, Quy trình Lịch sử Địa phương (Teacher soạn/share, School Admin duyệt, Disclaimer Policy), Engine Giao bài tập đa nhiệm kèm Deadline, 5 Systems & User Dashboards APIs.
    * **Tài liệu Tasks:**
-     * 📄 [class_association_and_assignment_management.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_6/user_stories/class_association_and_assignment_management.md)
-     * 📄 [local_history_content_workflow.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_6/user_stories/local_history_content_workflow.md)
-     * 📄 [dashboards_and_analytics_apis.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_6/user_stories/dashboards_and_analytics_apis.md)
-     * 🔄 [assignment_analytics_flow.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_6/business_flows/assignment_analytics_flow.md)
+     * 📄 [class_association_and_assignment_management.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/user_stories/class_association_and_assignment_management.md)
+     * 📄 [local_history_content_workflow.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/user_stories/local_history_content_workflow.md)
+     * 📄 [dashboards_and_analytics_apis.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/user_stories/dashboards_and_analytics_apis.md)
+     * 🔄 [assignment_analytics_flow.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/business_flows/assignment_analytics_flow.md)

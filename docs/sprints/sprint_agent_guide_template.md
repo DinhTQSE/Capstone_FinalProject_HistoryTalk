@@ -33,7 +33,7 @@ docs/sprints/sprint_{X}/
 ```markdown
 # 🏆 SPRINT {X} OVERVIEW & DOCUMENTATION ({DD/MM/YYYY} – {DD/MM/YYYY})
 > **Mục tiêu chính:** [Tóm tắt 1-2 câu về giá trị nghiệp vụ cốt lõi sprint mang lại]  
-> **Thành viên phụ trách:** [Tên và username của các thành viên]  
+> **Thành viên phụ trách:** 🟢 Võ Đồng Đức Khải (`KhaiVDD`) *(Theo người trực tiếp ủy quyền nhiệm vụ)*  
 
 ---
 
@@ -106,6 +106,10 @@ flowchart TD
 
 * **Vị trí:** `docs/sprints/sprint_{X}/user_stories/[task_group_name].md`
 * **Quy tắc phân file:** Mỗi file gom nhóm từ **2 đến 5 User Stories** có cùng phân hệ nghiệp vụ để tài liệu gọn gàng, dễ theo dõi.
+* **⚠️ NGUYÊN TẮC NGƯỜI PHỤ TRÁCH (ASSIGNEE PRINCIPLE):**
+  - **Người phụ trách (Assignee)** của User Story **BẮT BUỘC** phải lấy theo người đang trực tiếp ủy quyền / làm việc với AI Agent trong phiên trao đổi (trong dự án này mặc định là 🟢 **Khải (`KhaiVDD`)**).
+  - AI Agent **TUYỆT ĐỐI KHÔNG ĐƯỢC** tự ý nhét thêm thành viên khác hoặc sao chép máy móc tên người từ các sprint cũ nếu không có chỉ định rõ ràng từ người giao việc.
+
 * **Cấu trúc khung chuẩn gồm 2 phần:**
 
 #### 1. Bảng Tổng hợp User Stories (Summary Table)
@@ -122,17 +126,20 @@ flowchart TD
 | Story ID | Tên User Story | Actor | Người phụ trách | API Endpoint chính |
 | :--- | :--- | :--- | :--- | :--- |
 | **`US-SP{X}-01`** | [Tên ngắn gọn Story 1] | `[Actor 1]` | 🟢 Khải (KhaiVDD) | `POST /api/v1/...` |
-| **`US-SP{X}-02`** | [Tên ngắn gọn Story 2] | `[Actor 2]` | 🔵 Dinh (DinhTQ)  | `GET /api/v1/...`  |
+| **`US-SP{X}-02`** | [Tên ngắn gọn Story 2] | `[Actor 2]` | 🟢 Khải (KhaiVDD) | `GET /api/v1/...`  |
 ```
 
 #### 2. Chi tiết từng User Story
-Mỗi User Story phải tuân thủ đúng định dạng tiêu đề và các trường thông tin:
+Mỗi User Story phải tuân thủ đúng định dạng tiêu đề, phân quyền RBAC và các trường thông tin:
 
 ```markdown
 ### 🆔 US-SP{X}-{YY}: [Tên User Story] ([English Title])
-* **Actor:** `[System Admin / School Admin / Teacher / School Student / Customer]`
+* **Actor:** `[SYSTEM_ADMIN / CONTENT_ADMIN / SCHOOL_ADMIN / TEACHER / SCHOOL_STUDENT / CUSTOMER]`
 * **Thời gian thực hiện:** DD/MM/YYYY – DD/MM/YYYY
-* **Phụ trách:** 🟢 Khải (KhaiVDD) hoặc 🔵 Dinh (DinhTQ)
+* **Phụ trách:** 🟢 Khải (KhaiVDD) *(Theo người ủy quyền thực hiện)*
+* **Quyền hạn (RBAC) & Phạm vi (Scope):**
+  - **Vai trò được phép:** `@PreAuthorize("hasRole('...')")` hoặc `hasAnyRole('...', '...')`
+  - **Phạm vi bảo vệ dữ liệu (Data Isolation):** `[Toàn hệ thống / Toàn trường (school_id) / Theo lớp (class_id) / Cá nhân (user_id)]`
 * **User Story:**  
   Là [Actor], tôi muốn [Hành động/Tính năng muốn có], để [Mục đích / Giá trị mang lại].
 
@@ -149,12 +156,15 @@ Mỗi User Story phải tuân thủ đúng định dạng tiêu đề và các t
   2. Ràng buộc nghiệp vụ & Validation:
      - Kiểm tra dữ liệu bắt buộc không được để trống.
      - Kiểm tra tính duy nhất (không trùng lặp mã/email trong hệ thống).
-     - Kiểm tra quyền sở hữu (người dùng chỉ được thao tác trên dữ liệu thuộc phạm vi của mình).
+     - Kiểm tra quyền sở hữu & Tenant Scope (không được thao tác chéo trường hay chéo lớp).
   3. Xử lý nghiệp vụ:
      - Mô tả các bước hệ thống xử lý (tính toán hạn mức, thay đổi trạng thái, kích hoạt email/thông báo).
   4. Kết quả đầu ra:
-     - Thông báo thành công kèm dữ liệu trả về cho người dùng.
-     - Trường hợp không hợp lệ: Trả về thông báo lỗi chi tiết, rõ ràng lý do từ chối.
+     - `HTTP 200/201`: Thông báo thành công kèm dữ liệu trả về cho người dùng.
+     - `HTTP 400`: Dữ liệu đầu vào không hợp lệ.
+     - `HTTP 401`: Chưa xác thực token hoặc token hết hạn.
+     - `HTTP 403`: Không đủ quyền (Sai Role hoặc truy cập ngoài Scope).
+     - `HTTP 404/409`: Không tìm thấy tài nguyên hoặc xung đột dữ liệu.
 ```
 
 ---
@@ -181,7 +191,8 @@ Trước khi hoàn tất soạn thảo một Sprint mới, hãy đối soát dan
 - [ ] Có đầy đủ 2 thư mục nghiệp vụ con: `user_stories/` và `business_flows/`.
 - [ ] File `README.md` của sprint đã có mục tiêu, timeline, phân công và link đến tất cả các tài liệu con.
 - [ ] File Master `docs/sprints/README.md` đã cập nhật thêm mục của sprint mới.
+- [ ] **Người phụ trách (Assignee)** khớp 100% với người ủy quyền trực tiếp (🟢 Khải `KhaiVDD`).
 - [ ] Các Story ID được đánh số nhất quán: `US-SP{X}-01`, `US-SP{X}-02`,...
-- [ ] Mỗi User Story có đủ 4 phần: Actor, User Story narrative (*"Là... tôi muốn... để..."*), Acceptance Criteria, và API Endpoint.
+- [ ] Mỗi User Story có đủ: Actor, Người phụ trách, **Quyền hạn RBAC & Scope**, Story narrative (*"Là... tôi muốn... để..."*), và Acceptance Criteria kèm HTTP Status Codes.
 - [ ] Các sơ đồ trong `business_flows/*.md` sử dụng đúng cú pháp Mermaid hợp lệ.
 - [ ] Nếu có file template dữ liệu mẫu, file nằm đúng trong `user_stories/` và đã được liên kết trong User Story.
