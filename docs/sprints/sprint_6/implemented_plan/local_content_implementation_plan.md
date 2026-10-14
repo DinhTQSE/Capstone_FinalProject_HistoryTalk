@@ -63,13 +63,13 @@ Thay vì tạo bảng mới (`local_historical_context`, `local_character`), ta 
 ### 2.6 Service
 | File | Mô tả |
 |------|-------|
-| `service/localcontent/LocalContentService.java` | Interface |
-| `service/localcontent/LocalContentServiceImpl.java` | Full implementation |
+| `service/localcontent/LocalContentService.java` | Interface (bao gồm 6 document methods) |
+| `service/localcontent/LocalContentServiceImpl.java` | Full implementation: CRUD context/character + 6 document methods + `DocumentRepository` + `AiServiceClient` |
 
 ### 2.7 Controllers
 | File | Base Path | Role |
 |------|-----------|------|
-| `controller/localcontent/TeacherLocalContentController.java` | `/api/v1/teacher/local-contents` | `TEACHER` |
+| `controller/localcontent/TeacherLocalContentController.java` | `/api/v1/teacher/local-contents` | `TEACHER` — 16 endpoints (CRUD context/character + 6 document) |
 | `controller/localcontent/SchoolAdminLocalContentController.java` | `/api/v1/school-admin/local-contents` | `SCHOOL_ADMIN` |
 | `controller/localcontent/StudentLocalContentController.java` | `/api/v1/student/local-contents` | `SCHOOL_STUDENT` |
 
@@ -164,6 +164,18 @@ Tạo mới ──────────────────────�
 | GET | `/student/local-contents/contexts` | Published context của trường |
 | GET | `/student/local-contents/characters` | Published character của trường |
 
+### Teacher — Document (`TEACHER` role)
+| Method | Path | Mô tả |
+|--------|------|—-----|
+| GET | `/teacher/local-contents/contexts/{id}/documents` | Danh sách documents của context |
+| POST | `/teacher/local-contents/contexts/{id}/documents` | Thêm document vào context |
+| DELETE | `/teacher/local-contents/contexts/{id}/documents/{docId}` | Xóa mềm document |
+| GET | `/teacher/local-contents/characters/{id}/documents` | Danh sách documents của character |
+| POST | `/teacher/local-contents/characters/{id}/documents` | Thêm document vào character |
+| DELETE | `/teacher/local-contents/characters/{id}/documents/{docId}` | Xóa mềm document |
+
+**Tổng: 22 endpoints**
+
 ---
 
 ## 7. Known Constraints & Future Work
@@ -174,5 +186,5 @@ Tạo mới ──────────────────────�
 | **Per-class Filtering** | ⏳ Chưa làm | Student hiện thấy tất cả published của trường; per-class filter sẽ xử lý ở tầng Assignment |
 | **"Kéo vào lớp" flow** | ⏳ Chưa làm | GV xem SCHOOL_WIDE content → assign vào lớp mình (sẽ làm ở Assignment feature) |
 | **Cross-schema FK** | ⚠️ Soft constraint | `school_id` trong `historical_schema.historical_context` không có DB-level FK tới `school` table (khác schema). Integrity enforced at app layer |
-| **RAG Integration** | 🔲 Chưa test | Local content chưa được embed vào vector store AI. Cần test với AI backend |
+| **RAG Integration** | ✅ Partial | Document upload tự động gọi `aiServiceClient.processDocumentAsync()`. Cần test end-to-end với AI backend |
 | **Policy Disclaimer UI** | 🔲 FE cần làm | FE phải hiển thị warning khi School Admin click Approve |
