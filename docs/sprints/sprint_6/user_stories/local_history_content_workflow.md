@@ -1,30 +1,53 @@
 # 📋 USER STORIES: LOCAL HISTORY CONTENT WORKFLOW & DISCLAIMER POLICY
 > **Sprint:** Sprint 6 (11/10/2026 – 17/10/2026)  
-> **Phân hệ:** Quản lý Nội dung Lịch sử Địa phương, Cơ chế Chia sẻ Nội bộ & Phê duyệt  
+> **Phân hệ:** Quản lý Nội dung Lịch sử Địa phương (Local Content), Cơ chế Scope Chia sẻ & Phê duyệt  
+> **Đã implement:** ✅ Hoàn thành (14/10/2026)
 
 ---
 
 ## 📌 TỔNG HỢP USER STORIES
 
-| Story ID | Tên User Story | Actor | Developer | API Endpoint chính |
+| Story ID | Tên User Story | Actor | Developer | Trạng thái |
 | :--- | :--- | :--- | :--- | :--- |
-| **`US-SP6-02`** | Giáo viên Tạo & Chia sẻ Nội dung Lịch sử Địa phương | `Teacher` | 🟢 Khải (KhaiVDD) | `POST /api/v1/teacher/local-contents` |
-| **`US-SP6-03`** | School Admin Duyệt Local Content & Policy Disclaimer | `School Admin` | 🟢 Khải (KhaiVDD) | `PUT /api/v1/school-admin/local-contents/{id}/status` |
+| **`US-SP6-02`** | Giáo viên Tạo & Chia sẻ Nội dung Lịch sử Địa phương | `Teacher` | 🟢 Khải (KhaiVDD) | ✅ Done |
+| **`US-SP6-03`** | School Admin Duyệt Local Content & Policy Disclaimer | `School Admin` | 🟢 Khải (KhaiVDD) | ✅ Done |
+| **`UC-14`** | Học sinh Xem Nội dung Địa phương đã Duyệt | `School Student` | 🟢 Khải (KhaiVDD) | ✅ Done |
 
 ---
 
 ## 📑 CHI TIẾT USER STORIES
 
-### 🆔 US-SP6-02: Giáo viên Tạo & Chia sẻ Nội dung Lịch sử Địa phương Nội bộ Trường (Local Content Sharing)
+### 🆔 US-SP6-02: Giáo viên Tạo & Chia sẻ Nội dung Lịch sử Địa phương
 * **Actor:** `Teacher`
-* **Thời gian thực hiện:** 12/10/2026 – 13/10/2026
+* **Thời gian thực hiện:** 12/10/2026 – 14/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là Giáo viên, tôi muốn tạo mới Bối cảnh, Nhân vật hoặc Quiz mang tính chất Lịch sử Địa phương và tự động chia sẻ nội bộ với các Giáo viên khác trong trường, để phục vụ việc giao bài tập đặc thù của nhà trường.
+  Là Giáo viên, tôi muốn tạo mới Bối cảnh hoặc Nhân vật mang tính chất Lịch sử Địa phương, gắn với trường mình, để phục vụ việc giao bài tập đặc thù của nhà trường.
+
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/teacher/local-contents` tạo nội dung địa phương gắn liền với `school_id` và `created_by_teacher_id`. Mặc định trạng thái là `DRAFT`.
-  2. Tất cả Giáo viên thuộc **cùng `school_id` đó** đều xem và dùng chung được nội dung địa phương này để tham khảo và giao bài tập.
-  3. Người dùng thuộc trường khác hoặc B2C Customer **tuyệt đối không thể truy cập** được nội dung địa phương này.
+  1. API `POST /api/v1/teacher/local-contents/contexts` tạo bối cảnh địa phương gắn liền với `school_id` (lấy từ JWT) và `created_by` (teacher đang đăng nhập). Mặc định trạng thái là `DRAFT`.
+  2. API `POST /api/v1/teacher/local-contents/characters` tạo nhân vật địa phương tương tự.
+  3. Teacher chọn **`contentScope`** lúc tạo:
+     - `CLASS_ONLY` *(mặc định)*: chỉ mình Teacher tác giả thấy.
+     - `SCHOOL_WIDE`: lưu vào kho nội dung toàn trường — GV khác cùng trường có thể xem và dùng.
+  4. Thay đổi `contentScope` sau khi tạo sẽ **reset trạng thái về DRAFT** và xóa `approved_by` — bắt buộc School Admin duyệt lại.
+  5. Teacher chỉ có thể **sửa/xóa nội dung do chính mình tạo** (ownership enforcement). GV khác không thể sửa dù cùng trường.
+  6. Người dùng thuộc trường khác hoặc B2C Customer **tuyệt đối không thể truy cập** nội dung địa phương này.
+
+* **API Endpoints:**
+
+  | Method | Path | Mô tả |
+  |--------|------|--------|
+  | `POST` | `/api/v1/teacher/local-contents/contexts` | Tạo bối cảnh địa phương |
+  | `GET` | `/api/v1/teacher/local-contents/contexts` | Danh sách context teacher có thể thấy |
+  | `GET` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Chi tiết context |
+  | `PUT` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Cập nhật (chỉ tác giả) |
+  | `DELETE` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Xóa mềm (chỉ tác giả) |
+  | `POST` | `/api/v1/teacher/local-contents/characters` | Tạo nhân vật địa phương |
+  | `GET` | `/api/v1/teacher/local-contents/characters` | Danh sách character teacher có thể thấy |
+  | `GET` | `/api/v1/teacher/local-contents/characters/{characterId}` | Chi tiết character |
+  | `PUT` | `/api/v1/teacher/local-contents/characters/{characterId}` | Cập nhật (chỉ tác giả) |
+  | `DELETE` | `/api/v1/teacher/local-contents/characters/{characterId}` | Xóa mềm (chỉ tác giả) |
 
 ---
 
@@ -33,8 +56,92 @@
 * **Thời gian thực hiện:** 13/10/2026 – 14/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là School Admin, tôi muốn kiểm duyệt nội dung Lịch sử Địa phương do Giáo viên trường mình soạn thảo và bấm Duyệt (`PUBLISHED`), để học sinh trong trường làm bài tập và chịu trách nhiệm nội dung theo đúng Policy nhà trường.
+  Là School Admin, tôi muốn kiểm duyệt nội dung Lịch sử Địa phương do Giáo viên trường mình soạn thảo và bấm Duyệt, để học sinh trong trường có thể tương tác với nội dung đó thông qua bài tập.
+
 * **Acceptance Criteria (AC):**
-  1. API `PUT /api/v1/school-admin/local-contents/{id}/status` cho phép chuyển trạng thái giữa `PUBLISHED`, `DRAFT`, và `INACTIVE`.
-  2. Lưu trường `approved_by_school_admin_id` để phục vụ đối soát nội bộ nhà trường.
-  3. Theo Điều khoản dịch vụ (Policy), bên cung cấp ứng dụng HistoryTalk hoàn toàn **miễn trừ trách nhiệm pháp lý** đối với tính xác thực của các nội dung Lịch sử Địa phương do nhà trường tự đăng tải.
+  1. School Admin xem được **toàn bộ** nội dung địa phương trong trường mình (bao gồm `CLASS_ONLY` và `SCHOOL_WIDE`) tại:
+     - `GET /api/v1/school-admin/local-contents/contexts`
+     - `GET /api/v1/school-admin/local-contents/characters`
+  2. API `PUT /api/v1/school-admin/local-contents/contexts/{contextId}/status` và `.../characters/{characterId}/status` cho phép chuyển trạng thái:
+     - `ACTIVE` → Duyệt & publish (`is_published = true`, lưu `approved_by`).
+     - `DRAFT` → Trả lại GV chỉnh sửa (`is_published = false`, xóa `approved_by`).
+     - `INACTIVE` → Ẩn tạm thời (`is_published = false`, giữ `approved_by` để audit).
+  3. Khi duyệt (`ACTIVE`), lưu `approved_by = school_admin_id` để phục vụ đối soát nội bộ.
+  4. ⚠️ **Policy Disclaimer (Điều khoản miễn trách):** Bằng cách duyệt nội dung, nhà trường xác nhận chịu **toàn bộ trách nhiệm pháp lý** về tính xác thực của nội dung Lịch sử Địa phương. Bên cung cấp ứng dụng HistoryTalk hoàn toàn **miễn trừ trách nhiệm** đối với nội dung do nhà trường tự đăng tải.
+
+* **API Endpoints:**
+
+  | Method | Path | Mô tả |
+  |--------|------|--------|
+  | `GET` | `/api/v1/school-admin/local-contents/contexts` | Xem tất cả context trong trường |
+  | `PUT` | `/api/v1/school-admin/local-contents/contexts/{contextId}/status` | Duyệt/thay đổi trạng thái context |
+  | `GET` | `/api/v1/school-admin/local-contents/characters` | Xem tất cả character trong trường |
+  | `PUT` | `/api/v1/school-admin/local-contents/characters/{characterId}/status` | Duyệt/thay đổi trạng thái character |
+
+---
+
+### 🆔 UC-14: Học sinh Xem Nội dung Lịch sử Địa phương
+* **Actor:** `School Student`
+* **User Story:**  
+  Là Học sinh, tôi muốn xem được các bối cảnh và nhân vật lịch sử địa phương của trường mình đã được School Admin duyệt, để chuẩn bị hoặc làm bài tập được giáo viên giao.
+
+* **Acceptance Criteria (AC):**
+  1. Học sinh chỉ xem được nội dung có `is_published = true` và thuộc `school_id` của mình.
+  2. Phân quyền chi tiết theo lớp (`CLASS_ONLY` vs `SCHOOL_WIDE`) được xử lý ở tầng Assignment — học sinh chỉ thực sự tương tác khi GV giao bài tập.
+  3. B2C Customer hoặc học sinh trường khác **không thể truy cập**.
+
+* **API Endpoints:**
+
+  | Method | Path | Mô tả |
+  |--------|------|--------|
+  | `GET` | `/api/v1/student/local-contents/contexts` | Xem context đã publish của trường |
+  | `GET` | `/api/v1/student/local-contents/characters` | Xem character đã publish của trường |
+
+---
+
+## 🏗️ THIẾT KẾ KỸ THUẬT
+
+### Database — Approach: Tái dụng bảng hiện có
+Thay vì tạo bảng mới, thêm 3 cột vào `historical_context` và `character`:
+
+```sql
+-- Flyway V32
+ALTER TABLE historical_schema.historical_context
+    ADD COLUMN school_id     UUID        NULL,  -- NULL = global, NOT NULL = local
+    ADD COLUMN content_scope VARCHAR(20) NULL,  -- 'CLASS_ONLY' | 'SCHOOL_WIDE'
+    ADD COLUMN approved_by   UUID        NULL;  -- School Admin UID
+
+ALTER TABLE historical_schema."character"
+    ADD COLUMN school_id     UUID        NULL,
+    ADD COLUMN content_scope VARCHAR(20) NULL,
+    ADD COLUMN approved_by   UUID        NULL;
+```
+
+**Lý do chọn approach này:**
+- Dùng chung RAG pipeline (bge-m3 embeddings) cho local content.
+- Không duplicate logic query.
+- Global content không bị ảnh hưởng (school_id = NULL).
+
+### Scope Visibility Logic
+```
+Teacher gọi GET /teacher/local-contents/contexts:
+  WHERE school_id = :mySchool
+    AND (created_by = :myId              ← CLASS_ONLY của mình
+      OR content_scope = 'SCHOOL_WIDE')  ← SCHOOL_WIDE của GV khác
+```
+
+### ContentScope Enum
+```java
+public enum ContentScope {
+    CLASS_ONLY,   // default — chỉ teacher tác giả thấy
+    SCHOOL_WIDE   // toàn bộ GV trong trường thấy
+}
+```
+
+### Status Lifecycle
+```
+[DRAFT] ──(School Admin approve)──► [ACTIVE/PUBLISHED]
+[ACTIVE] ──(School Admin revert)──► [DRAFT]
+[ACTIVE] ──(School Admin hide)────► [INACTIVE]
+[DRAFT/ACTIVE] ──(Teacher delete)─► [soft-deleted]
+```
