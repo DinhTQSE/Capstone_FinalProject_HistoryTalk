@@ -2,6 +2,8 @@ package com.historytalk.controller.localcontent;
 
 import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequest;
+import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historytalk.dto.localcontent.*;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.localcontent.LocalContentService;
@@ -170,5 +172,90 @@ public class TeacherLocalContentController {
 
         localContentService.deleteLocalCharacter(characterId, principal);
         return ResponseEntity.ok(ApiResponse.success(null, "Local character deleted successfully"));
+    }
+
+    // ── Document endpoints — Context ──────────────────────────────────────────
+
+    @GetMapping("/contexts/{contextId}/documents")
+    @Operation(
+            summary = "Danh sách tài liệu của bối cảnh địa phương",
+            description = "Trả về tất cả document không bị xóa của local context. " +
+                    "Chỉ Teacher thuộc cùng trường mới xem được.")
+    public ResponseEntity<ApiResponse<java.util.List<HistoricalContextDocumentResponse>>> getLocalContextDocuments(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var docs = localContentService.getLocalContextDocuments(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+    }
+
+    @PostMapping("/contexts/{contextId}/documents")
+    @Operation(
+            summary = "Thêm tài liệu cho bối cảnh địa phương",
+            description = "Upload/attach tài liệu (text, URL) vào local context. " +
+                    "Nội dung sẽ được gửi async lên AI backend để embed vào vector store.")
+    public ResponseEntity<ApiResponse<HistoricalContextDocumentResponse>> addLocalContextDocument(
+            @PathVariable String contextId,
+            @Valid @RequestBody CreateHistoricalContextDocumentRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var doc = localContentService.addLocalContextDocument(contextId, request, principal);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(doc, "Document added to local context successfully"));
+    }
+
+    @DeleteMapping("/contexts/{contextId}/documents/{docId}")
+    @Operation(
+            summary = "Xóa mềm tài liệu khỏi bối cảnh địa phương",
+            description = "Chỉ người upload tài liệu mới xóa được.")
+    public ResponseEntity<ApiResponse<Void>> deleteLocalContextDocument(
+            @PathVariable String contextId,
+            @PathVariable String docId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.deleteLocalContextDocument(contextId, docId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Document deleted successfully"));
+    }
+
+    // ── Document endpoints — Character ────────────────────────────────────────
+
+    @GetMapping("/characters/{characterId}/documents")
+    @Operation(
+            summary = "Danh sách tài liệu của nhân vật địa phương",
+            description = "Trả về tất cả document không bị xóa của local character. " +
+                    "Chỉ Teacher thuộc cùng trường mới xem được.")
+    public ResponseEntity<ApiResponse<java.util.List<HistoricalContextDocumentResponse>>> getLocalCharacterDocuments(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var docs = localContentService.getLocalCharacterDocuments(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+    }
+
+    @PostMapping("/characters/{characterId}/documents")
+    @Operation(
+            summary = "Thêm tài liệu cho nhân vật địa phương",
+            description = "Upload/attach tài liệu vào local character. Nội dung sẽ được embed vào AI backend.")
+    public ResponseEntity<ApiResponse<HistoricalContextDocumentResponse>> addLocalCharacterDocument(
+            @PathVariable String characterId,
+            @Valid @RequestBody CreateHistoricalContextDocumentRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var doc = localContentService.addLocalCharacterDocument(characterId, request, principal);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(doc, "Document added to local character successfully"));
+    }
+
+    @DeleteMapping("/characters/{characterId}/documents/{docId}")
+    @Operation(
+            summary = "Xóa mềm tài liệu khỏi nhân vật địa phương",
+            description = "Chỉ người upload tài liệu mới xóa được.")
+    public ResponseEntity<ApiResponse<Void>> deleteLocalCharacterDocument(
+            @PathVariable String characterId,
+            @PathVariable String docId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.deleteLocalCharacterDocument(characterId, docId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Document deleted successfully"));
     }
 }

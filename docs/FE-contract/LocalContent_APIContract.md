@@ -3,7 +3,7 @@
 > **Base URL:** `http://localhost:8080/Historical-tell`  
 > **Auth:** Bearer JWT required for all endpoints  
 > **Viết cho:** Frontend (Thành) & Mobile (nếu cần)  
-> **Last updated:** 14/10/2026
+> **Last updated:** 14/10/2026 — v2 (thêm Document APIs)
 
 ---
 
@@ -399,6 +399,104 @@ Authorization: Bearer {SCHOOL_STUDENT_TOKEN}
 ```
 GET /api/v1/student/local-contents/characters
 Authorization: Bearer {SCHOOL_STUDENT_TOKEN}
+```
+
+---
+
+## 📎 TEACHER — Document APIs
+
+> Tài liệu gắn vào local context/character để bổ sung kiến thức cho AI (RAG).
+> Sau khi upload, nội dung được gửi async lên AI backend để embed vào vector store.
+
+### 17. Danh sách tài liệu của local context
+```
+GET /api/v1/teacher/local-contents/contexts/{contextId}/documents
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+> School isolation: chỉ Teacher thuộc cùng trường với context mới xem được.
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Documents retrieved — 2 found",
+  "data": [
+    {
+      "docId": "uuid",
+      "contextId": "uuid-of-context",
+      "uid": "uuid-of-teacher",
+      "userName": "teacher01",
+      "title": "Tài liệu tham khảo khởi nghĩa Hai Bà Trưng",
+      "content": "Nội dung text đầy đủ...",
+      "fileUrl": null,
+      "type": "TEXT",
+      "uploadDate": "2026-10-14T08:00:00",
+      "updatedDate": null,
+      "deletedAt": null
+    }
+  ]
+}
+```
+
+---
+
+### 18. Thêm tài liệu vào local context
+```
+POST /api/v1/teacher/local-contents/contexts/{contextId}/documents
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "Tài liệu tham khảo lịch sử địa phương",
+  "content": "Nội dung chi tiết về sự kiện, nhân vật...",
+  "fileUrl": "https://drive.google.com/...",
+  "type": "TEXT"
+}
+```
+
+> `type`: `TEXT` | `PDF` | `URL` — mặc định `TEXT` nếu không truyền.
+
+**Response `201 Created`:** *(giống schema ở trên)*
+
+---
+
+### 19. Xóa mềm tài liệu khỏi local context
+```
+DELETE /api/v1/teacher/local-contents/contexts/{contextId}/documents/{docId}
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+> Chỉ người đã upload tài liệu mới xóa được. Soft-delete (set `deletedAt`).
+
+---
+
+### 20. Danh sách tài liệu của local character
+```
+GET /api/v1/teacher/local-contents/characters/{characterId}/documents
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+---
+
+### 21. Thêm tài liệu vào local character
+```
+POST /api/v1/teacher/local-contents/characters/{characterId}/documents
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:** *(giống context — title, content, fileUrl, type)*
+
+---
+
+### 22. Xóa mềm tài liệu khỏi local character
+```
+DELETE /api/v1/teacher/local-contents/characters/{characterId}/documents/{docId}
+Authorization: Bearer {TEACHER_TOKEN}
 ```
 
 ---

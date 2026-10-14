@@ -43,11 +43,17 @@
   | `GET` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Chi tiết context |
   | `PUT` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Cập nhật (chỉ tác giả) |
   | `DELETE` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Xóa mềm (chỉ tác giả) |
+  | `GET` | `/api/v1/teacher/local-contents/contexts/{contextId}/documents` | Danh sách tài liệu của context |
+  | `POST` | `/api/v1/teacher/local-contents/contexts/{contextId}/documents` | Thêm tài liệu vào context |
+  | `DELETE` | `/api/v1/teacher/local-contents/contexts/{contextId}/documents/{docId}` | Xóa tài liệu (chỉ người upload) |
   | `POST` | `/api/v1/teacher/local-contents/characters` | Tạo nhân vật địa phương |
   | `GET` | `/api/v1/teacher/local-contents/characters` | Danh sách character teacher có thể thấy |
   | `GET` | `/api/v1/teacher/local-contents/characters/{characterId}` | Chi tiết character |
   | `PUT` | `/api/v1/teacher/local-contents/characters/{characterId}` | Cập nhật (chỉ tác giả) |
   | `DELETE` | `/api/v1/teacher/local-contents/characters/{characterId}` | Xóa mềm (chỉ tác giả) |
+  | `GET` | `/api/v1/teacher/local-contents/characters/{characterId}/documents` | Danh sách tài liệu của character |
+  | `POST` | `/api/v1/teacher/local-contents/characters/{characterId}/documents` | Thêm tài liệu vào character |
+  | `DELETE` | `/api/v1/teacher/local-contents/characters/{characterId}/documents/{docId}` | Xóa tài liệu (chỉ người upload) |
 
 ---
 

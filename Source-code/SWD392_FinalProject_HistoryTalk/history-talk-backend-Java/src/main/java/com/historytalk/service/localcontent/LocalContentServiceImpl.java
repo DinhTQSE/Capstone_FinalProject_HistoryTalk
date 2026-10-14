@@ -1,21 +1,28 @@
 package com.historytalk.service.localcontent;
 
 import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequest;
+import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historytalk.dto.localcontent.*;
 import com.historytalk.entity.character.Character;
+import com.historytalk.entity.document.Document;
 import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.enums.ContentStatus;
+import com.historytalk.entity.enums.DocumentType;
+import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.UnauthorizedException;
+import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.LocalCharacterRepository;
 import com.historytalk.repository.LocalContextRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.service.chat.AiServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -53,6 +60,8 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final LocalCharacterRepository localCharacterRepo;
     private final UserRepository userRepository;
     private final SchoolRepository schoolRepository;
+    private final DocumentRepository documentRepository;
+    private final AiServiceClient aiServiceClient;
 
     // ══════════════════════════════════════════════════════════════════════════
     // TEACHER — Context
@@ -543,6 +552,140 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .schoolName(c.getSchool() != null ? c.getSchool().getName() : null)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
+                .build();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DOCUMENT MANAGEMENT — Local Context & Character
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HistoricalContextDocumentResponse> getLocalContextDocuments(String contextId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+        return documentRepository
+                .findByEntityIdAndEntityTypeOrderByUploadDateDesc(UUID.fromString(contextId), EntityType.CONTEXT, false)
+                .stream().map(this::mapDocumentToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public HistoricalContextDocumentResponse addLocalContextDocument(
+            String contextId, CreateHistoricalContextDocumentRequest req, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+
+        DocumentType type = req.getType() != null ? req.getType() : DocumentType.TEXT;
+        Document doc = Document.builder()
+                .entityId(ctx.getContextId())
+                .entityType(EntityType.CONTEXT)
+                .createdBy(teacher)
+                .title(req.getTitle())
+                .fileUrl(req.getFileUrl())
+                .content(req.getContent())
+                .documentType(type)
+                .build();
+        Document saved = documentRepository.save(doc);
+        aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        log.info("Teacher {} added document {} to local context {}", teacher.getUid(), saved.getDocId(), contextId);
+        return mapDocumentToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteLocalContextDocument(String contextId, String docId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        UUID teacherId = UUID.fromString(principal.getUid());
+        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+        Document doc = documentRepository.findById(UUID.fromString(docId))
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        if (!doc.getEntityId().equals(UUID.fromString(contextId))) {
+            throw new ResourceNotFoundException("Document does not belong to this context");
+        }
+        if (!doc.getCreatedBy().getUid().equals(teacherId)) {
+            throw new UnauthorizedException("You can only delete documents you uploaded");
+        }
+        doc.setDeletedAt(LocalDateTime.now());
+        documentRepository.save(doc);
+        log.info("Teacher {} soft-deleted document {} from local context {}", teacherId, docId, contextId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HistoricalContextDocumentResponse> getLocalCharacterDocuments(String characterId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+        return documentRepository
+                .findByEntityIdAndEntityTypeOrderByUploadDateDesc(UUID.fromString(characterId), EntityType.CHARACTER, false)
+                .stream().map(this::mapDocumentToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public HistoricalContextDocumentResponse addLocalCharacterDocument(
+            String characterId, CreateHistoricalContextDocumentRequest req, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+
+        DocumentType type = req.getType() != null ? req.getType() : DocumentType.TEXT;
+        Document doc = Document.builder()
+                .entityId(character.getCharacterId())
+                .entityType(EntityType.CHARACTER)
+                .createdBy(teacher)
+                .title(req.getTitle())
+                .fileUrl(req.getFileUrl())
+                .content(req.getContent())
+                .documentType(type)
+                .build();
+        Document saved = documentRepository.save(doc);
+        aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        log.info("Teacher {} added document {} to local character {}", teacher.getUid(), saved.getDocId(), characterId);
+        return mapDocumentToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteLocalCharacterDocument(String characterId, String docId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        UUID teacherId = UUID.fromString(principal.getUid());
+        localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+        Document doc = documentRepository.findById(UUID.fromString(docId))
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        if (!doc.getEntityId().equals(UUID.fromString(characterId))) {
+            throw new ResourceNotFoundException("Document does not belong to this character");
+        }
+        if (!doc.getCreatedBy().getUid().equals(teacherId)) {
+            throw new UnauthorizedException("You can only delete documents you uploaded");
+        }
+        doc.setDeletedAt(LocalDateTime.now());
+        documentRepository.save(doc);
+        log.info("Teacher {} soft-deleted document {} from local character {}", teacherId, docId, characterId);
+    }
+
+    // ── Document Mapper ───────────────────────────────────────────────────────
+
+    private HistoricalContextDocumentResponse mapDocumentToResponse(Document doc) {
+        return HistoricalContextDocumentResponse.builder()
+                .docId(doc.getDocId().toString())
+                .contextId(doc.getEntityId().toString())
+                .uid(doc.getCreatedBy() != null ? doc.getCreatedBy().getUid().toString() : null)
+                .userName(doc.getCreatedBy() != null ? doc.getCreatedBy().getUserName() : null)
+                .title(doc.getTitle())
+                .content(doc.getContent())
+                .fileUrl(doc.getFileUrl())
+                .type(doc.getDocumentType())
+                .uploadDate(doc.getUploadedAt())
+                .updatedDate(doc.getUpdatedAt())
+                .deletedAt(doc.getDeletedAt())
                 .build();
     }
 }
