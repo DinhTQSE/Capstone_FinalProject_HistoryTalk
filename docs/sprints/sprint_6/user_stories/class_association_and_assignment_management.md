@@ -35,16 +35,44 @@
 
 ---
 
-### 🆔 US-SP6-04: Giáo viên Giao Bài tập Đa nhiệm cho Lớp kèm Deadline (Assignment Creation)
+### 🆔 US-SP6-04: Giáo viên Giao Bài tập Đa nhiệm cho Lớp kèm Deadline (Assignment Creation & Content Pool Selection)
 * **Actor:** `Teacher`
 * **Thời gian thực hiện:** 14/10/2026 – 15/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là Giáo viên, tôi muốn giao Bài tập cho Lớp phụ trách (gồm: Đọc Bối cảnh, Chat AI với Nhân vật, hoặc Làm Quiz kiểm tra) kèm Hạn nộp (`deadline`), để học sinh làm bài và thu thập kết quả.
+  Là Giáo viên, tôi muốn duyệt kho nội dung (Bối cảnh, Nhân vật, Quiz), xem chi tiết nội dung trước khi chọn và giao Bài tập cho Lớp phụ trách kèm Hạn nộp (`deadline`), để học sinh làm bài và hệ thống thu thập kết quả.
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/teacher/assignments` nhận: `class_id`, `title`, `assignment_type` (`CONTEXT_READING`, `AI_CHAT_ROLEPLAY`, `QUIZ_TEST`), `target_id`, `deadline`.
-  2. Hỗ trợ chọn bài tập từ cả Kho Nội dung Chung (Global) lẫn Kho Lịch sử Địa phương (`PUBLISHED`) của trường.
-  3. Tự động khởi tạo trạng thái `assignment_submission` là `NOT_STARTED` cho toàn bộ học sinh có trong Lớp.
+  1. **API Giao Bài tập:** `POST /api/v1/teacher/assignments` nhận:
+     * `class_id` (`UUID`, bắt buộc): Lớp học được giao bài (phải thuộc quyền quản lý của Giáo viên).
+     * `title` (`String`, bắt buộc): Tiêu đề bài tập hiển thị cho học sinh.
+     * `description` (`String`, tùy chọn): Lời dặn dò, hướng dẫn của giáo viên.
+     * `assignment_type` (`AssignmentType`, bắt buộc):
+       - `CONTEXT_READING`: Đọc và tìm hiểu Bối cảnh Lịch sử.
+       - `AI_CHAT_ROLEPLAY`: Nhập vai trò chuyện tương tác với Nhân vật Lịch sử (AI Persona).
+       - `QUIZ_TEST`: Làm bài kiểm tra trắc nghiệm bấm giờ.
+     * `target_id` (`UUID`, bắt buộc): ID của nội dung được chọn (tương ứng `context_id`, `character_id`, hoặc `quiz_id`).
+     * `deadline` (`LocalDateTime`, bắt buộc): Hạn chót nộp bài (phải sau thời điểm hiện tại).
+  2. **Tích hợp Kho Nội dung (Content Pool Integration) & Preview:**
+     * Hệ thống tận dụng các kho nội dung đã có sẵn:
+       - `CONTEXT_READING`: Lấy từ `historical_context` (Global qua `GET /api/v1/historical-contexts`, Local qua `GET /api/v1/teacher/local-contents/contexts`).
+       - `AI_CHAT_ROLEPLAY`: Lấy từ `character` (Global qua `GET /api/v1/characters`, Local qua `GET /api/v1/teacher/local-contents/characters`).
+       - `QUIZ_TEST`: Lấy từ `quiz` (qua `GET /api/v1/quizzes`).
+     * Giáo viên có quyền xem trước chi tiết nội dung (`Preview/View Detail`) thông qua các API GET chi tiết theo ID trước khi xác nhận giao bài.
+     * Với nội dung địa phương (Local Content), chỉ được phép giao các bài đã ở trạng thái `ACTIVE` (đã được School Admin phê duyệt).
+  3. **Khởi tạo Submission tự động (Eager Initialization):**
+     * Ngay khi bài tập được tạo, hệ thống tự động sinh bản ghi `assignment_submission` cho toàn bộ học sinh đang có trạng thái `ACTIVE` trong lớp.
+     * Trạng thái khởi tạo ban đầu là **`NOT_STARTED`**.
+  4. **Cơ chế xử lý Edge Cases:**
+     * **Edge Case 1 (Học sinh mới chuyển vào lớp sau khi bài tập đã được giao):**
+       - Hệ thống **không** tự động ép gán làm các bài tập đã giao trước ngày chuyển lớp để tránh làm học sinh bị quá tải hoặc thiếu hụt kiến thức nền.
+       - Các bài tập đã hết hạn trước thời điểm chuyển lớp sẽ được đánh dấu trạng thái **`EXEMPTED` (Miễn làm)** trong sổ điểm, không tính điểm 0 và không kéo tụt điểm trung bình của học sinh/lớp.
+       - **Chế độ Luyện tập bù (Practice / Catch-up Mode):** Học sinh vẫn có thể xem và làm bài tập cũ để củng cố kiến thức mà không bị phạt nộp trễ (`LATE_SUBMITTED`).
+       - Giáo viên có quyền kích hoạt **"Gia hạn riêng" (Custom Student Deadline)** nếu muốn giao bài bù có tính điểm chính thức cho học sinh này.
+     * **Edge Case 2 (Học sinh bị gỡ khỏi lớp hoặc chuyển sang lớp khác):**
+       - Toàn bộ bài nộp và điểm số cũ của học sinh trong lớp cũ **được bảo toàn nguyên vẹn** (phục vụ đối soát học bạ), chỉ đổi trạng thái liên kết lớp `class_student` sang `TRANSFERRED` hoặc `INACTIVE`.
+     * **Edge Case 3 (Giáo viên gia hạn Deadline hoặc Hủy/Xóa bài tập):**
+       - *Gia hạn Deadline:* Nếu giáo viên lùi deadline sang tương lai, các bài nộp từng bị đánh dấu `LATE_SUBMITTED` nhưng có `submitted_at <= new_deadline` sẽ tự động chuyển thành `SUBMITTED` đúng hạn.
+       - *Hủy/Xóa bài tập:* Thực hiện **Soft Delete** (chuyển trạng thái bài tập sang `CANCELLED`). Tuyệt đối không hard delete để tránh phá vỡ toàn vẹn dữ liệu submission và phiên chat AI đã phát sinh.
 
 ---
 
@@ -53,9 +81,27 @@
 * **Thời gian thực hiện:** 15/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là Học sinh hoặc Hệ thống, tôi muốn tự động chấm điểm bài Quiz bấm giờ và đếm số tin nhắn AI trò chuyện, để tự động hoàn thành bài tập và ghi nhận điểm số.
+  Là Học sinh hoặc Hệ thống, tôi muốn tự động chấm điểm bài Quiz trắc nghiệm, ghi nhận số lượt đối thoại với AI, hoặc ghi nhận thời gian đọc bối cảnh, để tự động cập nhật trạng thái hoàn thành bài tập và ghi nhận điểm số vào sổ học tập.
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/student/assignments/{id}/submit`:
-     * Với Bài Quiz: Tính điểm % câu trả lời đúng và lưu `score`.
-     * Với Bài Chat AI: Đếm tổng số tin nhắn học sinh đã trò chuyện với nhân vật AI (`ai_chat_message_count`).
-  2. Cập nhật trạng thái `COMPLETED` (nếu nộp trước hạn) hoặc `LATE_SUBMITTED` (nếu nộp sau hạn).
+  1. **Đặc tả Enum Trạng thái Submission (`SubmissionStatus`):**
+     * `NOT_STARTED`: Khởi tạo mặc định khi bài tập được giao, học sinh chưa bấm vào xem/làm.
+     * `IN_PROGRESS`: Học sinh đã mở bài tập (bắt đầu chat AI, bắt đầu làm quiz, hoặc mở tài liệu đọc).
+     * `SUBMITTED`: Học sinh đã hoàn thành và nộp bài đúng hạn (`submitted_at <= deadline`).
+     * `LATE_SUBMITTED`: Học sinh nộp bài sau hạn (`submitted_at > deadline`).
+     * `MISSED`: Quá hạn chót mà học sinh vẫn ở `NOT_STARTED` hoặc `IN_PROGRESS` chưa hoàn thành.
+     * `EXEMPTED`: Miễn làm (dành riêng cho học sinh mới chuyển lớp đối với các bài đã giao trước đó).
+  2. **API Nộp bài & Tự động Đánh giá theo Loại bài:** `POST /api/v1/student/assignments/{assignmentId}/submit`
+     * **`QUIZ_TEST`:**
+       - Tích hợp với `QuizSession` của hệ thống Quiz hiện có.
+       - Tự động tính điểm theo thang điểm 10 (`score = (correct_answers / total_questions) * 10`).
+     * **`AI_CHAT_ROLEPLAY`:**
+       - Tích hợp đếm tổng số lượt tin nhắn học sinh đã gửi trong phiên chat với nhân vật AI (`message_count`).
+       - Điều kiện đạt (Passing Criteria) do giáo viên cấu hình hoặc mặc định (ví dụ: tối thiểu >= 5 tin nhắn tương tác lịch sử).
+     * **`CONTEXT_READING`:**
+       - Ghi nhận thời gian đọc tài liệu (`reading_duration_seconds`) và xác nhận hoàn thành từ học sinh.
+  3. **Cập nhật Vòng đời & Thời gian nộp:**
+     * Lưu chính xác `submitted_at = LocalDateTime.now()`.
+     * So sánh với `deadline` của bài tập để set trạng thái `SUBMITTED` hoặc `LATE_SUBMITTED`.
+  4. **Bảo mật & Tenant Isolation:**
+     * Học sinh chỉ được nộp bài cho các assignment thuộc lớp học mà mình đang theo học (`status = ACTIVE`).
+     * Học sinh không thể nộp bài tập của trường khác hoặc lớp khác (`403 Forbidden`).
