@@ -19,4 +19,7 @@ public interface SchoolRepository extends JpaRepository<School, UUID> {
     Page<School> findByNameContainingIgnoreCaseOrSchoolCodeContainingIgnoreCaseOrContactEmailContainingIgnoreCase(
             String name, String schoolCode, String contactEmail, Pageable pageable
     );
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(s.totalSchoolTokenQuota), 0) FROM School s WHERE s.deletedAt IS NULL")
+    long sumTotalSchoolTokenQuota();
 }
