@@ -13,6 +13,9 @@ import com.historytalk.dto.quiz.quizdata.MatchingAnswerData;
 import com.historytalk.dto.quiz.quizdata.MatchingPair;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MatchingItem;
+import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
+import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
+import com.historytalk.dto.quiz.quizdata.QuestionOption;
 import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
@@ -229,6 +232,104 @@ class QuestionBankServiceImplTest {
         AnswerDetailRequest answer = AnswerDetailRequest.builder()
                 .questionId(questionId.toString())
                 .answerData(objectMapper.valueToTree(ansData)).build();
+
+        QuizSubmitResponse response = quizService.submitQuiz(
+                QuizSubmitRequest.builder().sessionId(sessionId.toString()).answers(List.of(answer)).build(),
+                userId);
+
+        assertThat(response.getScore()).isEqualTo(0);
+    }
+
+    // ==================== Multiple Choice grading ====================
+
+    @Test
+    void submitQuiz_MC_correctAnswer_scoreOne() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        UUID quizId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+
+        MultipleChoiceQuestionData qData = MultipleChoiceQuestionData.builder()
+                .options(List.of(
+                        QuestionOption.builder().id("0").text("938").build(),
+                        QuestionOption.builder().id("1").text("939").build()))
+                .correctOptionIds(List.of("0"))
+                .build();
+        String questionDataJson = objectMapper.writeValueAsString(qData);
+
+        Question question = Question.builder()
+                .questionId(questionId)
+                .content("Năm Bạch Đằng?")
+                .questionType(QuestionType.MULTIPLE_CHOICE)
+                .questionData(questionDataJson)
+                .build();
+
+        User user = new User();
+        user.setUid(userId);
+        Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
+        QuizSession session = QuizSession.builder()
+                .sessionId(sessionId).quiz(quiz).user(user)
+                .startTime(LocalDateTime.now()).build();
+
+        when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
+        when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
+        when(quizSessionRepository.save(any())).thenReturn(session);
+
+        MultipleChoiceAnswerData ansData = MultipleChoiceAnswerData.builder()
+                .selectedOptionIds(List.of("0"))
+                .build();
+        AnswerDetailRequest answer = AnswerDetailRequest.builder()
+                .questionId(questionId.toString())
+                .answerData(objectMapper.valueToTree(ansData))
+                .build();
+
+        QuizSubmitResponse response = quizService.submitQuiz(
+                QuizSubmitRequest.builder().sessionId(sessionId.toString()).answers(List.of(answer)).build(),
+                userId);
+
+        assertThat(response.getScore()).isEqualTo(1);
+    }
+
+    @Test
+    void submitQuiz_MC_wrongAnswer_scoreZero() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        UUID quizId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+
+        MultipleChoiceQuestionData qData = MultipleChoiceQuestionData.builder()
+                .options(List.of(
+                        QuestionOption.builder().id("0").text("938").build(),
+                        QuestionOption.builder().id("1").text("939").build()))
+                .correctOptionIds(List.of("0"))
+                .build();
+        String questionDataJson = objectMapper.writeValueAsString(qData);
+
+        Question question = Question.builder()
+                .questionId(questionId)
+                .content("Năm Bạch Đằng?")
+                .questionType(QuestionType.MULTIPLE_CHOICE)
+                .questionData(questionDataJson)
+                .build();
+
+        User user = new User();
+        user.setUid(userId);
+        Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
+        QuizSession session = QuizSession.builder()
+                .sessionId(sessionId).quiz(quiz).user(user)
+                .startTime(LocalDateTime.now()).build();
+
+        when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
+        when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
+        when(quizSessionRepository.save(any())).thenReturn(session);
+
+        MultipleChoiceAnswerData ansData = MultipleChoiceAnswerData.builder()
+                .selectedOptionIds(List.of("1"))
+                .build();
+        AnswerDetailRequest answer = AnswerDetailRequest.builder()
+                .questionId(questionId.toString())
+                .answerData(objectMapper.valueToTree(ansData))
+                .build();
 
         QuizSubmitResponse response = quizService.submitQuiz(
                 QuizSubmitRequest.builder().sessionId(sessionId.toString()).answers(List.of(answer)).build(),

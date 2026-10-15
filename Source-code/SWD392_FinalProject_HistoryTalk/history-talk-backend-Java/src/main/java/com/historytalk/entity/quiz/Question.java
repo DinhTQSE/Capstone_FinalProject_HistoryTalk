@@ -40,13 +40,6 @@ public class Question {
     private String content;
 
     //    @Lob
-    @Column(name = "options", columnDefinition = "TEXT", nullable = true)
-    private String options;
-
-    @Column(name = "correct_answer", nullable = true)
-    private Integer correctAnswer;
-
-    //    @Lob
     @Column(name = "explanation", columnDefinition = "TEXT", nullable = true)
     private String explanation;
 
