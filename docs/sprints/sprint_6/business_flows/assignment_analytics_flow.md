@@ -155,6 +155,9 @@ flowchart TD
     end
 ```
 
+> 📖 **Xem kịch bản chi tiết:** Hướng dẫn kiểm thử và các API payload thực chiến cho từng bước được lưu tại:  
+> 📑 [assignment_end_to_end_test_flows.md](assignment_end_to_end_test_flows.md)
+
 ---
 
 ## 3. DB SCHEMA
