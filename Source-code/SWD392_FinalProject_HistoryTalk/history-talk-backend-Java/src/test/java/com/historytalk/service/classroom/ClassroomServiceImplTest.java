@@ -211,7 +211,7 @@ class ClassroomServiceImplTest {
         when(classroomRepository.existsBySchoolIdAndClassNameIgnoreCaseAndAcademicYearAndIdNotAndDeletedAtIsNull(
                 schoolId, "10A1 Chuyên", 2026, classroomId)).thenReturn(false);
         when(classroomRepository.save(any(Classroom.class))).thenReturn(classroom);
-        when(classStudentRepository.countByClassroomId(classroomId)).thenReturn(35L);
+        when(classStudentRepository.countByClassroomIdAndStatus(classroomId, "ACTIVE")).thenReturn(35L);
 
         ClassroomResponse response = classroomService.updateClassroom(classroomId, request, adminPrincipal);
 
@@ -277,7 +277,7 @@ class ClassroomServiceImplTest {
 
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId))
                 .thenReturn(Optional.of(classroom));
-        when(classStudentRepository.countByClassroomId(classroomId)).thenReturn(40L);
+        when(classStudentRepository.countByClassroomIdAndStatus(classroomId, "ACTIVE")).thenReturn(40L);
 
         ClassroomResponse response = classroomService.getClassroomById(classroomId, adminPrincipal);
 
@@ -300,7 +300,7 @@ class ClassroomServiceImplTest {
         when(classroomRepository.findBySchoolIdAndDeletedAtIsNullAndClassNameContainingIgnoreCaseOrSchoolIdAndDeletedAtIsNullAndClassCodeContainingIgnoreCase(
                 eq(schoolId), eq("10A1"), eq(schoolId), eq("10A1"), eq(pageable)))
                 .thenReturn(page);
-        when(classStudentRepository.countByClassroomId(any())).thenReturn(20L);
+        when(classStudentRepository.countByClassroomIdAndStatus(any(), eq("ACTIVE"))).thenReturn(20L);
 
         PaginatedResponse<ClassroomResponse> result = classroomService.getSchoolClassrooms(
                 "10A1", 10, 2026, pageable, adminPrincipal);
@@ -322,7 +322,7 @@ class ClassroomServiceImplTest {
 
         when(classStudentRepository.findClassroomsByStudentUid(studentUser.getUid()))
                 .thenReturn(List.of(classroom));
-        when(classStudentRepository.countByClassroomId(any())).thenReturn(30L);
+        lenient().when(classStudentRepository.countByClassroomIdAndStatus(any(), eq("ACTIVE"))).thenReturn(30L);
 
         List<ClassroomResponse> list = classroomService.getStudentClassrooms(studentPrincipal);
 

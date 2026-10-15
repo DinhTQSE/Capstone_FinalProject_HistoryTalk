@@ -76,22 +76,90 @@ flowchart TD
 
 ---
 
-## 2. LUỒNG GIAO BÀI TẬP, THU BÀI VÀ CẬP NHẬT DASHBOARD GIÁO VIÊN
+## 2. LUỒNG GIAO BÀI TẬP, THU BÀI & XỬ LÝ EDGE CASES
+
+### 2.1 Luồng Giáo viên Duyệt Kho nội dung & Giao bài tập (Eager Initialization)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor T as Teacher (Trường A)
+    participant BE as HistoryTalk Backend
+    participant DB as Database (Postgres)
+
+    Note over T,BE: Bước 1: Duyệt Kho Nội dung (Global + Local APPROVED)
+    T->>BE: GET /api/v1/historical-contexts hoặc /characters hoặc /quizzes
+    BE-->>T: Danh sách nội dung khả dụng (kèm cờ Global/Local)
+    
+    T->>BE: GET .../{targetId} (Xem chi tiết/Preview nội dung trước khi giao)
+    BE-->>T: Chi tiết bối cảnh / tiểu sử nhân vật / bộ câu hỏi quiz
+
+    Note over T,BE: Bước 2: Tạo Bài tập cho Lớp
+    T->>BE: POST /api/v1/teacher/assignments<br/>{classId, title, assignmentType, targetId, deadline}
+    BE->>DB: 1. Validate Teacher sở hữu Class & Target hợp lệ<br/>2. INSERT INTO assignment (status: 'ACTIVE')
+    BE->>DB: 3. Eager Init: SELECT student_id FROM class_student WHERE classroom_id = classId AND status = 'ACTIVE'
+    BE->>DB: 4. INSERT INTO assignment_submission (student_id, assignment_id, status: 'NOT_STARTED')
+    BE-->>T: 201 Created (Kèm tổng số học sinh đã được khởi tạo submission)
+```
+
+### 2.2 Luồng Học sinh Làm bài & Tự động Chấm điểm (Submission State Machine)
 
 ```mermaid
 flowchart TD
-    A["Giáo viên giao Bài tập cho Lớp:\nChọn bài, đặt Deadline"] --> B["Hệ thống tạo bản ghi\nAssignment_Submission (NOT_STARTED)\ncho toàn bộ HS trong lớp"]
-    B --> C["Học sinh vào làm bài tập:\nChat AI hoặc Làm Quiz bấm giờ"]
-    C --> D{Thời điểm nộp bài <= Deadline?}
-    D -- "Đúng hạn" --> E["COMPLETED\nLưu Điểm/Message Count"]
-    D -- "Nộp trễ" --> F["LATE_SUBMITTED\nLưu Điểm/Message Count"]
-    E --> G["Cập nhật Bảng điểm\n& Analytics Teacher Dashboard"]
-    F --> G
+    A["Assignment được giao"] --> B["Bản ghi Submission tạo tự động:\nstatus = NOT_STARTED"]
+    
+    B --> C["Học sinh bấm vào làm bài:\nstatus = IN_PROGRESS\nstarted_at = NOW()"]
+    
+    C --> D{Loại bài tập?}
+    D -- "QUIZ_TEST" --> E["Học sinh nộp bài trắc nghiệm\nBackend tính score = (đúng / tổng) * 10"]
+    D -- "AI_CHAT_ROLEPLAY" --> F["Chat tương tác với Nhân vật AI\nĐếm message_count\nscore = min(10, message_count/min_requirement * 10)"]
+    D -- "CONTEXT_READING" --> G["Đọc bối cảnh & tài liệu\nĐo reading_duration_seconds\nscore = min(10, duration/min_requirement * 10)"]
+
+    E --> H{Thời điểm nộp <= Deadline?}
+    F --> H
+    G --> H
+
+    H -- "Đúng hạn" --> I["status = SUBMITTED\nsubmitted_at = NOW()"]
+    H -- "Quá hạn" --> J["status = LATE_SUBMITTED\nsubmitted_at = NOW()"]
+
+    B -. "Hết hạn mà HS chưa từng làm/nộp" .-> K["status = MISSED\n(Phục vụ thống kê Dashboard)"]
+    
+    I --> L["Cập nhật Sổ điểm & Dashboard Giáo viên/Học sinh"]
+    J --> L
+    K --> L
+```
+
+### 2.3 Luồng Xử lý Edge Cases Thực tế
+
+```mermaid
+flowchart TD
+    subgraph EC1["Edge Case 1: Học sinh mới chuyển vào Lớp"]
+        direction TB
+        EC1_A["Học sinh mới chuyển vào lớp"] --> EC1_B{Bài tập trong lớp?}
+        EC1_B -- "Bài tập đã giao trước đó" --> EC1_C["Đánh dấu EXEMPTED trong sổ điểm\n(Không tính điểm 0, không kéo tụt KPI)"]
+        EC1_C --> EC1_D["Chế độ Luyện tập bù (Practice Mode)\nHS vẫn được tự do vào làm củng cố kiến thức"]
+        EC1_C --> EC1_E["Giáo viên có thể cấp Custom Deadline\nnếu muốn tính điểm chính thức"]
+        EC1_B -- "Bài tập mới giao sau khi vào" --> EC1_F["Tạo NOT_STARTED bình thường"]
+    end
+
+    subgraph EC2["Edge Case 2: Học sinh rời khỏi Lớp"]
+        direction TB
+        EC2_A["Học sinh chuyển lớp hoặc bị gỡ"] --> EC2_B["Chuyển class_student sang TRANSFERRED / INACTIVE"]
+        EC2_B --> EC2_C["Bảo toàn 100% dữ liệu submission & điểm số cũ\n(Không xóa bản ghi nào)"]
+    end
+
+    subgraph EC3["Edge Case 3: Sửa Deadline hoặc Hủy Bài tập"]
+        direction TB
+        EC3_A["Giáo viên lùi Deadline (Gia hạn)"] --> EC3_B["Các bài LATE_SUBMITTED nhưng submitted_at <= New Deadline\n-> Tự động chuyển thành SUBMITTED"]
+        EC3_C["Giáo viên Hủy bài tập"] --> EC3_D["Soft Delete (assignment status = CANCELLED)\nBảo toàn dữ liệu chat AI & submission cũ"]
+    end
 ```
 
 ---
 
-## 3. DB SCHEMA — Local Content Columns (Flyway V32)
+## 3. DB SCHEMA
+
+### 3.1 Local Content Columns (Flyway V32)
 
 | Bảng | Cột mới | Kiểu | Ý nghĩa |
 |------|---------|------|---------|
@@ -101,6 +169,42 @@ flowchart TD
 | `historical_schema."character"` | `school_id` | `UUID NULL` | Tương tự |
 | `historical_schema."character"` | `content_scope` | `VARCHAR(20) NULL` | Tương tự |
 | `historical_schema."character"` | `approved_by` | `UUID NULL` | Tương tự |
+
+### 3.2 Assignment & Submission Tables (Sprint 6 Plan)
+
+```sql
+-- historical_schema.assignment
+CREATE TABLE historical_schema.assignment (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    classroom_id    UUID NOT NULL REFERENCES historical_schema.classroom(id),
+    teacher_id      UUID NOT NULL REFERENCES historical_schema."user"(uid),
+    title           VARCHAR(255) NOT NULL,
+    description     TEXT,
+    assignment_type VARCHAR(30) NOT NULL, -- 'CONTEXT_READING', 'AI_CHAT_ROLEPLAY', 'QUIZ_TEST'
+    target_id       UUID NOT NULL,        -- context_id, character_id, or quiz_id
+    deadline        TIMESTAMP WITH TIME ZONE NOT NULL,
+    min_requirement INT DEFAULT 5,        -- số tin nhắn tối thiểu hoặc số giây đọc tối thiểu để đạt 10 điểm
+    status          VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'CANCELLED', 'ARCHIVED'
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- historical_schema.assignment_submission
+CREATE TABLE historical_schema.assignment_submission (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id           UUID NOT NULL REFERENCES historical_schema.assignment(id) ON DELETE CASCADE,
+    student_id              UUID NOT NULL REFERENCES historical_schema."user"(uid),
+    status                  VARCHAR(20) NOT NULL DEFAULT 'NOT_STARTED', -- 'NOT_STARTED', 'IN_PROGRESS', 'SUBMITTED', 'LATE_SUBMITTED', 'MISSED', 'EXEMPTED'
+    score                   NUMERIC(4, 2),        -- điểm bài quiz (thang điểm 10)
+    message_count           INT DEFAULT 0,         -- số tin nhắn chat AI
+    reading_duration_seconds INT DEFAULT 0,        -- thời gian đọc bối cảnh (giây)
+    started_at              TIMESTAMP WITH TIME ZONE,
+    submitted_at            TIMESTAMP WITH TIME ZONE,
+    created_at              TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at              TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_assignment_student UNIQUE (assignment_id, student_id)
+);
+```
 
 ---
 

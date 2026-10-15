@@ -96,13 +96,11 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
             }
 
             if (existingStudentOpt.isPresent()) {
-                // CASE 1: Học sinh ĐÃ TỒN TẠI trong trường
                 User existingStudent = existingStudentOpt.get();
-                if (classStudentRepository.existsByClassroomIdAndStudentUid(classroom.getId(), existingStudent.getUid())) {
-                    plans.add(new RowPlan(row, existingStudent, true, true));
-                } else {
-                    plans.add(new RowPlan(row, existingStudent, true, false));
-                }
+                // CASE 1: Học sinh ĐÃ TỒN TẠI trong trường
+                Optional<ClassStudent> existingCs = classStudentRepository.findByClassroomIdAndStudentUid(classroom.getId(), existingStudent.getUid());
+                boolean isCurrentlyActive = existingCs.isPresent() && "ACTIVE".equals(existingCs.get().getStatus());
+                plans.add(new RowPlan(row, existingStudent, true, isCurrentlyActive));
             } else {
                 // CASE 2: Học sinh MỚI TINH cần onboarding
                 if (row.getFullName() == null || row.getFullName().trim().isEmpty()) {
@@ -167,11 +165,18 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
             if (plan.isExisting) {
                 User student = plan.existingStudent;
                 if (!plan.alreadyEnrolled) {
-                    classStudentRepository.save(ClassStudent.builder()
-                            .classroom(classroom)
-                            .student(student)
-                            .status("ACTIVE")
-                            .build());
+                    Optional<ClassStudent> existingEnrollment = classStudentRepository.findByClassroomIdAndStudentUid(classroom.getId(), student.getUid());
+                    if (existingEnrollment.isPresent()) {
+                        ClassStudent cs = existingEnrollment.get();
+                        cs.setStatus("ACTIVE");
+                        classStudentRepository.save(cs);
+                    } else {
+                        classStudentRepository.save(ClassStudent.builder()
+                                .classroom(classroom)
+                                .student(student)
+                                .status("ACTIVE")
+                                .build());
+                    }
                     log.info("Enrolled existing student {} ({}) into class {}", student.getFullName(), student.getStudentCode(), classroom.getClassCode());
                 }
                 resultDto.getSuccessfulAccounts().add(ImportedStudentAccountDto.builder()
