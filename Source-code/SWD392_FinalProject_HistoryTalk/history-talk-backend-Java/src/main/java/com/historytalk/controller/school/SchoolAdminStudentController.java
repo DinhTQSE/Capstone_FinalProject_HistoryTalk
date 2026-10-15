@@ -17,7 +17,7 @@ import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.school.StudentManagementService;
-import com.historytalk.service.school.student.StudentImportProcessor;
+import com.historytalk.service.school.student.StudentImportService;
 import com.historytalk.service.school.token.StudentTokenAllocationService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,8 +25,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
@@ -46,14 +44,10 @@ import java.util.UUID;
 @Tag(name = "SaaS Student Management", description = "Endpoints for School Admin to manage and bulk-import students (US-SP5-04)")
 public class SchoolAdminStudentController {
 
-    @Qualifier("SCHOOL_WIDE_IMPORT")
-    private final StudentImportProcessor studentImportProcessor;
+    private final StudentImportService studentImportService;
     private final StudentManagementService studentManagementService;
     private final StudentTokenAllocationService studentTokenAllocationService;
     private final UserRepository userRepository;
-
-    @Value("${historytalk.saas.student.default-initial-token:10000}")
-    private Integer configuredDefaultToken;
 
     @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
@@ -64,37 +58,7 @@ public class SchoolAdminStudentController {
             @RequestParam(name = "defaultInitialToken", required = false) Integer defaultInitialToken,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        int effectiveDefaultToken = (defaultInitialToken != null && defaultInitialToken >= 0)
-                ? defaultInitialToken
-                : configuredDefaultToken;
-
-        UUID schoolId;
-        String schoolCode;
-        UUID operatorId;
-        com.historytalk.entity.enums.UserRole operatorRole;
-
-        if (principal != null && principal.getSchoolId() != null) {
-            schoolId = principal.getSchoolId();
-            schoolCode = principal.getSchoolCode();
-            operatorId = UUID.fromString(principal.getUid());
-            operatorRole = principal.getRole();
-        } else {
-            User schoolAdmin = resolveSchoolAdmin(principal);
-            schoolId = schoolAdmin.getSchool().getId();
-            schoolCode = schoolAdmin.getSchool().getSchoolCode();
-            operatorId = schoolAdmin.getUid();
-            operatorRole = schoolAdmin.getRole();
-        }
-
-        StudentImportContext context = StudentImportContext.builder()
-                .schoolId(schoolId)
-                .schoolCode(schoolCode)
-                .operatorId(operatorId)
-                .operatorRole(operatorRole)
-                .defaultInitialToken(effectiveDefaultToken)
-                .build();
-
-        StudentImportResultDto result = studentImportProcessor.processImport(file, context);
+        StudentImportResultDto result = studentImportService.importSchoolWide(file, defaultInitialToken, principal);
 
         String message = String.format("Import completed: %d succeeded, %d failed. Allocated %,d tokens.",
                 result.getSuccessCount(), result.getFailureCount(), result.getTotalTokensAllocated());

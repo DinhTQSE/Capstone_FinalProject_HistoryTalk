@@ -17,12 +17,18 @@ sequenceDiagram
     T->>System: 1. POST /teacher/local-contents (Soạn bối cảnh/nhân vật địa phương)
     System-->>T: Tạo bản ghi Local Content (Trạng thái: DRAFT, Gắn school_id)
     
-    Note over T,System: Tất cả Giáo viên thuộc Trường A có thể thấy & dùng chung bản ghi DRAFT này
+    Note over T,System: Giáo viên cùng Trường A có thể gọi GET /teacher/local-contents để xem & dùng chung
 
-    ScA->>System: 2. PUT /school-admin/local-contents/{id}/status (Duyệt PUBLISHED)
-    System-->>ScA: Lưu approved_by_school_admin_id. Nhà trường chịu trách nhiệm nội dung (Policy Disclaimer)
+    ScA->>System: 2. GET /school-admin/local-contents?status=DRAFT (Xem danh sách chờ duyệt)
+    System-->>ScA: Trả về danh sách bài soạn địa phương của giáo viên trường mình
 
-    St->>System: 3. GET /student/assignments (Xem & làm bài tập Địa phương đã duyệt)
+    ScA->>System: 3. GET /school-admin/local-contents/{id} (Xem chi tiết nội dung cần duyệt)
+    System-->>ScA: Trả về chi tiết bài viết, bối cảnh, quiz để thẩm định
+
+    ScA->>System: 4. PUT /school-admin/local-contents/{id}/status (Duyệt PUBLISHED kèm reviewNote)
+    System-->>ScA: Lưu approved_by_school_admin_id & thời điểm duyệt. Nhà trường chịu trách nhiệm nội dung (Policy Disclaimer)
+
+    St->>System: 5. GET /student/assignments (Xem & làm bài tập Địa phương đã duyệt)
     System-->>St: Học sinh tương tác AI với Nhân vật Địa phương của Trường A
 ```
 

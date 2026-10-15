@@ -10,6 +10,7 @@ import com.historytalk.exception.GlobalExceptionHandler;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.school.student.StudentImportProcessor;
 import com.historytalk.service.school.token.StudentTokenAllocationService;
+import com.historytalk.service.school.student.StudentImportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class SchoolAdminStudentControllerTest {
     private MockMvc mockMvc;
 
     @Mock
-    private StudentImportProcessor studentImportProcessor;
+    private StudentImportService studentImportService;
 
     @Mock
     private StudentTokenAllocationService studentTokenAllocationService;

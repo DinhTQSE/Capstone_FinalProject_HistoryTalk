@@ -22,4 +22,5 @@ public class StudentImportRowDto {
     private String phoneNumber;
     private String password;
     private Integer additionalToken;
+    private String classCode;
 }
