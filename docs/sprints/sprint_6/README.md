@@ -42,6 +42,7 @@
 ### 3. 📂 Implemented Plans (Ghi chép triển khai):
 * 📋 **[local_content_implementation_plan.md](implemented_plan/local_content_implementation_plan.md):** ✅ 14/10 — Design decisions, danh sách files tạo/sửa, business rules, scope logic, status lifecycle, known constraints.
 * 📋 **[class_roster_association_and_student_import_plan.md](implemented_plan/class_roster_association_and_student_import_plan.md):** Kế hoạch chi tiết triển khai Gán & Chuyển Học sinh vào Lớp học (`US-SP6-01`), tích hợp tái sử dụng Import Engine từ Sprint 5.
+* 📋 **[assignment_management_and_submission_plan.md](implemented_plan/assignment_management_and_submission_plan.md):** Kế hoạch chi tiết triển khai Giao Bài tập Đa nhiệm & Tự động Đánh giá Nộp bài (`US-SP6-04`, `US-SP6-05`), quản lý vòng đời bài nộp và xử lý Edge Cases.
 
 ### 4. 📦 FE Contract (API Contract cho Frontend):
 * 📄 **[LocalContent_APIContract.md](../../FE-contract/LocalContent_APIContract.md):** ✅ 14/10 — Full API contract với request/response schema cho Teacher, School Admin, Student endpoints (16 endpoints).
