@@ -111,4 +111,48 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket);
+
+    long countByUser_UidAndEndTimeIsNotNullAndDeletedAtIsNull(UUID uid);
+
+    @Query(value = """
+            SELECT COALESCE(AVG(
+                CASE
+                    WHEN qs.end_time IS NOT NULL
+                     AND qs.score IS NOT NULL
+                     AND qc.question_count > 0
+                    THEN qs.score * 100.0 / qc.question_count
+                END
+            ), 0.0)
+            FROM quiz_session qs
+            JOIN (
+                SELECT quiz_id, COUNT(*) AS question_count
+                FROM question
+                WHERE deleted_at IS NULL
+                GROUP BY quiz_id
+            ) qc ON qc.quiz_id = qs.quiz_id
+            WHERE qs.deleted_at IS NULL
+              AND qs.end_time IS NOT NULL
+              AND qs.uid = :uid
+            """, nativeQuery = true)
+    Double averageScorePercentageByUser(@Param("uid") UUID uid);
+
+    @Query("""
+            SELECT s FROM QuizSession s
+            WHERE s.user.uid = :uid
+              AND s.endTime IS NOT NULL
+              AND s.deletedAt IS NULL
+            ORDER BY s.endTime DESC
+            """)
+    List<QuizSession> findRecentCompletedByUser(@Param("uid") UUID uid, Pageable pageable);
+
+    @Query(value = """
+            SELECT CAST(q.era AS text) AS era, COUNT(*) AS count
+            FROM quiz_session qs
+            JOIN quiz q ON q.quiz_id = qs.quiz_id
+            WHERE qs.uid = :uid
+              AND qs.end_time IS NOT NULL
+              AND qs.deleted_at IS NULL
+            GROUP BY q.era
+            """, nativeQuery = true)
+    List<Object[]> countEraDistributionByUser(@Param("uid") UUID uid);
 }
