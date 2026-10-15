@@ -5,14 +5,14 @@
 ALTER TABLE historical_schema.question
     ADD COLUMN IF NOT EXISTS question_type VARCHAR(40) NOT NULL DEFAULT 'MULTIPLE_CHOICE';
 
--- 2. Add question_data JSONB for typed per-type payload
+-- 2. Add question_data TEXT for typed per-type payload (stored as JSON text)
 ALTER TABLE historical_schema.question
-    ADD COLUMN IF NOT EXISTS question_data JSONB NULL;
+    ADD COLUMN IF NOT EXISTS question_data TEXT NULL;
 
 -- 3. Create quiz_question link table (many-to-many, replaces direct FK for bank-aware code)
 CREATE TABLE IF NOT EXISTS historical_schema.quiz_question (
-    quiz_id     UUID NOT NULL REFERENCES historical_schema.quiz(quiz_id),
-    question_id UUID NOT NULL REFERENCES historical_schema.question(question_id),
+    quiz_id     UUID NOT NULL REFERENCES historical_schema.quiz(quiz_id) ON DELETE CASCADE,
+    question_id UUID NOT NULL REFERENCES historical_schema.question(question_id) ON DELETE CASCADE,
     order_index INTEGER NOT NULL DEFAULT 0,
     points      NUMERIC(8,2) NOT NULL DEFAULT 1,
     created_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -35,9 +35,9 @@ ON CONFLICT (quiz_id, question_id) DO NOTHING;
 ALTER TABLE historical_schema.question
     ALTER COLUMN quiz_id DROP NOT NULL;
 
--- 6. Add answer_data JSONB and score_earned to quiz_answer_detail
+-- 6. Add answer_data TEXT and score_earned to quiz_answer_detail
 ALTER TABLE historical_schema.quiz_answer_detail
-    ADD COLUMN IF NOT EXISTS answer_data JSONB NULL;
+    ADD COLUMN IF NOT EXISTS answer_data TEXT NULL;
 
 ALTER TABLE historical_schema.quiz_answer_detail
     ADD COLUMN IF NOT EXISTS score_earned NUMERIC(8,2) NULL;

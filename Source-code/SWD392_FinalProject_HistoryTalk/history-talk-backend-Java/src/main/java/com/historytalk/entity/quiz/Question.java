@@ -55,8 +55,7 @@ public class Question {
     @Column(name = "question_type", length = 40, nullable = false)
     private QuestionType questionType = QuestionType.MULTIPLE_CHOICE;
 
-    /** Typed payload JSON: serialized by service using ObjectMapper. JSONB in DB. */
-    @Column(name = "question_data", columnDefinition = "jsonb", nullable = true)
+    @Column(name = "question_data", columnDefinition = "text", nullable = true)
     private String questionData;
 
     @CreationTimestamp
