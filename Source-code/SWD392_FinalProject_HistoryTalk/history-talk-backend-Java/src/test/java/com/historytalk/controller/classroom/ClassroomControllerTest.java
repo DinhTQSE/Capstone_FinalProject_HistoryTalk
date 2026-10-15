@@ -233,8 +233,8 @@ class ClassroomControllerTest {
                         .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content[0].className").value("10A1"))
-                .andExpect(jsonPath("$.data.totalElements").value(1));
+                .andExpect(jsonPath("$.data[0].className").value("10A1"))
+                .andExpect(jsonPath("$.pagination.totalElements").value(1));
     }
 
     @Test
@@ -253,7 +253,9 @@ class ClassroomControllerTest {
 
         mockMvc.perform(get("/api/v1/teacher/classrooms"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.pagination.totalElements").value(0));
     }
 
     @Test

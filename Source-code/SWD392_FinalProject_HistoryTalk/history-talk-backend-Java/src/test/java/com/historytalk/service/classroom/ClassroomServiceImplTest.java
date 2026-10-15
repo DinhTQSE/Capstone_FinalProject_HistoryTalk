@@ -297,7 +297,8 @@ class ClassroomServiceImplTest {
                 .build();
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
 
-        when(classroomRepository.findSchoolClassrooms(eq(schoolId), eq("10A1"), eq(10), eq(2026), eq(pageable)))
+        when(classroomRepository.findBySchoolIdAndDeletedAtIsNullAndClassNameContainingIgnoreCaseOrSchoolIdAndDeletedAtIsNullAndClassCodeContainingIgnoreCase(
+                eq(schoolId), eq("10A1"), eq(schoolId), eq("10A1"), eq(pageable)))
                 .thenReturn(page);
         when(classStudentRepository.countByClassroomId(any())).thenReturn(20L);
 

@@ -19,4 +19,5 @@ public class StudentImportContext {
     private UUID operatorId;
     private UserRole operatorRole;
     private Integer defaultInitialToken;
+    private UUID classroomId;
 }

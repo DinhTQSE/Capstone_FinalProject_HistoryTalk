@@ -117,6 +117,7 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                 String phoneNumber = getRecordValue(record, "phone_number");
                 String password = getRecordValue(record, "password");
                 String additionalTokenStr = getRecordValue(record, "additional_token");
+                String classCode = getRecordValue(record, "class_code");
 
                 LocalDate dob = null;
                 if (dobStr != null && !dobStr.isEmpty()) {
@@ -144,6 +145,7 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                         .phoneNumber(phoneNumber)
                         .password(password)
                         .additionalToken(additionalToken)
+                        .classCode(classCode)
                         .build());
             }
         } catch (Exception e) {

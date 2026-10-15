@@ -1,6 +1,7 @@
 package com.historytalk.controller.classroom;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.PaginatedApiResponse;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.classroom.ClassroomResponse;
 import com.historytalk.dto.classroom.CreateClassroomRequest;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -80,29 +82,29 @@ public class ClassroomController {
     @GetMapping("/school-admin/classrooms")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     @Operation(summary = "School Admin: View all classrooms in the school with search & filters")
-    public ResponseEntity<ApiResponse<PaginatedResponse<ClassroomResponse>>> getSchoolClassrooms(
+    public ResponseEntity<PaginatedApiResponse<ClassroomResponse>> getSchoolClassrooms(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Integer gradeLevel,
             @RequestParam(required = false) Integer academicYear,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<ClassroomResponse> response = classroomService.getSchoolClassrooms(
                 search, gradeLevel, academicYear, pageable, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "School classrooms retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "School classrooms retrieved successfully"));
     }
 
     @GetMapping("/teacher/classrooms")
     @PreAuthorize("hasRole('TEACHER')")
     @Operation(summary = "Teacher: View all classrooms managed by the current teacher")
-    public ResponseEntity<ApiResponse<PaginatedResponse<ClassroomResponse>>> getTeacherClassrooms(
+    public ResponseEntity<PaginatedApiResponse<ClassroomResponse>> getTeacherClassrooms(
             @RequestParam(required = false) Integer academicYear,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<ClassroomResponse> response = classroomService.getTeacherClassrooms(
                 academicYear, pageable, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Teacher classrooms retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Teacher classrooms retrieved successfully"));
     }
 
     @GetMapping("/student/classrooms")
