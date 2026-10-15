@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vn.payos.exception.ForbiddenException;
+import com.historytalk.exception.ForbiddenException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -105,28 +105,25 @@ public class MapPinServiceImpl implements MapPinService {
         String pinOwnerType;
         String pinType;
 
-//        if (isAdminRole(role)) {
-//            // Admin: context may be draft; pinType is required and validated
-//            pinOwnerType = PIN_OWNER_ADMIN;
-//            if (request.getPinType() == null || !VALID_PIN_TYPES.contains(request.getPinType().toUpperCase())) {
-//                throw new InvalidRequestException(
-//                        "pinType phải là ALLIED_FORCE hoặc ENEMY_FORCE cho pin của admin");
-//            }
-//            pinType = request.getPinType().toUpperCase();
-//        } else {
-            // Regular user: context must be published; pinType is ignored
-//            if (!Boolean.TRUE.equals(context.getIsPublished())) {
-//                throw new ResourceNotFoundException(
-//                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
-//            }
-//            pinOwnerType = PIN_OWNER_USER;
-//            pinType = null;
-//        }
-        if(!isAdminRole(role)){
-            throw new ForbiddenException("Bạn cần là admin để sử dụng tính năng này");
+        if (isAdminRole(role)) {
+            // Admin creates an educational ADMIN pin.
+            // pinType classification (ALLIED_FORCE / ENEMY_FORCE) is not yet used by the FE;
+            // stored as null until the frontend adopts it.
+            pinOwnerType = PIN_OWNER_ADMIN;
+            pinType = null;
+        } else if (isRegularUserRole(role)) {
+            // Regular user creates a personal USER study pin.
+            // Context must be published; pinType is ignored and always null.
+            if (!Boolean.TRUE.equals(context.getIsPublished())) {
+                throw new ResourceNotFoundException(
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+            }
+            pinOwnerType = PIN_OWNER_USER;
+            pinType = null;
+        } else {
+            // SCHOOL_ADMIN and other non-learning roles may not place pins
+            throw new ForbiddenException("Bạn không có quyền tạo ghim bản đồ");
         }
-        pinOwnerType = PIN_OWNER_ADMIN;
-        pinType = null;
 
         MapPin pin = MapPin.builder()
                 .historicalContext(context)
@@ -300,6 +297,18 @@ public class MapPinServiceImpl implements MapPinService {
                 || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                 || "STAFF".equalsIgnoreCase(role)
                 || "ADMIN".equalsIgnoreCase(role)
+        );
+    }
+
+    /**
+     * Returns true for roles that learn from the system and are allowed
+     * to place personal (USER) study pins.
+     */
+    private boolean isRegularUserRole(String role) {
+        return role != null && (
+                "CUSTOMER".equalsIgnoreCase(role)
+                || "SCHOOL_STUDENT".equalsIgnoreCase(role)
+                || "TEACHER".equalsIgnoreCase(role)
         );
     }
 
