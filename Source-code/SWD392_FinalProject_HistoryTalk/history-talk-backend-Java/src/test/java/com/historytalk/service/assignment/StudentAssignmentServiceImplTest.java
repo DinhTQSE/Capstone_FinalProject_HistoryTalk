@@ -199,4 +199,121 @@ class StudentAssignmentServiceImplTest {
         assertEquals(SubmissionStatus.SUBMITTED, resp.getStatus());
         assertEquals(new BigDecimal("8.00"), resp.getScore());
     }
+
+    @Test
+    @DisplayName("Nộp bài Context Reading: Tính thời gian đọc và quy đổi điểm thang 10")
+    void testSubmitAssignment_ContextReading_AutoGrading() {
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.CONTEXT_READING)
+                .minRequirement(60) // Tiêu chuẩn 60 giây
+                .deadline(LocalDateTime.now().plusDays(1))
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .startedAt(LocalDateTime.now().minusSeconds(45)) // Đã đọc 45s
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+
+        StudentSubmissionResponse resp = studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal);
+
+        assertNotNull(resp);
+        assertEquals(SubmissionStatus.SUBMITTED, resp.getStatus());
+        assertTrue(resp.getReadingDurationSeconds() >= 44);
+        assertNotNull(resp.getScore());
+    }
+
+    @Test
+    @DisplayName("Nộp bài sau deadline: tự động đánh dấu LATE_SUBMITTED")
+    void testSubmitAssignment_LateSubmitted_WhenAfterDeadline() {
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.CONTEXT_READING)
+                .minRequirement(60)
+                .deadline(LocalDateTime.now().minusHours(2)) // Đã quá hạn 2 tiếng
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .startedAt(LocalDateTime.now().minusSeconds(60))
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+
+        StudentSubmissionResponse resp = studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal);
+
+        assertNotNull(resp);
+        assertEquals(SubmissionStatus.LATE_SUBMITTED, resp.getStatus());
+    }
+
+    @Test
+    @DisplayName("Chặn nộp lại nếu bài đã có trạng thái SUBMITTED")
+    void testSubmitAssignment_Throws_AlreadySubmitted() {
+        Assignment assignment = Assignment.builder().id(assignmentId).status(AssignmentStatus.ACTIVE).build();
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(SubmissionStatus.SUBMITTED) // Đã nộp rồi
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+
+        assertThrows(com.historytalk.exception.InvalidRequestException.class, () ->
+                studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal));
+    }
+
+    @Test
+    @DisplayName("Chặn nộp Quiz nếu phiên làm bài không thuộc về học sinh (Anti-cheat)")
+    void testSubmitAssignment_QuizTest_Throws_NotOwner() {
+        UUID otherStudentUid = UUID.randomUUID();
+        User otherStudent = User.builder().uid(otherStudentUid).build();
+        UUID quizId = UUID.randomUUID();
+        UUID quizSessionId = UUID.randomUUID();
+
+        Quiz quiz = Quiz.builder().quizId(quizId).build();
+        QuizSession quizSession = QuizSession.builder()
+                .sessionId(quizSessionId)
+                .quiz(quiz)
+                .user(otherStudent) // Thuộc học sinh khác!
+                .endTime(LocalDateTime.now())
+                .build();
+
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.QUIZ_TEST)
+                .targetId(quizId)
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+        when(quizSessionRepository.findBySessionId(quizSessionId))
+                .thenReturn(Optional.of(quizSession));
+
+        SubmitAssignmentRequest req = SubmitAssignmentRequest.builder().quizSessionId(quizSessionId).build();
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () ->
+                studentAssignmentService.submitAssignment(assignmentId, req, studentPrincipal));
+    }
 }
