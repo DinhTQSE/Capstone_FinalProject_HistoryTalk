@@ -181,4 +181,59 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     List<com.historytalk.repository.dashboard.DashboardUserTopCharacterProjection> findTopCharactersForUser(
             @Param("uid") UUID uid,
             @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE u.school_id = :schoolId
+              AND m.deleted_at IS NULL
+            """, nativeQuery = true)
+    long sumTokensUsedBySchoolStudents(@Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE cs.uid = :uid
+              AND m.deleted_at IS NULL
+              AND m.created_at >= :since
+            """, nativeQuery = true)
+    long sumTokensUsedByUserSince(@Param("uid") UUID uid, @Param("since") LocalDateTime since);
+
+    @Query(value = """
+            SELECT COUNT(m.message_id)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE cs.uid = :uid
+              AND m.deleted_at IS NULL
+            """, nativeQuery = true)
+    long countMessagesByUser(@Param("uid") UUID uid);
+
+    @Query(value = """
+            SELECT COUNT(m.message_id)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE cs.uid IN (:studentUids)
+              AND m.deleted_at IS NULL
+            """, nativeQuery = true)
+    long countMessagesByStudentUids(@Param("studentUids") List<UUID> studentUids);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE u.role = 'CUSTOMER'
+              AND m.deleted_at IS NULL
+            """, nativeQuery = true)
+    long sumTokensUsedByCustomerUsers();
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            WHERE m.deleted_at IS NULL
+            """, nativeQuery = true)
+    long sumAllTokensUsed();
 }
