@@ -1,11 +1,15 @@
 package com.historytalk.entity.character;
 
 import com.historytalk.entity.chat.ChatSession;
+import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.historicalContext.HistoricalContext;
+import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -107,6 +111,33 @@ public class Character {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
+
+    // ── Local Content Fields (NULL = global platform content) ────────────────
+
+    /**
+     * Non-null when this character is school-owned local content.
+     * NULL means global content managed by CONTENT_ADMIN / SYSTEM_ADMIN.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "school_id", nullable = true)
+    private School school;
+
+    /**
+     * CLASS_ONLY: visible only to the creating teacher’s class.
+     * SCHOOL_WIDE: visible to all teachers in the same school.
+     * NULL for global content.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_scope", length = 20, nullable = true)
+    private ContentScope contentScope;
+
+    /**
+     * School Admin who approved this local character (PUBLISHED state).
+     * NULL = not yet approved, or global content.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by", nullable = true)
+    private User approvedBy;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

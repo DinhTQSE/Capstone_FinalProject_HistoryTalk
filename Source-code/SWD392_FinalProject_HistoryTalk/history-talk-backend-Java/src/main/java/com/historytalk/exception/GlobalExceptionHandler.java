@@ -54,6 +54,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex);
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex) {
+        return buildErrorResponse(ex);
+    }
+
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
         ErrorResponse errorResponse = ErrorResponse.builder()

@@ -8,11 +8,9 @@
 
 | Story ID | Tên User Story | Actor | Developer | API Endpoint chính |
 | :--- | :--- | :--- | :--- | :--- |
-| Story ID | Tên User Story | Actor | Developer | API Endpoint chính |
-| :--- | :--- | :--- | :--- | :--- |
 | **`US-SP6-01`** | Gán & Chuyển Học sinh vào Lớp học (Batch, CSV & Transfer) | `School Admin` / `Teacher` | 🟢 Khải (KhaiVDD) | `POST /api/v1/classrooms/{classId}/students/batch`<br>`POST /api/v1/classrooms/{classId}/students/import-csv`<br>`GET /api/v1/classrooms/{classId}/students`<br>`GET /api/v1/classrooms/{classId}/available-students`<br>`DELETE /api/v1/classrooms/{classId}/students/{studentId}`<br>`POST /api/v1/classrooms/{fromClassId}/students/transfer` |
-| **`US-SP6-04`** | Giáo viên Giao Bài tập Đa nhiệm cho Lớp kèm Deadline | `Teacher` | 🔵 Dinh (DinhTQ) | `POST /api/v1/teacher/assignments` |
-| **`US-SP6-05`** | Học sinh Nộp bài & Tự động Đánh giá Tiến độ | `School Student` / System | 🔵 Dinh (DinhTQ) | `POST /api/v1/student/assignments/{id}/submit` |
+| **`US-SP6-04`** | Giáo viên Giao Bài tập Đa nhiệm cho Lớp kèm Deadline | `Teacher` | 🟢 Khải (KhaiVDD) | `POST /api/v1/teacher/assignments` |
+| **`US-SP6-05`** | Học sinh Nộp bài & Tự động Đánh giá Tiến độ | `School Student` / System | 🟢 Khải (KhaiVDD) | `POST /api/v1/student/assignments/{id}/submit` |
 
 ---
 
@@ -40,7 +38,7 @@
 ### 🆔 US-SP6-04: Giáo viên Giao Bài tập Đa nhiệm cho Lớp kèm Deadline (Assignment Creation)
 * **Actor:** `Teacher`
 * **Thời gian thực hiện:** 14/10/2026 – 15/10/2026
-* **Phụ trách:** 🔵 Dinh (DinhTQ)
+* **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
   Là Giáo viên, tôi muốn giao Bài tập cho Lớp phụ trách (gồm: Đọc Bối cảnh, Chat AI với Nhân vật, hoặc Làm Quiz kiểm tra) kèm Hạn nộp (`deadline`), để học sinh làm bài và thu thập kết quả.
 * **Acceptance Criteria (AC):**
@@ -53,7 +51,7 @@
 ### 🆔 US-SP6-05: Học sinh Nộp bài & Tự động Đánh giá Tiến độ (Assignment Submission & Auto-Grading)
 * **Actor:** `School Student` / System
 * **Thời gian thực hiện:** 15/10/2026
-* **Phụ trách:** 🔵 Dinh (DinhTQ)
+* **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
   Là Học sinh hoặc Hệ thống, tôi muốn tự động chấm điểm bài Quiz bấm giờ và đếm số tin nhắn AI trò chuyện, để tự động hoàn thành bài tập và ghi nhận điểm số.
 * **Acceptance Criteria (AC):**
