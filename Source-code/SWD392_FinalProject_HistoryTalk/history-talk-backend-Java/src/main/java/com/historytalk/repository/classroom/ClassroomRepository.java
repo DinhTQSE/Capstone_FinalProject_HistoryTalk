@@ -52,4 +52,6 @@ public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
     // Giáo viên: lọc theo năm học
     Page<Classroom> findBySchoolIdAndTeacher_UidAndAcademicYearAndDeletedAtIsNull(
             UUID schoolId, UUID teacherUid, Integer academicYear, Pageable pageable);
+
+    long countBySchoolIdAndDeletedAtIsNull(UUID schoolId);
 }
