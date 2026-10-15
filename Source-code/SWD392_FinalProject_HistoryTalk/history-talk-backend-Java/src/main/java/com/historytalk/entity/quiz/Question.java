@@ -1,5 +1,6 @@
 package com.historytalk.entity.quiz;
 
+import com.historytalk.entity.enums.QuestionType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,7 +32,7 @@ public class Question {
     private UUID questionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id", nullable = false)
+    @JoinColumn(name = "quiz_id", nullable = true)
     private Quiz quiz;
 
     //    @Lob
@@ -48,6 +49,15 @@ public class Question {
     //    @Lob
     @Column(name = "explanation", columnDefinition = "TEXT", nullable = true)
     private String explanation;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_type", length = 40, nullable = false)
+    private QuestionType questionType = QuestionType.MULTIPLE_CHOICE;
+
+    /** Typed payload JSON: serialized by service using ObjectMapper. JSONB in DB. */
+    @Column(name = "question_data", columnDefinition = "jsonb", nullable = true)
+    private String questionData;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
