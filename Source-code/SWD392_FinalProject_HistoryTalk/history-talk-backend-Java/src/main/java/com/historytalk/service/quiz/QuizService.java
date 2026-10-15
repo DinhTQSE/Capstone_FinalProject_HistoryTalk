@@ -64,4 +64,18 @@ public interface QuizService {
     // ==================== Import ====================
 
     QuizImportResponse importQuizzesFromCsv(MultipartFile file, UUID userId);
+
+    // ==================== Question Bank ====================
+
+    PaginatedResponse<QuestionBankResponse> getQuestionBank(String questionType, String search, Pageable pageable);
+
+    QuestionBankResponse createBankQuestion(QuestionRequest request);
+
+    QuestionBankResponse updateBankQuestion(String questionId, QuestionRequest request);
+
+    void softDeleteBankQuestion(String questionId);
+
+    void attachQuestionToQuiz(String quizId, String questionId);
+
+    void unlinkQuestionFromQuiz(String quizId, String questionId);
 }

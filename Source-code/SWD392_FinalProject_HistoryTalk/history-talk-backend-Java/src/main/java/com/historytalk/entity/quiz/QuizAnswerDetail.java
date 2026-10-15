@@ -37,8 +37,15 @@ public class QuizAnswerDetail {
     @JoinColumn(name = "session_id", nullable = false)
     private QuizSession quizSession;
 
-    @Column(name = "selected_option", nullable = false)
+    @Column(name = "selected_option", nullable = true)
     private Integer selectedOption;
+
+    /** Typed answer payload JSON: used for FILL_IN_BLANK and MATCHING. */
+    @Column(name = "answer_data", columnDefinition = "jsonb", nullable = true)
+    private String answerData;
+
+    @Column(name = "score_earned", nullable = true)
+    private Float scoreEarned;
 
     @Builder.Default
     @Column(name = "is_correct", nullable = false)
