@@ -54,6 +54,18 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex);
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .errorCode(HttpStatus.FORBIDDEN.value())
+                .message(ex.getMessage() != null ? ex.getMessage() : "Truy cập bị từ chối")
+                .status(HttpStatus.FORBIDDEN)
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         ErrorResponse errorResponse = ErrorResponse.builder()

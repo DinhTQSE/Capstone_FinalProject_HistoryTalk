@@ -22,4 +22,11 @@
   * `US-SP6-10` (Định): API Dashboard Admin Hệ thống & Sức khỏe JVM.
 
 ### 2. 📂 Business Flows (Luồng Nghiệp vụ):
-* 🔄 **[assignment_analytics_flow.md](file:///c:/Users/trand/OneDrive/Documents/Semester%207/SWD392/SWD392_FinalProject_Git/docs/sprints/sprint_6/business_flows/assignment_analytics_flow.md):** Sơ đồ Sequence & Flowchart cho luồng Duyệt Lịch sử Địa phương, Disclaimer Policy và Engine Giao bài tập / 5 Dashboards.
+* 🔄 **[assignment_analytics_flow.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/business_flows/assignment_analytics_flow.md):** Sơ đồ Sequence & Flowchart cho luồng Duyệt Lịch sử Địa phương, Disclaimer Policy và Engine Giao bài tập / 5 Dashboards.
+
+### 3. 📂 Implemented Plans (Kế hoạch Triển khai Chi tiết):
+* 📋 **[class_roster_association_and_student_import_plan.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/implemented_plan/class_roster_association_and_student_import_plan.md):** Kế hoạch chi tiết triển khai Gán & Chuyển Học sinh vào Lớp học (`US-SP6-01`), tích hợp tái sử dụng Import Engine từ Sprint 5.
+
+### 4. 📂 Frontend Contracts (Hợp đồng API cho FE):
+* 📑 **[class_roster_association_and_student_import_api_contract.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_6/fe_contracts/class_roster_association_and_student_import_api_contract.md):** Hợp đồng API chi tiết, TypeScript types, payloads, mã lỗi và hướng dẫn tích hợp màn hình Roster lớp học cho Frontend.
+

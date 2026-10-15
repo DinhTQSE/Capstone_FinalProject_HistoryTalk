@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -21,7 +22,35 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
 
     List<ClassStudent> findByStudentUidAndStatus(UUID studentUid, String status);
 
+    Optional<ClassStudent> findByClassroomIdAndStudentUid(UUID classroomId, UUID studentUid);
+
+    void deleteByClassroomIdAndStudentUid(UUID classroomId, UUID studentUid);
+
+    @Query("SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE'")
+    List<UUID> findEnrolledStudentUids(@Param("classroomId") UUID classroomId);
+
     @Query("SELECT cs.classroom FROM ClassStudent cs WHERE cs.student.uid = :studentUid " +
             "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'")
     List<Classroom> findClassroomsByStudentUid(@Param("studentUid") UUID studentUid);
+
+    @Query("SELECT cs FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
+            "AND cs.classroom.school.id = :schoolId " +
+            "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'")
+    org.springframework.data.domain.Page<ClassStudent> findStudentsInClassroom(
+            @Param("classroomId") UUID classroomId,
+            @Param("schoolId") UUID schoolId,
+            org.springframework.data.domain.Pageable pageable);
+
+    @Query("SELECT cs FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
+            "AND cs.classroom.school.id = :schoolId " +
+            "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE' " +
+            "AND (LOWER(cs.student.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "     OR (cs.student.studentCode IS NOT NULL AND LOWER(cs.student.studentCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "     OR LOWER(cs.student.userName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "     OR LOWER(cs.student.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    org.springframework.data.domain.Page<ClassStudent> searchStudentsInClassroom(
+            @Param("classroomId") UUID classroomId,
+            @Param("schoolId") UUID schoolId,
+            @Param("keyword") String keyword,
+            org.springframework.data.domain.Pageable pageable);
 }

@@ -30,6 +30,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findBySchoolIdAndStudentCodeIgnoreCase(UUID schoolId, String studentCode);
 
+    Optional<User> findBySchoolIdAndEmailIgnoreCase(UUID schoolId, String email);
+
     boolean existsBySchoolIdAndStudentCodeIgnoreCase(UUID schoolId, String studentCode);
 
     org.springframework.data.domain.Page<User> findBySchoolIdAndRole(UUID schoolId, UserRole role, org.springframework.data.domain.Pageable pageable);
@@ -48,6 +50,27 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             @Param("schoolId") UUID schoolId,
             @Param("role") UserRole role,
             @Param("active") Boolean active,
+            @Param("search") String search,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
+           "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE')")
+    org.springframework.data.domain.Page<User> findAvailableStudentsForClassroom(
+            @Param("schoolId") UUID schoolId,
+            @Param("classroomId") UUID classroomId,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
+           "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE') " +
+           "AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.userName) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR (u.studentCode IS NOT NULL AND LOWER(u.studentCode) LIKE LOWER(CONCAT('%', :search, '%'))))")
+    org.springframework.data.domain.Page<User> searchAvailableStudentsForClassroom(
+            @Param("schoolId") UUID schoolId,
+            @Param("classroomId") UUID classroomId,
             @Param("search") String search,
             org.springframework.data.domain.Pageable pageable
     );
