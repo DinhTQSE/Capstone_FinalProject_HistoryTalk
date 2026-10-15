@@ -157,4 +157,102 @@ class TeacherAssignmentServiceImplTest {
         assertEquals(1, result.getContent().size());
         assertEquals("Bài tập 1", result.getContent().get(0).getTitle());
     }
+
+    @Test
+    @DisplayName("Xem Gradebook chi tiết của bài tập")
+    void testGetAssignmentGradebook_Success() {
+        UUID assignmentId = UUID.randomUUID();
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .classroom(classroom)
+                .title("Bài tập lịch sử")
+                .assignmentType(AssignmentType.CONTEXT_READING)
+                .deadline(LocalDateTime.now().plusDays(2))
+                .minRequirement(60)
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        User student = User.builder().uid(UUID.randomUUID()).fullName("Nguyễn An").studentCode("HS01").email("an@school.edu").build();
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(com.historytalk.entity.enums.SubmissionStatus.SUBMITTED)
+                .score(new java.math.BigDecimal("9.00"))
+                .build();
+
+        when(assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)).thenReturn(Optional.of(assignment));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(assignmentSubmissionRepository.findByAssignmentId(assignmentId)).thenReturn(List.of(submission));
+
+        var gradebook = teacherAssignmentService.getAssignmentGradebook(assignmentId, teacherPrincipal);
+
+        assertNotNull(gradebook);
+        assertEquals("Bài tập lịch sử", gradebook.getTitle());
+        assertEquals(1, gradebook.getSubmissions().size());
+        assertEquals("Nguyễn An", gradebook.getSubmissions().get(0).getFullName());
+        assertEquals(new java.math.BigDecimal("9.00"), gradebook.getSubmissions().get(0).getScore());
+    }
+
+    @Test
+    @DisplayName("Cập nhật gia hạn deadline và tự động revert LATE_SUBMITTED sang SUBMITTED")
+    void testUpdateAssignment_Success_RevertsLateSubmissions() {
+        UUID assignmentId = UUID.randomUUID();
+        LocalDateTime oldDeadline = LocalDateTime.now().minusHours(1);
+        LocalDateTime newDeadline = LocalDateTime.now().plusDays(2);
+        LocalDateTime submittedAt = LocalDateTime.now().minusMinutes(30); // Nộp sau oldDeadline nhưng trước newDeadline
+
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .classroom(classroom)
+                .title("Bài tập cũ")
+                .deadline(oldDeadline)
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission lateSubmission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .status(com.historytalk.entity.enums.SubmissionStatus.LATE_SUBMITTED)
+                .submittedAt(submittedAt)
+                .build();
+
+        when(assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)).thenReturn(Optional.of(assignment));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStatus(assignmentId, com.historytalk.entity.enums.SubmissionStatus.LATE_SUBMITTED))
+                .thenReturn(List.of(lateSubmission));
+        when(assignmentRepository.save(any(Assignment.class))).thenReturn(assignment);
+
+        com.historytalk.dto.assignment.UpdateAssignmentRequest req = com.historytalk.dto.assignment.UpdateAssignmentRequest.builder()
+                .title("Bài tập mới gia hạn")
+                .deadline(newDeadline)
+                .build();
+
+        var resp = teacherAssignmentService.updateAssignment(assignmentId, req, teacherPrincipal);
+
+        assertNotNull(resp);
+        assertEquals("Bài tập mới gia hạn", resp.getTitle());
+        assertEquals(com.historytalk.entity.enums.SubmissionStatus.SUBMITTED, lateSubmission.getStatus());
+        verify(assignmentSubmissionRepository, times(1)).save(lateSubmission);
+    }
+
+    @Test
+    @DisplayName("Hủy bài tập (Soft delete sang CANCELLED)")
+    void testCancelAssignment_Success() {
+        UUID assignmentId = UUID.randomUUID();
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .classroom(classroom)
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        when(assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)).thenReturn(Optional.of(assignment));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+
+        teacherAssignmentService.cancelAssignment(assignmentId, teacherPrincipal);
+
+        assertEquals(AssignmentStatus.CANCELLED, assignment.getStatus());
+        verify(assignmentRepository, times(1)).save(assignment);
+    }
 }
+

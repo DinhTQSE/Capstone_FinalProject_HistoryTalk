@@ -67,7 +67,7 @@ public class QuizController {
      * Requires CUSTOMER role. Optional ?limitedTime=N (seconds).
      */
     @PostMapping("/{quizId}/start")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Start a quiz session", description = "Creates a session and returns questions. Pass ?limitedTime=N (seconds) to set a time limit.")
     public ResponseEntity<ApiResponse<QuizStartResponse>> startQuiz(
@@ -85,7 +85,7 @@ public class QuizController {
      * Requires CUSTOMER role.
      */
     @PostMapping("/submit")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Submit quiz answers", description = "Submit answers and receive score. Fails if time limit expired or already submitted.")
     public ResponseEntity<ApiResponse<QuizSubmitResponse>> submitQuiz(
@@ -102,7 +102,7 @@ public class QuizController {
      * Requires CUSTOMER role. Paginated, 0-indexed.
      */
     @GetMapping("/results/me")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get my quiz history", description = "Paginated list of completed quiz sessions for the current user.")
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizHistoryResponse>>> getMyQuizHistory(
@@ -121,7 +121,7 @@ public class QuizController {
      * Requires CUSTOMER role. Returns full answer breakdown for one of the caller's own sessions.
      */
     @GetMapping("/results/me/{sessionId}")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get quiz session detail", description = "Returns the full per-question answer breakdown for one of the caller's own completed quiz sessions.")
     public ResponseEntity<ApiResponse<QuizSessionDetailResponse>> getMySessionDetail(
@@ -134,7 +134,7 @@ public class QuizController {
     }
 
     @PostMapping("/{quizId}/rating")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Rate a quiz", description = "Submit a star rating (1-5) for a quiz.")
     public ResponseEntity<ApiResponse<QuizRatingResponse>> rateQuiz(
@@ -148,7 +148,7 @@ public class QuizController {
     }
 
     @GetMapping("/{quizId}/rating/me")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get user's rating for a quiz", description = "Get current user's star rating for a quiz.")
     public ResponseEntity<ApiResponse<MyRatingResponse>> getMyRating(
@@ -160,7 +160,7 @@ public class QuizController {
     }
 
     @PostMapping("/questions/{questionId}/report")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Report question issue", description = "Report an issue or error with a quiz question.")
     public ResponseEntity<ApiResponse<Void>> reportQuestion(
