@@ -42,6 +42,7 @@ CREATE TABLE historical_schema.assignment (
     assignment_type     VARCHAR(30) NOT NULL, -- 'CONTEXT_READING', 'AI_CHAT_ROLEPLAY', 'QUIZ_TEST'
     target_id           UUID NOT NULL,        -- context_id, character_id, or quiz_id
     deadline            TIMESTAMP WITH TIME ZONE NOT NULL,
+    min_requirement     INT DEFAULT 5,        -- Số tin nhắn chat tối thiểu hoặc số giây đọc tối thiểu để đạt 10 điểm
     status              VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'CANCELLED', 'ARCHIVED'
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -150,6 +151,10 @@ public class Assignment {
     @Column(name = "deadline", nullable = false)
     private LocalDateTime deadline;
 
+    @Builder.Default
+    @Column(name = "min_requirement")
+    private Integer minRequirement = 5;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     @Column(name = "status", length = 20, nullable = false)
@@ -243,7 +248,8 @@ public class AssignmentSubmission {
     "description": "Các em đọc kỹ bối cảnh và chuẩn bị câu hỏi thảo luận vào tiết học thứ 5 tới.",
     "assignmentType": "CONTEXT_READING",
     "targetId": "7c12f4b0-3d89-4a92-b432-11a5b8e90c23",
-    "deadline": "2026-10-20T23:59:59"
+    "deadline": "2026-10-20T23:59:59",
+    "minRequirement": 10
   }
   ```
 * **Validation Rules:**
@@ -252,6 +258,7 @@ public class AssignmentSubmission {
   - `assignmentType`: Thuộc `[CONTEXT_READING, AI_CHAT_ROLEPLAY, QUIZ_TEST]`.
   - `targetId`: Phải tồn tại tương ứng trong kho (nếu là Context thì tìm trong `HistoricalContext` hoặc `LocalContext`; nếu là Character thì tìm trong `Character` hoặc `LocalCharacter`; nếu là Quiz thì tìm trong `Quiz`). Nếu là Local Content thì phải có `is_published = true` (status `ACTIVE`).
   - `deadline`: Phải sau thời điểm hiện tại (`deadline.isAfter(LocalDateTime.now())`).
+  - `minRequirement`: Tùy chọn (mặc định: 5 cho AI Chat, 180s cho Context Reading, Quiz tự động lấy tổng số câu). Điểm tương tác sẽ quy đổi theo tiêu chuẩn này lên thang 10.
 * **Response `201 Created`:**
   ```json
   {
@@ -450,29 +457,54 @@ public class AssignmentSubmission {
 * **Request Body (JSON):**
   ```json
   {
-    "score": 8.5,
-    "messageCount": 12,
-    "readingDurationSeconds": 450
+    "quizSessionId": "c83b23e1-7e89-4912-a1b2-998877665544",
+    "chatSessionId": "d94c34e2-8f90-4823-b2c3-112233445566"
   }
   ```
-  *(Frontend gửi payload tương ứng với loại bài: `score` đối với Quiz sau khi kết thúc quiz session; `messageCount` đối với AI Chat; `readingDurationSeconds` đối với Reading Context).*
-* **Auto-Grading & Deadline Evaluation:**
+  *(Frontend gửi session ID tương ứng: `quizSessionId` đối với Quiz; `chatSessionId` đối với AI Chat. Với `CONTEXT_READING`, client không cần gửi session mà backend tự động tính thời lượng đọc giữa `started_at` và thời điểm submit. Client tuyệt đối KHÔNG gửi điểm trực tiếp).*
+* **Server-Side Auto-Grading & Interactive Scoring Logic (Quy về thang điểm 10):**
   ```java
   LocalDateTime now = LocalDateTime.now();
   submission.setSubmittedAt(now);
+
+  // 1. So khớp Deadline
   if (now.isAfter(assignment.getDeadline())) {
       submission.setStatus(SubmissionStatus.LATE_SUBMITTED);
   } else {
       submission.setStatus(SubmissionStatus.SUBMITTED);
   }
-  if (request.getScore() != null) {
-      submission.setScore(request.getScore());
-  }
-  if (request.getMessageCount() != null) {
-      submission.setMessageCount(request.getMessageCount());
-  }
-  if (request.getReadingDurationSeconds() != null) {
-      submission.setReadingDurationSeconds(request.getReadingDurationSeconds());
+
+  // 2. Chấm điểm tự động theo loại bài tập:
+  int minReq = assignment.getMinRequirement() != null && assignment.getMinRequirement() > 0 
+          ? assignment.getMinRequirement() : 5;
+
+  switch (assignment.getAssignmentType()) {
+      case AI_CHAT_ROLEPLAY -> {
+          // Đếm số tin nhắn USER đã gửi trong ChatSession
+          long actualCount = messageRepository.countByChatSessionIdAndRole(request.getChatSessionId(), "USER");
+          submission.setMessageCount((int) actualCount);
+          // Điểm tương tác: vượt tiêu chuẩn cho max 10.0, ít hơn tính tỷ lệ trên thang 10
+          double rawScore = ((double) actualCount / minReq) * 10.0;
+          BigDecimal calculatedScore = BigDecimal.valueOf(Math.min(10.0, rawScore)).setScale(2, RoundingMode.HALF_UP);
+          submission.setScore(calculatedScore);
+      }
+      case QUIZ_TEST -> {
+          // Lấy điểm từ QuizSession đã chấm
+          QuizSession quizSession = quizSessionRepository.findBySessionId(request.getQuizSessionId())
+                  .orElseThrow(() -> new ResourceNotFoundException("Quiz session không tồn tại"));
+          int totalQuestions = questionRepository.countActiveByQuizId(assignment.getTargetId());
+          double rawScore = totalQuestions > 0 ? (quizSession.getScore() / totalQuestions) * 10.0 : 0.0;
+          submission.setScore(BigDecimal.valueOf(rawScore).setScale(2, RoundingMode.HALF_UP));
+      }
+      case CONTEXT_READING -> {
+          // Đo thời gian đọc thực tế từ lúc start đến submit
+          long durationSec = submission.getStartedAt() != null 
+                  ? Duration.between(submission.getStartedAt(), now).getSeconds() : 0;
+          submission.setReadingDurationSeconds((int) durationSec);
+          double rawScore = ((double) durationSec / minReq) * 10.0;
+          BigDecimal calculatedScore = BigDecimal.valueOf(Math.min(10.0, rawScore)).setScale(2, RoundingMode.HALF_UP);
+          submission.setScore(calculatedScore);
+      }
   }
   ```
 * **Response `200 OK`:**

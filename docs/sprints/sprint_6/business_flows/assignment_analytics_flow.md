@@ -111,9 +111,9 @@ flowchart TD
     B --> C["Học sinh bấm vào làm bài:\nstatus = IN_PROGRESS\nstarted_at = NOW()"]
     
     C --> D{Loại bài tập?}
-    D -- "QUIZ_TEST" --> E["Học sinh nộp bài trắc nghiệm\nTính score = (đúng / tổng) * 10"]
-    D -- "AI_CHAT_ROLEPLAY" --> F["Chat tương tác với Nhân vật AI\nĐếm message_count"]
-    D -- "CONTEXT_READING" --> G["Đọc bối cảnh & tài liệu\nĐo reading_duration_seconds"]
+    D -- "QUIZ_TEST" --> E["Học sinh nộp bài trắc nghiệm\nBackend tính score = (đúng / tổng) * 10"]
+    D -- "AI_CHAT_ROLEPLAY" --> F["Chat tương tác với Nhân vật AI\nĐếm message_count\nscore = min(10, message_count/min_requirement * 10)"]
+    D -- "CONTEXT_READING" --> G["Đọc bối cảnh & tài liệu\nĐo reading_duration_seconds\nscore = min(10, duration/min_requirement * 10)"]
 
     E --> H{Thời điểm nộp <= Deadline?}
     F --> H
@@ -183,6 +183,7 @@ CREATE TABLE historical_schema.assignment (
     assignment_type VARCHAR(30) NOT NULL, -- 'CONTEXT_READING', 'AI_CHAT_ROLEPLAY', 'QUIZ_TEST'
     target_id       UUID NOT NULL,        -- context_id, character_id, or quiz_id
     deadline        TIMESTAMP WITH TIME ZONE NOT NULL,
+    min_requirement INT DEFAULT 5,        -- số tin nhắn tối thiểu hoặc số giây đọc tối thiểu để đạt 10 điểm
     status          VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'CANCELLED', 'ARCHIVED'
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()

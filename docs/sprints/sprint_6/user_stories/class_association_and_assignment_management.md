@@ -62,6 +62,10 @@
        - `QUIZ_TEST`: Làm bài kiểm tra trắc nghiệm bấm giờ.
      * `target_id` (`UUID`, bắt buộc): ID của nội dung được chọn (tương ứng `context_id`, `character_id`, hoặc `quiz_id`).
      * `deadline` (`LocalDateTime`, bắt buộc): Hạn chót nộp bài (phải sau thời điểm hiện tại).
+     * `min_requirement` (`Integer`, tùy chọn): Số lượng tiêu chuẩn yêu cầu để đạt điểm tối đa (thang 10):
+       - Với `AI_CHAT_ROLEPLAY`: Số lượt tin nhắn tương tác tối thiểu (mặc định: 5 hoặc do GV cài đặt, ví dụ: 10 câu).
+       - Với `CONTEXT_READING`: Thời gian đọc tối thiểu tính bằng giây (mặc định: 180s - 3 phút).
+       - Với `QUIZ_TEST`: Tự động lấy tổng số câu hỏi của bộ Quiz làm tiêu chuẩn.
   2. **Tích hợp Kho Nội dung (Content Pool Integration) & Preview:**
      * Hệ thống tận dụng các kho nội dung đã có sẵn:
        - `CONTEXT_READING`: Lấy từ `historical_context` (Global qua `GET /api/v1/historical-contexts`, Local qua `GET /api/v1/teacher/local-contents/contexts`).
@@ -91,7 +95,7 @@
 * **Thời gian thực hiện:** 15/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là Học sinh hoặc Hệ thống, tôi muốn tự động chấm điểm bài Quiz trắc nghiệm, ghi nhận số lượt đối thoại với AI, hoặc ghi nhận thời gian đọc bối cảnh, để tự động cập nhật trạng thái hoàn thành bài tập và ghi nhận điểm số vào sổ học tập.
+  Là Học sinh hoặc Hệ thống, tôi muốn tự động chấm điểm bài Quiz trắc nghiệm, tính điểm tương tác đối thoại với AI, hoặc ghi nhận thời gian đọc bối cảnh quy về thang điểm 10, để tự động cập nhật trạng thái hoàn thành bài tập và ghi nhận điểm số vào sổ học tập.
 * **Acceptance Criteria (AC):**
   1. **Đặc tả Enum Trạng thái Submission (`SubmissionStatus`):**
      * `NOT_STARTED`: Khởi tạo mặc định khi bài tập được giao, học sinh chưa bấm vào xem/làm.
@@ -100,15 +104,25 @@
      * `LATE_SUBMITTED`: Học sinh nộp bài sau hạn (`submitted_at > deadline`).
      * `MISSED`: Quá hạn chót mà học sinh vẫn ở `NOT_STARTED` hoặc `IN_PROGRESS` chưa hoàn thành.
      * `EXEMPTED`: Miễn làm (dành riêng cho học sinh mới chuyển lớp đối với các bài đã giao trước đó).
-  2. **API Nộp bài & Tự động Đánh giá theo Loại bài:** `POST /api/v1/student/assignments/{assignmentId}/submit`
-     * **`QUIZ_TEST`:**
-       - Tích hợp với `QuizSession` của hệ thống Quiz hiện có.
-       - Tự động tính điểm theo thang điểm 10 (`score = (correct_answers / total_questions) * 10`).
-     * **`AI_CHAT_ROLEPLAY`:**
-       - Tích hợp đếm tổng số lượt tin nhắn học sinh đã gửi trong phiên chat với nhân vật AI (`message_count`).
-       - Điều kiện đạt (Passing Criteria) do giáo viên cấu hình hoặc mặc định (ví dụ: tối thiểu >= 5 tin nhắn tương tác lịch sử).
-     * **`CONTEXT_READING`:**
-       - Ghi nhận thời gian đọc tài liệu (`reading_duration_seconds`) và xác nhận hoàn thành từ học sinh.
+  2. **API Nộp bài & Công thức Chấm điểm Tương tác (Server-Side Auto Grading trên Thang điểm 10):**
+     * `POST /api/v1/student/assignments/{assignmentId}/submit`: Client gửi mã phiên (`quizSessionId` hoặc `chatSessionId`), Backend tự động tính toán khép kín, tuyệt đối không nhận điểm trực tiếp từ client.
+     * **`AI_CHAT_ROLEPLAY` (Điểm tương tác Chat AI):**
+       - Backend đếm số tin nhắn học sinh gửi trong `ChatSession`: `actual_count = COUNT(message WHERE role = 'USER')`.
+       - So khớp với tiêu chuẩn `min_requirement` do giáo viên cài đặt:
+         * Nếu `actual_count >= min_requirement`: Cho tối đa **`10.0`** điểm.
+         * Nếu `actual_count < min_requirement`: Tính tỷ lệ trên thang điểm 10:  
+           $$\text{score} = \left(\frac{\text{actual\_count}}{\text{min\_requirement}}\right) \times 10.0$$
+           *(Ví dụ: Tiêu chuẩn là 10 tin nhắn. Học sinh chat 7 tin nhắn ➔ `score = 7.00/10`; chat 12 tin nhắn ➔ `score = 10.00/10`).*
+       - Lưu `message_count = actual_count`.
+     * **`QUIZ_TEST` (Điểm trắc nghiệm Quiz):**
+       - Backend lấy kết quả từ `QuizSession`:  
+         $$\text{score} = \left(\frac{\text{correct\_answers}}{\text{total\_questions}}\right) \times 10.0$$
+     * **`CONTEXT_READING` (Điểm tương tác Đọc bối cảnh):**
+       - Backend tính `reading_duration_seconds = Duration.between(started_at, submitted_at).getSeconds()`.
+       - So khớp với `min_requirement` (giây):
+         * Nếu `reading_duration_seconds >= min_requirement`: Cho **`10.0`** điểm.
+         * Nếu `reading_duration_seconds < min_requirement`:  
+           $$\text{score} = \left(\frac{\text{reading\_duration\_seconds}}{\text{min\_requirement}}\right) \times 10.0$$
   3. **Cập nhật Vòng đời & Thời gian nộp:**
      * Lưu chính xác `submitted_at = LocalDateTime.now()`.
      * So sánh với `deadline` của bài tập để set trạng thái `SUBMITTED` hoặc `LATE_SUBMITTED`.
