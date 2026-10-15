@@ -16,12 +16,18 @@ import java.util.UUID;
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
 
     /**
-     * Get all non-deleted questions for a quiz, ordered by insertion time.
+     * Get all non-deleted questions for a quiz — from both the direct FK column
+     * and the quiz_question link table (bank-attached questions).
      */
     @Query("""
             SELECT q FROM Question q
-            WHERE q.quiz.quizId = :quizId
-            AND q.deletedAt IS NULL
+            WHERE q.deletedAt IS NULL
+            AND (
+                (q.quiz IS NOT NULL AND q.quiz.quizId = :quizId)
+                OR EXISTS (SELECT qq FROM QuizQuestion qq
+                           WHERE qq.quiz.quizId = :quizId
+                           AND qq.question.questionId = q.questionId)
+            )
             ORDER BY q.createdAt ASC
             """)
     List<Question> findActiveByQuizId(@Param("quizId") UUID quizId);

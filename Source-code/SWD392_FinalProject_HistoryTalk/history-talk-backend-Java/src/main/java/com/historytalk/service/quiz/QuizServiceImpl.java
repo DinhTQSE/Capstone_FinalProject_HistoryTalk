@@ -27,6 +27,7 @@ import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.HistoricalContextRepository;
@@ -726,6 +727,11 @@ public class QuizServiceImpl implements QuizService {
     private Question buildQuestion(QuestionRequest request, Quiz quiz) {
         QuestionType type = request.getQuestionType() != null
                 ? request.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
+        if (type == QuestionType.MULTIPLE_CHOICE
+                && (request.getOptions() == null || request.getOptions().isEmpty())
+                && request.getQuestionData() == null) {
+            throw new InvalidRequestException("Câu hỏi trắc nghiệm yêu cầu options hoặc questionData");
+        }
         String questionDataJson = serializeJsonNode(request.getQuestionData());
         return Question.builder()
                 .quiz(quiz)
@@ -792,7 +798,6 @@ public class QuizServiceImpl implements QuizService {
     }
 
     private QuestionResponse mapToQuestionResponse(Question q) {
-        JsonNode questionDataNode = deserializeJsonNode(q.getQuestionData());
         return QuestionResponse.builder()
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
@@ -800,8 +805,34 @@ public class QuizServiceImpl implements QuizService {
                 .correctAnswer(q.getCorrectAnswer())
                 .explanation(q.getExplanation())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
-                .questionData(questionDataNode)
+                .questionData(sanitizeQuestionDataForLearner(q))
                 .build();
+    }
+
+    /** Strip correct-answer fields before sending questionData to learners. */
+    private JsonNode sanitizeQuestionDataForLearner(Question q) {
+        if (q.getQuestionData() == null) return null;
+        QuestionType type = q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
+        switch (type) {
+            case FILL_IN_BLANK:
+                // acceptedAnswers must not leak; learner only needs content + type
+                return null;
+            case MATCHING:
+                // Keep left/right items for display, strip correctPairs
+                try {
+                    MatchingQuestionData data = objectMapper.readValue(q.getQuestionData(), MatchingQuestionData.class);
+                    MatchingQuestionData safe = MatchingQuestionData.builder()
+                            .leftItems(data.getLeftItems())
+                            .rightItems(data.getRightItems())
+                            .build();
+                    return objectMapper.valueToTree(safe);
+                } catch (Exception e) {
+                    log.warn("Failed to sanitize matching questionData for question {}", q.getQuestionId());
+                    return null;
+                }
+            default:
+                return deserializeJsonNode(q.getQuestionData());
+        }
     }
 
     private QuestionBankResponse mapToBankResponse(Question q) {
@@ -1044,7 +1075,11 @@ public class QuizServiceImpl implements QuizService {
                 .question(question)
                 .orderIndex(nextOrder)
                 .build();
-        quizQuestionRepository.save(link);
+        try {
+            quizQuestionRepository.save(link);
+        } catch (DataIntegrityViolationException e) {
+            throw new DataConflictException("Câu hỏi đã được liên kết với quiz này");
+        }
     }
 
     @Override
