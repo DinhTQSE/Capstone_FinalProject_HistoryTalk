@@ -28,6 +28,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
@@ -75,10 +77,19 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
                 continue;
             }
 
-            if (classStudentRepository.existsByClassroomIdAndStudentUid(classroomId, studentId)) {
-                alreadyEnrolledCount++;
-                notes.add(String.format("Học sinh %s (%s) đã có trong lớp", student.getFullName(), student.getStudentCode()));
-                continue;
+            Optional<ClassStudent> existingOpt = classStudentRepository.findByClassroomIdAndStudentUid(classroomId, studentId);
+            if (existingOpt.isPresent()) {
+                ClassStudent existing = existingOpt.get();
+                if ("ACTIVE".equals(existing.getStatus())) {
+                    alreadyEnrolledCount++;
+                    notes.add(String.format("Học sinh %s (%s) đã có trong lớp", student.getFullName(), student.getStudentCode()));
+                    continue;
+                } else {
+                    existing.setStatus("ACTIVE");
+                    classStudentRepository.save(existing);
+                    successCount++;
+                    continue;
+                }
             }
 
             ClassStudent classStudent = ClassStudent.builder()
@@ -91,7 +102,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
             successCount++;
         }
 
-        long currentCount = classStudentRepository.countByClassroomId(classroomId);
+        long currentCount = classStudentRepository.countByClassroomIdAndStatus(classroomId, "ACTIVE");
 
         log.info("Batch enrolled students to class {}: requested={}, success={}, alreadyEnrolled={}",
                 classroom.getClassCode(), totalRequested, successCount, alreadyEnrolledCount);
@@ -117,8 +128,9 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         ClassStudent classStudent = classStudentRepository.findByClassroomIdAndStudentUid(classroomId, studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Học sinh không có trong lớp học này"));
 
-        classStudentRepository.delete(classStudent);
-        log.info("Removed student {} from classroom {}", studentId, classroomId);
+        classStudent.setStatus("INACTIVE");
+        classStudentRepository.save(classStudent);
+        log.info("Soft removed student {} from classroom {}", studentId, classroomId);
     }
 
     @Override
@@ -215,11 +227,17 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
                 continue;
             }
 
-            // Remove from source class
-            classStudentRepository.delete(enrollment);
+            // Mark transferred in source class
+            enrollment.setStatus("TRANSFERRED");
+            classStudentRepository.save(enrollment);
 
-            // Add to target class if not already enrolled
-            if (!classStudentRepository.existsByClassroomIdAndStudentUid(targetClass.getId(), studentId)) {
+            // Add to target class or reactivate if exists
+            Optional<ClassStudent> existingInTarget = classStudentRepository.findByClassroomIdAndStudentUid(targetClass.getId(), studentId);
+            if (existingInTarget.isPresent()) {
+                ClassStudent csTarget = existingInTarget.get();
+                csTarget.setStatus("ACTIVE");
+                classStudentRepository.save(csTarget);
+            } else {
                 classStudentRepository.save(ClassStudent.builder()
                         .classroom(targetClass)
                         .student(enrollment.getStudent())
@@ -230,7 +248,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
             successCount++;
         }
 
-        long targetCount = classStudentRepository.countByClassroomId(targetClass.getId());
+        long targetCount = classStudentRepository.countByClassroomIdAndStatus(targetClass.getId(), "ACTIVE");
 
         log.info("Transferred {} students from class {} to class {}",
                 successCount, fromClass.getClassCode(), targetClass.getClassCode());

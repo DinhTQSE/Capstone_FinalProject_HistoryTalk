@@ -182,9 +182,9 @@ class ClassroomStudentServiceImplTest {
                 .thenReturn(Optional.of(classroomA));
         when(userRepository.findById(student1.getUid())).thenReturn(Optional.of(student1));
         when(userRepository.findById(student2.getUid())).thenReturn(Optional.of(student2));
-        when(classStudentRepository.existsByClassroomIdAndStudentUid(classroomA.getId(), student1.getUid())).thenReturn(false);
-        when(classStudentRepository.existsByClassroomIdAndStudentUid(classroomA.getId(), student2.getUid())).thenReturn(false);
-        when(classStudentRepository.countByClassroomId(classroomA.getId())).thenReturn(2L);
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomA.getId(), student1.getUid())).thenReturn(Optional.empty());
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomA.getId(), student2.getUid())).thenReturn(Optional.empty());
+        when(classStudentRepository.countByClassroomIdAndStatus(classroomA.getId(), "ACTIVE")).thenReturn(2L);
 
         BatchEnrollStudentRequest req = BatchEnrollStudentRequest.builder()
                 .studentIds(List.of(student1.getUid(), student2.getUid()))
@@ -205,8 +205,9 @@ class ClassroomStudentServiceImplTest {
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomA.getId(), school.getId()))
                 .thenReturn(Optional.of(classroomA));
         when(userRepository.findById(student1.getUid())).thenReturn(Optional.of(student1));
-        when(classStudentRepository.existsByClassroomIdAndStudentUid(classroomA.getId(), student1.getUid())).thenReturn(true);
-        when(classStudentRepository.countByClassroomId(classroomA.getId())).thenReturn(1L);
+        ClassStudent existing = ClassStudent.builder().status("ACTIVE").student(student1).build();
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomA.getId(), student1.getUid())).thenReturn(Optional.of(existing));
+        when(classStudentRepository.countByClassroomIdAndStatus(classroomA.getId(), "ACTIVE")).thenReturn(1L);
 
         BatchEnrollStudentRequest req = BatchEnrollStudentRequest.builder()
                 .studentIds(List.of(student1.getUid()))
@@ -226,7 +227,7 @@ class ClassroomStudentServiceImplTest {
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomA.getId(), school.getId()))
                 .thenReturn(Optional.of(classroomA));
         when(userRepository.findById(studentOtherSchool.getUid())).thenReturn(Optional.of(studentOtherSchool));
-        when(classStudentRepository.countByClassroomId(classroomA.getId())).thenReturn(0L);
+        lenient().when(classStudentRepository.countByClassroomIdAndStatus(classroomA.getId(), "ACTIVE")).thenReturn(0L);
 
         BatchEnrollStudentRequest req = BatchEnrollStudentRequest.builder()
                 .studentIds(List.of(studentOtherSchool.getUid()))
@@ -272,7 +273,8 @@ class ClassroomStudentServiceImplTest {
         assertDoesNotThrow(() ->
                 classroomStudentService.removeStudentFromClass(classroomA.getId(), student1.getUid(), adminPrincipal));
 
-        verify(classStudentRepository, times(1)).delete(enrollment);
+        verify(classStudentRepository, times(1)).save(enrollment);
+        assertEquals("INACTIVE", enrollment.getStatus());
     }
 
     @Test
@@ -303,9 +305,9 @@ class ClassroomStudentServiceImplTest {
                 .thenReturn(Optional.of(classroomB));
         when(classStudentRepository.findByClassroomIdAndStudentUid(classroomA.getId(), student1.getUid()))
                 .thenReturn(Optional.of(enrollmentA));
-        when(classStudentRepository.existsByClassroomIdAndStudentUid(classroomB.getId(), student1.getUid()))
-                .thenReturn(false);
-        when(classStudentRepository.countByClassroomId(classroomB.getId())).thenReturn(1L);
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomB.getId(), student1.getUid()))
+                .thenReturn(Optional.empty());
+        when(classStudentRepository.countByClassroomIdAndStatus(classroomB.getId(), "ACTIVE")).thenReturn(1L);
 
         TransferStudentRequest req = TransferStudentRequest.builder()
                 .targetClassroomId(classroomB.getId())
@@ -315,8 +317,8 @@ class ClassroomStudentServiceImplTest {
         BatchEnrollResultResponse result = classroomStudentService.transferStudents(classroomA.getId(), req, adminPrincipal);
 
         assertEquals(1, result.getSuccessCount());
-        verify(classStudentRepository, times(1)).delete(enrollmentA);
-        verify(classStudentRepository, times(1)).save(any(ClassStudent.class));
+        verify(classStudentRepository, times(2)).save(any(ClassStudent.class));
+        assertEquals("TRANSFERRED", enrollmentA.getStatus());
     }
 
     @Test
