@@ -1,8 +1,8 @@
 package com.historytalk.service.quiz;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.*;
 import com.historytalk.dto.quiz.quizdata.FillInBlankAnswerData;
@@ -10,6 +10,9 @@ import com.historytalk.dto.quiz.quizdata.FillInBlankQuestionData;
 import com.historytalk.dto.quiz.quizdata.MatchingAnswerData;
 import com.historytalk.dto.quiz.quizdata.MatchingPair;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
+import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
+import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
+import com.historytalk.dto.quiz.quizdata.QuestionOption;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuestType;
@@ -210,7 +213,6 @@ public class QuizServiceImpl implements QuizService {
                 answerDetails.add(QuizAnswerDetail.builder()
                         .question(q)
                         .quizSession(session)
-                        .selectedOption(ans.getSelectedAnswer())
                         .answerData(answerDataJson)
                         .isCorrect(isCorrect)
                         .scoreEarned(isCorrect ? 1.0f : 0.0f)
@@ -288,12 +290,16 @@ public class QuizServiceImpl implements QuizService {
         List<QuizSessionDetailResponse.QuestionResultItem> items = questions.stream()
                 .map(q -> {
                     QuizAnswerDetail detail = detailByQuestion.get(q.getQuestionId());
+                    JsonNode submittedAnswer = null;
+                    if (detail != null && detail.getAnswerData() != null) {
+                        submittedAnswer = deserializeJsonNode(detail.getAnswerData());
+                    }
                     return QuizSessionDetailResponse.QuestionResultItem.builder()
                             .questionId(q.getQuestionId().toString())
                             .content(q.getContent())
-                            .options(deserializeOptions(q.getOptions()))
-                            .correctAnswer(q.getCorrectAnswer() != null ? q.getCorrectAnswer() : -1)
-                            .selectedAnswer(detail != null ? detail.getSelectedOption() : null)
+                            .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                            .questionData(deserializeJsonNode(q.getQuestionData()))
+                            .submittedAnswer(submittedAnswer)
                             .isCorrect(detail != null && Boolean.TRUE.equals(detail.getIsCorrect()))
                             .explanation(q.getExplanation())
                             .build();
@@ -471,21 +477,21 @@ public class QuizServiceImpl implements QuizService {
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
-        if (!question.getQuiz().getQuizId().equals(quizUuid)) {
+        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
         if (request.getContent() != null && !request.getContent().isBlank()) {
             question.setContent(request.getContent());
         }
-        if (request.getOptions() != null && !request.getOptions().isEmpty()) {
-            question.setOptions(serializeOptions(request.getOptions()));
-        }
-        if (request.getCorrectAnswer() != null) {
-            question.setCorrectAnswer(request.getCorrectAnswer());
-        }
         if (request.getExplanation() != null) {
             question.setExplanation(request.getExplanation());
+        }
+        if (request.getQuestionType() != null) {
+            question.setQuestionType(request.getQuestionType());
+        }
+        if (request.getQuestionData() != null) {
+            question.setQuestionData(serializeJsonNode(request.getQuestionData()));
         }
 
         questionRepository.save(question);
@@ -502,7 +508,7 @@ public class QuizServiceImpl implements QuizService {
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
-        if (!question.getQuiz().getQuizId().equals(quizUuid)) {
+        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
@@ -680,37 +686,47 @@ public class QuizServiceImpl implements QuizService {
                         "Hàng " + rowNum + ": questionContent must not be empty");
             }
 
-            List<String> options = Arrays.asList(
+            String[] rawOptions = {
                     row.get("option1").trim(),
                     row.get("option2").trim(),
                     row.get("option3").trim(),
                     row.get("option4").trim()
-            );
-            for (int o = 0; o < options.size(); o++) {
-                if (options.get(o).isBlank()) {
+            };
+            for (int o = 0; o < rawOptions.length; o++) {
+                if (rawOptions[o].isBlank()) {
                     throw new InvalidRequestException(
                             "Hàng " + rowNum + ": option" + (o + 1) + " must not be empty");
                 }
             }
 
-            int correctAnswer;
+            int correctIndex;
             try {
-                correctAnswer = Integer.parseInt(row.get("correctAnswer").trim());
+                correctIndex = Integer.parseInt(row.get("correctAnswer").trim());
             } catch (NumberFormatException e) {
                 throw new InvalidRequestException(
                         "Hàng " + rowNum + ": correctAnswer must be an integer (0-3)");
             }
-            if (correctAnswer < 0 || correctAnswer > 3) {
+            if (correctIndex < 0 || correctIndex > 3) {
                 throw new InvalidRequestException(
-                        "Hàng " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctAnswer);
+                        "Hàng " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctIndex);
             }
+
+            // Build typed questionData from CSV columns
+            List<QuestionOption> optionList = new ArrayList<>();
+            for (int o = 0; o < rawOptions.length; o++) {
+                optionList.add(QuestionOption.builder().id(String.valueOf(o)).text(rawOptions[o]).build());
+            }
+            MultipleChoiceQuestionData mcData = MultipleChoiceQuestionData.builder()
+                    .options(optionList)
+                    .correctOptionIds(List.of(String.valueOf(correctIndex)))
+                    .build();
 
             String explanation = row.get("explanation").trim();
 
             QuestionRequest qr = QuestionRequest.builder()
                     .content(questionContent)
-                    .options(options)
-                    .correctAnswer(correctAnswer)
+                    .questionType(QuestionType.MULTIPLE_CHOICE)
+                    .questionData(objectMapper.valueToTree(mcData))
                     .explanation(explanation.isBlank() ? null : explanation)
                     .build();
 
@@ -727,20 +743,15 @@ public class QuizServiceImpl implements QuizService {
     private Question buildQuestion(QuestionRequest request, Quiz quiz) {
         QuestionType type = request.getQuestionType() != null
                 ? request.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
-        if (type == QuestionType.MULTIPLE_CHOICE
-                && (request.getOptions() == null || request.getOptions().isEmpty())
-                && request.getQuestionData() == null) {
-            throw new InvalidRequestException("Câu hỏi trắc nghiệm yêu cầu options hoặc questionData");
+        if (request.getQuestionData() == null) {
+            throw new InvalidRequestException("Yêu cầu questionData cho câu hỏi loại " + type.name());
         }
-        String questionDataJson = serializeJsonNode(request.getQuestionData());
         return Question.builder()
                 .quiz(quiz)
                 .content(request.getContent())
-                .options(request.getOptions() != null ? serializeOptions(request.getOptions()) : null)
-                .correctAnswer(request.getCorrectAnswer())
                 .explanation(request.getExplanation())
                 .questionType(type)
-                .questionData(questionDataJson)
+                .questionData(serializeJsonNode(request.getQuestionData()))
                 .build();
     }
 
@@ -774,7 +785,7 @@ public class QuizServiceImpl implements QuizService {
                 .updatedDate(quiz.getUpdatedAt())
                 .isPublished(quiz.getIsPublished())
                 .status(buildStatus(quiz.getIsPublished(), quiz.getDeletedAt()))
-                .questions(questions.stream().map(this::mapToQuestionResponse).collect(Collectors.toList()))
+                .questions(questions.stream().map(this::mapToStaffQuestionDetail).collect(Collectors.toList()))
                 .build();
     }
 
@@ -801,11 +812,19 @@ public class QuizServiceImpl implements QuizService {
         return QuestionResponse.builder()
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
-                .options(deserializeOptions(q.getOptions()))
-                .correctAnswer(q.getCorrectAnswer())
-                .explanation(q.getExplanation())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
                 .questionData(sanitizeQuestionDataForLearner(q))
+                .explanation(q.getExplanation())
+                .build();
+    }
+
+    private QuestionResponse mapToStaffQuestionDetail(Question q) {
+        return QuestionResponse.builder()
+                .questionId(q.getQuestionId().toString())
+                .content(q.getContent())
+                .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .questionData(deserializeJsonNode(q.getQuestionData()))
+                .explanation(q.getExplanation())
                 .build();
     }
 
@@ -813,11 +832,11 @@ public class QuizServiceImpl implements QuizService {
     private JsonNode sanitizeQuestionDataForLearner(Question q) {
         if (q.getQuestionData() == null) return null;
         QuestionType type = q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
-        switch (type) {
-            case FILL_IN_BLANK:
-                // acceptedAnswers must not leak; learner only needs content + type
-                return null;
-            case MATCHING:
+        return switch (type) {
+            case FILL_IN_BLANK ->
+                // acceptedAnswers must not leak; learner needs only content + type
+                null;
+            case MATCHING -> {
                 // Keep left/right items for display, strip correctPairs
                 try {
                     MatchingQuestionData data = objectMapper.readValue(q.getQuestionData(), MatchingQuestionData.class);
@@ -825,26 +844,34 @@ public class QuizServiceImpl implements QuizService {
                             .leftItems(data.getLeftItems())
                             .rightItems(data.getRightItems())
                             .build();
-                    return objectMapper.valueToTree(safe);
+                    yield objectMapper.valueToTree(safe);
                 } catch (Exception e) {
                     log.warn("Failed to sanitize matching questionData for question {}", q.getQuestionId());
-                    return null;
+                    yield null;
                 }
-            default:
-                return deserializeJsonNode(q.getQuestionData());
-        }
+            }
+            case MULTIPLE_CHOICE -> {
+                // Keep options for display, strip correctOptionIds
+                try {
+                    JsonNode node = objectMapper.readTree(q.getQuestionData());
+                    ObjectNode safe = objectMapper.createObjectNode();
+                    if (node.has("options")) safe.set("options", node.get("options"));
+                    yield safe;
+                } catch (Exception e) {
+                    log.warn("Failed to sanitize MC questionData for question {}", q.getQuestionId());
+                    yield null;
+                }
+            }
+        };
     }
 
     private QuestionBankResponse mapToBankResponse(Question q) {
-        JsonNode questionDataNode = deserializeJsonNode(q.getQuestionData());
         return QuestionBankResponse.builder()
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
                 .explanation(q.getExplanation())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
-                .questionData(questionDataNode)
-                .options(deserializeOptions(q.getOptions()))
-                .correctAnswer(q.getCorrectAnswer())
+                .questionData(deserializeJsonNode(q.getQuestionData()))
                 .assignedToQuiz(q.getQuiz() != null)
                 .build();
     }
@@ -880,25 +907,6 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
-    private String serializeOptions(List<String> options) {
-        try {
-            return objectMapper.writeValueAsString(options);
-        } catch (Exception e) {
-            log.error("Failed to serialize options", e);
-            throw new InvalidRequestException("Định dạng tùy chọn không hợp lệ");
-        }
-    }
-
-    private List<String> deserializeOptions(String json) {
-        if (json == null || json.isBlank()) return new ArrayList<>();
-        try {
-            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
-        } catch (Exception e) {
-            log.warn("Failed to deserialize options: {}", json);
-            return new ArrayList<>();
-        }
-    }
-
     private String serializeJsonNode(JsonNode node) {
         if (node == null) return null;
         try {
@@ -927,9 +935,24 @@ public class QuizServiceImpl implements QuizService {
         return switch (type) {
             case FILL_IN_BLANK -> gradeFillInBlank(question, answer);
             case MATCHING -> gradeMatching(question, answer);
-            default -> question.getCorrectAnswer() != null
-                    && question.getCorrectAnswer().equals(answer.getSelectedAnswer());
+            case MULTIPLE_CHOICE -> gradeMultipleChoice(question, answer);
         };
+    }
+
+    private boolean gradeMultipleChoice(Question question, AnswerDetailRequest answer) {
+        if (question.getQuestionData() == null || answer.getAnswerData() == null) return false;
+        try {
+            MultipleChoiceQuestionData qData = objectMapper.readValue(
+                    question.getQuestionData(), MultipleChoiceQuestionData.class);
+            MultipleChoiceAnswerData aData = objectMapper.treeToValue(
+                    answer.getAnswerData(), MultipleChoiceAnswerData.class);
+            if (aData.getSelectedOptionIds() == null || qData.getCorrectOptionIds() == null) return false;
+            return aData.getSelectedOptionIds().size() == qData.getCorrectOptionIds().size()
+                    && aData.getSelectedOptionIds().containsAll(qData.getCorrectOptionIds());
+        } catch (Exception e) {
+            log.warn("Failed to grade MC for question {}", question.getQuestionId(), e);
+            return false;
+        }
     }
 
     private boolean gradeFillInBlank(Question question, AnswerDetailRequest answer) {
@@ -1020,12 +1043,6 @@ public class QuizServiceImpl implements QuizService {
         }
         if (request.getContent() != null && !request.getContent().isBlank()) {
             question.setContent(request.getContent());
-        }
-        if (request.getOptions() != null && !request.getOptions().isEmpty()) {
-            question.setOptions(serializeOptions(request.getOptions()));
-        }
-        if (request.getCorrectAnswer() != null) {
-            question.setCorrectAnswer(request.getCorrectAnswer());
         }
         if (request.getExplanation() != null) {
             question.setExplanation(request.getExplanation());
@@ -1201,8 +1218,8 @@ public class QuizServiceImpl implements QuizService {
                         .reportId(r.getReportId().toString())
                         .questionId(r.getQuestion().getQuestionId().toString())
                         .questionContent(r.getQuestion().getContent())
-                        .quizId(r.getQuiz().getQuizId().toString())
-                        .quizTitle(r.getQuiz().getTitle())
+                        .quizId(r.getQuiz() != null ? r.getQuiz().getQuizId().toString() : null)
+                        .quizTitle(r.getQuiz() != null ? r.getQuiz().getTitle() : null)
                         .reportedBy(r.getReportedBy().getUserName() != null ? r.getReportedBy().getUserName() : r.getReportedBy().getEmail())
                         .reason(r.getReason())
                         .status(r.getStatus())

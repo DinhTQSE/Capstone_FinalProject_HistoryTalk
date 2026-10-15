@@ -7,7 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -36,9 +35,6 @@ public class QuizAnswerDetail {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false)
     private QuizSession quizSession;
-
-    @Column(name = "selected_option", nullable = true)
-    private Integer selectedOption;
 
     @Column(name = "answer_data", columnDefinition = "text", nullable = true)
     private String answerData;
