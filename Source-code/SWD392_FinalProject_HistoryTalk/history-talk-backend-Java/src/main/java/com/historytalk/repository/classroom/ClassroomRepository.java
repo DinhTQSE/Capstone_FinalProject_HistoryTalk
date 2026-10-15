@@ -26,23 +26,30 @@ public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
     boolean existsBySchoolIdAndClassNameIgnoreCaseAndAcademicYearAndIdNotAndDeletedAtIsNull(
             UUID schoolId, String className, Integer academicYear, UUID id);
 
-    @Query("SELECT c FROM Classroom c WHERE c.school.id = :schoolId AND c.deletedAt IS NULL " +
-            "AND (:gradeLevel IS NULL OR c.gradeLevel = :gradeLevel) " +
-            "AND (:academicYear IS NULL OR c.academicYear = :academicYear) " +
-            "AND (:search IS NULL OR LOWER(c.className) LIKE LOWER(CONCAT('%', :search, '%')) " +
-            "     OR LOWER(c.classCode) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Page<Classroom> findSchoolClassrooms(
-            @Param("schoolId") UUID schoolId,
-            @Param("search") String search,
-            @Param("gradeLevel") Integer gradeLevel,
-            @Param("academicYear") Integer academicYear,
-            Pageable pageable);
+    // Tất cả lớp của trường
+    Page<Classroom> findBySchoolIdAndDeletedAtIsNull(UUID schoolId, Pageable pageable);
 
-    @Query("SELECT c FROM Classroom c WHERE c.school.id = :schoolId AND c.teacher.uid = :teacherUid AND c.deletedAt IS NULL " +
-            "AND (:academicYear IS NULL OR c.academicYear = :academicYear)")
-    Page<Classroom> findTeacherClassrooms(
-            @Param("schoolId") UUID schoolId,
-            @Param("teacherUid") UUID teacherUid,
-            @Param("academicYear") Integer academicYear,
-            Pageable pageable);
+    // Lọc theo Khối lớp (gradeLevel)
+    Page<Classroom> findBySchoolIdAndGradeLevelAndDeletedAtIsNull(
+            UUID schoolId, Integer gradeLevel, Pageable pageable);
+
+    // Lọc theo Năm học (academicYear)
+    Page<Classroom> findBySchoolIdAndAcademicYearAndDeletedAtIsNull(
+            UUID schoolId, Integer academicYear, Pageable pageable);
+
+    // Lọc theo cả Khối lớp và Năm học
+    Page<Classroom> findBySchoolIdAndGradeLevelAndAcademicYearAndDeletedAtIsNull(
+            UUID schoolId, Integer gradeLevel, Integer academicYear, Pageable pageable);
+
+    // Tìm kiếm theo tên lớp hoặc mã lớp trong trường
+    Page<Classroom> findBySchoolIdAndDeletedAtIsNullAndClassNameContainingIgnoreCaseOrSchoolIdAndDeletedAtIsNullAndClassCodeContainingIgnoreCase(
+            UUID schoolId1, String className, UUID schoolId2, String classCode, Pageable pageable);
+
+    // Giáo viên: tất cả lớp phụ trách
+    Page<Classroom> findBySchoolIdAndTeacher_UidAndDeletedAtIsNull(
+            UUID schoolId, UUID teacherUid, Pageable pageable);
+
+    // Giáo viên: lọc theo năm học
+    Page<Classroom> findBySchoolIdAndTeacher_UidAndAcademicYearAndDeletedAtIsNull(
+            UUID schoolId, UUID teacherUid, Integer academicYear, Pageable pageable);
 }

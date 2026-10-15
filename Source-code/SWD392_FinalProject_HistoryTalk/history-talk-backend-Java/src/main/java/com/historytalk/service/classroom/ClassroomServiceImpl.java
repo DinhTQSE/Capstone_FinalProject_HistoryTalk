@@ -12,11 +12,13 @@ import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
+import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -44,7 +46,8 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public ClassroomResponse createClassroom(CreateClassroomRequest request, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
             throw new AccessDeniedException("User does not belong to any school tenant");
         }
@@ -64,11 +67,11 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         // 2. Xác định Giáo viên phụ trách
         User teacher = null;
-        if (principal.getRole() == UserRole.TEACHER) {
+        if (userPrincipal.getRole() == UserRole.TEACHER) {
             // Nếu Teacher tự tạo lớp thì mặc định gán cho chính mình
-            teacher = userRepository.findById(UUID.fromString(principal.getUid()))
+            teacher = userRepository.findById(UUID.fromString(userPrincipal.getUid()))
                     .orElseThrow(() -> new ResourceNotFoundException("Teacher not found"));
-        } else if (principal.getRole() == UserRole.SCHOOL_ADMIN) {
+        } else if (userPrincipal.getRole() == UserRole.SCHOOL_ADMIN) {
             if (request.getTeacherId() != null) {
                 teacher = validateAndGetTeacher(request.getTeacherId(), schoolId);
             }
@@ -98,12 +101,16 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public ClassroomResponse updateClassroom(UUID id, UpdateClassroomRequest request, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID schoolId = userPrincipal.getSchoolId();
+        if (schoolId == null) {
+            throw new AccessDeniedException("User does not belong to any school tenant");
+        }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
         // Kiểm tra quyền hạn
-        if (principal.getRole() == UserRole.TEACHER) {
-            UUID currentTeacherUid = UUID.fromString(principal.getUid());
+        if (userPrincipal.getRole() == UserRole.TEACHER) {
+            UUID currentTeacherUid = UUID.fromString(userPrincipal.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(currentTeacherUid)) {
                 throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
             }
@@ -140,7 +147,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
 
         // Cập nhật giáo viên (chỉ School Admin mới được đổi)
-        if (principal.getRole() == UserRole.SCHOOL_ADMIN && request.getTeacherId() != null) {
+        if (userPrincipal.getRole() == UserRole.SCHOOL_ADMIN && request.getTeacherId() != null) {
             User teacher = validateAndGetTeacher(request.getTeacherId(), schoolId);
             classroom.setTeacher(teacher);
         }
@@ -154,17 +161,21 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional(readOnly = true)
     public ClassroomResponse getClassroomById(UUID id, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID schoolId = userPrincipal.getSchoolId();
+        if (schoolId == null) {
+            throw new AccessDeniedException("User does not belong to any school tenant");
+        }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
         // Kiểm tra phân quyền truy cập chi tiết lớp
-        if (principal.getRole() == UserRole.TEACHER) {
-            UUID currentTeacherUid = UUID.fromString(principal.getUid());
+        if (userPrincipal.getRole() == UserRole.TEACHER) {
+            UUID currentTeacherUid = UUID.fromString(userPrincipal.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(currentTeacherUid)) {
                 throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
             }
-        } else if (principal.getRole() == UserRole.SCHOOL_STUDENT) {
-            UUID currentStudentUid = UUID.fromString(principal.getUid());
+        } else if (userPrincipal.getRole() == UserRole.SCHOOL_STUDENT) {
+            UUID currentStudentUid = UUID.fromString(userPrincipal.getUid());
             if (!classStudentRepository.existsByClassroomIdAndStudentUid(id, currentStudentUid)) {
                 throw new AccessDeniedException("Bạn không phải là thành viên của lớp học này!");
             }
@@ -178,11 +189,29 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Transactional(readOnly = true)
     public PaginatedResponse<ClassroomResponse> getSchoolClassrooms(
             String search, Integer gradeLevel, Integer academicYear, Pageable pageable, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID schoolId = userPrincipal.getSchoolId();
+        if (schoolId == null) {
+            throw new AccessDeniedException("User does not belong to any school tenant");
+        }
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
-        Page<Classroom> page = classroomRepository.findSchoolClassrooms(
-                schoolId, trimmedSearch, gradeLevel, academicYear, pageable);
+        Page<Classroom> page;
+        if (trimmedSearch != null) {
+            page = classroomRepository.findBySchoolIdAndDeletedAtIsNullAndClassNameContainingIgnoreCaseOrSchoolIdAndDeletedAtIsNullAndClassCodeContainingIgnoreCase(
+                    schoolId, trimmedSearch, schoolId, trimmedSearch, pageable);
+        } else if (gradeLevel != null && academicYear != null) {
+            page = classroomRepository.findBySchoolIdAndGradeLevelAndAcademicYearAndDeletedAtIsNull(
+                    schoolId, gradeLevel, academicYear, pageable);
+        } else if (gradeLevel != null) {
+            page = classroomRepository.findBySchoolIdAndGradeLevelAndDeletedAtIsNull(
+                    schoolId, gradeLevel, pageable);
+        } else if (academicYear != null) {
+            page = classroomRepository.findBySchoolIdAndAcademicYearAndDeletedAtIsNull(
+                    schoolId, academicYear, pageable);
+        } else {
+            page = classroomRepository.findBySchoolIdAndDeletedAtIsNull(schoolId, pageable);
+        }
 
         List<ClassroomResponse> content = page.getContent().stream()
                 .map(c -> mapToResponse(c, classStudentRepository.countByClassroomId(c.getId())))
@@ -203,11 +232,21 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Transactional(readOnly = true)
     public PaginatedResponse<ClassroomResponse> getTeacherClassrooms(
             Integer academicYear, Pageable pageable, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
-        UUID teacherUid = UUID.fromString(principal.getUid());
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID schoolId = userPrincipal.getSchoolId();
+        if (schoolId == null) {
+            throw new AccessDeniedException("User does not belong to any school tenant");
+        }
+        UUID teacherUid = UUID.fromString(userPrincipal.getUid());
 
-        Page<Classroom> page = classroomRepository.findTeacherClassrooms(
-                schoolId, teacherUid, academicYear, pageable);
+        Page<Classroom> page;
+        if (academicYear != null) {
+            page = classroomRepository.findBySchoolIdAndTeacher_UidAndAcademicYearAndDeletedAtIsNull(
+                    schoolId, teacherUid, academicYear, pageable);
+        } else {
+            page = classroomRepository.findBySchoolIdAndTeacher_UidAndDeletedAtIsNull(
+                    schoolId, teacherUid, pageable);
+        }
 
         List<ClassroomResponse> content = page.getContent().stream()
                 .map(c -> mapToResponse(c, classStudentRepository.countByClassroomId(c.getId())))
@@ -227,7 +266,8 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional(readOnly = true)
     public List<ClassroomResponse> getStudentClassrooms(UserPrincipal principal) {
-        UUID studentUid = UUID.fromString(principal.getUid());
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID studentUid = UUID.fromString(userPrincipal.getUid());
         List<Classroom> classrooms = classStudentRepository.findClassroomsByStudentUid(studentUid);
 
         return classrooms.stream()
@@ -238,18 +278,35 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public void deleteClassroom(UUID id, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        UUID schoolId = userPrincipal.getSchoolId();
+        if (schoolId == null) {
+            throw new AccessDeniedException("User does not belong to any school tenant");
+        }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
         // Chỉ School Admin mới được xóa lớp học
-        if (principal.getRole() != UserRole.SCHOOL_ADMIN) {
+        if (userPrincipal.getRole() != UserRole.SCHOOL_ADMIN) {
             throw new AccessDeniedException("Chỉ School Admin mới có quyền xóa lớp học!");
         }
 
         classroom.setDeletedAt(LocalDateTime.now());
         classroom.setStatus("DELETED");
         classroomRepository.save(classroom);
-        log.info("Soft-deleted classroom {} by School Admin {}", classroom.getClassCode(), principal.getUid());
+        log.info("Soft-deleted classroom {} by School Admin {}", classroom.getClassCode(), userPrincipal.getUid());
+    }
+
+    private UserPrincipal resolvePrincipal(UserPrincipal principal) {
+        if (principal != null) {
+            return principal;
+        }
+        String userId = SecurityUtils.getUserId();
+        if (userId == null) {
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
+        }
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+        return new UserPrincipal(user);
     }
 
     private Classroom findClassroomInTenant(UUID id, UUID schoolId) {

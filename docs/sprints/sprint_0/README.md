@@ -1,5 +1,5 @@
 # 🏆 SPRINT 0 OVERVIEW & DOCUMENTATION (13/10/2026 – 19/10/2026)
-> **Mục tiêu chính:** Nâng cấp toàn diện kiến trúc Bảo mật, Xác thực Dual-Token (Access Token 15p + Refresh Token Rotation & Reuse Detection), và Chuẩn hóa Ma trận Phân quyền (RBAC Matrix) 6 vai trò trên toàn bộ hệ thống HistoryTalk.  
+> **Mục tiêu chính:** Nâng cấp toàn diện kiến trúc Bảo mật, Xác thực Dual-Token (Access Token 15p + Refresh Token Rotation & Reuse Detection), Chuẩn hóa Ma trận Phân quyền (RBAC Matrix) 6 vai trò, và Chuyển đổi Hạ tầng Lưu trữ tệp sang Cloudflare R2 (S3-Compatible, Zero Egress Fees & Edge CDN) trên toàn bộ hệ thống HistoryTalk.  
 > **Thành viên phụ trách:** Võ Đồng Đức Khải (`KhaiVDD`)  
 
 ---
@@ -14,9 +14,15 @@
 * 📄 **[global_rbac_and_account_matrix.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/user_stories/global_rbac_and_account_matrix.md):**
   * `US-SP0-04` (🟢 Khải): Chuẩn hóa Ma trận phân quyền 27 tính năng (RBAC Foundation) cho 6 vai trò người dùng.
   * `US-SP0-05` (🟢 Khải): Triển khai Bộ lọc Phân quyền Controller & Prefix Endpoint Security (`@PreAuthorize` + `SecurityConfig`).
+* 📄 **[cloudflare_r2_storage_migration.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/user_stories/cloudflare_r2_storage_migration.md):**
+  * `US-SP0-06` (🟢 Khải): Chuẩn hóa Kiến trúc Storage Đa nền tảng & Tích hợp Cloudflare R2 (`StorageService` Interface, AWS SDK v2, Zero Egress).
+  * `US-SP0-07` (🟢 Khải): Quản lý Tài liệu PDF Học thuật & Ký Presigned S3 URL bảo mật (`POST /{docId}/upload-pdf`, `GET /{docId}/pdf-url`).
+  * `US-SP0-08` (🟢 Khải): Tải lên Trực tiếp Đa phương tiện 2D/3D & Phân phối qua Edge CDN (Avatar, Map Pin, 3D Model, Custom Domain CDN).
+  * `US-SP0-09` (🟢 Khải): Quy trình Đồng bộ Dữ liệu Không gián đoạn & Cơ chế Dự phòng Nóng (rclone sync, Instant Rollback toggle).
 
 ### 2. 📂 Business Flows (Luồng Nghiệp vụ):
 * 🔄 **[authentication_and_rbac_flows.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/business_flows/authentication_and_rbac_flows.md):** Sơ đồ Sequence & Flowchart cho Luồng Đăng nhập, Silent Refresh Xoay vòng Token, Báo động đỏ Reuse Detection và Kiểm tra Quyền RBAC.
+* 🔄 **[cloudflare_r2_storage_flows.md](file:///c:/Users/KHAI/Documents/Historical-talk/SWD392_FinalProject_HistoryTalk/docs/sprints/sprint_0/business_flows/cloudflare_r2_storage_flows.md):** Sơ đồ Sequence & Flowchart cho Luồng Tải lên/Phân phối Tệp (PDF & Media 2D/3D), Sinh Presigned S3 URL, Di chuyển Dữ liệu rclone và Phân luồng Provider.
 
 ---
 
