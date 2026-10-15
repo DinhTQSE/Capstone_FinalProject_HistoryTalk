@@ -21,6 +21,9 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     List<Message> findByChatSessionSessionIdOrderByTimestampAsc(@Param("sessionId") UUID sessionId,
                                                                 @Param("includeDeleted") boolean includeDeleted);
 
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chatSession.sessionId = :sessionId AND m.isFromAi = false AND m.deletedAt IS NULL")
+    long countUserMessagesInSession(@Param("sessionId") UUID sessionId);
+
     @Query("SELECT COUNT(m) FROM Message m")
     long countCurrent();
 

@@ -114,7 +114,7 @@ class ClassroomImportProcessorTest {
         when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
         when(userRepository.findBySchoolIdAndStudentCodeIgnoreCase(schoolId, "HS001")).thenReturn(Optional.of(existingStudent));
-        when(classStudentRepository.existsByClassroomIdAndStudentUid(classroomId, existingStudent.getUid())).thenReturn(false);
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomId, existingStudent.getUid())).thenReturn(Optional.empty());
 
         StudentImportResultDto result = processor.processImport(file, context);
 
@@ -146,6 +146,12 @@ class ClassroomImportProcessorTest {
                 .role(UserRole.SCHOOL_STUDENT)
                 .build();
 
+        ClassStudent existingEnrollment = ClassStudent.builder()
+                .classroom(classroom)
+                .student(existingStudent)
+                .status("ACTIVE")
+                .build();
+
         StudentImportContext context = StudentImportContext.builder()
                 .schoolId(schoolId)
                 .classroomId(classroomId)
@@ -155,7 +161,7 @@ class ClassroomImportProcessorTest {
         when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
         when(userRepository.findBySchoolIdAndStudentCodeIgnoreCase(schoolId, "HS001")).thenReturn(Optional.of(existingStudent));
-        when(classStudentRepository.existsByClassroomIdAndStudentUid(classroomId, existingStudent.getUid())).thenReturn(true);
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomId, existingStudent.getUid())).thenReturn(Optional.of(existingEnrollment));
 
         StudentImportResultDto result = processor.processImport(file, context);
 
