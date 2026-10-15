@@ -23,15 +23,25 @@
 * **User Story:**  
   Là School Admin hoặc Giáo viên, tôi muốn gán hàng loạt học sinh vào lớp học (bằng cách chọn trên UI hoặc tải file CSV), xem danh sách học sinh của lớp, tra cứu học sinh chưa có lớp, chuyển lớp và gỡ học sinh khỏi lớp, để quản lý danh sách học sinh theo từng lớp học chính xác.
 * **Acceptance Criteria (AC):**
-  1. **API Batch Assign (JSON):** `POST /api/v1/classrooms/{classId}/students/batch` tiếp nhận mảng `studentIds` để thêm vào lớp. Xử lý idempotent (học sinh đã có trong lớp thì bỏ qua, không crash cả batch).
+  1. **API Batch Assign (JSON):** `POST /api/v1/classrooms/{classId}/students/batch` tiếp nhận mảng `studentIds` để thêm vào lớp. Xử lý idempotent:
+     - Nếu học sinh chưa từng có trong lớp: Tạo mới bản ghi `class_student` với `status = 'ACTIVE'`.
+     - Nếu học sinh từng ở lớp này với trạng thái `INACTIVE` hoặc `TRANSFERRED`: Tái kích hoạt lại `status = 'ACTIVE'`.
   2. **API CSV Import vào Lớp:** `POST /api/v1/classrooms/{classId}/students/import-csv` kế thừa Import Engine Sprint 5:
-     - Học sinh đã có tài khoản: Chỉ liên kết vào lớp, không trừ token.
-     - Học sinh mới: Tạo tài khoản, trừ token từ quỹ trường, và gán ngay vào lớp.
-  3. **API Xem Roster Lớp:** `GET /api/v1/classrooms/{classId}/students` trả về danh sách học sinh hiện có trong lớp (hỗ trợ tìm kiếm theo họ tên, mã HS, phân trang).
-  4. **API Danh sách Học sinh khả dụng:** `GET /api/v1/classrooms/{classId}/available-students` trả về học sinh của trường chưa thuộc lớp này để hiển thị Modal chọn học sinh trên UI.
-  5. **API Gỡ Học sinh khỏi Lớp:** `DELETE /api/v1/classrooms/{classId}/students/{studentId}` xóa liên kết khỏi lớp, bảo toàn lịch sử học tập.
-  6. **API Chuyển Lớp:** `POST /api/v1/classrooms/{fromClassId}/students/transfer` chuyển học sinh sang lớp mới trong cùng 1 transaction.
+     - Học sinh đã có tài khoản: Chỉ liên kết vào lớp (`status = 'ACTIVE'`), không trừ token.
+     - Học sinh mới: Tạo tài khoản, trừ token từ quỹ trường, và gán ngay vào lớp (`status = 'ACTIVE'`).
+  3. **API Xem Roster Lớp:** `GET /api/v1/classrooms/{classId}/students` trả về danh sách học sinh hiện có trong lớp (chỉ lấy học sinh có `status = 'ACTIVE'`, hỗ trợ tìm kiếm theo họ tên, mã HS, phân trang).
+  4. **API Danh sách Học sinh khả dụng:** `GET /api/v1/classrooms/{classId}/available-students` trả về học sinh của trường chưa thuộc bất kỳ lớp nào (hoặc đang `INACTIVE` trong lớp này) để hiển thị Modal chọn học sinh trên UI.
+  5. **API Gỡ Học sinh khỏi Lớp (Soft Delete):** `DELETE /api/v1/classrooms/{classId}/students/{studentId}`:
+     - **Cơ chế Soft Delete:** Tuyệt đối **không xóa cứng (Hard Delete)** bản ghi `class_student`, mà cập nhật trạng thái sang `status = 'INACTIVE'`.
+     - **Mục đích:** Bảo toàn 100% lịch sử học tập và các bài nộp cũ (`assignment_submission`) mà học sinh đã làm trong thời gian ở lớp, ngăn chặn việc tạo ra "học sinh ma" khi giáo viên xem lại sổ điểm các bài tập cũ.
+  6. **API Chuyển Lớp:** `POST /api/v1/classrooms/{fromClassId}/students/transfer`:
+     - Trong cùng 1 transaction: Cập nhật bản ghi ở lớp cũ sang `status = 'TRANSFERRED'`, và tạo/kích hoạt bản ghi ở lớp mới sang `status = 'ACTIVE'`.
+     - Toàn bộ kết quả bài tập học sinh từng làm ở lớp cũ vẫn được lưu giữ và gắn liền với bài tập của lớp cũ để phục vụ đối soát học bạ.
   7. **Tenant & Role Isolation:** Tất cả học sinh và lớp học phải cùng thuộc `school_id`. Giáo viên chỉ được thao tác trên lớp do mình phụ trách.
+
+> ⚠️ **Phạm vi nghiệp vụ (Scope Boundary):**
+> * US này **CHỈ** phụ trách quản lý mối liên kết học sinh - lớp học và trạng thái liên kết (`ACTIVE`, `INACTIVE`, `TRANSFERRED`), đảm bảo không làm đứt gãy quan hệ dữ liệu của các bài nộp lịch sử.
+> * US này **KHÔNG** cover việc tính toán tỷ lệ hoàn thành (Completion Rate), điểm trung bình hay thống kê biểu đồ của Lớp học (các nghiệp vụ này thuộc về phân hệ Analytics & Dashboard trong `US-SP6-06` và `US-SP6-07`).
 
 ---
 
