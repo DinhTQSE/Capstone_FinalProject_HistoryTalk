@@ -39,7 +39,7 @@ public class StaffQuizController {
     @GetMapping
     @Operation(summary = "List all quizzes (paginated)", description = "Retrieve quizzes with optional search and era filter.")
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizStaffResponse>>> getAllQuizzes(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String era,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {

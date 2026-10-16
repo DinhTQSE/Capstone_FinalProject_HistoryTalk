@@ -48,7 +48,7 @@ public class AdminSchoolController {
     @Operation(summary = "Get list of schools with search and pagination (US-SP5-01)")
     public ResponseEntity<com.historytalk.dto.PaginatedApiResponse<SchoolResponse>> getSchools(
             @io.swagger.v3.oas.annotations.Parameter(description = "Keyword to search by school name, school code, or contact email")
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @io.swagger.v3.oas.annotations.Parameter(description = "Page number (0-indexed, default: 0)")
             @RequestParam(defaultValue = "0") int page,
             @io.swagger.v3.oas.annotations.Parameter(description = "Number of items per page (default: 10)")
@@ -91,7 +91,7 @@ public class AdminSchoolController {
     @Operation(summary = "Get list of School Admins of a school with pagination, search, and status filter (US-SP5-02)")
     public ResponseEntity<PaginatedApiResponse<SchoolAdminResponse>> getSchoolAdmins(
             @PathVariable UUID schoolId,
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,

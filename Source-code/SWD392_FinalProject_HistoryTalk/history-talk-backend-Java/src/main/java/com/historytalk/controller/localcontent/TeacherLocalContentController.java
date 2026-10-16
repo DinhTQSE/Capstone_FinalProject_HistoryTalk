@@ -67,7 +67,7 @@ public class TeacherLocalContentController {
             description = "Trả về: (1) tất cả context Teacher tự tạo, " +
                     "(2) context SCHOOL_WIDE của GV khác cùng trường.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getLocalContexts(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -131,7 +131,7 @@ public class TeacherLocalContentController {
     @GetMapping("/characters")
     @Operation(summary = "Danh sách nhân vật địa phương mà Teacher có thể thấy")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getLocalCharacters(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {

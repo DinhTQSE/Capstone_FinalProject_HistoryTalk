@@ -115,6 +115,22 @@ class TeacherManagementServiceImplTest {
     }
 
     @Test
+    void getTeachers_whenSearchIsNull_shouldPassEmptyStringToRepository() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<User> page = new PageImpl<>(List.of(teacher), pageable, 1);
+
+        when(schoolRepository.existsById(schoolId)).thenReturn(true);
+        when(userRepository.searchSchoolUsersWithFilter(schoolId, UserRole.TEACHER, null, "", pageable))
+                .thenReturn(page);
+
+        PaginatedResponse<TeacherResponse> result = teacherManagementService.getTeachers(
+                schoolId, null, null, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(userRepository).searchSchoolUsersWithFilter(schoolId, UserRole.TEACHER, null, "", pageable);
+    }
+
+    @Test
     void updateTeacher_shouldUpdateProfileSuccessfully() {
         UpdateTeacherRequest request = UpdateTeacherRequest.builder()
                 .fullName("Trần Thị Giáo Viên Mới")
