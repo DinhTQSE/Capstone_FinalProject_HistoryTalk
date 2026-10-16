@@ -70,7 +70,7 @@ public class CharacterMediaController {
     }
 
     @GetMapping("/view-url")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'USER')")
+    @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get signed view URL for character media")
     public ResponseEntity<ApiResponse<SignedViewUrlResponse>> getViewUrl(

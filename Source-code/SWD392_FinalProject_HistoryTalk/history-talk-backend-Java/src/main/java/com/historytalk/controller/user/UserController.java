@@ -35,7 +35,7 @@ public class UserController {
     private final GamificationService gamificationService;
 
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get current user profile")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile() {
         String userId = SecurityUtils.getUserId();
@@ -47,7 +47,7 @@ public class UserController {
     }
 
     @GetMapping("/me/dashboard")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get authenticated user's personalized dashboard analytics")
     public ResponseEntity<ApiResponse<com.historytalk.dto.user.UserDashboardResponse>> getMyDashboard() {
         String userId = SecurityUtils.getUserId();
@@ -59,7 +59,7 @@ public class UserController {
     }
 
     @PostMapping("/me/daily-check-in")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Perform daily check-in for streak & token bonus")
     public ResponseEntity<ApiResponse<com.historytalk.dto.gamification.DailyCheckInResponse>> dailyCheckIn() {
         String userId = SecurityUtils.getUserId();
@@ -69,7 +69,7 @@ public class UserController {
     }
 
     @PatchMapping("/me")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update current user profile")
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateMyProfile(
             @Valid @RequestBody UpdateMyProfileRequest request) {
@@ -82,7 +82,7 @@ public class UserController {
     }
 
     @PatchMapping("/me/password")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Change current user password")
     public ResponseEntity<ApiResponse<Void>> changeMyPassword(
             @Valid @RequestBody ChangePasswordRequest request) {
