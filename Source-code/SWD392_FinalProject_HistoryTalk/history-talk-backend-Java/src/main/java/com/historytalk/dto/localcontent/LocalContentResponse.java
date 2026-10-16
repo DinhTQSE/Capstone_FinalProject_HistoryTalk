@@ -1,5 +1,6 @@
 package com.historytalk.dto.localcontent;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.enums.ContentStatus;
@@ -8,6 +9,7 @@ import com.historytalk.entity.enums.EventEra;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Response DTO for local content (Context or Character).
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class LocalContentResponse {
 
     // ── Common ──────────────────────────────────────────────────────────────
@@ -45,6 +48,10 @@ public class LocalContentResponse {
     @JsonProperty("contentScope")
     private ContentScope contentScope;
 
+    /** Admin feedback note — visible to Teacher after review. */
+    @JsonProperty("reviewNote")
+    private String reviewNote;
+
     // ── Context-specific ─────────────────────────────────────────────────────
     @JsonProperty("era")
     private EventEra era;
@@ -70,6 +77,14 @@ public class LocalContentResponse {
     @JsonProperty("videoUrl")
     private String videoUrl;
 
+    /** Latitude for map display (context only). */
+    @JsonProperty("latitude")
+    private Double latitude;
+
+    /** Longitude for map display (context only). */
+    @JsonProperty("longitude")
+    private Double longitude;
+
     // ── Character-specific ───────────────────────────────────────────────────
     @JsonProperty("title")
     private String title;
@@ -79,6 +94,39 @@ public class LocalContentResponse {
 
     @JsonProperty("modelUrl")
     private String modelUrl;
+
+    @JsonProperty("bornYear")
+    private Integer bornYear;
+
+    @JsonProperty("bornMonth")
+    private Integer bornMonth;
+
+    @JsonProperty("bornDay")
+    private Integer bornDay;
+
+    @JsonProperty("isBornBc")
+    private Boolean isBornBc;
+
+    @JsonProperty("deathYear")
+    private Integer deathYear;
+
+    @JsonProperty("deathMonth")
+    private Integer deathMonth;
+
+    @JsonProperty("deathDay")
+    private Integer deathDay;
+
+    @JsonProperty("isDeathBc")
+    private Boolean isDeathBc;
+
+    /** IDs of linked historical contexts (character only). */
+    @JsonProperty("contextIds")
+    private List<String> contextIds;
+
+    // ── Classroom assignment ──────────────────────────────────────────────────
+    /** IDs of classrooms this content is assigned to. */
+    @JsonProperty("classIds")
+    private List<String> classIds;
 
     // ── Audit ────────────────────────────────────────────────────────────────
     @JsonProperty("createdBy")

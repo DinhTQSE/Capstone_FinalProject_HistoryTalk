@@ -7,6 +7,8 @@ import com.historytalk.entity.enums.EventEra;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.List;
+
 /**
  * Request body for Teacher updating their own local context.
  * All fields are optional (partial update).
@@ -57,4 +59,16 @@ public class UpdateLocalContextRequest {
 
     @JsonProperty("contentScope")
     private ContentScope contentScope;
+
+    /** Latitude for map pin (optional). */
+    @JsonProperty("latitude")
+    private Double latitude;
+
+    /** Longitude for map pin (optional). */
+    @JsonProperty("longitude")
+    private Double longitude;
+
+    /** IDs of classrooms to assign (replaces existing assignments). */
+    @JsonProperty("classIds")
+    private List<String> classIds;
 }

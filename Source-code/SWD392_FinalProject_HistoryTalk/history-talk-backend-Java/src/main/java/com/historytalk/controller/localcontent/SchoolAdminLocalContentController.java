@@ -2,6 +2,7 @@ package com.historytalk.controller.localcontent;
 
 import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historytalk.dto.localcontent.*;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.localcontent.LocalContentService;
@@ -15,6 +16,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * REST endpoints for School Admin reviewing and approving local history content.
  *
@@ -24,8 +27,9 @@ import org.springframework.web.bind.annotation.*;
  * <p><b>Approval workflow (Sprint 6 — US-SP6-03):</b>
  * <ul>
  *   <li>Teacher creates content → DRAFT.</li>
- *   <li>School Admin reviews and sets status to PUBLISHED (ACTIVE), DRAFT (revert), or INACTIVE.</li>
- *   <li>On PUBLISHED: {@code approved_by_school_admin_id} is recorded for audit.</li>
+ *   <li>Teacher submits → PENDING_REVIEW.</li>
+ *   <li>School Admin reviews and sets status to ACTIVE, DRAFT (revert), or INACTIVE.</li>
+ *   <li>On ACTIVE: {@code approved_by} and {@code review_note} are recorded.</li>
  *   <li>Policy Disclaimer: HistoryTalk platform bears zero legal responsibility for accuracy
  *       of local content. The school assumes full responsibility upon publishing.</li>
  * </ul>
@@ -47,17 +51,18 @@ public class SchoolAdminLocalContentController {
     @GetMapping("/contexts")
     @Operation(
             summary = "Xem toàn bộ bối cảnh địa phương của trường",
-            description = "School Admin xem danh sách tất cả bối cảnh do GV trong trường tạo, " +
-                    "có thể lọc theo scope (CLASS_ONLY / SCHOOL_WIDE).")
+            description = "School Admin xem danh sách tất cả bối cảnh do GV trong trường tạo. " +
+                    "Filter theo scope (CLASS_ONLY / SCHOOL_WIDE) và status (DRAFT / PENDING_REVIEW / ACTIVE / INACTIVE).")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getSchoolLocalContexts(
             @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String scope,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> response =
-                localContentService.getSchoolLocalContexts(search, scope, page, size, principal);
+                localContentService.getSchoolLocalContexts(search, scope, status, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "School local contexts retrieved successfully"));
     }
 
@@ -68,7 +73,7 @@ public class SchoolAdminLocalContentController {
                     Thay đổi trạng thái của một bối cảnh lịch sử địa phương.
                     
                     Các giá trị `status` hợp lệ:
-                    - **ACTIVE** → Duyệt & publish (isPublished=true, lưu approved_by).
+                    - **ACTIVE** → Duyệt & publish (isPublished=true, lưu approved_by + review_note).
                     - **DRAFT**  → Trả lại giáo viên chỉnh sửa (isPublished=false, xóa approved_by).
                     - **INACTIVE** → Ẩn tạm thời (isPublished=false, giữ approved_by để audit).
                     
@@ -85,6 +90,19 @@ public class SchoolAdminLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(response, message));
     }
 
+    @GetMapping("/contexts/{contextId}/documents")
+    @Operation(
+            summary = "Xem tài liệu đính kèm bối cảnh (Admin review)",
+            description = "Admin xem tài liệu của bối cảnh đang chờ duyệt để đánh giá nội dung.")
+    public ResponseEntity<ApiResponse<List<HistoricalContextDocumentResponse>>> getLocalContextDocuments(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        List<HistoricalContextDocumentResponse> docs =
+                localContentService.getLocalContextDocuments(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // REVIEW — Characters
     // ══════════════════════════════════════════════════════════════════════════
@@ -92,16 +110,18 @@ public class SchoolAdminLocalContentController {
     @GetMapping("/characters")
     @Operation(
             summary = "Xem toàn bộ nhân vật địa phương của trường",
-            description = "School Admin xem danh sách tất cả nhân vật do GV trong trường tạo.")
+            description = "School Admin xem danh sách tất cả nhân vật do GV trong trường tạo. " +
+                    "Filter theo scope và status.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getSchoolLocalCharacters(
             @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String scope,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> response =
-                localContentService.getSchoolLocalCharacters(search, scope, page, size, principal);
+                localContentService.getSchoolLocalCharacters(search, scope, status, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "School local characters retrieved successfully"));
     }
 
@@ -126,13 +146,27 @@ public class SchoolAdminLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(response, message));
     }
 
+    @GetMapping("/characters/{characterId}/documents")
+    @Operation(
+            summary = "Xem tài liệu đính kèm nhân vật (Admin review)",
+            description = "Admin xem tài liệu của nhân vật đang chờ duyệt để đánh giá nội dung.")
+    public ResponseEntity<ApiResponse<List<HistoricalContextDocumentResponse>>> getLocalCharacterDocuments(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        List<HistoricalContextDocumentResponse> docs =
+                localContentService.getLocalCharacterDocuments(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+    }
+
     // ── Helper ───────────────────────────────────────────────────────────────
 
     private String buildApprovalMessage(String type, UpdateLocalContentStatusRequest req) {
         return switch (req.getStatus()) {
-            case ACTIVE   -> "Local " + type + " published successfully. School assumes full content responsibility.";
-            case DRAFT    -> "Local " + type + " reverted to DRAFT.";
-            case INACTIVE -> "Local " + type + " set to INACTIVE.";
+            case ACTIVE        -> "Local " + type + " published successfully. School assumes full content responsibility.";
+            case DRAFT         -> "Local " + type + " reverted to DRAFT.";
+            case INACTIVE      -> "Local " + type + " set to INACTIVE.";
+            case PENDING_REVIEW -> "Local " + type + " status set to PENDING_REVIEW.";
         };
     }
 }

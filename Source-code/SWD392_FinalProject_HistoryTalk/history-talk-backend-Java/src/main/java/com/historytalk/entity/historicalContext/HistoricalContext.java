@@ -1,6 +1,7 @@
 package com.historytalk.entity.historicalContext;
 
 import com.historytalk.entity.enums.ContentScope;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.quiz.Quiz;
@@ -118,6 +119,27 @@ public class HistoricalContext {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by", nullable = true)
     private User approvedBy;
+
+    /**
+     * Explicit status for local content. Replaces is_published-based derivation.
+     * NULL for global content (use is_published directly).
+     * DRAFT → PENDING_REVIEW (submit) → ACTIVE (approve) | INACTIVE (hide/reject)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_status", length = 20, nullable = true)
+    private ContentStatus contentStatus;
+
+    /** School Admin feedback note saved on each PUT .../status call. */
+    @Column(name = "review_note", columnDefinition = "TEXT", nullable = true)
+    private String reviewNote;
+
+    /** Latitude for map pin display (local content only). */
+    @Column(name = "latitude", nullable = true)
+    private Double latitude;
+
+    /** Longitude for map pin display (local content only). */
+    @Column(name = "longitude", nullable = true)
+    private Double longitude;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
