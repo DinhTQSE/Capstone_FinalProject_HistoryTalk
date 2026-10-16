@@ -1,5 +1,6 @@
 package com.historytalk.dto.quiz;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,7 +9,10 @@ import lombok.NoArgsConstructor;
 
 /**
  * One answer entry within QuizSubmitRequest.
- * Shape: { questionId, selectedAnswer }
+ * All types (MC, FILL_IN_BLANK, MATCHING) use answerData.
+ *   MC:    MultipleChoiceAnswerData { selectedOptionIds: ["2"] }
+ *   FILL:  FillInBlankAnswerData   { answers: ["938"] }
+ *   MATCH: MatchingAnswerData      { pairs: [{leftId, rightId}] }
  */
 @Data
 @Builder
@@ -19,6 +23,5 @@ public class AnswerDetailRequest {
     @NotNull(message = "Yêu cầu Question ID")
     private String questionId;
 
-    @NotNull(message = "Yêu cầu chọn câu trả lời")
-    private Integer selectedAnswer;
+    private JsonNode answerData;
 }

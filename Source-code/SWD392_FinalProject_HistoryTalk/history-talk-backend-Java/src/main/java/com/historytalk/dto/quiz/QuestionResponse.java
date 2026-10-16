@@ -1,16 +1,12 @@
 package com.historytalk.dto.quiz;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.historytalk.entity.enums.QuestionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
-/**
- * Response for GET /quizzes/:id (full detail) and embedded in QuizStartResponse / QuizStaffResponse.
- * Shape matches contract QuizQuestion: { questionId, content, options[], correctAnswer, explanation? }
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,11 +17,15 @@ public class QuestionResponse {
 
     private String content;
 
-    /** 4 options, deserialized from JSON stored in Question.options */
-    private List<String> options;
+    @Builder.Default
+    private QuestionType questionType = QuestionType.MULTIPLE_CHOICE;
 
-    /** 0-based index of the correct option */
-    private Integer correctAnswer;
+    /**
+     * Typed payload.
+     * Learner paths: correct answer keys stripped (no correctOptionIds / correctPairs / acceptedAnswers).
+     * Staff paths: full data including correct answers.
+     */
+    private JsonNode questionData;
 
     private String explanation;
 }
