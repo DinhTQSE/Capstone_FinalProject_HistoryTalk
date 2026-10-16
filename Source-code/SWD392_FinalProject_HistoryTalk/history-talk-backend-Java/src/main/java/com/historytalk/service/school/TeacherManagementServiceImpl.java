@@ -83,7 +83,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
             throw new ResourceNotFoundException("School not found with ID: " + schoolId);
         }
 
-        String keyword = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String keyword = (search != null) ? search.trim() : "";
         Page<User> teacherPage = userRepository.searchSchoolUsersWithFilter(
                 schoolId, UserRole.TEACHER, active, keyword, pageable);
 

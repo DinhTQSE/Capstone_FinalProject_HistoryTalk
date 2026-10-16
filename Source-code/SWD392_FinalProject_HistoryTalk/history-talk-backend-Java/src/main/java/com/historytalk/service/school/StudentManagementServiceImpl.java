@@ -42,7 +42,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
             throw new ResourceNotFoundException("School not found with ID: " + schoolId);
         }
 
-        String keyword = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String keyword = (search != null) ? search.trim() : "";
         Page<User> studentPage = userRepository.searchSchoolUsersWithFilter(
                 schoolId, UserRole.SCHOOL_STUDENT, active, keyword, pageable);
 

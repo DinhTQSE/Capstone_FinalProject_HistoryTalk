@@ -57,7 +57,7 @@ public class SchoolAdminTeacherController {
     @Operation(summary = "Get list of teachers with search, active filter, and pagination (US-SP5-03)")
     public ResponseEntity<PaginatedApiResponse<TeacherResponse>> getTeachers(
             @Parameter(description = "Keyword to search teacher by full name, username, or email")
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @Parameter(description = "Filter by active status (true: active, false: inactive)")
             @RequestParam(required = false) Boolean active,
             @Parameter(description = "Page number (0-indexed, default: 0)")
