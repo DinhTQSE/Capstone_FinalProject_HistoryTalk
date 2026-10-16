@@ -177,7 +177,7 @@ public class AuthController {
     }
 
     @PatchMapping("/me/deactivate")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Deactivate my account", description = "Deactivate the currently logged in user account")
     public ResponseEntity<ApiResponse<?>> deactivateMe() {
