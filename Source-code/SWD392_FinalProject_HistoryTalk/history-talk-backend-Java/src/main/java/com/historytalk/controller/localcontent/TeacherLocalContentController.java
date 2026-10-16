@@ -65,15 +65,17 @@ public class TeacherLocalContentController {
     @Operation(
             summary = "Danh sách bối cảnh địa phương mà Teacher có thể thấy",
             description = "Trả về: (1) tất cả context Teacher tự tạo, " +
-                    "(2) context SCHOOL_WIDE của GV khác cùng trường.")
+                    "(2) context SCHOOL_WIDE của GV khác cùng trường. " +
+                    "Filter theo status: DRAFT | PENDING_REVIEW | ACTIVE | INACTIVE.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getLocalContexts(
             @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> response =
-                localContentService.getLocalContexts(search, page, size, principal);
+                localContentService.getLocalContexts(search, status, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Local contexts retrieved successfully"));
     }
 
@@ -111,6 +113,18 @@ public class TeacherLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(null, "Local context deleted successfully"));
     }
 
+    @PutMapping("/contexts/{contextId}/submit")
+    @Operation(
+            summary = "Gửi bối cảnh lên để Admin duyệt",
+            description = "Chuyển trạng thái từ DRAFT → PENDING_REVIEW. Admin sẽ thấy trong queue chờ duyệt.")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> submitLocalContext(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.submitLocalContext(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Context submitted for review successfully"));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // LOCAL CHARACTERS
     // ══════════════════════════════════════════════════════════════════════════
@@ -129,15 +143,18 @@ public class TeacherLocalContentController {
     }
 
     @GetMapping("/characters")
-    @Operation(summary = "Danh sách nhân vật địa phương mà Teacher có thể thấy")
+    @Operation(
+            summary = "Danh sách nhân vật địa phương mà Teacher có thể thấy",
+            description = "Filter theo status: DRAFT | PENDING_REVIEW | ACTIVE | INACTIVE.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getLocalCharacters(
             @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> response =
-                localContentService.getLocalCharacters(search, page, size, principal);
+                localContentService.getLocalCharacters(search, status, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Local characters retrieved successfully"));
     }
 
@@ -172,6 +189,18 @@ public class TeacherLocalContentController {
 
         localContentService.deleteLocalCharacter(characterId, principal);
         return ResponseEntity.ok(ApiResponse.success(null, "Local character deleted successfully"));
+    }
+
+    @PutMapping("/characters/{characterId}/submit")
+    @Operation(
+            summary = "Gửi nhân vật lên để Admin duyệt",
+            description = "Chuyển trạng thái từ DRAFT → PENDING_REVIEW. Admin sẽ thấy trong queue chờ duyệt.")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> submitLocalCharacter(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.submitLocalCharacter(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Character submitted for review successfully"));
     }
 
     // ── Document endpoints — Context ──────────────────────────────────────────

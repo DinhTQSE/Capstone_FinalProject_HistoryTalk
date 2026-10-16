@@ -2,6 +2,7 @@ package com.historytalk.entity.character;
 
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.enums.ContentScope;
+import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
@@ -138,6 +139,19 @@ public class Character {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by", nullable = true)
     private User approvedBy;
+
+    /**
+     * Explicit status for local character.
+     * DRAFT → PENDING_REVIEW (submit) → ACTIVE (approve) | INACTIVE (hide/reject)
+     * NULL for global content.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_status", length = 20, nullable = true)
+    private ContentStatus contentStatus;
+
+    /** School Admin feedback note. */
+    @Column(name = "review_note", columnDefinition = "TEXT", nullable = true)
+    private String reviewNote;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

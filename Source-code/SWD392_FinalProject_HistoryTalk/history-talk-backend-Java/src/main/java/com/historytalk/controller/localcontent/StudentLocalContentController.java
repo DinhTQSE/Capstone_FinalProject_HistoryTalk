@@ -1,13 +1,10 @@
 package com.historytalk.controller.localcontent;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.localcontent.LocalContentResponse;
-import com.historytalk.entity.character.Character;
-import com.historytalk.entity.historicalContext.HistoricalContext;
-import com.historytalk.exception.InvalidRequestException;
-import com.historytalk.repository.LocalCharacterRepository;
-import com.historytalk.repository.LocalContextRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.service.localcontent.LocalContentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,18 +14,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
 /**
  * Student endpoint to browse published local content from their school.
  *
  * <p><b>Access:</b> SCHOOL_STUDENT only.
  * <p><b>Rule (UC-14 from Role Matrix):</b>
- * Students see published local content that belongs to their school.
- * The actual per-class filtering is enforced at the Assignment layer
- * (teacher assigns specific content to a specific class).
+ * Students see published local content belonging to their school.
+ * classId param filters to content assigned to a specific classroom.
  */
 @RestController
 @RequestMapping("/api/v1/student/local-contents")
@@ -38,89 +30,98 @@ import java.util.stream.Collectors;
 @Tag(name = "Local Content — Student", description = "Student: view published local history content from their school (UC-14)")
 public class StudentLocalContentController {
 
-    private final LocalContextRepository localContextRepository;
-    private final LocalCharacterRepository localCharacterRepository;
+    private final LocalContentService localContentService;
+
+    // ── Context list ─────────────────────────────────────────────────────────
 
     @GetMapping("/contexts")
     @Operation(
-            summary = "Xem danh sách bối cảnh lịch sử địa phương đã duyệt của trường",
-            description = "Học sinh xem được bối cảnh lịch sử địa phương trường mình đã được School Admin duyệt (PUBLISHED). " +
-                    "Phân quyền chi tiết theo lớp được xử lý ở tầng Assignment.")
-    public ResponseEntity<ApiResponse<List<LocalContentResponse>>> getPublishedLocalContexts(
+            summary = "Danh sách bối cảnh địa phương đã duyệt",
+            description = "Học sinh xem bối cảnh đã được School Admin duyệt (ACTIVE). " +
+                    "Filter theo lớp bằng classId. Hỗ trợ search, phân trang.")
+    public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getPublishedLocalContexts(
+            @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String classId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        UUID schoolId = resolveSchoolId(principal);
-        List<HistoricalContext> contexts = localContextRepository.findPublishedBySchool(schoolId);
-        List<LocalContentResponse> response = contexts.stream()
-                .map(this::mapContext)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(ApiResponse.success(response,
-                "Published local contexts retrieved successfully — " + response.size() + " found"));
+        PaginatedResponse<LocalContentResponse> result =
+                localContentService.getLocalContexts(search, "ACTIVE", page, size, principal);
+        // classId filter: if provided, only return content assigned to that class
+        if (classId != null && !classId.isBlank()) {
+            var filtered = result.getContent().stream()
+                    .filter(r -> r.getClassIds() != null && r.getClassIds().contains(classId))
+                    .toList();
+            result = PaginatedResponse.<LocalContentResponse>builder()
+                    .content(filtered)
+                    .currentPage(result.getCurrentPage())
+                    .pageSize(result.getPageSize())
+                    .totalElements((long) filtered.size())
+                    .totalPages(1)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+        return ResponseEntity.ok(ApiResponse.success(result,
+                "Published local contexts retrieved — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " found"));
     }
+
+    @GetMapping("/contexts/{contextId}")
+    @Operation(
+            summary = "Chi tiết bối cảnh địa phương đã duyệt",
+            description = "Học sinh xem chi tiết một bối cảnh cụ thể (chỉ khi đã ACTIVE).")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> getPublishedLocalContextById(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.getPublishedLocalContextById(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Local context retrieved successfully"));
+    }
+
+    // ── Character list ────────────────────────────────────────────────────────
 
     @GetMapping("/characters")
     @Operation(
-            summary = "Xem danh sách nhân vật lịch sử địa phương đã duyệt của trường",
-            description = "Học sinh xem được nhân vật lịch sử địa phương trường mình đã được School Admin duyệt (PUBLISHED).")
-    public ResponseEntity<ApiResponse<List<LocalContentResponse>>> getPublishedLocalCharacters(
+            summary = "Danh sách nhân vật địa phương đã duyệt",
+            description = "Học sinh xem nhân vật đã được School Admin duyệt (ACTIVE). " +
+                    "Filter theo lớp bằng classId. Hỗ trợ search, phân trang.")
+    public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getPublishedLocalCharacters(
+            @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String classId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        UUID schoolId = resolveSchoolId(principal);
-        List<Character> characters = localCharacterRepository.findPublishedBySchool(schoolId);
-        List<LocalContentResponse> response = characters.stream()
-                .map(this::mapCharacter)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(ApiResponse.success(response,
-                "Published local characters retrieved successfully — " + response.size() + " found"));
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private UUID resolveSchoolId(UserPrincipal principal) {
-        if (principal.getSchoolId() == null) {
-            throw new InvalidRequestException("Tài khoản học sinh chưa được liên kết với trường học");
+        PaginatedResponse<LocalContentResponse> result =
+                localContentService.getLocalCharacters(search, "ACTIVE", page, size, principal);
+        if (classId != null && !classId.isBlank()) {
+            var filtered = result.getContent().stream()
+                    .filter(r -> r.getClassIds() != null && r.getClassIds().contains(classId))
+                    .toList();
+            result = PaginatedResponse.<LocalContentResponse>builder()
+                    .content(filtered)
+                    .currentPage(result.getCurrentPage())
+                    .pageSize(result.getPageSize())
+                    .totalElements((long) filtered.size())
+                    .totalPages(1)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
         }
-        return principal.getSchoolId();
+        return ResponseEntity.ok(ApiResponse.success(result,
+                "Published local characters retrieved — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " found"));
     }
 
-    private LocalContentResponse mapContext(HistoricalContext ctx) {
-        return LocalContentResponse.builder()
-                .id(ctx.getContextId().toString())
-                .type("CONTEXT")
-                .name(ctx.getName())
-                .description(ctx.getDescription())
-                .imageUrl(ctx.getImageUrl())
-                .isPublished(ctx.getIsPublished())
-                .contentScope(ctx.getContentScope())
-                .era(ctx.getEra())
-                .category(ctx.getCategory())
-                .year(ctx.getYear())
-                .startYear(ctx.getStartYear())
-                .endYear(ctx.getEndYear())
-                .isBC(ctx.getIsBC())
-                .location(ctx.getLocation())
-                .videoUrl(ctx.getVideoUrl())
-                .schoolId(ctx.getSchool() != null ? ctx.getSchool().getId().toString() : null)
-                .schoolName(ctx.getSchool() != null ? ctx.getSchool().getName() : null)
-                .createdAt(ctx.getCreatedAt())
-                .build();
-    }
+    @GetMapping("/characters/{characterId}")
+    @Operation(
+            summary = "Chi tiết nhân vật địa phương đã duyệt",
+            description = "Học sinh xem chi tiết một nhân vật cụ thể (chỉ khi đã ACTIVE).")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> getPublishedLocalCharacterById(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
 
-    private LocalContentResponse mapCharacter(Character c) {
-        return LocalContentResponse.builder()
-                .id(c.getCharacterId().toString())
-                .type("CHARACTER")
-                .name(c.getName())
-                .description(c.getBackground())
-                .imageUrl(c.getImageUrl())
-                .isPublished(c.getIsPublished())
-                .contentScope(c.getContentScope())
-                .title(c.getTitle())
-                .personality(c.getPersonality())
-                .modelUrl(c.getModelUrl())
-                .schoolId(c.getSchool() != null ? c.getSchool().getId().toString() : null)
-                .schoolName(c.getSchool() != null ? c.getSchool().getName() : null)
-                .createdAt(c.getCreatedAt())
-                .build();
+        LocalContentResponse response = localContentService.getPublishedLocalCharacterById(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Local character retrieved successfully"));
     }
 }
