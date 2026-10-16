@@ -32,7 +32,7 @@ public class GamificationController {
     private final GamificationService gamificationService;
 
     @GetMapping("/today")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get today's streak and daily quests")
     public ResponseEntity<ApiResponse<TodayGamificationResponse>> getToday() {
@@ -43,7 +43,7 @@ public class GamificationController {
     }
 
     @GetMapping("/study-days")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get list of studied dates (yyyy-MM-dd) for a given month",
                description = "Returns an array of date strings for each day the user checked in during the requested month.")
@@ -59,7 +59,7 @@ public class GamificationController {
     }
 
     @PostMapping("/claim")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Claim token reward for a completed daily quest")
     public ResponseEntity<ApiResponse<ClaimQuestResponse>> claimReward(
