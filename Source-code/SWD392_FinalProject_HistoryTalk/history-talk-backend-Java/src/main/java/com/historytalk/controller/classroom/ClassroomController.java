@@ -83,7 +83,7 @@ public class ClassroomController {
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     @Operation(summary = "School Admin: View all classrooms in the school with search & filters")
     public ResponseEntity<PaginatedApiResponse<ClassroomResponse>> getSchoolClassrooms(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) Integer gradeLevel,
             @RequestParam(required = false) Integer academicYear,
             @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,

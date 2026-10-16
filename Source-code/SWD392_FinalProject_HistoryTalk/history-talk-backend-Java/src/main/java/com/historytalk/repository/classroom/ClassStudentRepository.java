@@ -44,10 +44,11 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
     @Query("SELECT cs FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
             "AND cs.classroom.school.id = :schoolId " +
             "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE' " +
-            "AND (LOWER(cs.student.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-            "     OR (cs.student.studentCode IS NOT NULL AND LOWER(cs.student.studentCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-            "     OR LOWER(cs.student.userName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-            "     OR LOWER(cs.student.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+            "AND (CAST(:keyword AS string) IS NULL OR :keyword = '' " +
+            "     OR cs.student.fullName ILIKE CONCAT('%', CAST(:keyword AS string), '%') " +
+            "     OR (cs.student.studentCode IS NOT NULL AND cs.student.studentCode ILIKE CONCAT('%', CAST(:keyword AS string), '%')) " +
+            "     OR cs.student.userName ILIKE CONCAT('%', CAST(:keyword AS string), '%') " +
+            "     OR cs.student.email ILIKE CONCAT('%', CAST(:keyword AS string), '%'))")
     org.springframework.data.domain.Page<ClassStudent> searchStudentsInClassroom(
             @Param("classroomId") UUID classroomId,
             @Param("schoolId") UUID schoolId,

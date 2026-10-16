@@ -249,6 +249,39 @@ class SchoolManagementServiceImplTest {
     }
 
     @Test
+    void getSchoolAdmins_whenSearchIsNull_shouldPassEmptyStringToRepository() {
+        UUID schoolId = UUID.randomUUID();
+        com.historytalk.entity.school.School school = com.historytalk.entity.school.School.builder()
+                .id(schoolId)
+                .name("Trường THPT Lê Hồng Phong")
+                .schoolCode("LHP-HCM")
+                .build();
+
+        com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
+                .uid(UUID.randomUUID())
+                .userName("lhp_admin")
+                .email("admin@lhp.edu.vn")
+                .fullName("Nguyễn Văn Admin")
+                .role(com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN)
+                .school(school)
+                .build();
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<com.historytalk.entity.user.User> page = new org.springframework.data.domain.PageImpl<>(
+                java.util.List.of(admin), pageable, 1);
+
+        when(schoolRepository.existsById(schoolId)).thenReturn(true);
+        when(userRepository.searchSchoolUsersWithFilter(schoolId, com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN, null, "", pageable))
+                .thenReturn(page);
+
+        com.historytalk.dto.PaginatedResponse<com.historytalk.dto.school.SchoolAdminResponse> result =
+                schoolManagementService.getSchoolAdmins(schoolId, null, null, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(userRepository).searchSchoolUsersWithFilter(schoolId, com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN, null, "", pageable);
+    }
+
+    @Test
     void updateSchoolAdmin_shouldUpdateProfileSuccessfully() {
         UUID adminId = UUID.randomUUID();
         com.historytalk.entity.user.User admin = com.historytalk.entity.user.User.builder()
