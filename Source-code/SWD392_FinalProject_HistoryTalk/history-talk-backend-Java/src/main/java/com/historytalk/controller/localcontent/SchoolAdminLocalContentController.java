@@ -50,7 +50,7 @@ public class SchoolAdminLocalContentController {
             description = "School Admin xem danh sách tất cả bối cảnh do GV trong trường tạo, " +
                     "có thể lọc theo scope (CLASS_ONLY / SCHOOL_WIDE).")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getSchoolLocalContexts(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String scope,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -94,7 +94,7 @@ public class SchoolAdminLocalContentController {
             summary = "Xem toàn bộ nhân vật địa phương của trường",
             description = "School Admin xem danh sách tất cả nhân vật do GV trong trường tạo.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getSchoolLocalCharacters(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String scope,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,

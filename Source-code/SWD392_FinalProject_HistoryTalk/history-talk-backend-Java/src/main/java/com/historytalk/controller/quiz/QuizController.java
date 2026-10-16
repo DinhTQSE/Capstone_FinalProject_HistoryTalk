@@ -38,7 +38,7 @@ public class QuizController {
     @GetMapping
     @Operation(summary = "List active quizzes", description = "Returns all active quizzes. Optionally filter by search term and contextId.")
     public ResponseEntity<ApiResponse<List<QuizCustomerResponse>>> getAllQuizzes(
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String contextId) {
 
         log.info("GET /api/v1/quizzes search={}, contextId={}", search, contextId);

@@ -99,6 +99,22 @@ class StudentManagementServiceImplTest {
     }
 
     @Test
+    void getStudents_whenSearchIsNull_shouldPassEmptyStringToRepository() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<User> page = new PageImpl<>(List.of(student), pageable, 1);
+
+        when(schoolRepository.existsById(schoolId)).thenReturn(true);
+        when(userRepository.searchSchoolUsersWithFilter(schoolId, UserRole.SCHOOL_STUDENT, null, "", pageable))
+                .thenReturn(page);
+
+        PaginatedResponse<StudentResponse> result = studentManagementService.getStudents(
+                schoolId, null, null, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(userRepository).searchSchoolUsersWithFilter(schoolId, UserRole.SCHOOL_STUDENT, null, "", pageable);
+    }
+
+    @Test
     void getStudentById_shouldReturnStudentResponse() {
         when(userRepository.findById(studentId)).thenReturn(Optional.of(student));
 

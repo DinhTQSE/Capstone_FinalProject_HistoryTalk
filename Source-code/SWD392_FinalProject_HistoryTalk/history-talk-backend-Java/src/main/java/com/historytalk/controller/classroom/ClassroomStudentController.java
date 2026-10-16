@@ -70,7 +70,7 @@ public class ClassroomStudentController {
     public ResponseEntity<PaginatedApiResponse<ClassroomStudentResponse>> getClassroomStudents(
             @PathVariable UUID classId,
             @Parameter(description = "Keyword to search student by name, studentCode, username, or email")
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @ParameterObject @PageableDefault(size = 10, sort = "joinedAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
 
@@ -85,7 +85,7 @@ public class ClassroomStudentController {
     public ResponseEntity<PaginatedApiResponse<StudentResponse>> getAvailableStudents(
             @PathVariable UUID classId,
             @Parameter(description = "Keyword to search student by name, studentCode, username, or email")
-            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "") String search,
             @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
 

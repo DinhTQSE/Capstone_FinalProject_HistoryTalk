@@ -42,10 +42,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = :role " +
            "AND (:active IS NULL OR (:active = true AND u.deletedAt IS NULL) OR (:active = false AND u.deletedAt IS NOT NULL)) " +
-           "AND (:search IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.userName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR (u.studentCode IS NOT NULL AND LOWER(u.studentCode) LIKE LOWER(CONCAT('%', :search, '%'))))")
+           "AND (CAST(:search AS string) IS NULL OR :search = '' " +
+           "OR u.fullName ILIKE CONCAT('%', CAST(:search AS string), '%') " +
+           "OR u.userName ILIKE CONCAT('%', CAST(:search AS string), '%') " +
+           "OR u.email ILIKE CONCAT('%', CAST(:search AS string), '%') " +
+           "OR (u.studentCode IS NOT NULL AND u.studentCode ILIKE CONCAT('%', CAST(:search AS string), '%')))")
     org.springframework.data.domain.Page<User> searchSchoolUsersWithFilter(
             @Param("schoolId") UUID schoolId,
             @Param("role") UserRole role,
@@ -64,10 +65,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
            "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE') " +
-           "AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.userName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR (u.studentCode IS NOT NULL AND LOWER(u.studentCode) LIKE LOWER(CONCAT('%', :search, '%'))))")
+           "AND (CAST(:search AS string) IS NULL OR :search = '' " +
+           "OR u.fullName ILIKE CONCAT('%', CAST(:search AS string), '%') " +
+           "OR u.userName ILIKE CONCAT('%', CAST(:search AS string), '%') " +
+           "OR u.email ILIKE CONCAT('%', CAST(:search AS string), '%') " +
+           "OR (u.studentCode IS NOT NULL AND u.studentCode ILIKE CONCAT('%', CAST(:search AS string), '%')))")
     org.springframework.data.domain.Page<User> searchAvailableStudentsForClassroom(
             @Param("schoolId") UUID schoolId,
             @Param("classroomId") UUID classroomId,

@@ -232,7 +232,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
             throw new ResourceNotFoundException("School not found with ID: " + schoolId);
         }
 
-        String keyword = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String keyword = (search != null) ? search.trim() : "";
         Page<User> adminPage = userRepository.searchSchoolUsersWithFilter(
                 schoolId, UserRole.SCHOOL_ADMIN, active, keyword, pageable);
 
