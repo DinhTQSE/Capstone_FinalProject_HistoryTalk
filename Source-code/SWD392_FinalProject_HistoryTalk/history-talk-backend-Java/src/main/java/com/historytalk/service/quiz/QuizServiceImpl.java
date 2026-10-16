@@ -1,29 +1,43 @@
 package com.historytalk.service.quiz;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.*;
+import com.historytalk.dto.quiz.quizdata.FillInBlankAnswerData;
+import com.historytalk.dto.quiz.quizdata.FillInBlankQuestionData;
+import com.historytalk.dto.quiz.quizdata.MatchingAnswerData;
+import com.historytalk.dto.quiz.quizdata.MatchingPair;
+import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
+import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
+import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
+import com.historytalk.dto.quiz.quizdata.QuestionOption;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuestType;
+import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.QuestionReport;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizAnswerDetail;
+import com.historytalk.entity.quiz.QuizQuestion;
+import com.historytalk.entity.quiz.QuizQuestionId;
 import com.historytalk.entity.quiz.QuizRating;
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionReportRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizAnswerDetailRepository;
+import com.historytalk.repository.QuizQuestionRepository;
 import com.historytalk.repository.QuizRatingRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
@@ -68,6 +82,7 @@ public class QuizServiceImpl implements QuizService {
     private final QuestionReportRepository questionReportRepository;
     private final ObjectMapper objectMapper;
     private final GamificationService gamificationService;
+    private final QuizQuestionRepository quizQuestionRepository;
 
     // ==================== Customer ====================
 
@@ -178,7 +193,7 @@ public class QuizServiceImpl implements QuizService {
 
             if (answerOpt.isPresent()) {
                 AnswerDetailRequest ans = answerOpt.get();
-                boolean isCorrect = q.getCorrectAnswer() != null && q.getCorrectAnswer().equals(ans.getSelectedAnswer());
+                boolean isCorrect = gradeAnswer(q, ans);
                 if (isCorrect) {
                     score++;
                     correctAnswers.add(i);
@@ -186,11 +201,21 @@ public class QuizServiceImpl implements QuizService {
                     wrongAnswers.add(i);
                 }
 
+                String answerDataJson = null;
+                if (ans.getAnswerData() != null) {
+                    try {
+                        answerDataJson = objectMapper.writeValueAsString(ans.getAnswerData());
+                    } catch (Exception e) {
+                        log.warn("Failed to serialize answerData for question {}", q.getQuestionId());
+                    }
+                }
+
                 answerDetails.add(QuizAnswerDetail.builder()
                         .question(q)
                         .quizSession(session)
-                        .selectedOption(ans.getSelectedAnswer())
+                        .answerData(answerDataJson)
                         .isCorrect(isCorrect)
+                        .scoreEarned(isCorrect ? 1.0f : 0.0f)
                         .build());
             } else {
                 // No answer submitted for this question — mark as wrong
@@ -265,12 +290,16 @@ public class QuizServiceImpl implements QuizService {
         List<QuizSessionDetailResponse.QuestionResultItem> items = questions.stream()
                 .map(q -> {
                     QuizAnswerDetail detail = detailByQuestion.get(q.getQuestionId());
+                    JsonNode submittedAnswer = null;
+                    if (detail != null && detail.getAnswerData() != null) {
+                        submittedAnswer = deserializeJsonNode(detail.getAnswerData());
+                    }
                     return QuizSessionDetailResponse.QuestionResultItem.builder()
                             .questionId(q.getQuestionId().toString())
                             .content(q.getContent())
-                            .options(deserializeOptions(q.getOptions()))
-                            .correctAnswer(q.getCorrectAnswer() != null ? q.getCorrectAnswer() : -1)
-                            .selectedAnswer(detail != null ? detail.getSelectedOption() : null)
+                            .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                            .questionData(deserializeJsonNode(q.getQuestionData()))
+                            .submittedAnswer(submittedAnswer)
                             .isCorrect(detail != null && Boolean.TRUE.equals(detail.getIsCorrect()))
                             .explanation(q.getExplanation())
                             .build();
@@ -448,21 +477,21 @@ public class QuizServiceImpl implements QuizService {
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
-        if (!question.getQuiz().getQuizId().equals(quizUuid)) {
+        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
         if (request.getContent() != null && !request.getContent().isBlank()) {
             question.setContent(request.getContent());
         }
-        if (request.getOptions() != null && !request.getOptions().isEmpty()) {
-            question.setOptions(serializeOptions(request.getOptions()));
-        }
-        if (request.getCorrectAnswer() != null) {
-            question.setCorrectAnswer(request.getCorrectAnswer());
-        }
         if (request.getExplanation() != null) {
             question.setExplanation(request.getExplanation());
+        }
+        if (request.getQuestionType() != null) {
+            question.setQuestionType(request.getQuestionType());
+        }
+        if (request.getQuestionData() != null) {
+            question.setQuestionData(serializeJsonNode(request.getQuestionData()));
         }
 
         questionRepository.save(question);
@@ -479,7 +508,7 @@ public class QuizServiceImpl implements QuizService {
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
-        if (!question.getQuiz().getQuizId().equals(quizUuid)) {
+        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
@@ -657,37 +686,47 @@ public class QuizServiceImpl implements QuizService {
                         "Hàng " + rowNum + ": questionContent must not be empty");
             }
 
-            List<String> options = Arrays.asList(
+            String[] rawOptions = {
                     row.get("option1").trim(),
                     row.get("option2").trim(),
                     row.get("option3").trim(),
                     row.get("option4").trim()
-            );
-            for (int o = 0; o < options.size(); o++) {
-                if (options.get(o).isBlank()) {
+            };
+            for (int o = 0; o < rawOptions.length; o++) {
+                if (rawOptions[o].isBlank()) {
                     throw new InvalidRequestException(
                             "Hàng " + rowNum + ": option" + (o + 1) + " must not be empty");
                 }
             }
 
-            int correctAnswer;
+            int correctIndex;
             try {
-                correctAnswer = Integer.parseInt(row.get("correctAnswer").trim());
+                correctIndex = Integer.parseInt(row.get("correctAnswer").trim());
             } catch (NumberFormatException e) {
                 throw new InvalidRequestException(
                         "Hàng " + rowNum + ": correctAnswer must be an integer (0-3)");
             }
-            if (correctAnswer < 0 || correctAnswer > 3) {
+            if (correctIndex < 0 || correctIndex > 3) {
                 throw new InvalidRequestException(
-                        "Hàng " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctAnswer);
+                        "Hàng " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctIndex);
             }
+
+            // Build typed questionData from CSV columns
+            List<QuestionOption> optionList = new ArrayList<>();
+            for (int o = 0; o < rawOptions.length; o++) {
+                optionList.add(QuestionOption.builder().id(String.valueOf(o)).text(rawOptions[o]).build());
+            }
+            MultipleChoiceQuestionData mcData = MultipleChoiceQuestionData.builder()
+                    .options(optionList)
+                    .correctOptionIds(List.of(String.valueOf(correctIndex)))
+                    .build();
 
             String explanation = row.get("explanation").trim();
 
             QuestionRequest qr = QuestionRequest.builder()
                     .content(questionContent)
-                    .options(options)
-                    .correctAnswer(correctAnswer)
+                    .questionType(QuestionType.MULTIPLE_CHOICE)
+                    .questionData(objectMapper.valueToTree(mcData))
                     .explanation(explanation.isBlank() ? null : explanation)
                     .build();
 
@@ -702,12 +741,17 @@ public class QuizServiceImpl implements QuizService {
     // ==================== Private Helpers ====================
 
     private Question buildQuestion(QuestionRequest request, Quiz quiz) {
+        QuestionType type = request.getQuestionType() != null
+                ? request.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
+        if (request.getQuestionData() == null) {
+            throw new InvalidRequestException("Yêu cầu questionData cho câu hỏi loại " + type.name());
+        }
         return Question.builder()
                 .quiz(quiz)
                 .content(request.getContent())
-                .options(serializeOptions(request.getOptions()))
-                .correctAnswer(request.getCorrectAnswer())
                 .explanation(request.getExplanation())
+                .questionType(type)
+                .questionData(serializeJsonNode(request.getQuestionData()))
                 .build();
     }
 
@@ -741,7 +785,7 @@ public class QuizServiceImpl implements QuizService {
                 .updatedDate(quiz.getUpdatedAt())
                 .isPublished(quiz.getIsPublished())
                 .status(buildStatus(quiz.getIsPublished(), quiz.getDeletedAt()))
-                .questions(questions.stream().map(this::mapToQuestionResponse).collect(Collectors.toList()))
+                .questions(questions.stream().map(this::mapToStaffQuestionDetail).collect(Collectors.toList()))
                 .build();
     }
 
@@ -768,9 +812,67 @@ public class QuizServiceImpl implements QuizService {
         return QuestionResponse.builder()
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
-                .options(deserializeOptions(q.getOptions()))
-                .correctAnswer(q.getCorrectAnswer())
+                .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .questionData(sanitizeQuestionDataForLearner(q))
                 .explanation(q.getExplanation())
+                .build();
+    }
+
+    private QuestionResponse mapToStaffQuestionDetail(Question q) {
+        return QuestionResponse.builder()
+                .questionId(q.getQuestionId().toString())
+                .content(q.getContent())
+                .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .questionData(deserializeJsonNode(q.getQuestionData()))
+                .explanation(q.getExplanation())
+                .build();
+    }
+
+    /** Strip correct-answer fields before sending questionData to learners. */
+    private JsonNode sanitizeQuestionDataForLearner(Question q) {
+        if (q.getQuestionData() == null) return null;
+        QuestionType type = q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
+        return switch (type) {
+            case FILL_IN_BLANK ->
+                // acceptedAnswers must not leak; learner needs only content + type
+                null;
+            case MATCHING -> {
+                // Keep left/right items for display, strip correctPairs
+                try {
+                    MatchingQuestionData data = objectMapper.readValue(q.getQuestionData(), MatchingQuestionData.class);
+                    MatchingQuestionData safe = MatchingQuestionData.builder()
+                            .leftItems(data.getLeftItems())
+                            .rightItems(data.getRightItems())
+                            .build();
+                    yield objectMapper.valueToTree(safe);
+                } catch (Exception e) {
+                    log.warn("Failed to sanitize matching questionData for question {}", q.getQuestionId());
+                    yield null;
+                }
+            }
+            case MULTIPLE_CHOICE -> {
+                // Keep options for display, strip correctOptionIds
+                try {
+                    JsonNode node = objectMapper.readTree(q.getQuestionData());
+                    ObjectNode safe = objectMapper.createObjectNode();
+                    if (node.has("options")) safe.set("options", node.get("options"));
+                    yield safe;
+                } catch (Exception e) {
+                    log.warn("Failed to sanitize MC questionData for question {}", q.getQuestionId());
+                    yield null;
+                }
+            }
+        };
+    }
+
+    private QuestionBankResponse mapToBankResponse(Question q) {
+        return QuestionBankResponse.builder()
+                .questionId(q.getQuestionId().toString())
+                .content(q.getContent())
+                .explanation(q.getExplanation())
+                .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .questionData(deserializeJsonNode(q.getQuestionData()))
+                .assignedToQuiz(q.getQuiz() != null)
                 .build();
     }
 
@@ -805,23 +907,215 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
-    private String serializeOptions(List<String> options) {
+    private String serializeJsonNode(JsonNode node) {
+        if (node == null) return null;
         try {
-            return objectMapper.writeValueAsString(options);
+            return objectMapper.writeValueAsString(node);
         } catch (Exception e) {
-            log.error("Failed to serialize options", e);
-            throw new InvalidRequestException("Định dạng tùy chọn không hợp lệ");
+            log.warn("Failed to serialize JsonNode", e);
+            throw new InvalidRequestException("Định dạng dữ liệu câu hỏi không hợp lệ");
         }
     }
 
-    private List<String> deserializeOptions(String json) {
-        if (json == null || json.isBlank()) return new ArrayList<>();
+    private JsonNode deserializeJsonNode(String json) {
+        if (json == null || json.isBlank()) return null;
         try {
-            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            return objectMapper.readTree(json);
         } catch (Exception e) {
-            log.warn("Failed to deserialize options: {}", json);
-            return new ArrayList<>();
+            log.warn("Failed to deserialize JsonNode: {}", json);
+            return null;
         }
+    }
+
+    // ==================== Answer Grading ====================
+
+    private boolean gradeAnswer(Question question, AnswerDetailRequest answer) {
+        QuestionType type = question.getQuestionType() != null
+                ? question.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
+        return switch (type) {
+            case FILL_IN_BLANK -> gradeFillInBlank(question, answer);
+            case MATCHING -> gradeMatching(question, answer);
+            case MULTIPLE_CHOICE -> gradeMultipleChoice(question, answer);
+        };
+    }
+
+    private boolean gradeMultipleChoice(Question question, AnswerDetailRequest answer) {
+        if (question.getQuestionData() == null || answer.getAnswerData() == null) return false;
+        try {
+            MultipleChoiceQuestionData qData = objectMapper.readValue(
+                    question.getQuestionData(), MultipleChoiceQuestionData.class);
+            MultipleChoiceAnswerData aData = objectMapper.treeToValue(
+                    answer.getAnswerData(), MultipleChoiceAnswerData.class);
+            if (aData.getSelectedOptionIds() == null || qData.getCorrectOptionIds() == null) return false;
+            return aData.getSelectedOptionIds().size() == qData.getCorrectOptionIds().size()
+                    && aData.getSelectedOptionIds().containsAll(qData.getCorrectOptionIds());
+        } catch (Exception e) {
+            log.warn("Failed to grade MC for question {}", question.getQuestionId(), e);
+            return false;
+        }
+    }
+
+    private boolean gradeFillInBlank(Question question, AnswerDetailRequest answer) {
+        if (question.getQuestionData() == null || answer.getAnswerData() == null) return false;
+        try {
+            FillInBlankQuestionData qData = objectMapper.readValue(
+                    question.getQuestionData(), FillInBlankQuestionData.class);
+            FillInBlankAnswerData aData = objectMapper.treeToValue(
+                    answer.getAnswerData(), FillInBlankAnswerData.class);
+            if (aData.getAnswers() == null || aData.getAnswers().isEmpty()) return false;
+
+            String submitted = aData.getAnswers().get(0);
+            if (qData.isTrimWhitespace() && submitted != null) submitted = submitted.trim();
+
+            if (submitted == null) return false;
+            for (String accepted : qData.getAcceptedAnswers()) {
+                String target = qData.isTrimWhitespace() ? accepted.trim() : accepted;
+                boolean match = qData.isCaseSensitive()
+                        ? submitted.equals(target)
+                        : submitted.equalsIgnoreCase(target);
+                if (match) return true;
+            }
+            return false;
+        } catch (Exception e) {
+            log.warn("Failed to grade FillInBlank for question {}", question.getQuestionId(), e);
+            return false;
+        }
+    }
+
+    private boolean gradeMatching(Question question, AnswerDetailRequest answer) {
+        if (question.getQuestionData() == null || answer.getAnswerData() == null) return false;
+        try {
+            MatchingQuestionData qData = objectMapper.readValue(
+                    question.getQuestionData(), MatchingQuestionData.class);
+            MatchingAnswerData aData = objectMapper.treeToValue(
+                    answer.getAnswerData(), MatchingAnswerData.class);
+            if (aData.getPairs() == null || qData.getCorrectPairs() == null) return false;
+            if (aData.getPairs().size() != qData.getCorrectPairs().size()) return false;
+
+            // All-or-nothing: every correct pair must appear exactly in submitted pairs
+            for (MatchingPair correct : qData.getCorrectPairs()) {
+                boolean found = aData.getPairs().stream().anyMatch(p ->
+                        correct.getLeftId().equals(p.getLeftId())
+                        && correct.getRightId().equals(p.getRightId()));
+                if (!found) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to grade Matching for question {}", question.getQuestionId(), e);
+            return false;
+        }
+    }
+
+    // ==================== Question Bank ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<QuestionBankResponse> getQuestionBank(String questionType, String search, Pageable pageable) {
+        QuestionType typeEnum = null;
+        if (questionType != null && !questionType.isBlank()) {
+            try {
+                typeEnum = QuestionType.valueOf(questionType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new InvalidRequestException("Loại câu hỏi không hợp lệ: " + questionType);
+            }
+        }
+        Page<Question> page = questionRepository.findAllForBank(typeEnum, normalize(search), pageable);
+        return toPaginatedResponse(page.map(this::mapToBankResponse));
+    }
+
+    @Override
+    @Transactional
+    public QuestionBankResponse createBankQuestion(QuestionRequest request) {
+        log.info("createBankQuestion: type={}", request.getQuestionType());
+        Question question = buildQuestion(request, null);
+        question = questionRepository.save(question);
+        return mapToBankResponse(question);
+    }
+
+    @Override
+    @Transactional
+    public QuestionBankResponse updateBankQuestion(String questionId, QuestionRequest request) {
+        log.info("updateBankQuestion: questionId={}", questionId);
+        Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+        if (question.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Question has been deleted: " + questionId);
+        }
+        if (request.getContent() != null && !request.getContent().isBlank()) {
+            question.setContent(request.getContent());
+        }
+        if (request.getExplanation() != null) {
+            question.setExplanation(request.getExplanation());
+        }
+        if (request.getQuestionType() != null) {
+            question.setQuestionType(request.getQuestionType());
+        }
+        if (request.getQuestionData() != null) {
+            question.setQuestionData(serializeJsonNode(request.getQuestionData()));
+        }
+        question = questionRepository.save(question);
+        return mapToBankResponse(question);
+    }
+
+    @Override
+    @Transactional
+    public void softDeleteBankQuestion(String questionId) {
+        log.info("softDeleteBankQuestion: questionId={}", questionId);
+        Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+        question.setDeletedAt(LocalDateTime.now());
+        questionRepository.save(question);
+    }
+
+    @Override
+    @Transactional
+    public void attachQuestionToQuiz(String quizId, String questionId) {
+        log.info("attachQuestionToQuiz: quizId={}, questionId={}", quizId, questionId);
+        UUID quizUuid = parseUuid(quizId, "quizId");
+        UUID questionUuid = parseUuid(questionId, "questionId");
+
+        Quiz quiz = quizRepository.findById(quizUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        Question question = questionRepository.findById(questionUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+
+        if (question.getDeletedAt() != null) {
+            throw new InvalidRequestException("Không thể thêm câu hỏi đã bị xóa vào quiz");
+        }
+        if (quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quizUuid, questionUuid)) {
+            throw new DataConflictException("Câu hỏi đã được liên kết với quiz này");
+        }
+
+        int nextOrder = quizQuestionRepository.findMaxOrderIndex(quizUuid) + 1;
+        QuizQuestion link = QuizQuestion.builder()
+                .quiz(quiz)
+                .question(question)
+                .orderIndex(nextOrder)
+                .build();
+        try {
+            quizQuestionRepository.save(link);
+        } catch (DataIntegrityViolationException e) {
+            throw new DataConflictException("Câu hỏi đã được liên kết với quiz này");
+        }
+    }
+
+    @Override
+    @Transactional
+    public void unlinkQuestionFromQuiz(String quizId, String questionId) {
+        log.info("unlinkQuestionFromQuiz: quizId={}, questionId={}", quizId, questionId);
+        UUID quizUuid = parseUuid(quizId, "quizId");
+        UUID questionUuid = parseUuid(questionId, "questionId");
+
+        quizRepository.findById(quizUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        questionRepository.findById(questionUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+
+        QuizQuestionId linkId = new QuizQuestionId(quizUuid, questionUuid);
+        QuizQuestion link = quizQuestionRepository.findById(linkId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Câu hỏi chưa được liên kết với quiz này"));
+        quizQuestionRepository.delete(link);
     }
 
     private UUID parseUuid(String id, String fieldName) {
@@ -924,8 +1218,8 @@ public class QuizServiceImpl implements QuizService {
                         .reportId(r.getReportId().toString())
                         .questionId(r.getQuestion().getQuestionId().toString())
                         .questionContent(r.getQuestion().getContent())
-                        .quizId(r.getQuiz().getQuizId().toString())
-                        .quizTitle(r.getQuiz().getTitle())
+                        .quizId(r.getQuiz() != null ? r.getQuiz().getQuizId().toString() : null)
+                        .quizTitle(r.getQuiz() != null ? r.getQuiz().getTitle() : null)
                         .reportedBy(r.getReportedBy().getUserName() != null ? r.getReportedBy().getUserName() : r.getReportedBy().getEmail())
                         .reason(r.getReason())
                         .status(r.getStatus())

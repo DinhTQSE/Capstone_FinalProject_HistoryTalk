@@ -7,7 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
@@ -37,8 +36,11 @@ public class QuizAnswerDetail {
     @JoinColumn(name = "session_id", nullable = false)
     private QuizSession quizSession;
 
-    @Column(name = "selected_option", nullable = false)
-    private Integer selectedOption;
+    @Column(name = "answer_data", columnDefinition = "text", nullable = true)
+    private String answerData;
+
+    @Column(name = "score_earned", nullable = true)
+    private Float scoreEarned;
 
     @Builder.Default
     @Column(name = "is_correct", nullable = false)
