@@ -31,9 +31,9 @@ Kế hoạch này giải quyết triệt để 5 bài toán cốt lõi của mô
 
 ---
 
-## 🏗️ 2. THIẾT KẾ CƠ SỞ DỮ LIỆU (FLYWAY MIGRATION V37)
+## 🏗️ 2. THIẾT KẾ CƠ SỞ DỮ LIỆU (FLYWAY MIGRATION V38)
 
-Tạo file `src/main/resources/db/migration/V37__school_subscription_daily_token_and_academic_lifecycle.sql`:
+Tạo file `src/main/resources/db/migration/V38__school_subscription_daily_token_and_academic_lifecycle.sql`:
 
 ```sql
 -- 1. Mở rộng bảng school cho chu kỳ năm học (01/09 - 31/05) và hạn mức ngày mặc định
@@ -81,8 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_token_boost_req_student_date
 ## 🗺️ 3. LỘ TRÌNH THỰC HIỆN THEO 6 PHASE
 
 ```text
-Phase 1: Database Migration (Flyway V37) & Enums
-   ├── V37__school_subscription_daily_token_and_academic_lifecycle.sql
+Phase 1: Database Migration (Flyway V38) & Enums
+   ├── V38__school_subscription_daily_token_and_academic_lifecycle.sql
    ├── SchoolStatus (ACTIVE, INACTIVE, SUSPENDED, EXPIRED)
    ├── AccountStatus (ACTIVE, DEACTIVATED)
    ├── TokenBoostRequestStatus (PENDING, APPROVED, REJECTED)
@@ -124,7 +124,7 @@ Phase 6: US-SP7-18 (Academic Year Rollover, Class Archive & Student Account Deac
 
 | STT | File Path | Hành động | Mục đích |
 | :--- | :--- | :--- | :--- |
-| 1 | `src/main/resources/db/migration/V37__school_subscription_daily_token_and_academic_lifecycle.sql` | Tạo mới | Thêm cột hạn gói năm học, hạn mức ngày, trạng thái `account_status` và bảng `token_boost_request` |
+| 1 | `src/main/resources/db/migration/V38__school_subscription_daily_token_and_academic_lifecycle.sql` | Tạo mới | Thêm cột hạn gói năm học, hạn mức ngày, trạng thái `account_status` và bảng `token_boost_request` |
 | 2 | `src/main/java/com/historytalk/entity/enums/SchoolStatus.java` | Chỉnh sửa | Thêm trạng thái `EXPIRED` |
 | 3 | `src/main/java/com/historytalk/entity/enums/AccountStatus.java` | Tạo mới | Enum `ACTIVE`, `DEACTIVATED` |
 | 4 | `src/main/java/com/historytalk/entity/enums/TokenBoostRequestStatus.java` | Tạo mới | Enum `PENDING`, `APPROVED`, `REJECTED` |
