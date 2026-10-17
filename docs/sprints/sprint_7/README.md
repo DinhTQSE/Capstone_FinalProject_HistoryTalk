@@ -42,5 +42,5 @@
 * 🔄 **[school_subscription_daily_token_and_lifecycle_flow.md](business_flows/school_subscription_daily_token_and_lifecycle_flow.md):** State Diagram, Flowchart & Sequence Diagram cho Chu kỳ Gói Năm học (`01/09` – `31/05`), Lazy Daily Token Allowance, Luồng Xin/Duyệt Token trong ngày và Chuyển giao Năm học (`ARCHIVED` / `DEACTIVATED`).
 
 ### 3. 📂 Implemented Plans (Kế hoạch Triển khai Chi tiết):
-* 📋 **[school_subscription_daily_token_and_lifecycle_plan.md](implemented_plan/school_subscription_daily_token_and_lifecycle_plan.md):** Kế hoạch 6 Phase triển khai Flyway Migration `V37`, Quỹ Token Chung theo Ngày, Khóa phân tầng Gói vs AI và Quản lý Vòng đời Học sinh (`US-SP7-14` ~ `US-SP7-18`).
+* 📋 **[school_subscription_daily_token_and_lifecycle_plan.md](implemented_plan/school_subscription_daily_token_and_lifecycle_plan.md):** Kế hoạch 6 Phase triển khai Flyway Migration `V38`, Quỹ Token Chung theo Ngày, Khóa phân tầng Gói vs AI và Quản lý Vòng đời Học sinh (`US-SP7-14` ~ `US-SP7-18`).
 
