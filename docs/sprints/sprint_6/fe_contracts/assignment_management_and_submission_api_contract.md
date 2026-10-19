@@ -206,9 +206,9 @@ Khi tạo bài tập thành công, hệ thống tự động khởi tạo trư�
 }
 ```
 *Ghi chú về `minRequirement`:*
-- Với `AI_CHAT_ROLEPLAY`: Là số lượt tin nhắn học sinh cần chat để đạt 10 điểm (mặc định = 5).
-- Với `CONTEXT_READING`: Là số giây đọc tài liệu để đạt 10 điểm (mặc định = 60).
-- Với `QUIZ_TEST`: Để null hoặc 0 (hệ thống tự lấy tổng số câu hỏi của Quiz để quy đổi điểm).
+- Với `AI_CHAT_ROLEPLAY`: Là số lượt tin nhắn học sinh cần chat để đạt 10 điểm (mặc định = `5`).
+- Với `CONTEXT_READING`: Là số giây đọc tài liệu để đạt 10 điểm (mặc định = `180` giây khi tạo bài tập).
+- Với `QUIZ_TEST`: Để `null` hoặc `1` (hệ thống tự lấy tổng số câu hỏi hoạt động của Quiz, bao gồm cả câu hỏi từ Question Bank, để quy đổi điểm).
 
 - **Response:** `201 Created` (`ApiResponse<TeacherAssignmentResponse>`)
 ```json
@@ -471,15 +471,16 @@ Học sinh gọi endpoint này khi bấm nút "Bắt đầu làm bài" trên gia
 
 ### 4.4 Nộp bài tập & Tự động Chấm điểm Server-side
 
-> 🛡️ **Cơ chế Chống Gian lận (Anti-cheat):**  
+> 🛡️ **Cơ chế Chống Gian lận (Anti-cheat) & Tự động Tra cứu (Auto-resolution):**  
 > Frontend **tuyệt đối KHÔNG gửi điểm số** lên Server.  
-> Frontend chỉ gửi ID phiên làm bài (`chatSessionId` hoặc `quizSessionId`), Server sẽ trực tiếp truy vấn Database để tính toán và tự động chấm điểm trên **thang điểm 10**.
+> Request Body khi gọi API `/submit` là **tùy chọn (optional — có thể gửi `{}` hoặc để trống hoàn toàn)** cho cả 3 loại bài tập! Nếu FE không truyền `chatSessionId` hoặc `quizSessionId`, Server sẽ tự động truy vấn Database để lấy phiên chat gần nhất hoặc phiên làm bài Quiz hoàn thành đạt điểm cao nhất của chính học sinh đó để chấm điểm trên **thang điểm 10**.
 
 - **Method:** `POST`
 - **Path:** `/api/v1/student/assignments/{assignmentId}/submit`
+- **Request Body (`SubmitAssignmentRequest` - Optional):** Có thể để trống hoặc truyền `{}`
 
 #### Trường hợp 1: Nộp bài `AI_CHAT_ROLEPLAY`
-Học sinh đã trò chuyện với nhân vật trong phiên chat, FE truyền `chatSessionId`:
+Học sinh đã trò chuyện với nhân vật trong phiên chat. FE có thể gửi body rỗng `{}` (Server tự lấy phiên chat gần nhất của học sinh với nhân vật được giao) hoặc chỉ định rõ `chatSessionId`:
 ```json
 {
   "chatSessionId": "d94c34e2-8f90-4823-b2c3-112233445566"
@@ -487,11 +488,11 @@ Học sinh đã trò chuyện với nhân vật trong phiên chat, FE truyền `
 ```
 *Quy tắc Server tính điểm:*
 - Đếm số tin nhắn user gửi trong phiên chat (`m.isFromAi = false`).
-- So sánh với `minRequirement` (số tin nhắn tiêu chuẩn giáo viên đặt ra).
+- So sánh với `minRequirement` (số tin nhắn tiêu chuẩn giáo viên đặt ra, mặc định = 5).
 - Điểm = `min(10.0, (messageCount / minRequirement) * 10.0)`. Nếu chat 4/5 tin nhắn -> 8.00 điểm; nếu chat >= 5 tin nhắn -> 10.00 điểm.
 
 #### Trường hợp 2: Nộp bài `QUIZ_TEST`
-Học sinh đã hoàn thành bài thi Quiz qua API Quiz của hệ thống, FE truyền `quizSessionId`:
+Học sinh đã hoàn thành bài thi Quiz qua API Quiz của hệ thống. FE có thể gửi body rỗng `{}` (Server tự lấy phiên làm bài Quiz đã hoàn thành có điểm cao nhất của học sinh) hoặc chỉ định rõ `quizSessionId`:
 ```json
 {
   "quizSessionId": "c83b23e1-7e89-4912-a1b2-998877665544"
@@ -499,17 +500,18 @@ Học sinh đã hoàn thành bài thi Quiz qua API Quiz của hệ thống, FE t
 ```
 *Quy tắc Server tính điểm:*
 - Server kiểm tra `QuizSession` thuộc quyền sở hữu của chính học sinh, đúng bài Quiz được giao và đã kết thúc (`endTime != null`).
-- Server lấy số câu đúng và tổng số câu hỏi hoạt động của Quiz.
+- Server lấy số câu đúng và tổng số câu hỏi hoạt động của Quiz (hỗ trợ cả câu hỏi trực tiếp lẫn câu hỏi gắn từ Question Bank qua bảng `quiz_question`).
 - Điểm = `(correctAnswers / totalQuestions) * 10.0`. (VD: Đúng 8/10 câu -> 8.00 điểm).
 
 #### Trường hợp 3: Nộp bài `CONTEXT_READING`
-Học sinh hoàn thành việc đọc tài liệu bối cảnh, FE gửi body rỗng `{}`:
+Học sinh hoàn thành việc đọc tài liệu bối cảnh, FE gửi body rỗng `{}` (hoặc không truyền body):
 ```json
 {}
 ```
 *Quy tắc Server tính điểm:*
+- Bắt buộc học sinh đã gọi API `/start` trước đó (`startedAt != null`).
 - Server đo khoảng thời gian từ `startedAt` (lúc bấm start) đến thời điểm nộp bài `now`: `readingDurationSeconds`.
-- So sánh với `minRequirement` (số giây tiêu chuẩn đọc, mặc định = 60s).
+- So sánh với `minRequirement` (số giây tiêu chuẩn đọc).
 - Điểm = `min(10.0, (readingDurationSeconds / minRequirement) * 10.0)`.
 
 - **Response:** `200 OK` (`ApiResponse<StudentSubmissionResponse>`)
@@ -537,13 +539,15 @@ Học sinh hoàn thành việc đọc tài liệu bối cảnh, FE gửi body r�
 
 | HTTP Status | Chi tiết lỗi | Nguyên nhân & Hướng dẫn xử lý |
 | :--- | :--- | :--- |
-| `400 Bad Request` | `Vui lòng cung cấp chatSessionId cho bài tập AI Chat Roleplay` | Học sinh submit bài AI Chat nhưng không truyền `chatSessionId`. |
-| `400 Bad Request` | `Phiên chat không phải với nhân vật lịch sử được yêu cầu` | `chatSessionId` trỏ tới cuộc trò chuyện với nhân vật khác, không đúng nhân vật được giao. |
-| `400 Bad Request` | `Vui lòng cung cấp quizSessionId cho bài tập trắc nghiệm` | Học sinh submit bài Quiz nhưng không truyền `quizSessionId`. |
-| `400 Bad Request` | `Phiên làm bài Quiz này chưa hoàn thành nộp bài` | Học sinh chưa nộp bài Quiz bên module Quiz mà đã bấm submit bài tập. |
+| `400 Bad Request` | `Nhân vật lịch sử này không tham gia vào bối cảnh/sự kiện đã chọn!` | Khi gọi `POST /api/v1/chat/sessions`, FE truyền `characterId` và `contextId` không có liên kết lịch sử với nhau. Hãy dùng danh sách từ `GET /api/v1/chat/scenarios`. |
+| `400 Bad Request` | `Bạn chưa có phiên trò chuyện nào với nhân vật lịch sử được yêu cầu trong bài tập` | Học sinh bấm nộp bài `AI_CHAT_ROLEPLAY` (không truyền `chatSessionId`) nhưng chưa từng tạo phiên chat nào với nhân vật được giao. |
+| `400 Bad Request` | `Phiên chat không phải với nhân vật lịch sử được yêu cầu` | `chatSessionId` truyền lên trỏ tới cuộc trò chuyện với nhân vật khác, không đúng nhân vật được giao. |
+| `400 Bad Request` | `Bạn chưa hoàn thành bài làm trắc nghiệm nào cho bộ câu hỏi được giao` | Học sinh bấm nộp bài `QUIZ_TEST` (không truyền `quizSessionId`) nhưng chưa hoàn thành bài thi Quiz nào của đề được giao. |
+| `400 Bad Request` | `Phiên làm bài Quiz này chưa hoàn thành nộp bài` | Học sinh truyền `quizSessionId` nhưng phiên Quiz đó chưa gọi `/api/v1/quizzes/submit`. |
+| `400 Bad Request` | `Vui lòng bắt đầu làm bài tập đọc bối cảnh trước khi nộp bài` | Học sinh nộp bài `CONTEXT_READING` khi chưa gọi `/start` (`startedAt == null`). |
 | `400 Bad Request` | `Bạn đã nộp bài tập này rồi, không thể nộp lại` | Trạng thái hiện tại đã là `SUBMITTED` hoặc `LATE_SUBMITTED`. Hệ thống ngăn chặn nộp đè để bảo toàn điểm số. |
 | `400 Bad Request` | `Bài tập này hiện không còn khả dụng để nộp` | Bài tập đã bị giáo viên hủy (`CANCELLED`) hoặc đã bị xóa. |
-| `403 Forbidden` | `Phiên làm bài Quiz không thuộc quyền sở hữu của bạn` | Học sinh truyền ID bài thi của người khác (gian lận). |
+| `403 Forbidden` | `Phiên trò chuyện không thuộc quyền sở hữu của bạn` / `Phiên làm bài Quiz không thuộc quyền sở hữu của bạn` | Học sinh truyền ID phiên chat hoặc bài thi của người khác (gian lận). |
 | `403 Forbidden` | `Bạn không phụ trách lớp học này` | Giáo viên thao tác trên lớp học mà mình không được phân công giảng dạy. |
 | `404 Not Found` | `Không tìm thấy thông tin nộp bài của bạn cho bài tập này` | Học sinh không thuộc danh sách học sinh của lớp được giao bài tập. |
 | `404 Not Found` | `Bài tập không tồn tại hoặc đã bị xóa` | Sai `assignmentId`. |
@@ -580,8 +584,8 @@ sequenceDiagram
 
     Note over S, BE: 3. Nộp bài & Tự động Chấm điểm
     S->>FE: Bấm "Nộp bài tập"
-    FE->>BE: POST /api/v1/student/assignments/{assignmentId}/submit {sessionId}
-    BE->>DB: Server tự động kiểm tra số tin nhắn / điểm quiz / thời gian đọc
+    FE->>BE: POST /api/v1/student/assignments/{assignmentId}/submit (Body {} hoặc optional sessionId)
+    BE->>DB: Server tự động tra cứu phiên làm bài / số tin nhắn / điểm quiz / thời gian đọc
     BE->>DB: Tính điểm trên thang 10 & gán SUBMITTED / LATE_SUBMITTED
     BE-->>FE: 200 OK {score, status, submittedAt}
     FE->>S: Hiển thị Popup chúc mừng kèm điểm số đạt được!
@@ -601,11 +605,12 @@ Khi mở modal/màn hình **Tạo Bài tập**, giáo viên cần chọn Lớp h
 | API | Method | Endpoint | Mục đích sử dụng | Role yêu cầu |
 | :--- | :---: | :--- | :--- | :---: |
 | **Lấy danh sách Lớp học phụ trách** | `GET` | `/api/v1/classrooms/my-teaching` | Lấy danh sách lớp giáo viên đang dạy để chọn `classId` | `TEACHER` |
-| **Lấy Bối cảnh Lịch sử (Chung)** | `GET` | `/api/v1/historical-contexts?page=0&size=50` | Chọn `targetId` khi `assignmentType = CONTEXT_READING` | Public / All |
-| **Lấy Bối cảnh Địa phương (Trường)** | `GET` | `/api/v1/teacher/local-contexts` | Chọn bối cảnh địa phương của trường đã duyệt | `TEACHER` |
-| **Lấy Nhân vật Lịch sử (Chung)** | `GET` | `/api/v1/characters?page=0&size=50` | Chọn `targetId` khi `assignmentType = AI_CHAT_ROLEPLAY` | Public / All |
-| **Lấy Nhân vật Địa phương (Trường)** | `GET` | `/api/v1/teacher/local-characters` | Chọn nhân vật lịch sử của trường đã duyệt | `TEACHER` |
-| **Lấy Bộ đề Quiz Trắc nghiệm** | `GET` | `/api/v1/quizzes?page=0&size=50` | Chọn `targetId` khi `assignmentType = QUIZ_TEST` | Public / All |
+| **Lấy Kịch bản Nhập vai (Nhân vật + Bối cảnh)** | `GET` | `/api/v1/chat/scenarios?page=1&limit=50` | Lấy danh sách cặp Nhân vật - Bối cảnh hợp lệ (gồm cả Global & Trường) | Public / All |
+| **Lấy Bối cảnh Lịch sử (Chung + Trường)** | `GET` | `/api/v1/historical-contexts?page=1&limit=50` | Chọn `targetId` khi `assignmentType = CONTEXT_READING` | Public / All |
+| **Lấy Bối cảnh Địa phương (Trường)** | `GET` | `/api/v1/teacher/local-contents/contexts` | Quản lý/chọn bối cảnh địa phương của trường | `TEACHER` |
+| **Lấy Nhân vật Lịch sử (Chung + Trường)** | `GET` | `/api/v1/characters?page=1&limit=50` | Chọn `targetId` khi `assignmentType = AI_CHAT_ROLEPLAY` | Public / All |
+| **Lấy Nhân vật Địa phương (Trường)** | `GET` | `/api/v1/teacher/local-contents/characters` | Quản lý/chọn nhân vật lịch sử của trường | `TEACHER` |
+| **Lấy Bộ đề Quiz Trắc nghiệm** | `GET` | `/api/v1/quizzes?page=1&limit=50` (hoặc `/api/v1/teacher/quizzes`) | Chọn `targetId` khi `assignmentType = QUIZ_TEST` | Public / `TEACHER` |
 
 ---
 
@@ -616,18 +621,51 @@ Khi học sinh nhấn **"Bắt đầu làm bài"** (`POST /api/v1/student/assign
 #### A. Nhóm Bài tập `AI_CHAT_ROLEPLAY` (Chat nhập vai với AI)
 Học sinh cần trò chuyện với nhân vật lịch sử để tích lũy số lượt trao đổi (message count):
 
-1. **Khởi tạo phiên chat với nhân vật:**
+1. **Lấy danh sách các Gói Kịch bản Nhập vai (Scenarios Catalog):**
+   - **Method:** `GET`
+   - **Endpoint:** `/api/v1/chat/scenarios`
+   - **Mô tả:** Lấy danh sách tất cả các bộ kịch bản (Nhân vật + Bối cảnh lịch sử) đang kích hoạt để hiển thị thẻ chọn kịch bản. Tự động nhận diện bối cảnh địa phương của trường nếu người dùng đã đăng nhập tài khoản trường.
+   - **Query Params (Tùy chọn):** `search` (tìm theo tên nhân vật/bối cảnh), `era` (thời kỳ: `ANCIENT`, `MEDIEVAL`, `MODERN`, `CONTEMPORARY`), `page`, `limit`.
+   - **Response (`200 OK`):**
+     ```json
+     {
+       "success": true,
+       "message": "Scenarios retrieved successfully",
+       "data": [
+         {
+           "scenarioId": "9fa8c13b-1234-4567-89ab-cdef01234567",
+           "characterId": "7c12f4b0-3d89-4a92-b432-11a5b8e90c23",
+           "characterName": "Đại tướng Võ Nguyên Giáp",
+           "characterTitle": "Tổng tư lệnh Quân đội Nhân dân Việt Nam",
+           "characterAvatar": "https://.../vng.jpg",
+           "characterPersonality": "Điềm đạm, quyết đoán",
+           "contextId": "b8a9c04d-e910-4123-c345-d4e5f6a7b8c9",
+           "contextName": "Chiến dịch Điện Biên Phủ",
+           "contextEra": "CONTEMPORARY",
+           "contextYear": 1954,
+           "contextImage": "https://.../dbp.jpg",
+           "contextSummary": "Chiến thắng lừng lẫy năm châu, chấn động địa cầu năm 1954",
+           "scope": "GLOBAL"
+         }
+       ],
+       "pagination": { "page": 1, "size": 20, "totalElements": 1, "totalPages": 1 }
+     }
+     ```
+
+2. **Khởi tạo phiên chat với nhân vật (kèm hoặc không kèm bối cảnh):**
    - **Method:** `POST`
    - **Endpoint:** `/api/v1/chat/sessions`
+   - **Lưu ý Ràng buộc Lịch sử:** Nếu truyền `contextId`, nhân vật (`characterId`) **bắt buộc phải có tham gia vào bối cảnh đó** (nằm trong danh sách `GET /api/v1/chat/scenarios` hoặc `character.events`). Nếu ghép sai (VD: Lý Thường Kiệt với Chiến dịch Điện Biên Phủ), Backend sẽ chặn với lỗi `400 Bad Request` (`Nhân vật lịch sử này không tham gia vào bối cảnh/sự kiện đã chọn!`).
    - **Request Body:**
      ```json
      {
-       "characterId": "7c12f4b0-3d89-4a92-b432-11a5b8e90c23"
+       "characterId": "7c12f4b0-3d89-4a92-b432-11a5b8e90c23",
+       "contextId": "b8a9c04d-e910-4123-c345-d4e5f6a7b8c9"
      }
      ```
-   - **Response (`201 Created`):** Nhận về `sessionId` (VD: `d94c34e2-8f90-4823-b2c3-112233445566`). Frontend lưu lại `sessionId` này để dùng cho bước nộp bài.
+   - **Response (`201 Created`):** Nhận về `sessionId` (VD: `d94c34e2-8f90-4823-b2c3-112233445566`).
 
-2. **Gửi tin nhắn trò chuyện (Stream SSE hoặc Standard REST):**
+3. **Gửi tin nhắn trò chuyện (Stream SSE hoặc Standard REST):**
    - **Stream SSE:** `POST /api/v1/chat/messages/stream` (Nhận AI stream phản hồi theo thời gian thực)
    - **Standard REST:** `POST /api/v1/chat/messages`
    - **Request Body:**
@@ -638,14 +676,14 @@ Học sinh cần trò chuyện với nhân vật lịch sử để tích lũy s�
      }
      ```
 
-3. **Lấy lịch sử tin nhắn của phiên chat:**
+4. **Lấy lịch sử tin nhắn của phiên chat:**
    - **Method:** `GET`
    - **Endpoint:** `/api/v1/chat/sessions/{sessionId}/messages`
 
-4. **Nộp bài tập:**
+5. **Nộp bài tập:**
    - **Method:** `POST`
    - **Endpoint:** `/api/v1/student/assignments/{assignmentId}/submit`
-   - **Request Body:** `{ "chatSessionId": "d94c34e2-8f90-4823-b2c3-112233445566" }`
+   - **Request Body (Tùy chọn):** Không cần truyền body (hoặc `{}`), hệ thống tự động tìm phiên chat mới nhất của học sinh với nhân vật được giao. Nếu muốn chỉ định phiên chat cụ thể: `{ "chatSessionId": "d94c34e2-8f90-4823-b2c3-112233445566" }`.
 
 ---
 
@@ -675,7 +713,7 @@ Học sinh làm và nộp bài trắc nghiệm thông qua bộ API Quiz có sẵ
 3. **Nộp bài tập cho lớp học:**
    - **Method:** `POST`
    - **Endpoint:** `/api/v1/student/assignments/{assignmentId}/submit`
-   - **Request Body:** `{ "quizSessionId": "c83b23e1-7e89-4912-a1b2-998877665544" }`
+   - **Request Body (Tùy chọn):** Không cần truyền body (hoặc `{}`), hệ thống tự động lấy kết quả từ phiên làm bài Quiz đã hoàn thành của học sinh. Nếu muốn chỉ định phiên cụ thể: `{ "quizSessionId": "c83b23e1-7e89-4912-a1b2-998877665544" }`.
 
 ---
 

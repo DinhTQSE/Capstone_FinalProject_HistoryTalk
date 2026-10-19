@@ -4,10 +4,14 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.localcontent.LocalContentResponse;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.historicalContext.HistoricalContext;
+import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
+import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.LocalCharacterRepository;
 import com.historytalk.repository.LocalContextRepository;
+import com.historytalk.repository.UserRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +44,7 @@ public class StudentLocalContentController {
 
     private final LocalContextRepository localContextRepository;
     private final LocalCharacterRepository localCharacterRepository;
+    private final UserRepository userRepository;
 
     @GetMapping("/contexts")
     @Operation(
@@ -77,10 +82,19 @@ public class StudentLocalContentController {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private UUID resolveSchoolId(UserPrincipal principal) {
-        if (principal.getSchoolId() == null) {
+        if (principal != null && principal.getSchoolId() != null) {
+            return principal.getSchoolId();
+        }
+        String userId = (principal != null) ? principal.getUid() : SecurityUtils.getUserId();
+        if (userId == null) {
+            throw new UnauthorizedException("Vui lòng đăng nhập với tài khoản Học sinh");
+        }
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản học sinh"));
+        if (user.getSchool() == null) {
             throw new InvalidRequestException("Tài khoản học sinh chưa được liên kết với trường học");
         }
-        return principal.getSchoolId();
+        return user.getSchool().getId();
     }
 
     private LocalContentResponse mapContext(HistoricalContext ctx) {
