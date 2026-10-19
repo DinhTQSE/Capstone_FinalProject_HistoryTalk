@@ -131,6 +131,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         }
 
         int totalQuota = resolvePackageTokens(request.getPackageType());
+        java.time.LocalDate today = java.time.LocalDate.now();
+        int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
+        java.time.LocalDate subStart = java.time.LocalDate.of(academicStartYear, 9, 1);
+        java.time.LocalDate subEnd = java.time.LocalDate.of(academicStartYear + 1, 5, 31);
+        int defaultDailyQuota = request.getPackageType() != null ? request.getPackageType().getDefaultDailyQuota() : 1000;
 
         School school = School.builder()
                 .name(request.getName().trim())
@@ -141,11 +146,16 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .packageType(request.getPackageType())
                 .totalSchoolTokenQuota(totalQuota)
                 .unallocatedTokenQuota(totalQuota)
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
+                .renewedForNextYear(false)
+                .defaultDailyStudentQuota(defaultDailyQuota)
                 .localHistoryPolicyAccepted(true)
                 .build();
 
         School savedSchool = schoolRepository.save(school);
-        log.info("Created new school: {} ({}) with quota: {} tokens", savedSchool.getName(), savedSchool.getSchoolCode(), totalQuota);
+        log.info("Created new school: {} ({}) with quota: {} tokens ({} to {})",
+                savedSchool.getName(), savedSchool.getSchoolCode(), totalQuota, subStart, subEnd);
 
         return mapToSchoolResponse(savedSchool);
     }
@@ -384,8 +394,14 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .contactEmail(school.getContactEmail())
                 .contactPhone(school.getContactPhone())
                 .packageType(school.getPackageType())
+                .recommendedStudents(school.getPackageType() != null ? school.getPackageType().getRecommendedStudents() : null)
                 .totalSchoolTokenQuota(school.getTotalSchoolTokenQuota())
                 .unallocatedTokenQuota(school.getUnallocatedTokenQuota())
+                .defaultDailyStudentQuota(school.getDefaultDailyStudentQuota())
+                .subscriptionStartDate(school.getSubscriptionStartDate())
+                .subscriptionEndDate(school.getSubscriptionEndDate())
+                .renewedForNextYear(school.getRenewedForNextYear())
+                .nextPackageType(school.getNextPackageType())
                 .localHistoryPolicyAccepted(school.getLocalHistoryPolicyAccepted())
                 .status(school.getStatus())
                 .createdAt(school.getCreatedAt() != null ? school.getCreatedAt() : java.time.LocalDateTime.now())

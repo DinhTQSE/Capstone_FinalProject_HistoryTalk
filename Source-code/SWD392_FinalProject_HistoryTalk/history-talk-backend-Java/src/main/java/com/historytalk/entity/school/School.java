@@ -13,6 +13,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +60,24 @@ public class School {
     @Builder.Default
     @Column(name = "unallocated_token_quota", nullable = false)
     private Integer unallocatedTokenQuota = 0;
+
+    @Column(name = "subscription_start_date")
+    private LocalDate subscriptionStartDate;
+
+    @Column(name = "subscription_end_date")
+    private LocalDate subscriptionEndDate;
+
+    @Builder.Default
+    @Column(name = "renewed_for_next_year", nullable = false)
+    private Boolean renewedForNextYear = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "next_package_type", length = 50)
+    private EnterprisePackage nextPackageType;
+
+    @Builder.Default
+    @Column(name = "default_daily_student_quota", nullable = false)
+    private Integer defaultDailyStudentQuota = 1000;
 
     @Builder.Default
     @Column(name = "local_history_policy_accepted", nullable = false)
