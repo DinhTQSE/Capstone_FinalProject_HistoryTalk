@@ -38,6 +38,8 @@ public class SystemAdminComprehensiveDashboardResponse {
     @Builder
     public static class TokenConsumptionSummary {
         private long totalTokensB2bAllocated;
+        private long totalTokensB2bRemainingInPools;
+        private long totalTokensB2bConsumed;
         private long totalTokensB2cConsumed;
         private long totalTokensSystemConsumed;
     }
@@ -60,6 +62,8 @@ public class SystemAdminComprehensiveDashboardResponse {
     @Builder
     public static class PlatformOverview {
         private long totalSchools;
+        private long activeSchools;
+        private long expiredSchools;
         private long totalUsers;
         private long totalQuizzes;
         private long totalRevenue;

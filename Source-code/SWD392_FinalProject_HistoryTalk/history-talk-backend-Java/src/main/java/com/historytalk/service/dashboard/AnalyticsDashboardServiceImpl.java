@@ -48,6 +48,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     private final MessageRepository messageRepository;
     private final PaymentOrderRepository paymentOrderRepository;
     private final UserTierRepository userTierRepository;
+    private final com.historytalk.repository.school.TokenBoostRequestRepository tokenBoostRequestRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -64,6 +65,10 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         int unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
         int allocated = Math.max(0, totalQuota - unallocated);
         long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(schoolId);
+        int defaultDailyQuota = school.getDefaultDailyStudentQuota() != null ? school.getDefaultDailyStudentQuota() : 1000;
+        long pendingBoostRequests = tokenBoostRequestRepository != null
+                ? tokenBoostRequestRepository.countBySchool_IdAndStatus(schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
+                : 0L;
 
         // Assignment progress distribution
         SchoolAdminDashboardResponse.AssignmentStats assignmentStats = SchoolAdminDashboardResponse.AssignmentStats.builder()
@@ -77,6 +82,13 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .schoolId(school.getId())
                 .schoolName(school.getName())
                 .schoolCode(school.getSchoolCode())
+                .packageType(school.getPackageType())
+                .recommendedStudents(school.getPackageType() != null ? school.getPackageType().getRecommendedStudents() : null)
+                .status(school.getStatus())
+                .subscriptionStartDate(school.getSubscriptionStartDate())
+                .subscriptionEndDate(school.getSubscriptionEndDate())
+                .renewedForNextYear(school.getRenewedForNextYear())
+                .nextPackageType(school.getNextPackageType())
                 .totalClassrooms(totalClassrooms)
                 .totalTeachers(totalTeachers)
                 .totalStudents(totalStudents)
@@ -84,6 +96,8 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .unallocatedTokenQuota(unallocated)
                 .allocatedTokens(allocated)
                 .tokensUsedByStudents(tokensUsedByStudents)
+                .defaultDailyStudentQuota(defaultDailyQuota)
+                .pendingTokenBoostRequests(pendingBoostRequests)
                 .assignmentStats(assignmentStats)
                 .build();
     }
@@ -102,10 +116,25 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             throw new AccessDeniedException("Bạn không có quyền xem dữ liệu của lớp học này!");
         }
 
+        School school = classroom.getSchool();
+        int schoolDefaultDaily = (school != null && school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
+                ? school.getDefaultDailyStudentQuota()
+                : 1000;
+        int classDailyLimit = (classroom.getDailyTokenQuota() != null && classroom.getDailyTokenQuota() > 0)
+                ? classroom.getDailyTokenQuota()
+                : schoolDefaultDaily;
+        int schoolPool = (school != null && school.getUnallocatedTokenQuota() != null)
+                ? Math.max(0, school.getUnallocatedTokenQuota())
+                : Integer.MAX_VALUE;
+        long pendingBoostRequests = tokenBoostRequestRepository != null
+                ? tokenBoostRequestRepository.countByClassroom_IdAndStatus(classId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
+                : 0L;
+
         // Lấy danh sách học sinh thuộc lớp
         List<UUID> studentUids = classStudentRepository.findEnrolledStudentUids(classId);
         long studentCount = studentUids.size();
 
+        LocalDate today = LocalDate.now();
         List<TeacherClassroomDashboardResponse.StudentAnalyticsItem> studentItems = new ArrayList<>();
         if (!studentUids.isEmpty()) {
             List<User> students = userRepository.findAllById(studentUids);
@@ -114,11 +143,25 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 Double avgScore = quizSessionRepository.averageScorePercentageByUser(student.getUid());
                 long aiMessages = messageRepository.countMessagesByUser(student.getUid());
 
+                boolean isSameDay = student.getLastTokenResetAt() != null
+                        && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
+                int usedToday = isSameDay && student.getDailyTokensUsed() != null
+                        ? Math.max(0, student.getDailyTokensUsed())
+                        : 0;
+                int bonusToday = isSameDay && student.getDailyBonusTokens() != null
+                        ? Math.max(0, student.getDailyBonusTokens())
+                        : 0;
+                int effectiveDailyLimit = classDailyLimit + bonusToday;
+                int remainingToday = Math.min(Math.max(0, effectiveDailyLimit - usedToday), schoolPool);
+
                 studentItems.add(TeacherClassroomDashboardResponse.StudentAnalyticsItem.builder()
                         .studentId(student.getUid())
                         .studentCode(student.getStudentCode())
                         .fullName(student.getFullName())
-                        .currentTokens(student.getToken() != null ? student.getToken() : 0)
+                        .dailyTokenLimit(classDailyLimit)
+                        .dailyBonusTokens(bonusToday)
+                        .dailyTokensUsed(usedToday)
+                        .currentTokens(remainingToday)
                         .quizzesAttempted(quizzes)
                         .averageScorePercentage(avgScore != null ? Math.round(avgScore * 10.0) / 10.0 : 0.0)
                         .aiMessagesCount(aiMessages)
@@ -135,6 +178,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .classCode(classroom.getClassCode())
                 .gradeLevel(classroom.getGradeLevel() != null ? classroom.getGradeLevel() : 0)
                 .academicYear(classroom.getAcademicYear() != null ? classroom.getAcademicYear() : 0)
+                .status(classroom.getStatus() != null ? classroom.getStatus() : "ACTIVE")
+                .dailyTokenLimit(classDailyLimit)
+                .pendingTokenBoostRequests(pendingBoostRequests)
                 .studentCount(studentCount)
                 .totalAiMessages(totalAiMessages)
                 .avgAiMessagesPerStudent(Math.round(avgAiMessages * 10.0) / 10.0)
@@ -156,9 +202,37 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         User student = userRepository.findById(studentUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + studentUid));
 
-        String schoolName = student.getSchool() != null ? student.getSchool().getName() : "";
-        int currentTokens = student.getToken() != null ? student.getToken() : 0;
-        long tokensUsedToday = messageRepository.sumTokensUsedByUserSince(studentUid, LocalDate.now().atStartOfDay());
+        School school = student.getSchool();
+        String schoolName = school != null ? school.getName() : "";
+
+        List<Classroom> enrolledClassrooms = classStudentRepository.findClassroomsByStudentUid(studentUid);
+        int baseDailyLimit = (school != null && school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
+                ? school.getDefaultDailyStudentQuota()
+                : 1000;
+        for (Classroom c : enrolledClassrooms) {
+            if ("ACTIVE".equalsIgnoreCase(c.getStatus()) && c.getDailyTokenQuota() != null && c.getDailyTokenQuota() > 0) {
+                baseDailyLimit = c.getDailyTokenQuota();
+                break;
+            }
+        }
+
+        LocalDate today = LocalDate.now();
+        boolean isSameDay = student.getLastTokenResetAt() != null
+                && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
+        int bonusToday = isSameDay && student.getDailyBonusTokens() != null
+                ? Math.max(0, student.getDailyBonusTokens())
+                : 0;
+        long queriedTokensUsedToday = messageRepository.sumTokensUsedByUserSince(studentUid, today.atStartOfDay());
+        int trackedUsedToday = isSameDay && student.getDailyTokensUsed() != null
+                ? Math.max(0, student.getDailyTokensUsed())
+                : 0;
+        long tokensUsedToday = Math.max(queriedTokensUsedToday, trackedUsedToday);
+
+        int schoolPool = (school != null && school.getUnallocatedTokenQuota() != null)
+                ? Math.max(0, school.getUnallocatedTokenQuota())
+                : Integer.MAX_VALUE;
+        int remainingDaily = (int) Math.max(0L, (baseDailyLimit + bonusToday) - tokensUsedToday);
+        int currentTokens = Math.min(remainingDaily, schoolPool);
 
         long totalQuizzes = quizSessionRepository.countByUser_UidAndEndTimeIsNotNullAndDeletedAtIsNull(studentUid);
         Double avgScore = quizSessionRepository.averageScorePercentageByUser(studentUid);
@@ -173,12 +247,13 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                         .build())
                 .collect(Collectors.toList());
 
-        List<Classroom> enrolledClassrooms = classStudentRepository.findClassroomsByStudentUid(studentUid);
         List<StudentPersonalDashboardResponse.EnrolledClassroomItem> classroomItems = enrolledClassrooms.stream()
                 .map(c -> StudentPersonalDashboardResponse.EnrolledClassroomItem.builder()
                         .classId(c.getId())
                         .className(c.getClassName())
                         .classCode(c.getClassCode())
+                        .academicYear(c.getAcademicYear())
+                        .status(c.getStatus() != null ? c.getStatus() : "ACTIVE")
                         .teacherName(c.getTeacher() != null ? c.getTeacher().getFullName() : "")
                         .build())
                 .collect(Collectors.toList());
@@ -188,6 +263,8 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .studentName(student.getFullName())
                 .studentCode(student.getStudentCode())
                 .schoolName(schoolName)
+                .dailyTokenLimit(baseDailyLimit)
+                .dailyBonusTokens(bonusToday)
                 .currentTokens(currentTokens)
                 .tokensUsedToday(tokensUsedToday)
                 .totalQuizzesAttempted(totalQuizzes)
@@ -312,14 +389,18 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                         .uptimeSeconds(uptimeSeconds)
                         .build();
 
-        // 2. Token consumption summary
+        // 2. Token consumption summary (B2B Shared Pools vs B2C)
         long b2bAllocated = schoolRepository.sumTotalSchoolTokenQuota();
+        long b2bRemainingInPools = schoolRepository.sumUnallocatedSchoolTokenQuota();
         long b2cConsumed = messageRepository.sumTokensUsedByCustomerUsers();
         long systemConsumed = messageRepository.sumAllTokensUsed();
+        long b2bConsumed = Math.max(0L, systemConsumed - b2cConsumed);
 
         SystemAdminComprehensiveDashboardResponse.TokenConsumptionSummary tokenSummary =
                 SystemAdminComprehensiveDashboardResponse.TokenConsumptionSummary.builder()
                         .totalTokensB2bAllocated(b2bAllocated)
+                        .totalTokensB2bRemainingInPools(b2bRemainingInPools)
+                        .totalTokensB2bConsumed(b2bConsumed)
                         .totalTokensB2cConsumed(b2cConsumed)
                         .totalTokensSystemConsumed(systemConsumed)
                         .build();
@@ -338,8 +419,10 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                         .build())
                 .collect(Collectors.toList());
 
-        // 4. Platform Overview
+        // 4. Platform Overview (including Active vs Expired Schools)
         long totalSchools = schoolRepository.count();
+        long activeSchools = schoolRepository.countByStatusAndDeletedAtIsNull(com.historytalk.entity.enums.SchoolStatus.ACTIVE);
+        long expiredSchools = schoolRepository.countByStatusAndDeletedAtIsNull(com.historytalk.entity.enums.SchoolStatus.EXPIRED);
         long totalUsers = userRepository.countAllUsers();
         long totalQuizzes = quizRepository.count();
         long totalRevenue = paymentOrderRepository.sumAmountByStatus(PaymentOrderStatus.PAID);
@@ -347,6 +430,8 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         SystemAdminComprehensiveDashboardResponse.PlatformOverview platformOverview =
                 SystemAdminComprehensiveDashboardResponse.PlatformOverview.builder()
                         .totalSchools(totalSchools)
+                        .activeSchools(activeSchools)
+                        .expiredSchools(expiredSchools)
                         .totalUsers(totalUsers)
                         .totalQuizzes(totalQuizzes)
                         .totalRevenue(totalRevenue)
