@@ -74,19 +74,23 @@ class DailyTokenAllowanceServiceImplTest {
     }
 
     @Test
-    @DisplayName("US-SP7-15: Lazy daily reset refunds unused yesterday tokens to school pool and allocates today's daily limit")
-    void verifyAndPrepareDailyAllowance_FirstCallToday_RefundsAndAllocates() {
+    @DisplayName("US-SP7-15: New day resets daily usage counter without withdrawing tokens upfront from school pool")
+    void verifyAndPrepareDailyAllowance_FirstCallToday_ResetsCountersWithoutUpfrontPoolDeduction() {
+        activeStudent.setDailyTokensUsed(600);
+        activeStudent.setDailyBonusTokens(500);
         when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
                 .thenReturn(Collections.emptyList());
 
         int available = dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(activeStudent);
 
         assertEquals(1_000, available);
+        assertEquals(0, activeStudent.getDailyTokensUsed());
+        assertEquals(0, activeStudent.getDailyBonusTokens());
         assertEquals(1_000, activeStudent.getToken());
-        // Pool was 100,000 + 400 refunded - 1,000 allocated = 99,400
-        assertEquals(99_400, activeSchool.getUnallocatedTokenQuota());
+        // Pure Shared Pool: school pool remains 100,000 until student actually chats with AI
+        assertEquals(100_000, activeSchool.getUnallocatedTokenQuota());
         assertEquals(LocalDate.now(), activeStudent.getLastTokenResetAt().toLocalDate());
-        verify(schoolRepository).save(activeSchool);
+        verify(schoolRepository, never()).save(activeSchool);
         verify(userRepository).save(activeStudent);
     }
 
@@ -105,14 +109,36 @@ class DailyTokenAllowanceServiceImplTest {
         int available = dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(activeStudent);
 
         assertEquals(2_500, available);
-        assertEquals(100_000 + 400 - 2_500, activeSchool.getUnallocatedTokenQuota());
+        assertEquals(100_000, activeSchool.getUnallocatedTokenQuota());
     }
 
     @Test
-    @DisplayName("US-SP7-15: Second call on same day does not reset allowance again")
-    void verifyAndPrepareDailyAllowance_SameDay_NoReset() {
-        activeStudent.setToken(650);
+    @DisplayName("US-SP7-15: recordStudentTokenUsage deducts directly from school shared pool and increments dailyTokensUsed")
+    void recordStudentTokenUsage_DeductsDirectlyFromSchoolPool() {
+        activeStudent.setDailyTokensUsed(200);
+        activeStudent.setDailyBonusTokens(0);
         activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
+                .thenReturn(Collections.emptyList());
+
+        int remainingToday = dailyTokenAllowanceService.recordStudentTokenUsage(activeStudent, 150);
+
+        assertEquals(350, activeStudent.getDailyTokensUsed());
+        assertEquals(650, remainingToday);
+        assertEquals(650, activeStudent.getToken());
+        assertEquals(99_850, activeSchool.getUnallocatedTokenQuota());
+        verify(schoolRepository).save(activeSchool);
+        verify(userRepository).save(activeStudent);
+    }
+
+    @Test
+    @DisplayName("US-SP7-15: Second call on same day returns remaining daily limit without resetting")
+    void verifyAndPrepareDailyAllowance_SameDay_NoReset() {
+        activeStudent.setDailyTokensUsed(350);
+        activeStudent.setDailyBonusTokens(0);
+        activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
+                .thenReturn(Collections.emptyList());
 
         int available = dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(activeStudent);
 
@@ -122,10 +148,13 @@ class DailyTokenAllowanceServiceImplTest {
     }
 
     @Test
-    @DisplayName("US-SP7-14: Out of tokens throws AI_QUOTA_EXCEEDED when daily limit and school pool are exhausted")
+    @DisplayName("US-SP7-14: Out of tokens throws AI_QUOTA_EXCEEDED when daily limit or school pool is exhausted")
     void verifyAndPrepareDailyAllowance_Exhausted_ThrowsAiQuotaExceeded() {
-        activeStudent.setToken(0);
+        activeStudent.setDailyTokensUsed(1_000);
+        activeStudent.setDailyBonusTokens(0);
         activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
+                .thenReturn(Collections.emptyList());
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(activeStudent));

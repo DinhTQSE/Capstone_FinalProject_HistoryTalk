@@ -88,9 +88,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
             throw new InvalidRequestException("Gói gia hạn năm học mới chỉ được kích hoạt bắt đầu từ ngày 01/09.");
         }
 
-        // Reclaim any remaining student daily tokens before calculating 20% rollover
-        long reclaimed = reclaimAllStudentTokensToPool(school);
-
+        // Pure Shared Pool: All unspent tokens are already inside school.unallocatedTokenQuota.
         int remainingOldPool = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
         int rolloverTokens = (int) Math.floor(remainingOldPool * MAX_ROLLOVER_RATE);
 
@@ -112,8 +110,8 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         school.setStatus(SchoolStatus.ACTIVE);
 
         School saved = schoolRepository.save(school);
-        log.info("Activated new academic year subscription for school {} ({} to {}): reclaimed={}, rollover20%={}, newTotal={}",
-                school.getSchoolCode(), newStart, newEnd, reclaimed, rolloverTokens, newTotalQuota);
+        log.info("Activated new academic year subscription for school {} ({} to {}): rollover20%={}, newTotal={}",
+                school.getSchoolCode(), newStart, newEnd, rolloverTokens, newTotalQuota);
 
         return mapToSchoolResponse(saved);
     }
@@ -199,29 +197,29 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         }
         classroomRepository.saveAll(oldYearClasses);
 
-        // Reclaim all daily tokens remaining on student accounts back to the School Shared Pool
-        long reclaimedTokens = reclaimAllStudentTokensToPool(school);
+        // Reset daily counters on student accounts (tokens remain 100% in school.unallocatedTokenQuota)
+        resetAllStudentDailyCounters(school);
 
         // Deactivate graduated Grade 12 students so they cannot log in anymore
         int deactivatedCount = 0;
         for (UUID gradUid : graduatedStudentUids) {
             User student = userRepository.findById(gradUid).orElse(null);
             if (student != null && student.getAccountStatus() != AccountStatus.DEACTIVATED) {
-                deactivateStudentInternal(student, school, "GRADUATED_GRADE_12");
+                deactivateStudentInternal(student, "GRADUATED_GRADE_12");
                 deactivatedCount++;
             }
         }
 
         schoolRepository.save(school);
 
-        log.info("Academic year rollover completed for school {} (year {}): archivedClasses={}, reclaimedTokens={}, deactivatedGraduates={}",
-                school.getSchoolCode(), request.getCompletedAcademicYear(), archivedCount, reclaimedTokens, deactivatedCount);
+        log.info("Academic year rollover completed for school {} (year {}): archivedClasses={}, deactivatedGraduates={}, remainingPool={}",
+                school.getSchoolCode(), request.getCompletedAcademicYear(), archivedCount, deactivatedCount, school.getUnallocatedTokenQuota());
 
         return AcademicYearRolloverResponse.builder()
                 .schoolId(schoolId)
                 .completedAcademicYear(request.getCompletedAcademicYear())
                 .archivedClassroomsCount(archivedCount)
-                .reclaimedTokensToPool(reclaimedTokens)
+                .reclaimedTokensToPool(0L)
                 .deactivatedGraduatedStudentsCount(deactivatedCount)
                 .remainingSchoolTokenPool(school.getUnallocatedTokenQuota())
                 .build();
@@ -245,8 +243,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
             throw new AccessDeniedException("Học sinh không thuộc trường của bạn.");
         }
 
-        deactivateStudentInternal(student, school, request.getReason().trim());
-        schoolRepository.save(school);
+        deactivateStudentInternal(student, request.getReason().trim());
         User saved = userRepository.save(student);
 
         log.info("Deactivated student {} ({}) in school {} for reason: {}",
@@ -270,33 +267,23 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
                 .build();
     }
 
-    private long reclaimAllStudentTokensToPool(School school) {
+    private void resetAllStudentDailyCounters(School school) {
         List<User> students = userRepository.findBySchoolIdAndRoleAndDeletedAtIsNull(
                 school.getId(), UserRole.SCHOOL_STUDENT);
-        long totalReclaimed = 0L;
-        for (User s : students) {
-            int remaining = s.getToken() != null ? Math.max(0, s.getToken()) : 0;
-            if (remaining > 0) {
-                totalReclaimed += remaining;
+        if (!students.isEmpty()) {
+            for (User s : students) {
                 s.setToken(0);
+                s.setDailyTokensUsed(0);
+                s.setDailyBonusTokens(0);
             }
-        }
-        if (totalReclaimed > 0) {
-            int currentPool = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
-            school.setUnallocatedTokenQuota((int) Math.min(Integer.MAX_VALUE, currentPool + totalReclaimed));
             userRepository.saveAll(students);
         }
-        return totalReclaimed;
     }
 
-    private void deactivateStudentInternal(User student, School school, String reason) {
-        int remainingTokens = student.getToken() != null ? Math.max(0, student.getToken()) : 0;
-        if (remainingTokens > 0) {
-            int currentPool = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
-            school.setUnallocatedTokenQuota(currentPool + remainingTokens);
-            student.setToken(0);
-        }
-
+    private void deactivateStudentInternal(User student, String reason) {
+        student.setToken(0);
+        student.setDailyTokensUsed(0);
+        student.setDailyBonusTokens(0);
         student.setAccountStatus(AccountStatus.DEACTIVATED);
         student.setDeactivatedReason(reason);
         student.setDeletedAt(LocalDateTime.now());

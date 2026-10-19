@@ -192,8 +192,9 @@ class TokenBoostRequestServiceImplTest {
 
         assertEquals(TokenBoostRequestStatus.APPROVED, response.getStatus());
         assertEquals(1000, response.getApprovedTokens());
+        assertEquals(1000, student.getDailyBonusTokens());
         assertEquals(1000, student.getToken());
-        assertEquals(49_000, school.getUnallocatedTokenQuota());
+        assertEquals(50_000, school.getUnallocatedTokenQuota());
     }
 
     @Test

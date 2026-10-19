@@ -96,6 +96,14 @@ public class User {
     @Column(name = "token", nullable = false)
     private Integer token = 0;
 
+    @Builder.Default
+    @Column(name = "daily_tokens_used", nullable = false)
+    private Integer dailyTokensUsed = 0;
+
+    @Builder.Default
+    @Column(name = "daily_bonus_tokens", nullable = false)
+    private Integer dailyBonusTokens = 0;
+
     @Column(name = "last_active_date")
     private LocalDateTime lastActiveDate;
 

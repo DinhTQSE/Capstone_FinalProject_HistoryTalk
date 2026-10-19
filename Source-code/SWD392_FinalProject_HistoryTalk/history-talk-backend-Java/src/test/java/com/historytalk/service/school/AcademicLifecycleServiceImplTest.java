@@ -125,8 +125,6 @@ class AcademicLifecycleServiceImplTest {
         school.setUnallocatedTokenQuota(1_000_000); // 20% rollover = 200,000
 
         when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
-        when(userRepository.findBySchoolIdAndRoleAndDeletedAtIsNull(school.getId(), UserRole.SCHOOL_STUDENT))
-                .thenReturn(Collections.emptyList());
         when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
 
         SchoolResponse response = academicLifecycleService.activateRenewedSubscription(
@@ -208,15 +206,15 @@ class AcademicLifecycleServiceImplTest {
         assertEquals(2, response.getArchivedClassroomsCount());
         assertEquals("ARCHIVED", grade10.getStatus());
         assertEquals("ARCHIVED", grade12.getStatus());
-        assertEquals(500L, response.getReclaimedTokensToPool());
+        assertEquals(0L, response.getReclaimedTokensToPool());
         assertEquals(1, response.getDeactivatedGraduatedStudentsCount());
         assertEquals(AccountStatus.DEACTIVATED, gradStudent.getAccountStatus());
         assertNotNull(gradStudent.getDeletedAt());
-        assertEquals(1_000_500, response.getRemainingSchoolTokenPool());
+        assertEquals(1_000_000, response.getRemainingSchoolTokenPool());
     }
 
     @Test
-    @DisplayName("US-SP7-18: Deactivating transferred student reclaims tokens and blocks login")
+    @DisplayName("US-SP7-18: Deactivating transferred student blocks login while keeping school shared pool intact")
     void deactivateStudentAccount_Success() {
         User student = User.builder()
                 .uid(UUID.randomUUID())
@@ -247,6 +245,6 @@ class AcademicLifecycleServiceImplTest {
         assertEquals(AccountStatus.DEACTIVATED, student.getAccountStatus());
         assertEquals("TRANSFERRED_SCHOOL", student.getDeactivatedReason());
         assertNotNull(student.getDeletedAt());
-        assertEquals(1_000_800, school.getUnallocatedTokenQuota());
+        assertEquals(1_000_000, school.getUnallocatedTokenQuota());
     }
 }
