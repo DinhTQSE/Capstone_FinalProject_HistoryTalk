@@ -171,6 +171,53 @@ class ClassroomImportProcessorTest {
     }
 
     @Test
+    @DisplayName("Import CSV: Học sinh đang ACTIVE ở lớp khác -> Báo lỗi dòng, không cho vào lớp thứ 2")
+    void testProcessImport_AlreadyInAnotherActiveClassroom_ReportsError() {
+        String csv = "student_code,full_name,email,dob,gender,phone_number,password,additional_token\n"
+                + "HS001,Trần Bảo Nam,,2009-05-15,MALE,0912345601,,0\n";
+        MockMultipartFile file = new MockMultipartFile("file", "students.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+        User existingStudent = User.builder()
+                .uid(UUID.randomUUID())
+                .studentCode("HS001")
+                .userName("cva_hs_hs001")
+                .fullName("Trần Bảo Nam")
+                .email("nam@cva.edu.vn")
+                .school(school)
+                .role(UserRole.SCHOOL_STUDENT)
+                .build();
+
+        Classroom otherActiveClassroom = Classroom.builder()
+                .id(UUID.randomUUID())
+                .school(school)
+                .className("10A2")
+                .classCode("CVA-10A2-2026")
+                .academicYear(2026)
+                .status("ACTIVE")
+                .build();
+
+        StudentImportContext context = StudentImportContext.builder()
+                .schoolId(schoolId)
+                .classroomId(classroomId)
+                .defaultInitialToken(10000)
+                .build();
+
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(userRepository.findBySchoolIdAndStudentCodeIgnoreCase(schoolId, "HS001")).thenReturn(Optional.of(existingStudent));
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomId, existingStudent.getUid())).thenReturn(Optional.empty());
+        when(classStudentRepository.findActiveClassroomsByStudentUid(existingStudent.getUid()))
+                .thenReturn(java.util.List.of(otherActiveClassroom));
+
+        StudentImportResultDto result = processor.processImport(file, context);
+
+        assertEquals(0, result.getSuccessCount());
+        assertEquals(1, result.getFailureCount());
+        assertTrue(result.getErrors().get(0).getMessage().contains("10A2"));
+        verify(classStudentRepository, never()).save(any(ClassStudent.class));
+    }
+
+    @Test
     @DisplayName("Import CSV: Học sinh mới tinh -> Tạo tài khoản, trừ token trường và gán vào lớp")
     void testProcessImport_NewStudent_CreatesAndEnrollsAndDeductsTokens() {
         String csv = "student_code,full_name,email,dob,gender,phone_number,password,additional_token\n"

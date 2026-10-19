@@ -78,18 +78,31 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
             }
 
             Optional<ClassStudent> existingOpt = classStudentRepository.findByClassroomIdAndStudentUid(classroomId, studentId);
+            if (existingOpt.isPresent() && "ACTIVE".equals(existingOpt.get().getStatus())) {
+                alreadyEnrolledCount++;
+                notes.add(String.format("Học sinh %s (%s) đã có trong lớp", student.getFullName(), student.getStudentCode()));
+                continue;
+            }
+
+            List<Classroom> activeClassrooms = classStudentRepository.findActiveClassroomsByStudentUid(studentId);
+            Optional<Classroom> otherActiveClassOpt = activeClassrooms.stream()
+                    .filter(c -> !c.getId().equals(classroomId))
+                    .findFirst();
+            if (otherActiveClassOpt.isPresent()) {
+                Classroom otherClass = otherActiveClassOpt.get();
+                alreadyEnrolledCount++;
+                notes.add(String.format(
+                        "Học sinh %s (%s) đang học ở lớp %s (mỗi học sinh chỉ được ở 1 lớp đang hoạt động, vui lòng dùng tính năng Chuyển lớp)",
+                        student.getFullName(), student.getStudentCode(), otherClass.getClassName()));
+                continue;
+            }
+
             if (existingOpt.isPresent()) {
                 ClassStudent existing = existingOpt.get();
-                if ("ACTIVE".equals(existing.getStatus())) {
-                    alreadyEnrolledCount++;
-                    notes.add(String.format("Học sinh %s (%s) đã có trong lớp", student.getFullName(), student.getStudentCode()));
-                    continue;
-                } else {
-                    existing.setStatus("ACTIVE");
-                    classStudentRepository.save(existing);
-                    successCount++;
-                    continue;
-                }
+                existing.setStatus("ACTIVE");
+                classStudentRepository.save(existing);
+                successCount++;
+                continue;
             }
 
             ClassStudent classStudent = ClassStudent.builder()
