@@ -33,6 +33,10 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
             "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'")
     List<Classroom> findClassroomsByStudentUid(@Param("studentUid") UUID studentUid);
 
+    @Query("SELECT cs.classroom FROM ClassStudent cs WHERE cs.student.uid = :studentUid " +
+            "AND cs.classroom.deletedAt IS NULL AND cs.classroom.status = 'ACTIVE' AND cs.status = 'ACTIVE'")
+    List<Classroom> findActiveClassroomsByStudentUid(@Param("studentUid") UUID studentUid);
+
     @Query("SELECT cs FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
             "AND cs.classroom.school.id = :schoolId " +
             "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'")

@@ -18,6 +18,9 @@ public class TeacherClassroomDashboardResponse {
     private String classCode;
     private int gradeLevel;
     private int academicYear;
+    private String status;
+    private int dailyTokenLimit;
+    private long pendingTokenBoostRequests;
     private long studentCount;
 
     // Tương tác AI (Engagement Analytics)
@@ -48,7 +51,10 @@ public class TeacherClassroomDashboardResponse {
         private UUID studentId;
         private String studentCode;
         private String fullName;
-        private int currentTokens;
+        private int dailyTokenLimit;
+        private int dailyBonusTokens;
+        private int dailyTokensUsed;
+        private int currentTokens; // Hạn mức còn được tiêu trong ngày hôm nay
         private long quizzesAttempted;
         private double averageScorePercentage;
         private long aiMessagesCount;

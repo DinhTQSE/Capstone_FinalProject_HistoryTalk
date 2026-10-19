@@ -36,6 +36,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     org.springframework.data.domain.Page<User> findBySchoolIdAndRole(UUID schoolId, UserRole role, org.springframework.data.domain.Pageable pageable);
 
+    List<User> findBySchoolIdAndRoleAndDeletedAtIsNull(UUID schoolId, UserRole role);
+
     long countBySchoolIdAndRole(UUID schoolId, UserRole role);
 
     boolean existsByEmailIgnoreCaseAndUidNot(String email, UUID uid);

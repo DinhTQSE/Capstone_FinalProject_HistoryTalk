@@ -17,14 +17,14 @@ Hệ thống chuyển đổi từ mô hình *"Cấp phát tĩnh 1 lần vô th�
 2. **Phân tách cơ chế Khóa (Two-Level Locking):**
    * **Hết hạn gói (`EXPIRED` / Chưa gia hạn):** **Khóa toàn bộ nền tảng của trường** (chặn mọi tính năng của Giáo viên, Học sinh, School Admin, chỉ mở trang thông tin gia hạn).
    * **Còn hạn gói nhưng Hết Token (`Out of Tokens`):** **Chỉ khóa tính năng AI** (Chat nhân vật lịch sử), toàn bộ các tính năng khác (làm Quiz, đọc tài liệu, giao/nộp bài tập, xem Dashboard) vẫn hoạt động bình thường.
-3. **Quỹ chung + Hạn mức theo Ngày (Shared Pool + Daily Limit):**
-   * Toàn bộ token nằm tại Quỹ chung của trường (`school.unallocatedTokenQuota`).
-   * Mỗi ngày học sinh chỉ được rút tối đa định mức ngày (`dailyTokenLimit`, mặc định `1.000 token/ngày`). Cuối ngày nếu học sinh dùng không hết, phần dư tự động thu hồi về Quỹ chung khi sang ngày mới $\rightarrow$ **Triệt tiêu 100% "token chết" (stranded tokens)** và **chống xài lố cả năm**.
-4. **Luồng Xin & Duyệt thêm Token trong ngày (Daily Boost):**
-   * Học sinh chạm trần hạn mức ngày có thể bấm **"Xin thêm token"** $\rightarrow$ Giáo viên dạy lớp đó (hoặc School Admin) duyệt cấp thêm ngay trong ngày trích từ Quỹ trường.
+3. **100% Quỹ chung + Hạn mức Chi tiêu theo Ngày (Pure Shared Pool + Daily Spending Limit):**
+   * Toàn bộ token của trường nằm cố định tại Quỹ chung (`school.unallocatedTokenQuota`). **Không chia trước token vào tài khoản học sinh đầu ngày và không cần thu hồi cuối ngày.**
+   * Mỗi học sinh có bộ đếm lượng đã dùng trong ngày (`dailyTokensUsed`) và hạn mức được tiêu tối đa trong ngày (`dailyTokenLimit`, mặc định `1.000 token/ngày`). Học sinh chat câu nào thì hệ thống trừ trực tiếp vào `school.unallocatedTokenQuota` và tăng `dailyTokensUsed` câu đó $\rightarrow$ **Triệt tiêu 100% "token chết" (stranded tokens)** và **chống xài lố cả năm**.
+4. **Luồng Xin & Duyệt thêm Hạn mức trong ngày (Daily Boost):**
+   * Học sinh chạm trần hạn mức ngày có thể bấm **"Xin thêm token"** $\rightarrow$ Giáo viên dạy lớp đó (hoặc School Admin) duyệt tăng thêm hạn mức trong ngày (`dailyBonusTokens`), học sinh dùng tới đâu mới trừ từ Quỹ trường tới đó.
 5. **Vòng đời qua các năm học (Academic Year Lifecycle):**
    * **Lên lớp / Đổi lớp:** Kết thúc năm học, lớp cũ chuyển sang `ARCHIVED`. Đầu năm học mới, học sinh được xếp vào lớp mới (`academicYear` mới) trên cùng tài khoản cũ.
-   * **Ra trường / Chuyển trường:** Tài khoản học sinh bị chuyển sang **`DEACTIVATED` (Vô hiệu hóa — khóa đăng nhập hoàn toàn)** và thu hồi toàn bộ hạn mức dư về Quỹ trường.
+   * **Ra trường / Chuyển trường:** Tài khoản học sinh bị chuyển sang **`DEACTIVATED` (Vô hiệu hóa — khóa đăng nhập hoàn toàn)**.
 
 ---
 
@@ -55,74 +55,73 @@ flowchart TD
     CheckSchoolSub -- "Có (Còn hạn)" --> CheckFeatureType{"Loại tính năng đang gọi?"}
 
     CheckFeatureType -- "Non-AI (Làm Quiz, Đọc bài, Giao/Nộp Assignment, Dashboard)" --> AllowNonAI["200 OK: Cho phép sử dụng bình thường 100%"]
-    CheckFeatureType -- "Tính năng AI (Chat Nhân vật Lịch sử)" --> CheckDailyToken{"Kiểm tra Hạn mức Ngày (Daily Token) & Quỹ Trường"}
+    CheckFeatureType -- "Tính năng AI (Chat Nhân vật Lịch sử)" --> CheckDailyToken{"Kiểm tra: dailyTokensUsed < effectiveDailyLimit VÀ schoolPool > 0?"}
 
-    CheckDailyToken -- "Còn hạn mức ngày (> 0)" --> AllowAI["200 OK: Cho phép gọi AI & Trừ token"]
-    CheckDailyToken -- "Hết hạn mức ngày hoặc Quỹ trường = 0" --> BlockAIOnly["403 AI_QUOTA_EXCEEDED: Chỉ khóa tính năng AI (Gợi ý Xin thêm token hoặc Top-up)"]
+    CheckDailyToken -- "Thỏa mãn" --> AllowAI["200 OK: Cho phép gọi AI & Trừ trực tiếp từ Quỹ chung của trường"]
+    CheckDailyToken -- "Đã chạm hạn mức ngày hoặc Quỹ trường = 0" --> BlockAIOnly["403 AI_QUOTA_EXCEEDED: Chỉ khóa tính năng AI (Gợi ý Xin thêm token hoặc Top-up)"]
 ```
 
 ---
 
-## 3. LUỒNG QUỸ CHUNG & HẠN MỨC TOKEN THEO NGÀY (US-SP7-15 & US-SP7-16)
+## 3. LUỒNG 100% QUỸ CHUNG & HẠN MỨC CHI TIÊU THEO NGÀY (US-SP7-15 & US-SP7-16)
 
-### 3.1. Cơ chế Lazy Daily Token Reset & Refund (Không cần chạy Cronjob nặng)
-Thay vì cấp phát cứng cho toàn bộ học sinh (kể cả những em không đăng nhập trong ngày gây giam token), hệ thống sử dụng thuật toán **Lazy Daily Allowance kết hợp Refund**:
+### 3.1. Cơ chế Direct Pool Deduction & Bộ đếm Hạn mức Ngày (Không chia trước, Không cần thu hồi)
+Thay vì chia token vào tài khoản học sinh đầu ngày rồi cuối ngày phải thu hồi, hệ thống áp dụng mô hình **100% Quỹ chung (Pure Shared Pool) kết hợp Bộ đếm Hạn mức Ngày (`dailyTokensUsed`)**:
 
-1. **Khi học sinh gửi tin nhắn AI đầu tiên trong ngày $D$ (`lastTokenResetAt < D.atStartOfDay()`):**
-   * **Bước 1 (Thu hồi dư ngày cũ):** Nếu `user.token > 0` (còn dư từ ngày hôm trước), cộng trả `user.token` về lại `school.unallocatedTokenQuota` và đặt `user.token = 0`.
-   * **Bước 2 (Xác định hạn mức ngày $D$):**
-     $$\text{limit} = \text{ COALESCE}(\text{classroom.dailyTokenQuota}, \text{school.defaultDailyStudentQuota}, 1000)$$
-   * **Bước 3 (Rút hạn mức ngày từ Quỹ chung):**
-     $$\text{allocated} = \min(\text{limit}, \text{school.unallocatedTokenQuota})$$
-     * Nếu $\text{allocated} == 0$: Báo lỗi `403 AI_QUOTA_EXCEEDED` (Trường đã hết sạch Quỹ token chung, cần Top-up).
-     * Nếu $\text{allocated} > 0$: Trừ `allocated` khỏi `school.unallocatedTokenQuota`, gán `user.token = allocated`, cập nhật `user.lastTokenResetAt = LocalDateTime.now()`.
-2. **Trong cùng ngày $D$ (`lastTokenResetAt >= D.atStartOfDay()`):**
-   * Khấu trừ trực tiếp vào `user.token` theo lượng token thực tế của cuộc hội thoại AI.
-   * Nếu `user.token <= 0`: Chặn cuộc gọi AI tiếp theo và hiển thị nút **"Xin thêm Token hôm nay"**.
+1. **Khi học sinh gửi tin nhắn AI đầu tiên trong ngày mới $D$ (`lastTokenResetAt < D.atStartOfDay()`):**
+   * Hệ thống chỉ đặt lại bộ đếm trong ngày của học sinh: `user.dailyTokensUsed = 0`, `user.dailyBonusTokens = 0`, `user.lastTokenResetAt = LocalDateTime.now()`.
+   * **Không rút trước bất kỳ token nào từ `school.unallocatedTokenQuota`**.
+2. **Kiểm tra điều kiện trước khi gọi AI:**
+   * Xác định hạn mức tối đa học sinh được phép tiêu hôm nay:
+     $$\text{effectiveDailyLimit} = \text{COALESCE}(\text{classroom.dailyTokenQuota}, \text{school.defaultDailyStudentQuota}, 1000) + \text{user.dailyBonusTokens}$$
+   * Số lượng còn được phép tiêu hôm nay:
+     $$\text{availableToday} = \min(\max(0, \text{effectiveDailyLimit} - \text{user.dailyTokensUsed}), \text{school.unallocatedTokenQuota})$$
+   * Nếu $\text{availableToday} \le 0$: Chặn cuộc gọi AI với mã `403 AI_QUOTA_EXCEEDED` (các tính năng Quiz/Tài liệu/Bài tập vẫn mở bình thường).
+3. **Sau khi AI phản hồi (`tokensUsed`):**
+   * Trừ trực tiếp `tokensUsed` vào Quỹ chung của trường: `school.unallocatedTokenQuota -= tokensUsed`.
+   * Tăng bộ đếm đã dùng trong ngày của học sinh: `user.dailyTokensUsed += tokensUsed`.
 
-### 3.2. Sequence Diagram: Học sinh Chat AI với Hạn mức Ngày
+### 3.2. Sequence Diagram: Học sinh Chat AI Trừ Trực tiếp vào Quỹ Chung
 
 ```mermaid
 sequenceDiagram
     actor Student as Học sinh (ROLE_STUDENT)
-    participant ChatCtrl as ChatController
-    participantGuard as DailyTokenAllowanceService
+    participant ChatCtrl as MessageServiceImpl
+    participant Guard as DailyTokenAllowanceService
     participant DB as PostgreSQL (School & User)
     participant AI as HistoryTalk AI Service
 
     Student->>ChatCtrl: POST /api/v1/chat/messages
-    ChatCtrl->>participantGuard: verifyAndPrepareDailyAllowance(studentUid)
-    participantGuard->>DB: SELECT user, school FOR UPDATE
+    ChatCtrl->>Guard: verifyAndPrepareDailyAllowance(student)
     alt Gói trường hết hạn (ngoài 01/09 - 31/05 hoặc EXPIRED)
-        participantGuard-->>ChatCtrl: Throw 403 SCHOOL_SUBSCRIPTION_EXPIRED
+        Guard-->>ChatCtrl: Throw 403 SCHOOL_SUBSCRIPTION_EXPIRED
         ChatCtrl-->>Student: 403 Khóa toàn bộ nền tảng trường
-    else Còn hạn gói & Sang ngày mới (lastTokenResetAt < Today 00:00)
-        participantGuard->>DB: Hoàn trả user.token dư (ngày cũ) -> school.unallocatedTokenQuota
-        participantGuard->>DB: Rút min(dailyLimit, unallocatedTokenQuota) -> user.token
-        participantGuard->>DB: Cập nhật lastTokenResetAt = NOW()
+    else Sang ngày mới (lastTokenResetAt < Today 00:00)
+        Guard->>DB: Reset dailyTokensUsed = 0, dailyBonusTokens = 0, lastTokenResetAt = NOW()
     end
 
-    alt user.token <= 0 (Hết hạn mức ngày hoặc Quỹ trường = 0)
-        participantGuard-->>ChatCtrl: Throw 403 AI_QUOTA_EXCEEDED
+    alt dailyTokensUsed >= effectiveDailyLimit HOẶC school.unallocatedTokenQuota <= 0
+        Guard-->>ChatCtrl: Throw 403 AI_QUOTA_EXCEEDED
         ChatCtrl-->>Student: 403 Chỉ khóa tính năng AI (Các tính năng Quiz/Bài tập vẫn mở)
-    else user.token > 0
-        participantGuard-->>ChatCtrl: OK (Available Daily Tokens)
+    else Còn hạn mức ngày & Quỹ trường > 0
+        Guard-->>ChatCtrl: OK (effectiveAvailableToday)
         ChatCtrl->>AI: Gửi prompt tới AI Backend
-        AI-->>ChatCtrl: Trả lời + tokensUsed
-        ChatCtrl->>DB: Trừ user.token = max(0, user.token - tokensUsed)
-        ChatCtrl-->>Student: 200 OK (Nội dung trả lời AI)
+        AI-->>ChatCtrl: Trả lời + totalToken
+        ChatCtrl->>Guard: recordStudentTokenUsage(student, totalToken)
+        Guard->>DB: Trừ trực tiếp school.unallocatedTokenQuota -= totalToken & Tăng student.dailyTokensUsed += totalToken
+        ChatCtrl-->>Student: 200 OK (Nội dung trả lời AI + remainingTokens hôm nay)
     end
 ```
 
 ---
 
-## 4. LUỒNG XIN & DUYỆT THÊM TOKEN TRONG NGÀY (US-SP7-17)
+## 4. LUỒNG XIN & DUYỆT THÊM HẠN MỨC TOKEN TRONG NGÀY (US-SP7-17)
 
 ```mermaid
 sequenceDiagram
     actor Student as Học sinh
     actor Teacher as Giáo viên phụ trách lớp / School Admin
-    participant API as TokenBoostRequestController
+    participant API as SchoolLifecycleAndTokenController
     participant Svc as TokenBoostRequestService
     participant DB as PostgreSQL
 
@@ -138,9 +137,9 @@ sequenceDiagram
     Teacher->>API: PUT /api/v1/teacher/token-requests/{id}/review { action: "APPROVE", approvedTokens: 1000 }
     API->>Svc: reviewBoostRequest(teacherPrincipal, id, reviewDto)
     Svc->>DB: Kiểm tra quyền sở hữu lớp (classroom.teacher_id == teacher.uid)
-    Svc->>DB: Trừ 1000 từ school.unallocatedTokenQuota & Cộng 1000 vào student.token
+    Svc->>DB: Cộng student.dailyBonusTokens += 1000 (Token thực tế vẫn nằm ở Quỹ trường cho tới khi HS chat)
     Svc->>DB: Cập nhật status = APPROVED, reviewedBy = teacher.uid
-    Svc-->>Teacher: 200 OK (Đã cấp thêm 1.000 token trong ngày cho học sinh)
+    Svc-->>Teacher: 200 OK (Đã mở thêm 1.000 hạn mức token trong ngày cho học sinh)
 ```
 
 ---
@@ -152,13 +151,12 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     EndYear["Kết thúc năm học (31/05) hoặc School Admin bấm Chuyển giao năm học"] --> ArchiveClasses["Chuyển tất cả Classroom của năm học cũ: status = ACTIVE -> ARCHIVED"]
-    ArchiveClasses --> ReclaimTokens["Thu hồi toàn bộ user.token dư trong ngày của HS về school.unallocatedTokenQuota"]
-    ReclaimTokens --> CheckStudentType{"Phân loại Học sinh"}
+    ArchiveClasses --> CheckStudentType{"Phân loại Học sinh"}
 
     CheckStudentType -- "Học sinh Khối 10, 11 (Lên lớp / Đổi lớp)" --> KeepActive["Giữ nguyên User (ACTIVE), bảo toàn lịch sử Quiz/Assignment cũ"]
     KeepActive --> NewYear["Đầu năm học mới (01/09): Import / Gán vào Classroom mới (academicYear mới, status = ACTIVE)"]
 
-    CheckStudentType -- "Học sinh Khối 12 Tốt nghiệp / HS Chuyển trường" --> DeactivateUser["Chuyển User: accountStatus = DEACTIVATED, deletedAt = NOW(), token = 0"]
+    CheckStudentType -- "Học sinh Khối 12 Tốt nghiệp / HS Chuyển trường" --> DeactivateUser["Chuyển User: accountStatus = DEACTIVATED, deletedAt = NOW()"]
     DeactivateUser --> BlockAuth["Khóa đăng nhập vĩnh viễn (Login & JWT Filter trả về 403 ACCOUNT_DEACTIVATED)"]
 ```
 
@@ -168,6 +166,6 @@ flowchart TD
    * Năm học `2026`: Học sinh `HS001` thuộc lớp `11A2` (`academicYear = 2026`, `status = ACTIVE`).
    * Khi kiểm tra điều kiện *"Học sinh đã có lớp chưa"* lúc gán lớp hoặc import: Hệ thống chỉ kiểm tra các lớp có `classroom.status == 'ACTIVE'`, cho phép học sinh đã có lớp `ARCHIVED` của năm trước được vào lớp `ACTIVE` của năm mới bình thường.
 2. **Khi Học sinh Ra trường hoặc Chuyển trường (`DEACTIVATED`):**
-   * Thu hồi ngay `user.token` còn lại trong ngày trả về `school.unallocatedTokenQuota`.
+   * Toàn bộ token chưa dùng vốn đã nằm sẵn trong `school.unallocatedTokenQuota` nên không bao giờ bị thất thoát.
    * Đánh dấu `user.accountStatus = DEACTIVATED` (và gán `deletedAt = LocalDateTime.now()`).
    * Tại `AuthServiceImpl.login()` và `JwtAuthenticationFilter`: Nếu phát hiện `user.accountStatus == DEACTIVATED` hoặc `user.deletedAt != null`, từ chối ngay lập tức với lỗi `403 Forbidden ("Tài khoản học sinh đã ngừng hoạt động do đã tốt nghiệp hoặc chuyển trường")`.
