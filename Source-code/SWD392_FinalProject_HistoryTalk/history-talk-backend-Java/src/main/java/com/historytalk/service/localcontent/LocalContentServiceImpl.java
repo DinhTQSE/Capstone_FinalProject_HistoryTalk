@@ -25,6 +25,7 @@ import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.chat.AiServiceClient;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -553,23 +554,42 @@ public class LocalContentServiceImpl implements LocalContentService {
         return c;
     }
 
+    private UserPrincipal resolvePrincipal(UserPrincipal principal) {
+        if (principal != null && principal.getSchoolId() != null) {
+            return principal;
+        }
+        String userId = SecurityUtils.getUserId();
+        if (userId == null) {
+            if (principal != null) {
+                return principal;
+            }
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
+        }
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+        return new UserPrincipal(user);
+    }
+
     private School resolveSchool(UserPrincipal principal) {
-        if (principal.getSchoolId() == null) {
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        if (userPrincipal.getSchoolId() == null) {
             throw new InvalidRequestException("Tài khoản chưa được liên kết với trường học");
         }
-        return schoolRepository.findById(principal.getSchoolId())
+        return schoolRepository.findById(userPrincipal.getSchoolId())
                 .orElseThrow(() -> new ResourceNotFoundException("School not found"));
     }
 
     private UUID resolveSchoolId(UserPrincipal principal) {
-        if (principal.getSchoolId() == null) {
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        if (userPrincipal.getSchoolId() == null) {
             throw new InvalidRequestException("Tài khoản chưa được liên kết với trường học");
         }
-        return principal.getSchoolId();
+        return userPrincipal.getSchoolId();
     }
 
     private User resolveUser(UserPrincipal principal) {
-        return userRepository.findById(UUID.fromString(principal.getUid()))
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        return userRepository.findById(UUID.fromString(userPrincipal.getUid()))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
