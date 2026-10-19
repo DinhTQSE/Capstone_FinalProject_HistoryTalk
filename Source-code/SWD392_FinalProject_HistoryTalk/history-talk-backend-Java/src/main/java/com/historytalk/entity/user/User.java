@@ -1,6 +1,7 @@
 package com.historytalk.entity.user;
 
 import com.historytalk.entity.chat.ChatSession;
+import com.historytalk.entity.enums.AccountStatus;
 import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.enums.UserRole;
 
@@ -83,7 +84,13 @@ public class User {
     @Column(name = "subject_department", length = 100)
     private String subjectDepartment;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", length = 30, nullable = false)
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
 
+    @Column(name = "deactivated_reason", length = 255)
+    private String deactivatedReason;
 
     @Builder.Default
     @Column(name = "token", nullable = false)
