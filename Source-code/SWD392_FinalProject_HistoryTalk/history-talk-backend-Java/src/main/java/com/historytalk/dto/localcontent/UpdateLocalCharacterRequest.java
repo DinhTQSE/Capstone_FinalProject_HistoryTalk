@@ -77,4 +77,8 @@ public class UpdateLocalCharacterRequest {
     /** IDs of classrooms to assign this character to (replaces existing assignments). */
     @JsonProperty("classIds")
     private List<String> classIds;
+
+    /** Publish or unpublish the local character. */
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 }

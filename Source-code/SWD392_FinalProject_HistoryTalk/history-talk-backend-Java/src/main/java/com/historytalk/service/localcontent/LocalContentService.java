@@ -38,13 +38,19 @@ public interface LocalContentService {
 
     PaginatedResponse<LocalContentResponse> getLocalCharacters(String search, String status, int page, int size, UserPrincipal principal);
 
-    // ── Teacher: Submit for review ───────────────────────────────────────────
-
-    /** Teacher submits a local context for School Admin review (DRAFT → PENDING_REVIEW). */
+    // ── Teacher: Submit / Publish / Status ────────────────────────────────────
+    
+    /** Teacher publishes / submits a local context (sets to ACTIVE). */
     LocalContentResponse submitLocalContext(String contextId, UserPrincipal principal);
 
-    /** Teacher submits a local character for School Admin review (DRAFT → PENDING_REVIEW). */
+    /** Teacher publishes / submits a local character (sets to ACTIVE). */
     LocalContentResponse submitLocalCharacter(String characterId, UserPrincipal principal);
+
+    /** Teacher changes status of their own local context (ACTIVE / DRAFT / INACTIVE). */
+    LocalContentResponse updateLocalContextStatus(String contextId, UpdateLocalContentStatusRequest request, UserPrincipal principal);
+
+    /** Teacher changes status of their own local character (ACTIVE / DRAFT / INACTIVE). */
+    LocalContentResponse updateLocalCharacterStatus(String characterId, UpdateLocalContentStatusRequest request, UserPrincipal principal);
 
     // ── School Admin: review panel ───────────────────────────────────────────
 

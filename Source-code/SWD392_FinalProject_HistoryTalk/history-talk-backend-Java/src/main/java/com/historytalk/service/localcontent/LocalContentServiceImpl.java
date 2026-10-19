@@ -78,6 +78,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         User teacher = resolveUser(principal);
 
+        boolean publish = req.getIsPublished() != null ? req.getIsPublished() : true;
+
         HistoricalContext ctx = HistoricalContext.builder()
                 .name(req.getName())
                 .description(req.getDescription())
@@ -90,8 +92,9 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .location(req.getLocation())
                 .imageUrl(req.getImageUrl())
                 .videoUrl(req.getVideoUrl())
-                .isPublished(false)                    // always DRAFT on creation
-                .contentStatus(ContentStatus.DRAFT)    // explicit status
+                .isPublished(publish)
+                .contentStatus(publish ? ContentStatus.ACTIVE : ContentStatus.DRAFT)
+                .approvedBy(publish ? teacher : null)
                 .school(school)
                 .contentScope(req.getContentScope() != null ? req.getContentScope() : ContentScope.CLASS_ONLY)
                 .latitude(req.getLatitude())
@@ -101,8 +104,8 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         ctx = localContextRepo.save(ctx);
         saveClassAssignments(ctx.getContextId(), EntityType.CONTEXT, req.getClassIds(), teacher.getUid());
-        log.info("Teacher {} created local context {} (scope={}) for school {}",
-                teacher.getUid(), ctx.getContextId(), ctx.getContentScope(), school.getId());
+        log.info("Teacher {} created local context {} (scope={}, published={}) for school {}",
+                teacher.getUid(), ctx.getContextId(), ctx.getContentScope(), ctx.getIsPublished(), school.getId());
         return mapContextToResponse(ctx);
     }
 
@@ -128,11 +131,10 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (req.getLatitude() != null)                 ctx.setLatitude(req.getLatitude());
         if (req.getLongitude() != null)                ctx.setLongitude(req.getLongitude());
 
-        // Changing scope resets approval — must be re-approved by School Admin
-        if (req.getContentScope() != null && req.getContentScope() != ctx.getContentScope()) {
-            ctx.setIsPublished(false);
-            ctx.setContentStatus(ContentStatus.DRAFT);
-            ctx.setApprovedBy(null);
+        if (req.getIsPublished() != null) {
+            ctx.setIsPublished(req.getIsPublished());
+            ctx.setContentStatus(req.getIsPublished() ? ContentStatus.ACTIVE : ContentStatus.DRAFT);
+            ctx.setApprovedBy(req.getIsPublished() ? teacher : null);
         }
         if (req.getContentScope() != null)             ctx.setContentScope(req.getContentScope());
 
@@ -203,6 +205,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         User teacher = resolveUser(principal);
 
+        boolean publish = req.getIsPublished() != null ? req.getIsPublished() : true;
+
         Character character = Character.builder()
                 .name(req.getName())
                 .title(req.getTitle())
@@ -218,8 +222,9 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .deathMonth(req.getDeathMonth())
                 .deathDay(req.getDeathDay())
                 .isDeathBc(req.getIsDeathBc() != null ? req.getIsDeathBc() : false)
-                .isPublished(false)
-                .contentStatus(ContentStatus.DRAFT)
+                .isPublished(publish)
+                .contentStatus(publish ? ContentStatus.ACTIVE : ContentStatus.DRAFT)
+                .approvedBy(publish ? teacher : null)
                 .school(school)
                 .contentScope(req.getContentScope() != null ? req.getContentScope() : ContentScope.CLASS_ONLY)
                 .createdBy(teacher)
@@ -235,8 +240,8 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         Character saved = localCharacterRepo.save(character);
         saveClassAssignments(saved.getCharacterId(), EntityType.CHARACTER, req.getClassIds(), teacher.getUid());
-        log.info("Teacher {} created local character {} (scope={}) for school {}",
-                teacher.getUid(), saved.getCharacterId(), saved.getContentScope(), school.getId());
+        log.info("Teacher {} created local character {} (scope={}, published={}) for school {}",
+                teacher.getUid(), saved.getCharacterId(), saved.getContentScope(), saved.getIsPublished(), school.getId());
         return mapCharacterToResponse(saved);
     }
 
@@ -262,12 +267,13 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (req.getDeathDay() != null)                 character.setDeathDay(req.getDeathDay());
         if (req.getIsDeathBc() != null)                character.setIsDeathBc(req.getIsDeathBc());
 
+        if (req.getIsPublished() != null) {
+            character.setIsPublished(req.getIsPublished());
+            character.setContentStatus(req.getIsPublished() ? ContentStatus.ACTIVE : ContentStatus.DRAFT);
+            character.setApprovedBy(req.getIsPublished() ? teacher : null);
+        }
+
         if (req.getContentScope() != null) {
-            if (req.getContentScope() != character.getContentScope()) {
-                character.setIsPublished(false);
-                character.setContentStatus(ContentStatus.DRAFT);
-                character.setApprovedBy(null);
-            }
             character.setContentScope(req.getContentScope());
         }
 
@@ -336,8 +342,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         return buildPage(mapped);
     }
 
-    // ── Teacher: Submit for review ──────────────────────────────────────────────────
-
+    // ── Teacher: Submit / Publish / Status ──────────────────────────────────────────
+    
     @Override
     @Transactional
     public LocalContentResponse submitLocalContext(String contextId, UserPrincipal principal) {
@@ -345,12 +351,11 @@ public class LocalContentServiceImpl implements LocalContentService {
         User teacher = resolveUser(principal);
         HistoricalContext ctx = findLocalContextOwned(contextId, school.getId(), teacher.getUid());
 
-        if (ctx.getContentStatus() == ContentStatus.ACTIVE) {
-            throw new InvalidRequestException("Nội dung đã được duyệt, không thể gửi lại");
-        }
-        ctx.setContentStatus(ContentStatus.PENDING_REVIEW);
+        ctx.setIsPublished(true);
+        ctx.setContentStatus(ContentStatus.ACTIVE);
+        ctx.setApprovedBy(teacher);
         ctx = localContextRepo.save(ctx);
-        log.info("Teacher {} submitted local context {} for review", teacher.getUid(), ctx.getContextId());
+        log.info("Teacher {} published local context {}", teacher.getUid(), ctx.getContextId());
         return mapContextToResponse(ctx);
     }
 
@@ -361,12 +366,37 @@ public class LocalContentServiceImpl implements LocalContentService {
         User teacher = resolveUser(principal);
         Character c = findLocalCharacterOwned(characterId, school.getId(), teacher.getUid());
 
-        if (c.getContentStatus() == ContentStatus.ACTIVE) {
-            throw new InvalidRequestException("Nội dung đã được duyệt, không thể gửi lại");
-        }
-        c.setContentStatus(ContentStatus.PENDING_REVIEW);
+        c.setIsPublished(true);
+        c.setContentStatus(ContentStatus.ACTIVE);
+        c.setApprovedBy(teacher);
         Character saved = localCharacterRepo.save(c);
-        log.info("Teacher {} submitted local character {} for review", teacher.getUid(), saved.getCharacterId());
+        log.info("Teacher {} published local character {}", teacher.getUid(), saved.getCharacterId());
+        return mapCharacterToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public LocalContentResponse updateLocalContextStatus(String contextId, UpdateLocalContentStatusRequest req, UserPrincipal principal) {
+        School school = resolveSchool(principal);
+        User teacher = resolveUser(principal);
+        HistoricalContext ctx = findLocalContextOwned(contextId, school.getId(), teacher.getUid());
+
+        applyStatus(ctx, req.getStatus(), req.getNote(), teacher);
+        ctx = localContextRepo.save(ctx);
+        log.info("Teacher {} set local context {} to status={}", teacher.getUid(), ctx.getContextId(), req.getStatus());
+        return mapContextToResponse(ctx);
+    }
+
+    @Override
+    @Transactional
+    public LocalContentResponse updateLocalCharacterStatus(String characterId, UpdateLocalContentStatusRequest req, UserPrincipal principal) {
+        School school = resolveSchool(principal);
+        User teacher = resolveUser(principal);
+        Character character = findLocalCharacterOwned(characterId, school.getId(), teacher.getUid());
+
+        applyStatus(character, req.getStatus(), req.getNote(), teacher);
+        Character saved = localCharacterRepo.save(character);
+        log.info("Teacher {} set local character {} to status={}", teacher.getUid(), saved.getCharacterId(), req.getStatus());
         return mapCharacterToResponse(saved);
     }
 

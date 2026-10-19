@@ -71,4 +71,8 @@ public class UpdateLocalContextRequest {
     /** IDs of classrooms to assign (replaces existing assignments). */
     @JsonProperty("classIds")
     private List<String> classIds;
+
+    /** Publish or unpublish the local context. */
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 }

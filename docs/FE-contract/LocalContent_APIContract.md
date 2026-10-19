@@ -3,7 +3,7 @@
 > **Base URL:** `http://localhost:8080/Historical-tell`  
 > **Auth:** Bearer JWT required for all endpoints  
 > **Viết cho:** Frontend (Thành) & Mobile (nếu cần)  
-> **Last updated:** 14/10/2026 — v2 (thêm Document APIs)
+> **Last updated:** 19/10/2026 — v3 (GV tự do upload & tự publish lên School's History Bank, không cần School Admin duyệt)
 
 ---
 
@@ -11,11 +11,17 @@
 
 Local Content là nội dung lịch sử **do Giáo viên tự soạn**, gắn với trường học, **không phải nội dung toàn cầu** của platform.
 
+**Cơ chế mới (v3):**
+- Giáo viên có quyền tự do tải lên và **tự xuất bản (self-publish)** nội dung vào ngân hàng lịch sử của trường (School's History Bank) tương tự quyền của Content Admin đối với nội dung toàn cầu.
+- Mặc định khi tạo mới, nội dung sẽ được xuất bản ngay (`isPublished = true`, `status = ACTIVE`, `approvedBy = { teacher }`).
+- Giáo viên có thể tùy chọn lưu bản nháp (`isPublished: false`) và xuất bản sau bằng API `/submit` hoặc API `/status`.
+- Thay đổi phạm vi chia sẻ (`contentScope`: `CLASS_ONLY` ↔ `SCHOOL_WIDE`) **KHÔNG** làm reset trạng thái về `DRAFT`.
+
 | Role | Quyền |
 |------|-------|
-| `TEACHER` | Tạo / Sửa / Xóa nội dung của mình. Xem nội dung SCHOOL_WIDE của GV khác |
-| `SCHOOL_ADMIN` | Xem tất cả nội dung trong trường. Duyệt / Trả lại / Ẩn |
-| `SCHOOL_STUDENT` | Chỉ xem nội dung đã được PUBLISHED trong trường |
+| `TEACHER` | Tạo / Sửa / Xóa / Tự xuất bản (Publish) nội dung của mình. Quản lý trạng thái (`ACTIVE`, `DRAFT`, `INACTIVE`). Xem nội dung `SCHOOL_WIDE` của GV khác cùng trường. |
+| `SCHOOL_ADMIN` | Xem tất cả nội dung trong trường. Có quyền giám sát, thay đổi trạng thái (Ẩn `INACTIVE` / Kích hoạt lại `ACTIVE` / Đưa về `DRAFT`) nếu cần can thiệp. |
+| `SCHOOL_STUDENT` | Xem nội dung đã được PUBLISHED (`ACTIVE` & `isPublished = true`) trong trường của mình. |
 | `CUSTOMER`, `CONTENT_ADMIN`, `SYSTEM_ADMIN` | Không có quyền truy cập |
 
 ---
@@ -25,14 +31,16 @@ Local Content là nội dung lịch sử **do Giáo viên tự soạn**, gắn v
 ### `contentScope`
 | Giá trị | Ý nghĩa |
 |---------|---------|
-| `CLASS_ONLY` | *(Default)* Chỉ Teacher tác giả thấy |
-| `SCHOOL_WIDE` | Tất cả GV cùng trường đều thấy (read-only với GV khác) |
+| `CLASS_ONLY` | *(Default)* Chỉ Teacher tác giả thấy và dùng trong bài tập lớp mình |
+| `SCHOOL_WIDE` | Lưu vào kho dữ liệu chung toàn trường (School's History Bank) — tất cả GV cùng trường đều thấy và dùng |
 
-### `status` (dùng trong approve endpoint)
+> 💡 *Lưu ý:* Việc chuyển đổi giữa `CLASS_ONLY` và `SCHOOL_WIDE` không làm mất trạng thái phê duyệt / không reset về DRAFT.
+
+### `status`
 | Giá trị | Ý nghĩa |
 |---------|---------|
-| `ACTIVE` | Duyệt — publish cho học sinh thấy |
-| `DRAFT` | Trả lại GV chỉnh sửa |
+| `ACTIVE` | Đã xuất bản — học sinh và giáo viên trong trường có thể tương tác |
+| `DRAFT` | Bản nháp — chỉ tác giả (và School Admin) thấy, học sinh chưa thấy |
 | `INACTIVE` | Ẩn tạm thời |
 
 ---
@@ -60,11 +68,13 @@ Content-Type: application/json
   "location": "Mê Linh, Vĩnh Phúc",
   "imageUrl": "https://...",
   "videoUrl": "https://...",
-  "contentScope": "CLASS_ONLY"
+  "contentScope": "SCHOOL_WIDE",
+  "isPublished": true
 }
 ```
 
 > `contentScope`: `CLASS_ONLY` (default) hoặc `SCHOOL_WIDE`  
+> `isPublished`: `true` (default - tự publish ngay) hoặc `false` (lưu nháp DRAFT)  
 > `era`: `ANCIENT` | `MEDIEVAL` | `MODERN` | `CONTEMPORARY`  
 > `category`: `WAR` | `POLITICS` | `CULTURE` | `REVOLUTION`
 
@@ -72,16 +82,16 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "message": "Local context created successfully (DRAFT)",
+  "message": "Local context created successfully",
   "data": {
     "id": "uuid",
     "type": "CONTEXT",
     "name": "Khởi nghĩa Hai Bà Trưng tại Mê Linh",
     "description": "...",
     "imageUrl": "...",
-    "status": "DRAFT",
-    "isPublished": false,
-    "contentScope": "CLASS_ONLY",
+    "status": "ACTIVE",
+    "isPublished": true,
+    "contentScope": "SCHOOL_WIDE",
     "era": "ANCIENT",
     "category": "WAR",
     "year": 40,
@@ -95,7 +105,11 @@ Content-Type: application/json
       "userName": "teacher01",
       "fullName": "Nguyễn Văn A"
     },
-    "approvedBy": null,
+    "approvedBy": {
+      "uid": "uuid",
+      "userName": "teacher01",
+      "fullName": "Nguyễn Văn A"
+    },
     "schoolId": "uuid",
     "schoolName": "THPT Nguyễn Du",
     "createdAt": "2026-10-14T08:00:00",
@@ -151,7 +165,7 @@ Content-Type: application/json
 ```
 
 > ⚠️ Chỉ **teacher tác giả** mới sửa được.  
-> ⚠️ Thay đổi `contentScope` → **reset về DRAFT** + xóa `approvedBy`.
+> 💡 Thay đổi `contentScope` (`CLASS_ONLY` ↔ `SCHOOL_WIDE`) **KHÔNG** làm reset trạng thái về `DRAFT`.
 
 **Request Body** *(tất cả optional — partial update)*:
 ```json
@@ -167,7 +181,8 @@ Content-Type: application/json
   "location": "...",
   "imageUrl": "...",
   "videoUrl": "...",
-  "contentScope": "SCHOOL_WIDE"
+  "contentScope": "SCHOOL_WIDE",
+  "isPublished": true
 }
 ```
 
@@ -192,7 +207,72 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-### 6. Tạo nhân vật địa phương
+### 6. Xuất bản bối cảnh lên kho tư liệu trường (Quick Publish / Submit)
+```
+PUT /api/v1/teacher/local-contents/contexts/{contextId}/submit
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+> Dùng khi GV tạo bản nháp (`isPublished: false`, `DRAFT`) và sau đó muốn xuất bản nhanh sang `ACTIVE` (`isPublished: true`).  
+> Tự động gán `approvedBy = teacher`.
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Context published successfully",
+  "data": {
+    "id": "uuid",
+    "type": "CONTEXT",
+    "name": "...",
+    "status": "ACTIVE",
+    "isPublished": true,
+    "approvedBy": {
+      "uid": "uuid",
+      "userName": "teacher01",
+      "fullName": "Nguyễn Văn A"
+    }
+  }
+}
+```
+
+---
+
+### 7. Giáo viên thay đổi trạng thái bối cảnh (Status management)
+```
+PUT /api/v1/teacher/local-contents/contexts/{contextId}/status
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "status": "ACTIVE",
+  "note": "Xuất bản lại sau khi chỉnh sửa"
+}
+```
+
+> **`status` hợp lệ:** `ACTIVE` (publish) | `DRAFT` (nháp) | `INACTIVE` (ẩn)  
+> Nếu `status == ACTIVE`, hệ thống tự động set `isPublished = true` và `approvedBy = teacher`.  
+> Nếu `status != ACTIVE`, `isPublished = false`.
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Context status updated to ACTIVE",
+  "data": {
+    "id": "uuid",
+    "status": "ACTIVE",
+    "isPublished": true
+  }
+}
+```
+
+---
+
+### 8. Tạo nhân vật địa phương
 ```
 POST /api/v1/teacher/local-contents/characters
 Authorization: Bearer {TEACHER_TOKEN}
@@ -217,15 +297,38 @@ Content-Type: application/json
   "deathDay": null,
   "isDeathBc": false,
   "contextIds": ["uuid-of-local-context"],
-  "contentScope": "SCHOOL_WIDE"
+  "contentScope": "SCHOOL_WIDE",
+  "isPublished": true
 }
 ```
 
+> `isPublished`: `true` (default - tự publish ngay vào kho trường) hoặc `false` (lưu nháp DRAFT).  
 > `contextIds`: optional — link nhân vật vào các bối cảnh (có thể để `[]` hoặc bỏ qua).
+
+**Response `201 Created`:**
+```json
+{
+  "success": true,
+  "message": "Local character created successfully",
+  "data": {
+    "id": "uuid",
+    "type": "CHARACTER",
+    "name": "Bà Trưng Trắc",
+    "status": "ACTIVE",
+    "isPublished": true,
+    "contentScope": "SCHOOL_WIDE",
+    "approvedBy": {
+      "uid": "uuid",
+      "userName": "teacher01",
+      "fullName": "Nguyễn Văn A"
+    }
+  }
+}
+```
 
 ---
 
-### 7. Danh sách nhân vật địa phương (Teacher view)
+### 9. Danh sách nhân vật địa phương (Teacher view)
 ```
 GET /api/v1/teacher/local-contents/characters?search=&page=1&size=10
 Authorization: Bearer {TEACHER_TOKEN}
@@ -233,7 +336,7 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-### 8. Chi tiết nhân vật địa phương
+### 10. Chi tiết nhân vật địa phương
 ```
 GET /api/v1/teacher/local-contents/characters/{characterId}
 Authorization: Bearer {TEACHER_TOKEN}
@@ -241,7 +344,7 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-### 9. Cập nhật nhân vật địa phương
+### 11. Cập nhật nhân vật địa phương
 ```
 PUT /api/v1/teacher/local-contents/characters/{characterId}
 Authorization: Bearer {TEACHER_TOKEN}
@@ -265,13 +368,14 @@ Content-Type: application/json
   "deathMonth": null,
   "deathDay": null,
   "isDeathBc": false,
-  "contentScope": "CLASS_ONLY"
+  "contentScope": "SCHOOL_WIDE",
+  "isPublished": true
 }
 ```
 
 ---
 
-### 10. Xóa mềm nhân vật địa phương
+### 12. Xóa mềm nhân vật địa phương
 ```
 DELETE /api/v1/teacher/local-contents/characters/{characterId}
 Authorization: Bearer {TEACHER_TOKEN}
@@ -279,9 +383,72 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-## 👨‍💼 SCHOOL ADMIN APIs
+### 13. Xuất bản nhân vật lên kho tư liệu trường (Quick Publish / Submit)
+```
+PUT /api/v1/teacher/local-contents/characters/{characterId}/submit
+Authorization: Bearer {TEACHER_TOKEN}
+```
 
-### 11. Xem tất cả bối cảnh địa phương trong trường
+> Giáo viên tự do xuất bản nhân vật (chuyển sang `ACTIVE`, `isPublished: true`).
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character published successfully",
+  "data": {
+    "id": "uuid",
+    "type": "CHARACTER",
+    "status": "ACTIVE",
+    "isPublished": true,
+    "approvedBy": {
+      "uid": "uuid",
+      "userName": "teacher01",
+      "fullName": "Nguyễn Văn A"
+    }
+  }
+}
+```
+
+---
+
+### 14. Giáo viên thay đổi trạng thái nhân vật (Status management)
+```
+PUT /api/v1/teacher/local-contents/characters/{characterId}/status
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "status": "ACTIVE",
+  "note": "..."
+}
+```
+
+> **`status` hợp lệ:** `ACTIVE` (publish) | `DRAFT` (nháp) | `INACTIVE` (ẩn)
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character status updated to ACTIVE",
+  "data": {
+    "id": "uuid",
+    "status": "ACTIVE",
+    "isPublished": true
+  }
+}
+```
+
+---
+
+## 👨‍💼 SCHOOL ADMIN APIs (Giám sát & Quản trị trường)
+
+> 💡 **Lưu ý:** Giáo viên có thể tự xuất bản nội dung của mình lên School's History Bank. School Admin đóng vai trò giám sát, quản trị toàn trường, có quyền xem tất cả và can thiệp điều chỉnh trạng thái khi cần.
+
+### 15. Xem tất cả bối cảnh địa phương trong trường
 ```
 GET /api/v1/school-admin/local-contents/contexts?search=&scope=&page=1&size=10
 Authorization: Bearer {SCHOOL_ADMIN_TOKEN}
@@ -293,7 +460,7 @@ Authorization: Bearer {SCHOOL_ADMIN_TOKEN}
 
 ---
 
-### 12. Duyệt / Thay đổi trạng thái bối cảnh địa phương
+### 16. Giám sát / Thay đổi trạng thái bối cảnh địa phương
 ```
 PUT /api/v1/school-admin/local-contents/contexts/{contextId}/status
 Authorization: Bearer {SCHOOL_ADMIN_TOKEN}
@@ -332,11 +499,11 @@ Content-Type: application/json
 }
 ```
 
-> ⚠️ **Policy Disclaimer:** Bằng cách duyệt, nhà trường chịu toàn bộ trách nhiệm pháp lý về tính xác thực nội dung. HistoryTalk không chịu trách nhiệm.
+> ⚠️ **Policy Disclaimer:** Trường học chịu trách nhiệm pháp lý về tính xác thực nội dung địa phương do giáo viên đăng tải. HistoryTalk không chịu trách nhiệm.
 
 ---
 
-### 13. Xem tất cả nhân vật địa phương trong trường
+### 17. Xem tất cả nhân vật địa phương trong trường
 ```
 GET /api/v1/school-admin/local-contents/characters?search=&scope=&page=1&size=10
 Authorization: Bearer {SCHOOL_ADMIN_TOKEN}
@@ -344,7 +511,7 @@ Authorization: Bearer {SCHOOL_ADMIN_TOKEN}
 
 ---
 
-### 14. Duyệt / Thay đổi trạng thái nhân vật địa phương
+### 18. Giám sát / Thay đổi trạng thái nhân vật địa phương
 ```
 PUT /api/v1/school-admin/local-contents/characters/{characterId}/status
 Authorization: Bearer {SCHOOL_ADMIN_TOKEN}
@@ -363,7 +530,7 @@ Content-Type: application/json
 
 ## 🎓 STUDENT APIs
 
-### 15. Xem bối cảnh địa phương đã duyệt
+### 19. Xem bối cảnh địa phương đã duyệt
 ```
 GET /api/v1/student/local-contents/contexts
 Authorization: Bearer {SCHOOL_STUDENT_TOKEN}
@@ -395,7 +562,7 @@ Authorization: Bearer {SCHOOL_STUDENT_TOKEN}
 
 ---
 
-### 16. Xem nhân vật địa phương đã duyệt
+### 20. Xem nhân vật địa phương đã duyệt
 ```
 GET /api/v1/student/local-contents/characters
 Authorization: Bearer {SCHOOL_STUDENT_TOKEN}
@@ -408,7 +575,7 @@ Authorization: Bearer {SCHOOL_STUDENT_TOKEN}
 > Tài liệu gắn vào local context/character để bổ sung kiến thức cho AI (RAG).
 > Sau khi upload, nội dung được gửi async lên AI backend để embed vào vector store.
 
-### 17. Danh sách tài liệu của local context
+### 21. Danh sách tài liệu của local context
 ```
 GET /api/v1/teacher/local-contents/contexts/{contextId}/documents
 Authorization: Bearer {TEACHER_TOKEN}
@@ -441,7 +608,7 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-### 18. Thêm tài liệu vào local context
+### 22. Thêm tài liệu vào local context
 ```
 POST /api/v1/teacher/local-contents/contexts/{contextId}/documents
 Authorization: Bearer {TEACHER_TOKEN}
@@ -464,7 +631,7 @@ Content-Type: application/json
 
 ---
 
-### 19. Xóa mềm tài liệu khỏi local context
+### 23. Xóa mềm tài liệu khỏi local context
 ```
 DELETE /api/v1/teacher/local-contents/contexts/{contextId}/documents/{docId}
 Authorization: Bearer {TEACHER_TOKEN}
@@ -474,7 +641,7 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-### 20. Danh sách tài liệu của local character
+### 24. Danh sách tài liệu của local character
 ```
 GET /api/v1/teacher/local-contents/characters/{characterId}/documents
 Authorization: Bearer {TEACHER_TOKEN}
@@ -482,7 +649,7 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
-### 21. Thêm tài liệu vào local character
+### 25. Thêm tài liệu vào local character
 ```
 POST /api/v1/teacher/local-contents/characters/{characterId}/documents
 Authorization: Bearer {TEACHER_TOKEN}
@@ -493,7 +660,7 @@ Content-Type: application/json
 
 ---
 
-### 22. Xóa mềm tài liệu khỏi local character
+### 26. Xóa mềm tài liệu khỏi local character
 ```
 DELETE /api/v1/teacher/local-contents/characters/{characterId}/documents/{docId}
 Authorization: Bearer {TEACHER_TOKEN}
