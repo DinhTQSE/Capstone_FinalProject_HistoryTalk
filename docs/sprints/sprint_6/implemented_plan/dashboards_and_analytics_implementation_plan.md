@@ -67,29 +67,30 @@ flowchart TD
 
 ### 4.1 DTO Models (`com.historytalk.dto.dashboard`)
 - `SchoolAdminDashboardResponse.java`:
+  - `packageType`, `recommendedStudents`, `status` (`ACTIVE`/`EXPIRED`), `subscriptionStartDate` (`01/09`), `subscriptionEndDate` (`31/05`), `renewedForNextYear`, `nextPackageType`.
   - `totalClassrooms`, `totalTeachers`, `totalStudents`.
-  - `totalSchoolTokenQuota`, `unallocatedTokenQuota`, `allocatedTokens`, `tokensUsedByStudents`.
+  - `totalSchoolTokenQuota`, `unallocatedTokenQuota` (Quỹ chung còn lại), `allocatedTokens`, `tokensUsedByStudents`, `defaultDailyStudentQuota`, `pendingTokenBoostRequests`.
   - `assignmentStats`: `completedRate`, `lateSubmittedRate`, `notStartedRate`.
 - `TeacherClassroomDashboardResponse.java`:
-  - `classId`, `className`, `classCode`, `studentCount`.
-  - `studentAnalytics`: list of `{ studentId, studentCode, fullName, quizzesAttempted, avgScorePercentage, aiMessagesCount }`.
+  - `classId`, `className`, `classCode`, `gradeLevel`, `academicYear`, `status` (`ACTIVE`/`ARCHIVED`), `dailyTokenLimit`, `pendingTokenBoostRequests`, `studentCount`.
+  - `students`: list of `{ studentId, studentCode, fullName, dailyTokenLimit, dailyBonusTokens, dailyTokensUsed, currentTokens, quizzesAttempted, averageScorePercentage, aiMessagesCount }`.
   - `totalAiMessages`, `avgAiMessagesPerStudent`.
   - `assignmentRates`: `onTimeRate`, `lateRate`, `pendingRate`.
 - `StudentPersonalDashboardResponse.java`:
-  - `studentName`, `studentCode`, `schoolName`, `currentTokens`, `tokensUsedToday`.
+  - `studentName`, `studentCode`, `schoolName`, `dailyTokenLimit`, `dailyBonusTokens`, `currentTokens` (hạn mức còn được tiêu hôm nay), `tokensUsedToday`.
   - `totalQuizzesAttempted`, `averageScorePercentage`, `recentQuizzes`.
-  - `enrolledClassrooms`: list of `{ classId, className, teacherName }`.
-  - `upcomingAssignments`: list of `{ assignmentId, title, type, deadline }`.
+  - `enrolledClassrooms`: list of `{ classId, className, classCode, academicYear, status, teacherName }`.
+  - `upcomingAssignments`: list of `{ assignmentId, title, assignmentType, deadline }`.
 - `CustomerPersonalDashboardResponse.java`:
-  - `currentTier`, `tokenBalance`, `tierExpiresAt`.
-  - `learning`: `totalQuizzesAttempted`, `averageScorePercentage`, `eraDistribution`, `recentQuizzes`.
-  - `aiUsage`: `totalMessages`, `topCharacters`.
+  - `currentTier`, `currentTokens`, `tierExpiresAt`.
+  - `totalQuizzesAttempted`, `averageScorePercentage`, `eraDistribution`, `recentQuizzes`.
+  - `totalAiMessages`, `topCharacters`.
   - `paymentHistory`: list of `{ orderCode, amount, tierName, status, createdAt }`.
 - `SystemAdminComprehensiveDashboardResponse.java`:
-  - `jvmHealth`: `cpuUsagePercentage`, `totalMemoryMb`, `usedMemoryMb`, `freeMemoryMb`, `activeThreads`, `uptimeSeconds`.
-  - `tokenSummary`: `totalTokensB2bAllocated`, `totalTokensB2cConsumed`, `totalTokensSystemConsumed`.
-  - `topWrongQuestions`: list of `{ questionId, content, quizTitle, errorRatePercentage, wrongAttempts }`.
-  - `platformOverview`: `totalSchools`, `totalUsers`, `totalRevenue`.
+  - `jvmHealth`: `cpuUsagePercentage`, `totalMemoryMb`, `usedMemoryMb`, `freeMemoryMb`, `activeThreadCount`, `uptimeSeconds`.
+  - `tokenSummary`: `totalTokensB2bAllocated`, `totalTokensB2bRemainingInPools`, `totalTokensB2bConsumed`, `totalTokensB2cConsumed`, `totalTokensSystemConsumed`.
+  - `topWrongQuestions`: list of `{ questionId, quizTitle, wrongAnswers, totalAnswers, wrongRate }`.
+  - `platformOverview`: `totalSchools`, `activeSchools`, `expiredSchools`, `totalUsers`, `totalQuizzes`, `totalRevenue`.
 
 ### 4.2 Repository Queries bổ sung
 - `MessageRepository`: Truy vấn tổng token tiêu thụ theo `school_id` hoặc theo `user_id`, đếm số lượng tin nhắn AI của học sinh trong lớp.
