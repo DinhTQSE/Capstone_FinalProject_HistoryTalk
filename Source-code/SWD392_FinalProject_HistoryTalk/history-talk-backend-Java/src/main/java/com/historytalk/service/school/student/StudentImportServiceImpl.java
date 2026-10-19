@@ -13,6 +13,7 @@ import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.utils.SecurityUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -137,10 +138,11 @@ public class StudentImportServiceImpl implements StudentImportService {
     }
 
     private User resolveSchoolAdmin(UserPrincipal principal) {
-        if (principal == null) {
+        String userId = (principal != null) ? principal.getUid() : SecurityUtils.getUserId();
+        if (userId == null) {
             throw new UnauthorizedException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
         }
-        User user = userRepository.findById(UUID.fromString(principal.getUid()))
+        User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         if (user.getSchool() == null) {
             throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");

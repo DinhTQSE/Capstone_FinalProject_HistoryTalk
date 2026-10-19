@@ -132,6 +132,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/historical-contexts/*/map-pins/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/*/map-pins").permitAll()
 
+                        // Chat Scenarios: GET is public (roleplay scenario catalog visible to all)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/chat/scenarios").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/Historical-tell/api/v1/chat/scenarios").permitAll()
+
                         .requestMatchers("/api/v1/chat/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/quizzes/**").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/quizzes/**").authenticated()
