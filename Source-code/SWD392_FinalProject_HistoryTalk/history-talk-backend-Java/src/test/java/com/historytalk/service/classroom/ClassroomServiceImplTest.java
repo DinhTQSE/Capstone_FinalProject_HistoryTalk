@@ -204,6 +204,7 @@ class ClassroomServiceImplTest {
         UpdateClassroomRequest request = UpdateClassroomRequest.builder()
                 .className("10A1 Chuyên")
                 .description("Cập nhật mô tả")
+                .dailyTokenQuota(8000)
                 .build();
 
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId))
@@ -217,6 +218,7 @@ class ClassroomServiceImplTest {
 
         assertNotNull(response);
         assertEquals("10A1 Chuyên", response.getClassName());
+        assertEquals(8000, response.getDailyTokenQuota());
         assertEquals(35L, response.getStudentCount());
     }
 

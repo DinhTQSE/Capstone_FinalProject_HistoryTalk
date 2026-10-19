@@ -162,7 +162,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public LocalContentResponse getLocalContextById(String contextId, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
 
         HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), school.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
@@ -179,7 +179,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public PaginatedResponse<LocalContentResponse> getLocalContexts(String search, String status, int page, int size, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Page<HistoricalContext> pageResult = localContextRepo.findVisibleToTeacher(
@@ -310,7 +310,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public LocalContentResponse getLocalCharacterById(String characterId, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
 
         Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), school.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
@@ -326,7 +326,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public PaginatedResponse<LocalContentResponse> getLocalCharacters(String search, String status, int page, int size, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.ASC, "name"));
 
         Page<Character> pageResult = localCharacterRepo.findVisibleToTeacher(
@@ -600,6 +600,11 @@ public class LocalContentServiceImpl implements LocalContentService {
         return new UserPrincipal(user);
     }
 
+    private UUID resolveUserId(UserPrincipal principal) {
+        UserPrincipal userPrincipal = resolvePrincipal(principal);
+        return UUID.fromString(userPrincipal.getUid());
+    }
+
     private School resolveSchool(UserPrincipal principal) {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         if (userPrincipal.getSchoolId() == null) {
@@ -835,7 +840,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional
     public void deleteLocalContextDocument(String contextId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
         Document doc = documentRepository.findById(UUID.fromString(docId))
@@ -891,7 +896,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional
     public void deleteLocalCharacterDocument(String characterId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
         Document doc = documentRepository.findById(UUID.fromString(docId))

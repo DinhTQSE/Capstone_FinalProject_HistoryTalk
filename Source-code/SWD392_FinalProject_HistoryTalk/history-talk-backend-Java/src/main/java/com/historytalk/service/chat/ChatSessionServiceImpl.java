@@ -1,11 +1,14 @@
 package com.historytalk.service.chat;
 
+import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.chat.ChatScenarioResponse;
 import com.historytalk.dto.chat.ChatSessionResponse;
 import com.historytalk.dto.chat.CreateChatSessionRequest;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 
+import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
@@ -20,8 +23,11 @@ import com.historytalk.service.chat.AiServiceClient.AiChatResult;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
 import com.historytalk.service.chat.AiServiceClient.ContextPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,6 +90,15 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             if (context != null && !isStaffOrAdmin(userRole)
                     && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
                 context = null; // Ignore if not visible
+            }
+            if (context != null) {
+                final UUID targetContextId = context.getContextId();
+                boolean belongsToCharacter = character.getHistoricalContexts() != null
+                        && character.getHistoricalContexts().stream()
+                                .anyMatch(hc -> targetContextId.equals(hc.getContextId()));
+                if (!belongsToCharacter) {
+                    throw new InvalidRequestException("Nhân vật lịch sử này không tham gia vào bối cảnh/sự kiện đã chọn!");
+                }
             }
         }
 
@@ -247,5 +262,61 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private boolean isPubliclyVisible(Boolean isPublished, LocalDateTime deletedAt) {
         return Boolean.TRUE.equals(isPublished)
                 && deletedAt == null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<ChatScenarioResponse> getScenarios(String search, EventEra era, Pageable pageable) {
+        String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+
+        UUID schoolId = null;
+        String userId = SecurityUtils.getUserId();
+        if (userId != null) {
+            try {
+                java.util.Optional<User> userOpt = userRepository.findById(UUID.fromString(userId));
+                if (userOpt.isPresent() && userOpt.get().getSchool() != null) {
+                    schoolId = userOpt.get().getSchool().getId();
+                }
+            } catch (Exception ex) {
+                log.debug("Could not resolve schoolId for userId {}: {}", userId, ex.getMessage());
+            }
+        }
+
+        Page<Object[]> page = characterRepository.findScenarios(trimmedSearch, era, schoolId, pageable);
+
+        List<ChatScenarioResponse> items = page.getContent().stream()
+                .map(row -> {
+                    Character c = (Character) row[0];
+                    HistoricalContext hc = (HistoricalContext) row[1];
+                    UUID scenarioId = UUID.nameUUIDFromBytes((c.getCharacterId().toString() + "_" + hc.getContextId().toString()).getBytes());
+                    String scope = (c.getSchool() != null || hc.getSchool() != null) ? "SCHOOL" : "GLOBAL";
+
+                    return ChatScenarioResponse.builder()
+                            .scenarioId(scenarioId)
+                            .characterId(c.getCharacterId())
+                            .characterName(c.getName())
+                            .characterTitle(c.getTitle())
+                            .characterAvatar(c.getImageUrl())
+                            .characterPersonality(c.getPersonality())
+                            .contextId(hc.getContextId())
+                            .contextName(hc.getName())
+                            .contextEra(hc.getEra())
+                            .contextYear(hc.getYear())
+                            .contextImage(hc.getImageUrl())
+                            .contextSummary(hc.getDescription())
+                            .scope(scope)
+                            .build();
+                })
+                .toList();
+
+        return PaginatedResponse.<ChatScenarioResponse>builder()
+                .content(items)
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .currentPage(page.getNumber() + 1)
+                .pageSize(page.getSize())
+                .hasNext(page.hasNext())
+                .hasPrevious(page.hasPrevious())
+                .build();
     }
 }
