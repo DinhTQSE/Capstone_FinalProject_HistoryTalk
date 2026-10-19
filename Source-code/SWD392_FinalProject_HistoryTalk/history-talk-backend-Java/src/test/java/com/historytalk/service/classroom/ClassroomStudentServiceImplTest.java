@@ -222,6 +222,32 @@ class ClassroomStudentServiceImplTest {
     }
 
     @Test
+    @DisplayName("Batch Enroll: Từ chối gán học sinh đang ACTIVE ở một lớp ACTIVE khác (chỉ được ở 1 lớp)")
+    void testEnrollStudentsBatch_AlreadyInAnotherActiveClassroom_Rejected() {
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomA.getId(), school.getId()))
+                .thenReturn(Optional.of(classroomA));
+        when(userRepository.findById(student1.getUid())).thenReturn(Optional.of(student1));
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomA.getId(), student1.getUid()))
+                .thenReturn(Optional.empty());
+        when(classStudentRepository.findActiveClassroomsByStudentUid(student1.getUid()))
+                .thenReturn(List.of(classroomB));
+        when(classStudentRepository.countByClassroomIdAndStatus(classroomA.getId(), "ACTIVE")).thenReturn(0L);
+
+        BatchEnrollStudentRequest req = BatchEnrollStudentRequest.builder()
+                .studentIds(List.of(student1.getUid()))
+                .build();
+
+        BatchEnrollResultResponse result = classroomStudentService.enrollStudentsBatch(classroomA.getId(), req, adminPrincipal);
+
+        assertEquals(1, result.getTotalRequested());
+        assertEquals(0, result.getSuccessCount());
+        assertEquals(1, result.getAlreadyEnrolledCount());
+        assertTrue(result.getNotes().get(0).contains("10A2"));
+        assertTrue(result.getNotes().get(0).contains("Chuyển lớp"));
+        verify(classStudentRepository, never()).save(any(ClassStudent.class));
+    }
+
+    @Test
     @DisplayName("Batch Enroll: Từ chối học sinh thuộc trường khác (Tenant check)")
     void testEnrollStudentsBatch_CrossSchoolRejected() {
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomA.getId(), school.getId()))
