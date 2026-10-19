@@ -23,6 +23,7 @@ import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.chat.AiServiceClient;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -144,7 +145,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public LocalContentResponse getLocalContextById(String contextId, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
 
         HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), school.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
@@ -161,7 +162,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public PaginatedResponse<LocalContentResponse> getLocalContexts(String search, int page, int size, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Page<HistoricalContext> pageResult = localContextRepo.findVisibleToTeacher(
@@ -265,7 +266,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public LocalContentResponse getLocalCharacterById(String characterId, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
 
         Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), school.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
@@ -281,7 +282,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public PaginatedResponse<LocalContentResponse> getLocalCharacters(String search, int page, int size, UserPrincipal principal) {
         School school = resolveSchool(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.ASC, "name"));
 
         Page<Character> pageResult = localCharacterRepo.findVisibleToTeacher(
@@ -407,23 +408,40 @@ public class LocalContentServiceImpl implements LocalContentService {
         return c;
     }
 
+    private UUID resolveUserId(UserPrincipal principal) {
+        String userId = (principal != null) ? principal.getUid() : SecurityUtils.getUserId();
+        if (userId == null) {
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
+        }
+        return UUID.fromString(userId);
+    }
+
     private School resolveSchool(UserPrincipal principal) {
-        if (principal.getSchoolId() == null) {
+        if (principal != null && principal.getSchoolId() != null) {
+            return schoolRepository.findById(principal.getSchoolId())
+                    .orElseThrow(() -> new ResourceNotFoundException("School not found"));
+        }
+        User user = resolveUser(principal);
+        if (user.getSchool() == null) {
             throw new InvalidRequestException("Tài khoản chưa được liên kết với trường học");
         }
-        return schoolRepository.findById(principal.getSchoolId())
-                .orElseThrow(() -> new ResourceNotFoundException("School not found"));
+        return user.getSchool();
     }
 
     private UUID resolveSchoolId(UserPrincipal principal) {
-        if (principal.getSchoolId() == null) {
+        if (principal != null && principal.getSchoolId() != null) {
+            return principal.getSchoolId();
+        }
+        User user = resolveUser(principal);
+        if (user.getSchool() == null) {
             throw new InvalidRequestException("Tài khoản chưa được liên kết với trường học");
         }
-        return principal.getSchoolId();
+        return user.getSchool().getId();
     }
 
     private User resolveUser(UserPrincipal principal) {
-        return userRepository.findById(UUID.fromString(principal.getUid()))
+        UUID userId = resolveUserId(principal);
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
@@ -599,7 +617,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional
     public void deleteLocalContextDocument(String contextId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
         Document doc = documentRepository.findById(UUID.fromString(docId))
@@ -655,7 +673,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional
     public void deleteLocalCharacterDocument(String characterId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        UUID teacherId = UUID.fromString(principal.getUid());
+        UUID teacherId = resolveUserId(principal);
         localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
         Document doc = documentRepository.findById(UUID.fromString(docId))

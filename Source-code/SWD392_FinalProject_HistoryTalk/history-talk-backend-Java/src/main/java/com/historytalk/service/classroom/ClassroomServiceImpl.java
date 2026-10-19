@@ -338,7 +338,6 @@ public class ClassroomServiceImpl implements ClassroomService {
                     .fullName(t.getFullName())
                     .email(t.getEmail())
                     .phoneNumber(t.getPhoneNumber())
-                    .subjectDepartment(t.getSubjectDepartment())
                     .build();
         }
 
