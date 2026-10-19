@@ -48,6 +48,10 @@ class StudentAssignmentServiceImplTest {
     private MessageRepository messageRepository;
     @Mock
     private QuizSessionRepository quizSessionRepository;
+    @Mock
+    private com.historytalk.repository.QuestionRepository questionRepository;
+    @Mock
+    private com.historytalk.repository.UserRepository userRepository;
 
     @InjectMocks
     private StudentAssignmentServiceImpl studentAssignmentService;
@@ -315,5 +319,100 @@ class StudentAssignmentServiceImplTest {
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class, () ->
                 studentAssignmentService.submitAssignment(assignmentId, req, studentPrincipal));
+    }
+
+    @Test
+    @DisplayName("Nộp bài AI Chat Roleplay không cần truyền Request Body: Tự động lấy phiên chat mới nhất")
+    void testSubmitAssignment_AiChatRoleplay_WithoutRequestBody() {
+        UUID characterId = UUID.randomUUID();
+        UUID chatSessionId = UUID.randomUUID();
+
+        Character character = Character.builder().characterId(characterId).name("Trần Hưng Đạo").build();
+        ChatSession chatSession = ChatSession.builder()
+                .sessionId(chatSessionId)
+                .character(character)
+                .user(student)
+                .build();
+
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
+                .targetId(characterId)
+                .minRequirement(5)
+                .deadline(LocalDateTime.now().plusDays(1))
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+        when(chatSessionRepository.findByUserAndCharacter(studentUid, characterId))
+                .thenReturn(List.of(chatSession));
+        when(messageRepository.countUserMessagesInSession(chatSessionId)).thenReturn(5L);
+
+        StudentSubmissionResponse resp = studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal);
+
+        assertNotNull(resp);
+        assertEquals(SubmissionStatus.SUBMITTED, resp.getStatus());
+        assertEquals(5, resp.getMessageCount());
+        assertEquals(new BigDecimal("10.00"), resp.getScore());
+    }
+
+    @Test
+    @DisplayName("Nộp bài Quiz không cần truyền Request Body: Tự động lấy phiên làm bài hoàn thành điểm cao nhất")
+    void testSubmitAssignment_QuizTest_WithoutRequestBody() {
+        UUID quizId = UUID.randomUUID();
+        UUID quizSessionId = UUID.randomUUID();
+
+        Quiz quiz = Quiz.builder()
+                .quizId(quizId)
+                .questions(List.of(
+                        Question.builder().build(),
+                        Question.builder().build(),
+                        Question.builder().build(),
+                        Question.builder().build(),
+                        Question.builder().build()
+                ))
+                .build();
+
+        QuizSession quizSession = QuizSession.builder()
+                .sessionId(quizSessionId)
+                .quiz(quiz)
+                .user(student)
+                .score(4.0f)
+                .endTime(LocalDateTime.now())
+                .build();
+
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.QUIZ_TEST)
+                .targetId(quizId)
+                .deadline(LocalDateTime.now().plusDays(1))
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+        when(quizSessionRepository.findCompletedByQuizAndUser(quizId, studentUid))
+                .thenReturn(List.of(quizSession));
+
+        StudentSubmissionResponse resp = studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal);
+
+        assertNotNull(resp);
+        assertEquals(SubmissionStatus.SUBMITTED, resp.getStatus());
+        assertEquals(new BigDecimal("8.00"), resp.getScore());
     }
 }

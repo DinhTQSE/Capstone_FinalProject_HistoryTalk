@@ -55,6 +55,16 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     long countCompletedByQuizAndUser(@Param("quizId") UUID quizId, @Param("uid") UUID uid);
 
     @Query("""
+            SELECT s FROM QuizSession s
+            WHERE s.quiz.quizId = :quizId
+              AND s.user.uid = :uid
+              AND s.endTime IS NOT NULL
+              AND s.deletedAt IS NULL
+            ORDER BY s.score DESC NULLS LAST, s.endTime DESC
+            """)
+    List<QuizSession> findCompletedByQuizAndUser(@Param("quizId") UUID quizId, @Param("uid") UUID uid);
+
+    @Query("""
             SELECT COUNT(s) FROM QuizSession s
             WHERE s.quiz.quizId = :quizId
             AND s.endTime IS NOT NULL
