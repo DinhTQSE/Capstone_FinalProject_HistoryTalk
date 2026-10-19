@@ -38,4 +38,8 @@ public interface TokenBoostRequestRepository extends JpaRepository<TokenBoostReq
             @Param("schoolId") UUID schoolId,
             @Param("status") TokenBoostRequestStatus status,
             Pageable pageable);
+
+    long countByClassroom_IdAndStatus(UUID classroomId, TokenBoostRequestStatus status);
+
+    long countBySchool_IdAndStatus(UUID schoolId, TokenBoostRequestStatus status);
 }

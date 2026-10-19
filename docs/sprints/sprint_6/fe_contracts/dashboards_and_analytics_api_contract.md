@@ -34,29 +34,38 @@ This document specifies the REST API contract for the **5 Role-based Dashboards 
 ### 2.1. School Admin Dashboard (US-SP6-06)
 - **Endpoint:** `GET /api/v1/school-admin/dashboard`
 - **Authorized Role:** `ROLE_SCHOOL_ADMIN`
-- **Description:** Returns aggregate KPI overview for the administrator's school, including teacher/student/class counts, token quota consumption, and classroom summaries.
+- **Description:** Returns aggregate KPI overview for the administrator's school, including academic year subscription status (`01/09` – `31/05`), May renewal status, teacher/student/class counts, shared token pool (`unallocatedTokenQuota`), daily student quota policy, and pending token boost requests.
 
 #### TypeScript Interface
 ```typescript
-export interface ClassroomSummary {
-  classId: string;
-  className: string;
-  classCode: string;
-  teacherName: string | null;
-  studentCount: number;
+export interface AssignmentStats {
+  totalSubmissions: number;
+  completedRate: number;
+  lateSubmittedRate: number;
+  notStartedRate: number;
 }
 
 export interface SchoolAdminDashboardResponse {
   schoolId: string;
   schoolName: string;
-  totalTeachers: number;
-  totalActiveStudents: number;
+  schoolCode: string;
+  packageType: 'ENTERPRISE_SMALL' | 'ENTERPRISE_MEDIUM' | 'ENTERPRISE_LARGE';
+  recommendedStudents: number;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'EXPIRED';
+  subscriptionStartDate: string; // YYYY-MM-DD (01/09)
+  subscriptionEndDate: string;   // YYYY-MM-DD (31/05)
+  renewedForNextYear: boolean;
+  nextPackageType: string | null;
   totalClassrooms: number;
-  allocatedTokenQuota: number;
-  consumedTokens: number;
-  remainingTokens: number;
-  quotaUsagePercentage: number;
-  classrooms: ClassroomSummary[];
+  totalTeachers: number;
+  totalStudents: number;
+  totalSchoolTokenQuota: number;
+  unallocatedTokenQuota: number; // Remaining School Shared Pool
+  allocatedTokens: number;       // Total tokens deducted from Shared Pool
+  tokensUsedByStudents: number;
+  defaultDailyStudentQuota: number;
+  pendingTokenBoostRequests: number;
+  assignmentStats: AssignmentStats;
 }
 ```
 
@@ -64,33 +73,33 @@ export interface SchoolAdminDashboardResponse {
 ```json
 {
   "code": 200,
-  "message": "School admin dashboard fetched successfully",
+  "message": "School Admin dashboard retrieved successfully",
   "data": {
     "schoolId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "schoolName": "THPT Chuyên Lê Hồng Phong",
-    "totalTeachers": 24,
-    "totalActiveStudents": 850,
+    "schoolCode": "LHP-HCM",
+    "packageType": "ENTERPRISE_SMALL",
+    "recommendedStudents": 350,
+    "status": "ACTIVE",
+    "subscriptionStartDate": "2025-09-01",
+    "subscriptionEndDate": "2026-05-31",
+    "renewedForNextYear": true,
+    "nextPackageType": "ENTERPRISE_MEDIUM",
     "totalClassrooms": 20,
-    "allocatedTokenQuota": 5000000,
-    "consumedTokens": 1824500,
-    "remainingTokens": 3175500,
-    "quotaUsagePercentage": 36.49,
-    "classrooms": [
-      {
-        "classId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-        "className": "Lớp 10A1",
-        "classCode": "LHP-10A1-2026",
-        "teacherName": "Nguyễn Văn A",
-        "studentCount": 42
-      },
-      {
-        "classId": "c81d4e2e-bcf2-11e6-869b-7df92533d2db",
-        "className": "Lớp 11B2",
-        "classCode": "LHP-11B2-2026",
-        "teacherName": "Trần Thị B",
-        "studentCount": 40
-      }
-    ]
+    "totalTeachers": 24,
+    "totalStudents": 380,
+    "totalSchoolTokenQuota": 5000000,
+    "unallocatedTokenQuota": 3175500,
+    "allocatedTokens": 1824500,
+    "tokensUsedByStudents": 1824500,
+    "defaultDailyStudentQuota": 1000,
+    "pendingTokenBoostRequests": 4,
+    "assignmentStats": {
+      "totalSubmissions": 0,
+      "completedRate": 0.0,
+      "lateSubmittedRate": 0.0,
+      "notStartedRate": 0.0
+    }
   }
 }
 ```
@@ -100,34 +109,43 @@ export interface SchoolAdminDashboardResponse {
 ### 2.2. Teacher Classroom Analytics Dashboard (US-SP6-07)
 - **Endpoint:** `GET /api/v1/teacher/dashboard/classrooms/{classId}`
 - **Authorized Role:** `ROLE_TEACHER`
-- **Description:** Returns pedagogical analytics for a specific classroom managed by the authenticated teacher. Multi-tenancy check ensures teacher cannot view classrooms outside their assignment.
+- **Description:** Returns pedagogical analytics for a specific classroom managed by the authenticated teacher, including the classroom's daily token limit, pending student token boost requests, and each student's daily token usage (`dailyTokensUsed`, `dailyBonusTokens`, `currentTokens` remaining today).
 
 #### TypeScript Interface
 ```typescript
-export interface StudentPerformanceSummary {
-  studentUid: string;
-  studentName: string;
-  studentCode: string;
-  averageScorePercentage: number;
-  completedQuizzesCount: number;
-  totalMessagesSent: number;
+export interface AssignmentRates {
+  onTimeRate: number;
+  lateRate: number;
+  pendingRate: number;
 }
 
-export interface WrongQuestionSummary {
-  questionId: string;
-  questionContent: string;
-  wrongCount: number;
+export interface StudentAnalyticsItem {
+  studentId: string;
+  studentCode: string;
+  fullName: string;
+  dailyTokenLimit: number;
+  dailyBonusTokens: number;
+  dailyTokensUsed: number;
+  currentTokens: number; // Remaining daily allowance today
+  quizzesAttempted: number;
+  averageScorePercentage: number;
+  aiMessagesCount: number;
 }
 
 export interface TeacherClassroomDashboardResponse {
-  classroomId: string;
+  classId: string;
   className: string;
   classCode: string;
-  totalStudents: number;
-  totalChatMessagesSent: number;
-  averageClassQuizScore: number;
-  studentRankings: StudentPerformanceSummary[];
-  topWrongQuestions: WrongQuestionSummary[];
+  gradeLevel: number;
+  academicYear: number;
+  status: 'ACTIVE' | 'ARCHIVED';
+  dailyTokenLimit: number;
+  pendingTokenBoostRequests: number;
+  studentCount: number;
+  totalAiMessages: number;
+  avgAiMessagesPerStudent: number;
+  assignmentRates: AssignmentRates;
+  students: StudentAnalyticsItem[];
 }
 ```
 
@@ -135,42 +153,36 @@ export interface TeacherClassroomDashboardResponse {
 ```json
 {
   "code": 200,
-  "message": "Teacher classroom dashboard fetched successfully",
+  "message": "Teacher classroom dashboard retrieved successfully",
   "data": {
-    "classroomId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "className": "Lớp 10A1",
+    "classId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "className": "10A1",
     "classCode": "LHP-10A1-2026",
-    "totalStudents": 42,
-    "totalChatMessagesSent": 1340,
-    "averageClassQuizScore": 81.25,
-    "studentRankings": [
+    "gradeLevel": 10,
+    "academicYear": 2026,
+    "status": "ACTIVE",
+    "dailyTokenLimit": 1000,
+    "pendingTokenBoostRequests": 2,
+    "studentCount": 42,
+    "totalAiMessages": 1340,
+    "avgAiMessagesPerStudent": 31.9,
+    "assignmentRates": {
+      "onTimeRate": 0.0,
+      "lateRate": 0.0,
+      "pendingRate": 0.0
+    },
+    "students": [
       {
-        "studentUid": "u1111111-2222-3333-4444-555555555555",
-        "studentName": "Phạm Quốc Huy",
+        "studentId": "u1111111-2222-3333-4444-555555555555",
         "studentCode": "HS00123",
+        "fullName": "Phạm Quốc Huy",
+        "dailyTokenLimit": 1000,
+        "dailyBonusTokens": 500,
+        "dailyTokensUsed": 450,
+        "currentTokens": 1050,
+        "quizzesAttempted": 8,
         "averageScorePercentage": 96.5,
-        "completedQuizzesCount": 8,
-        "totalMessagesSent": 65
-      },
-      {
-        "studentUid": "u2222222-3333-4444-5555-666666666666",
-        "studentName": "Lê Bảo Ngọc",
-        "studentCode": "HS00124",
-        "averageScorePercentage": 88.0,
-        "completedQuizzesCount": 7,
-        "totalMessagesSent": 48
-      }
-    ],
-    "topWrongQuestions": [
-      {
-        "questionId": "q1001-abc",
-        "questionContent": "Chiến thắng Điện Biên Phủ trên không diễn ra vào năm nào?",
-        "wrongCount": 15
-      },
-      {
-        "questionId": "q1002-def",
-        "questionContent": "Hội nghị Diên Hồng do vua Trần Thánh Tông triệu tập năm bao nhiêu?",
-        "wrongCount": 12
+        "aiMessagesCount": 65
       }
     ]
   }
@@ -181,33 +193,48 @@ export interface TeacherClassroomDashboardResponse {
 
 ### 2.3. Student Personal Dashboard (US-SP6-08)
 - **Endpoint:** `GET /api/v1/student/dashboard`
-- **Authorized Role:** `ROLE_STUDENT`
-- **Description:** Returns the authenticated student's personalized learning statistics, token consumption over the last 30 days, recent quiz results, and era distribution.
+- **Authorized Role:** `ROLE_SCHOOL_STUDENT`
+- **Description:** Returns the authenticated student's daily token spending limit (`dailyTokenLimit`), approved bonus tokens today (`dailyBonusTokens`), tokens used today (`tokensUsedToday`), remaining daily allowance (`currentTokens`), quiz performance, and enrolled classrooms across academic years (`ACTIVE` & `ARCHIVED`).
 
 #### TypeScript Interface
 ```typescript
-export interface RecentQuizSummary {
-  quizSessionId: string;
+export interface RecentQuizItem {
+  sessionId: string;
   quizTitle: string;
-  historicalEra: string;
-  scorePercentage: number;
+  percentage: number;
   completedAt: string; // ISO 8601
 }
 
-export interface EraDistributionSummary {
-  eraName: string;
-  quizzesTaken: number;
+export interface EnrolledClassroomItem {
+  classId: string;
+  className: string;
+  classCode: string;
+  academicYear: number;
+  status: 'ACTIVE' | 'ARCHIVED';
+  teacherName: string;
+}
+
+export interface UpcomingAssignmentItem {
+  assignmentId: string;
+  title: string;
+  assignmentType: string;
+  deadline: string;
 }
 
 export interface StudentPersonalDashboardResponse {
-  studentUid: string;
+  studentId: string;
   studentName: string;
-  tokensUsedLast30Days: number;
-  totalChatMessagesSent: number;
-  totalQuizzesTaken: number;
-  averageQuizScorePercentage: number;
-  recentQuizzes: RecentQuizSummary[];
-  eraDistribution: EraDistributionSummary[];
+  studentCode: string;
+  schoolName: string;
+  dailyTokenLimit: number;
+  dailyBonusTokens: number;
+  currentTokens: number;    // Remaining daily allowance today
+  tokensUsedToday: number;  // Tokens spent today
+  totalQuizzesAttempted: number;
+  averageScorePercentage: number;
+  recentQuizzes: RecentQuizItem[];
+  enrolledClassrooms: EnrolledClassroomItem[];
+  upcomingAssignments: UpcomingAssignmentItem[];
 }
 ```
 
@@ -215,36 +242,45 @@ export interface StudentPersonalDashboardResponse {
 ```json
 {
   "code": 200,
-  "message": "Student personal dashboard fetched successfully",
+  "message": "Student dashboard retrieved successfully",
   "data": {
-    "studentUid": "u1111111-2222-3333-4444-555555555555",
-    "studentName": "Phạm Quốc Huy",
-    "tokensUsedLast30Days": 45200,
-    "totalChatMessagesSent": 128,
-    "totalQuizzesTaken": 14,
-    "averageQuizScorePercentage": 89.4,
+    "studentId": "u1111111-2222-3333-4444-555555555555",
+    "studentName": "Trần Quốc Dinh",
+    "studentCode": "HS1001",
+    "schoolName": "THPT Chuyên Lê Hồng Phong",
+    "dailyTokenLimit": 1000,
+    "dailyBonusTokens": 500,
+    "currentTokens": 1200,
+    "tokensUsedToday": 300,
+    "totalQuizzesAttempted": 14,
+    "averageScorePercentage": 89.4,
     "recentQuizzes": [
       {
-        "quizSessionId": "qs-777",
+        "sessionId": "77777777-8888-9999-aaaa-bbbbbbbbbbbb",
         "quizTitle": "Khởi nghĩa Lam Sơn & Triều đại Lê Sơ",
-        "historicalEra": "Hậu Lê",
-        "scorePercentage": 90.0,
-        "completedAt": "2026-10-14T09:30:00Z"
-      },
-      {
-        "quizSessionId": "qs-888",
-        "quizTitle": "Ba lần kháng chiến chống quân Nguyên Mông",
-        "historicalEra": "Nhà Trần",
-        "scorePercentage": 95.0,
-        "completedAt": "2026-10-12T14:15:00Z"
+        "percentage": 90.0,
+        "completedAt": "2026-10-14T09:30:00"
       }
     ],
-    "eraDistribution": [
-      { "eraName": "Hậu Lê", "quizzesTaken": 5 },
-      { "eraName": "Nhà Trần", "quizzesTaken": 4 },
-      { "eraName": "Nhà Lý", "quizzesTaken": 3 },
-      { "eraName": "Cận đại", "quizzesTaken": 2 }
-    ]
+    "enrolledClassrooms": [
+      {
+        "classId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "className": "11A1",
+        "classCode": "LHP-11A1-2026",
+        "academicYear": 2026,
+        "status": "ACTIVE",
+        "teacherName": "Nguyễn Thị Mai"
+      },
+      {
+        "classId": "e11ac10b-58cc-4372-a567-0e02b2c3d111",
+        "className": "10A1",
+        "classCode": "LHP-10A1-2025",
+        "academicYear": 2025,
+        "status": "ARCHIVED",
+        "teacherName": "Trần Văn Hùng"
+      }
+    ],
+    "upcomingAssignments": []
   }
 }
 ```
@@ -254,48 +290,34 @@ export interface StudentPersonalDashboardResponse {
 ### 2.4. Customer B2C Personal Dashboard (US-SP6-09)
 - **Endpoint:** `GET /api/v1/customer/dashboard`
 - **Authorized Role:** `ROLE_CUSTOMER`
-- **Description:** Returns the individual retail customer's personal engagement statistics, chat token usage (30-day window), quiz records, and historical interest breakdown.
+- **Description:** Returns the individual retail customer's subscription tier, token balance, quiz records, top historical characters, and PayOS payment history.
 
 #### TypeScript Interface
 ```typescript
 export interface CustomerPersonalDashboardResponse {
-  customerUid: string;
-  customerName: string;
-  tokensUsedLast30Days: number;
-  totalChatMessagesSent: number;
-  totalQuizzesTaken: number;
-  averageQuizScorePercentage: number;
-  recentQuizzes: RecentQuizSummary[];
-  eraDistribution: EraDistributionSummary[];
-}
-```
-
-#### Sample Response (`200 OK`)
-```json
-{
-  "code": 200,
-  "message": "Customer personal dashboard fetched successfully",
-  "data": {
-    "customerUid": "c9999999-8888-7777-6666-555555555555",
-    "customerName": "Đỗ Minh Triết",
-    "tokensUsedLast30Days": 12850,
-    "totalChatMessagesSent": 45,
-    "totalQuizzesTaken": 6,
-    "averageQuizScorePercentage": 78.5,
-    "recentQuizzes": [
-      {
-        "quizSessionId": "qs-999",
-        "quizTitle": "Chiến dịch Điện Biên Phủ 1954",
-        "historicalEra": "Kháng chiến chống Pháp",
-        "scorePercentage": 85.0,
-        "completedAt": "2026-10-13T20:00:00Z"
-      }
-    ],
-    "eraDistribution": [
-      { "eraName": "Kháng chiến chống Pháp", "quizzesTaken": 3 },
-      { "eraName": "Thời kỳ dựng nước", "quizzesTaken": 3 }
-    ]
-  }
+  uid: string;
+  userName: string;
+  email: string;
+  currentTier: string;
+  currentTokens: number;
+  tierExpiresAt: string | null;
+  totalQuizzesAttempted: number;
+  averageScorePercentage: number;
+  eraDistribution: Record<string, number>;
+  recentQuizzes: RecentQuizItem[];
+  totalAiMessages: number;
+  topCharacters: {
+    characterId: string;
+    characterName: string;
+    messageCount: number;
+  }[];
+  paymentHistory: {
+    orderCode: number;
+    amount: number;
+    tierName: string;
+    status: string;
+    createdAt: string;
+  }[];
 }
 ```
 
@@ -303,28 +325,44 @@ export interface CustomerPersonalDashboardResponse {
 
 ### 2.5. System Admin Comprehensive Dashboard & JVM Health (US-SP6-10)
 - **Endpoint:** `GET /api/v1/admin/dashboard`
-- **Authorized Role:** `ROLE_ADMIN`
-- **Description:** High-level platform health, multi-tenant usage metrics, total commercial revenue (VND), and real-time JVM telemetry (Heap memory, CPU load, uptime).
+- **Authorized Role:** `ROLE_SYSTEM_ADMIN`
+- **Description:** High-level platform health, B2B Shared Token Pool metrics vs B2C token consumption, active vs expired schools count, total commercial revenue (VND), and real-time JVM telemetry.
 
 #### TypeScript Interface
 ```typescript
 export interface SystemAdminComprehensiveDashboardResponse {
-  totalActiveUsers: number;
-  totalSchools: number;
-  totalTeachers: number;
-  totalStudents: number;
-  totalCustomers: number;
-  totalAllocatedSchoolQuota: number;
-  totalConsumedSchoolTokens: number;
-  totalConsumedCustomerTokens: number;
-  totalPlatformTokensUsed: number;
-  totalRevenueVnd: number;
-  jvmHeapUsedBytes: number;
-  jvmHeapMaxBytes: number;
-  jvmHeapUsedMb: number;
-  jvmHeapMaxMb: number;
-  jvmCpuUsagePercent: number;
-  systemUptimeSeconds: number;
+  jvmHealth: {
+    cpuUsagePercentage: number;
+    usedMemoryMb: number;
+    totalMemoryMb: number;
+    freeMemoryMb: number;
+    maxMemoryMb: number;
+    memoryUsagePercentage: number;
+    activeThreadCount: number;
+    uptimeSeconds: number;
+  };
+  tokenSummary: {
+    totalTokensB2bAllocated: number;
+    totalTokensB2bRemainingInPools: number;
+    totalTokensB2bConsumed: number;
+    totalTokensB2cConsumed: number;
+    totalTokensSystemConsumed: number;
+  };
+  topWrongQuestions: {
+    questionId: string;
+    quizTitle: string;
+    wrongAnswers: number;
+    totalAnswers: number;
+    wrongRate: number;
+  }[];
+  platformOverview: {
+    totalSchools: number;
+    activeSchools: number;
+    expiredSchools: number;
+    totalUsers: number;
+    totalQuizzes: number;
+    totalRevenue: number;
+  };
 }
 ```
 
@@ -332,24 +370,42 @@ export interface SystemAdminComprehensiveDashboardResponse {
 ```json
 {
   "code": 200,
-  "message": "System admin comprehensive dashboard fetched successfully",
+  "message": "System Admin dashboard retrieved successfully",
   "data": {
-    "totalActiveUsers": 1250,
-    "totalSchools": 8,
-    "totalTeachers": 45,
-    "totalStudents": 1050,
-    "totalCustomers": 155,
-    "totalAllocatedSchoolQuota": 25000000,
-    "totalConsumedSchoolTokens": 8450200,
-    "totalConsumedCustomerTokens": 1120400,
-    "totalPlatformTokensUsed": 9570600,
-    "totalRevenueVnd": 45850000.0,
-    "jvmHeapUsedBytes": 284562432,
-    "jvmHeapMaxBytes": 1073741824,
-    "jvmHeapUsedMb": 271.38,
-    "jvmHeapMaxMb": 1024.0,
-    "jvmCpuUsagePercent": 4.12,
-    "systemUptimeSeconds": 142580
+    "jvmHealth": {
+      "cpuUsagePercentage": 4.1,
+      "usedMemoryMb": 271,
+      "totalMemoryMb": 512,
+      "freeMemoryMb": 241,
+      "maxMemoryMb": 1024,
+      "memoryUsagePercentage": 52.9,
+      "activeThreadCount": 28,
+      "uptimeSeconds": 142580
+    },
+    "tokenSummary": {
+      "totalTokensB2bAllocated": 25000000,
+      "totalTokensB2bRemainingInPools": 16549800,
+      "totalTokensB2bConsumed": 8450200,
+      "totalTokensB2cConsumed": 1120400,
+      "totalTokensSystemConsumed": 9570600
+    },
+    "topWrongQuestions": [
+      {
+        "questionId": "q-001",
+        "quizTitle": "Lịch sử Việt Nam thế kỷ 10",
+        "wrongAnswers": 45,
+        "totalAnswers": 50,
+        "wrongRate": 90.0
+      }
+    ],
+    "platformOverview": {
+      "totalSchools": 8,
+      "activeSchools": 7,
+      "expiredSchools": 1,
+      "totalUsers": 1250,
+      "totalQuizzes": 80,
+      "totalRevenue": 45850000
+    }
   }
 }
 ```
