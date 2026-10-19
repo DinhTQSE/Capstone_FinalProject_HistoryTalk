@@ -78,4 +78,16 @@ public class CreateLocalCharacterRequest {
     @Builder.Default
     @JsonProperty("contentScope")
     private ContentScope contentScope = ContentScope.CLASS_ONLY;
+
+    /** IDs of classrooms to assign this character to on creation. */
+    @JsonProperty("classIds")
+    private java.util.List<String> classIds;
+
+    /**
+     * Whether the local character is published immediately upon creation.
+     * Defaults to true (teachers can self-publish without admin approval).
+     */
+    @Builder.Default
+    @JsonProperty("isPublished")
+    private Boolean isPublished = true;
 }

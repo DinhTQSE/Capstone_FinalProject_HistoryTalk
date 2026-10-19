@@ -8,6 +8,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.List;
+
 /**
  * Request body for Teacher creating a Local Historical Context.
  * school_id and createdBy are derived from the JWT principal — not accepted from the client.
@@ -65,4 +67,24 @@ public class CreateLocalContextRequest {
     @Builder.Default
     @JsonProperty("contentScope")
     private ContentScope contentScope = ContentScope.CLASS_ONLY;
+
+    /** Latitude for map pin (optional). */
+    @JsonProperty("latitude")
+    private Double latitude;
+
+    /** Longitude for map pin (optional). */
+    @JsonProperty("longitude")
+    private Double longitude;
+
+    /** IDs of classrooms to assign this context to on creation. */
+    @JsonProperty("classIds")
+    private List<String> classIds;
+
+    /**
+     * Whether the local context is published immediately upon creation.
+     * Defaults to true (teachers can self-publish without admin approval).
+     */
+    @Builder.Default
+    @JsonProperty("isPublished")
+    private Boolean isPublished = true;
 }

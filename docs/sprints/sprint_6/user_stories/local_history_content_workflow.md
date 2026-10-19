@@ -17,72 +17,77 @@
 
 ## 📑 CHI TIẾT USER STORIES
 
-### 🆔 US-SP6-02: Giáo viên Tạo & Chia sẻ Nội dung Lịch sử Địa phương
+### 🆔 US-SP6-02: Giáo viên Tạo & Tự Xuất Bản (Publish) Nội dung Lịch sử Địa phương
 * **Actor:** `Teacher`
-* **Thời gian thực hiện:** 12/10/2026 – 14/10/2026
+* **Thời gian thực hiện:** 12/10/2026 – 19/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là Giáo viên, tôi muốn tạo mới Bối cảnh hoặc Nhân vật mang tính chất Lịch sử Địa phương, gắn với trường mình, để phục vụ việc giao bài tập đặc thù của nhà trường.
+  Là Giáo viên, tôi muốn tạo mới và tự do xuất bản Bối cảnh hoặc Nhân vật mang tính chất Lịch sử Địa phương lên Ngân hàng lịch sử của trường (School's History Bank) mà không cần phải chờ School Admin duyệt trước (tương tự như Content Admin xuất bản nội dung chung), để phục vụ việc giao bài tập đặc thù của nhà trường một cách nhanh chóng.
 
 * **Acceptance Criteria (AC):**
-  1. API `POST /api/v1/teacher/local-contents/contexts` tạo bối cảnh địa phương gắn liền với `school_id` (lấy từ JWT) và `created_by` (teacher đang đăng nhập). Mặc định trạng thái là `DRAFT`.
+  1. API `POST /api/v1/teacher/local-contents/contexts` tạo bối cảnh địa phương gắn liền với `school_id` (lấy từ JWT/Security context) và `created_by` (teacher đang đăng nhập). Mặc định `is_published = true`, trạng thái là `ACTIVE`, `approved_by` lưu teacher. Giáo viên có thể tùy chọn lưu `DRAFT` nếu truyền `isPublished: false`.
   2. API `POST /api/v1/teacher/local-contents/characters` tạo nhân vật địa phương tương tự.
   3. Teacher chọn **`contentScope`** lúc tạo:
-     - `CLASS_ONLY` *(mặc định)*: chỉ mình Teacher tác giả thấy.
-     - `SCHOOL_WIDE`: lưu vào kho nội dung toàn trường — GV khác cùng trường có thể xem và dùng.
-  4. Thay đổi `contentScope` sau khi tạo sẽ **reset trạng thái về DRAFT** và xóa `approved_by` — bắt buộc School Admin duyệt lại.
-  5. Teacher chỉ có thể **sửa/xóa nội dung do chính mình tạo** (ownership enforcement). GV khác không thể sửa dù cùng trường.
-  6. Người dùng thuộc trường khác hoặc B2C Customer **tuyệt đối không thể truy cập** nội dung địa phương này.
+     - `CLASS_ONLY`: dùng trong phạm vi lớp của Teacher tác giả.
+     - `SCHOOL_WIDE` *(mặc định)*: lưu vào kho nội dung toàn trường — GV khác cùng trường có thể xem và dùng.
+  4. Thay đổi `contentScope` sau khi tạo **KHÔNG** làm reset trạng thái về DRAFT hay xóa approved_by. GV có thể đổi scope tự do.
+  5. API `/submit` và `/status` cho phép Giáo viên chủ động quản lý vòng đời nội dung (`ACTIVE`, `DRAFT`, `INACTIVE`) của chính mình.
+  6. Teacher chỉ có thể **sửa/xóa nội dung do chính mình tạo** (ownership enforcement). GV khác không thể sửa dù cùng trường.
+  7. Người dùng thuộc trường khác hoặc B2C Customer **tuyệt đối không thể truy cập** nội dung địa phương này.
 
 * **API Endpoints:**
 
   | Method | Path | Mô tả |
   |--------|------|--------|
-  | `POST` | `/api/v1/teacher/local-contents/contexts` | Tạo bối cảnh địa phương |
+  | `POST` | `/api/v1/teacher/local-contents/contexts` | Tạo bối cảnh địa phương (mặc định publish ngay) |
   | `GET` | `/api/v1/teacher/local-contents/contexts` | Danh sách context teacher có thể thấy |
   | `GET` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Chi tiết context |
   | `PUT` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Cập nhật (chỉ tác giả) |
   | `DELETE` | `/api/v1/teacher/local-contents/contexts/{contextId}` | Xóa mềm (chỉ tác giả) |
+  | `PUT` | `/api/v1/teacher/local-contents/contexts/{contextId}/submit` | Xuất bản nhanh bối cảnh lên kho trường |
+  | `PUT` | `/api/v1/teacher/local-contents/contexts/{contextId}/status` | Thay đổi trạng thái bối cảnh (ACTIVE/DRAFT/INACTIVE) |
   | `GET` | `/api/v1/teacher/local-contents/contexts/{contextId}/documents` | Danh sách tài liệu của context |
   | `POST` | `/api/v1/teacher/local-contents/contexts/{contextId}/documents` | Thêm tài liệu vào context |
   | `DELETE` | `/api/v1/teacher/local-contents/contexts/{contextId}/documents/{docId}` | Xóa tài liệu (chỉ người upload) |
-  | `POST` | `/api/v1/teacher/local-contents/characters` | Tạo nhân vật địa phương |
+  | `POST` | `/api/v1/teacher/local-contents/characters` | Tạo nhân vật địa phương (mặc định publish ngay) |
   | `GET` | `/api/v1/teacher/local-contents/characters` | Danh sách character teacher có thể thấy |
   | `GET` | `/api/v1/teacher/local-contents/characters/{characterId}` | Chi tiết character |
   | `PUT` | `/api/v1/teacher/local-contents/characters/{characterId}` | Cập nhật (chỉ tác giả) |
   | `DELETE` | `/api/v1/teacher/local-contents/characters/{characterId}` | Xóa mềm (chỉ tác giả) |
+  | `PUT` | `/api/v1/teacher/local-contents/characters/{characterId}/submit` | Xuất bản nhanh nhân vật lên kho trường |
+  | `PUT` | `/api/v1/teacher/local-contents/characters/{characterId}/status` | Thay đổi trạng thái nhân vật (ACTIVE/DRAFT/INACTIVE) |
   | `GET` | `/api/v1/teacher/local-contents/characters/{characterId}/documents` | Danh sách tài liệu của character |
   | `POST` | `/api/v1/teacher/local-contents/characters/{characterId}/documents` | Thêm tài liệu vào character |
   | `DELETE` | `/api/v1/teacher/local-contents/characters/{characterId}/documents/{docId}` | Xóa tài liệu (chỉ người upload) |
 
 ---
 
-### 🆔 US-SP6-03: School Admin Duyệt Local Content & Policy Disclaimer Enforcement
+### 🆔 US-SP6-03: School Admin Giám Sát Local Content & Policy Disclaimer Enforcement
 * **Actor:** `School Admin`
-* **Thời gian thực hiện:** 13/10/2026 – 14/10/2026
+* **Thời gian thực hiện:** 13/10/2026 – 19/10/2026
 * **Phụ trách:** 🟢 Khải (KhaiVDD)
 * **User Story:**  
-  Là School Admin, tôi muốn kiểm duyệt nội dung Lịch sử Địa phương do Giáo viên trường mình soạn thảo và bấm Duyệt, để học sinh trong trường có thể tương tác với nội dung đó thông qua bài tập.
+  Là School Admin, tôi muốn giám sát toàn bộ nội dung Lịch sử Địa phương do Giáo viên trường mình đăng tải lên kho trường, có quyền can thiệp ẩn/kích hoạt lại hoặc đưa về bản nháp nếu nội dung có vấn đề, để đảm bảo chất lượng và tính chuẩn mực.
 
 * **Acceptance Criteria (AC):**
   1. School Admin xem được **toàn bộ** nội dung địa phương trong trường mình (bao gồm `CLASS_ONLY` và `SCHOOL_WIDE`) tại:
      - `GET /api/v1/school-admin/local-contents/contexts`
      - `GET /api/v1/school-admin/local-contents/characters`
-  2. API `PUT /api/v1/school-admin/local-contents/contexts/{contextId}/status` và `.../characters/{characterId}/status` cho phép chuyển trạng thái:
-     - `ACTIVE` → Duyệt & publish (`is_published = true`, lưu `approved_by`).
+  2. API `PUT /api/v1/school-admin/local-contents/contexts/{contextId}/status` và `.../characters/{characterId}/status` cho phép can thiệp chuyển trạng thái:
+     - `ACTIVE` → Duyệt/kích hoạt (`is_published = true`, lưu `approved_by`).
      - `DRAFT` → Trả lại GV chỉnh sửa (`is_published = false`, xóa `approved_by`).
      - `INACTIVE` → Ẩn tạm thời (`is_published = false`, giữ `approved_by` để audit).
   3. Khi duyệt (`ACTIVE`), lưu `approved_by = school_admin_id` để phục vụ đối soát nội bộ.
-  4. ⚠️ **Policy Disclaimer (Điều khoản miễn trách):** Bằng cách duyệt nội dung, nhà trường xác nhận chịu **toàn bộ trách nhiệm pháp lý** về tính xác thực của nội dung Lịch sử Địa phương. Bên cung cấp ứng dụng HistoryTalk hoàn toàn **miễn trừ trách nhiệm** đối với nội dung do nhà trường tự đăng tải.
+  4. ⚠️ **Policy Disclaimer (Điều khoản miễn trách):** Nhà trường xác nhận chịu **toàn bộ trách nhiệm pháp lý** về tính xác thực của nội dung Lịch sử Địa phương do giáo viên nhà trường đăng tải. Bên cung cấp ứng dụng HistoryTalk hoàn toàn **miễn trừ trách nhiệm** đối với nội dung do nhà trường tự đăng tải.
 
 * **API Endpoints:**
 
   | Method | Path | Mô tả |
   |--------|------|--------|
   | `GET` | `/api/v1/school-admin/local-contents/contexts` | Xem tất cả context trong trường |
-  | `PUT` | `/api/v1/school-admin/local-contents/contexts/{contextId}/status` | Duyệt/thay đổi trạng thái context |
+  | `PUT` | `/api/v1/school-admin/local-contents/contexts/{contextId}/status` | Giám sát / thay đổi trạng thái context |
   | `GET` | `/api/v1/school-admin/local-contents/characters` | Xem tất cả character trong trường |
-  | `PUT` | `/api/v1/school-admin/local-contents/characters/{characterId}/status` | Duyệt/thay đổi trạng thái character |
+  | `PUT` | `/api/v1/school-admin/local-contents/characters/{characterId}/status` | Giám sát / thay đổi trạng thái character |
 
 ---
 

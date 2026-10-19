@@ -58,22 +58,24 @@ public class TeacherLocalContentController {
 
         LocalContentResponse response = localContentService.createLocalContext(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Local context created successfully (DRAFT)"));
+                .body(ApiResponse.success(response, "Local context created successfully"));
     }
 
     @GetMapping("/contexts")
     @Operation(
             summary = "Danh sách bối cảnh địa phương mà Teacher có thể thấy",
             description = "Trả về: (1) tất cả context Teacher tự tạo, " +
-                    "(2) context SCHOOL_WIDE của GV khác cùng trường.")
+                    "(2) context SCHOOL_WIDE của GV khác cùng trường. " +
+                    "Filter theo status: DRAFT | PENDING_REVIEW | ACTIVE | INACTIVE.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getLocalContexts(
             @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> response =
-                localContentService.getLocalContexts(search, page, size, principal);
+                localContentService.getLocalContexts(search, status, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Local contexts retrieved successfully"));
     }
 
@@ -90,8 +92,7 @@ public class TeacherLocalContentController {
     @PutMapping("/contexts/{contextId}")
     @Operation(
             summary = "Cập nhật bối cảnh địa phương",
-            description = "Chỉ Teacher là tác giả mới được sửa. " +
-                    "Thay đổi contentScope sẽ reset trạng thái về DRAFT và xóa approval.")
+            description = "Chỉ Teacher là tác giả mới được sửa.")
     public ResponseEntity<ApiResponse<LocalContentResponse>> updateLocalContext(
             @PathVariable String contextId,
             @Valid @RequestBody UpdateLocalContextRequest request,
@@ -111,6 +112,31 @@ public class TeacherLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(null, "Local context deleted successfully"));
     }
 
+    @PutMapping("/contexts/{contextId}/submit")
+    @Operation(
+            summary = "Xuất bản bối cảnh lên kho tư liệu trường",
+            description = "Giáo viên tự do xuất bản bối cảnh (chuyển sang ACTIVE) để hiển thị cho học sinh.")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> submitLocalContext(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.submitLocalContext(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Context published successfully"));
+    }
+
+    @PutMapping("/contexts/{contextId}/status")
+    @Operation(
+            summary = "Giáo viên thay đổi trạng thái bối cảnh",
+            description = "Giáo viên cập nhật trạng thái bối cảnh của mình (ACTIVE / DRAFT / INACTIVE).")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> updateLocalContextStatus(
+            @PathVariable String contextId,
+            @Valid @RequestBody UpdateLocalContentStatusRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.updateLocalContextStatus(contextId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Context status updated to " + request.getStatus()));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // LOCAL CHARACTERS
     // ══════════════════════════════════════════════════════════════════════════
@@ -118,26 +144,29 @@ public class TeacherLocalContentController {
     @PostMapping("/characters")
     @Operation(
             summary = "Tạo nhân vật lịch sử địa phương",
-            description = "Teacher tạo nhân vật mới gắn với trường, mặc định DRAFT + CLASS_ONLY.")
+            description = "Teacher tạo nhân vật mới gắn với trường, tự do xuất bản vào kho tư liệu trường.")
     public ResponseEntity<ApiResponse<LocalContentResponse>> createLocalCharacter(
             @Valid @RequestBody CreateLocalCharacterRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.createLocalCharacter(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Local character created successfully (DRAFT)"));
+                .body(ApiResponse.success(response, "Local character created successfully"));
     }
 
     @GetMapping("/characters")
-    @Operation(summary = "Danh sách nhân vật địa phương mà Teacher có thể thấy")
+    @Operation(
+            summary = "Danh sách nhân vật địa phương mà Teacher có thể thấy",
+            description = "Filter theo status: DRAFT | PENDING_REVIEW | ACTIVE | INACTIVE.")
     public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getLocalCharacters(
             @RequestParam(required = false, defaultValue = "") String search,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> response =
-                localContentService.getLocalCharacters(search, page, size, principal);
+                localContentService.getLocalCharacters(search, status, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Local characters retrieved successfully"));
     }
 
@@ -172,6 +201,31 @@ public class TeacherLocalContentController {
 
         localContentService.deleteLocalCharacter(characterId, principal);
         return ResponseEntity.ok(ApiResponse.success(null, "Local character deleted successfully"));
+    }
+
+    @PutMapping("/characters/{characterId}/submit")
+    @Operation(
+            summary = "Xuất bản nhân vật lên kho tư liệu trường",
+            description = "Giáo viên tự do xuất bản nhân vật (chuyển sang ACTIVE) để hiển thị cho học sinh.")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> submitLocalCharacter(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.submitLocalCharacter(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Character published successfully"));
+    }
+
+    @PutMapping("/characters/{characterId}/status")
+    @Operation(
+            summary = "Giáo viên thay đổi trạng thái nhân vật",
+            description = "Giáo viên cập nhật trạng thái nhân vật của mình (ACTIVE / DRAFT / INACTIVE).")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> updateLocalCharacterStatus(
+            @PathVariable String characterId,
+            @Valid @RequestBody UpdateLocalContentStatusRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.updateLocalCharacterStatus(characterId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Character status updated to " + request.getStatus()));
     }
 
     // ── Document endpoints — Context ──────────────────────────────────────────

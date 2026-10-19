@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,9 +34,15 @@ public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
     Page<Classroom> findBySchoolIdAndGradeLevelAndDeletedAtIsNull(
             UUID schoolId, Integer gradeLevel, Pageable pageable);
 
+    List<Classroom> findBySchoolIdAndGradeLevelAndDeletedAtIsNull(UUID schoolId, Integer gradeLevel);
+
     // Lọc theo Năm học (academicYear)
     Page<Classroom> findBySchoolIdAndAcademicYearAndDeletedAtIsNull(
             UUID schoolId, Integer academicYear, Pageable pageable);
+
+    List<Classroom> findBySchoolIdAndAcademicYearAndDeletedAtIsNull(UUID schoolId, Integer academicYear);
+
+    List<Classroom> findBySchoolIdAndStatusAndDeletedAtIsNull(UUID schoolId, String status);
 
     // Lọc theo cả Khối lớp và Năm học
     Page<Classroom> findBySchoolIdAndGradeLevelAndAcademicYearAndDeletedAtIsNull(

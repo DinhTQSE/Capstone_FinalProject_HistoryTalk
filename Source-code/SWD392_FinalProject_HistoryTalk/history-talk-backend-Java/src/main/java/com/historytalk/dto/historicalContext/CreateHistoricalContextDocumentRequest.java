@@ -1,5 +1,6 @@
 package com.historytalk.dto.historicalContext;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.historytalk.entity.enums.DocumentType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -17,7 +18,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class CreateHistoricalContextDocumentRequest {
     
-    @NotBlank(message = "Yêu cầu Context ID")
+    /** Optional when used from local content endpoints (id is in URL path). Required for global document endpoints. */
+    @JsonProperty("contextId")
     private String contextId;
     
     @NotBlank(message = "Yêu cầu tiêu đề")
