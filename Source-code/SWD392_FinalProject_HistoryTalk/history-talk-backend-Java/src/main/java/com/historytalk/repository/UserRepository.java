@@ -58,7 +58,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     );
 
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
-           "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE')")
+           "AND (u.accountStatus IS NULL OR u.accountStatus <> com.historytalk.entity.enums.AccountStatus.DEACTIVATED) " +
+           "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.status = 'ACTIVE' " +
+           "AND cs.classroom.deletedAt IS NULL AND (cs.classroom.status = 'ACTIVE' OR cs.classroom.id = :classroomId))")
     org.springframework.data.domain.Page<User> findAvailableStudentsForClassroom(
             @Param("schoolId") UUID schoolId,
             @Param("classroomId") UUID classroomId,
@@ -66,7 +68,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     );
 
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
-           "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE') " +
+           "AND (u.accountStatus IS NULL OR u.accountStatus <> com.historytalk.entity.enums.AccountStatus.DEACTIVATED) " +
+           "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.status = 'ACTIVE' " +
+           "AND cs.classroom.deletedAt IS NULL AND (cs.classroom.status = 'ACTIVE' OR cs.classroom.id = :classroomId)) " +
            "AND (CAST(:search AS string) IS NULL OR :search = '' " +
            "OR u.fullName ILIKE CONCAT('%', CAST(:search AS string), '%') " +
            "OR u.userName ILIKE CONCAT('%', CAST(:search AS string), '%') " +
