@@ -89,6 +89,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 .gradeLevel(request.getGradeLevel())
                 .academicYear(request.getAcademicYear())
                 .description(request.getDescription() != null ? request.getDescription().trim() : null)
+                .dailyTokenQuota(request.getDailyTokenQuota() != null ? request.getDailyTokenQuota() : 0)
                 .status("ACTIVE")
                 .build();
 
@@ -140,6 +141,10 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         if (request.getDescription() != null) {
             classroom.setDescription(request.getDescription().trim());
+        }
+
+        if (request.getDailyTokenQuota() != null) {
+            classroom.setDailyTokenQuota(request.getDailyTokenQuota());
         }
 
         if (request.getStatus() != null) {
@@ -351,6 +356,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 .gradeLevel(classroom.getGradeLevel())
                 .academicYear(classroom.getAcademicYear())
                 .description(classroom.getDescription())
+                .dailyTokenQuota(classroom.getDailyTokenQuota() != null ? classroom.getDailyTokenQuota() : 0)
                 .status(classroom.getStatus())
                 .teacher(teacherSummary)
                 .studentCount(studentCount != null ? studentCount : 0L)

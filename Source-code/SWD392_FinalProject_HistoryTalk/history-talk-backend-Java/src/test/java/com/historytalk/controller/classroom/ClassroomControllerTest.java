@@ -152,6 +152,7 @@ class ClassroomControllerTest {
                 .classCode("CVA-10A1-2026")
                 .gradeLevel(10)
                 .academicYear(2026)
+                .dailyTokenQuota(5000)
                 .status("ACTIVE")
                 .studentCount(35L)
                 .teacher(TeacherSummaryDto.builder()
@@ -166,6 +167,7 @@ class ClassroomControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(classroomId.toString()))
+                .andExpect(jsonPath("$.data.dailyTokenQuota").value(5000))
                 .andExpect(jsonPath("$.data.studentCount").value(35))
                 .andExpect(jsonPath("$.data.teacher.fullName").value("Nguyễn Thị Mai"));
     }
@@ -175,12 +177,14 @@ class ClassroomControllerTest {
     void updateClassroom_Success() throws Exception {
         UpdateClassroomRequest request = UpdateClassroomRequest.builder()
                 .className("10A1 Chuyên")
+                .dailyTokenQuota(10000)
                 .build();
 
         ClassroomResponse response = ClassroomResponse.builder()
                 .id(classroomId)
                 .className("10A1 Chuyên")
                 .classCode("CVA-10A1-2026")
+                .dailyTokenQuota(10000)
                 .build();
 
         when(classroomService.updateClassroom(eq(classroomId), any(UpdateClassroomRequest.class), any(UserPrincipal.class)))
@@ -191,7 +195,8 @@ class ClassroomControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.className").value("10A1 Chuyên"));
+                .andExpect(jsonPath("$.data.className").value("10A1 Chuyên"))
+                .andExpect(jsonPath("$.data.dailyTokenQuota").value(10000));
     }
 
     @Test
@@ -213,6 +218,7 @@ class ClassroomControllerTest {
                 .id(classroomId)
                 .className("10A1")
                 .classCode("CVA-10A1-2026")
+                .dailyTokenQuota(5000)
                 .build();
 
         PaginatedResponse<ClassroomResponse> paginated = PaginatedResponse.<ClassroomResponse>builder()
@@ -234,18 +240,26 @@ class ClassroomControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].className").value("10A1"))
+                .andExpect(jsonPath("$.data[0].dailyTokenQuota").value(5000))
                 .andExpect(jsonPath("$.pagination.totalElements").value(1));
     }
 
     @Test
     @DisplayName("GET /api/v1/teacher/classrooms - Success returns teacher classrooms")
     void getTeacherClassrooms_Success() throws Exception {
+        ClassroomResponse item = ClassroomResponse.builder()
+                .id(classroomId)
+                .className("10A1")
+                .classCode("CVA-10A1-2026")
+                .dailyTokenQuota(5000)
+                .build();
+
         PaginatedResponse<ClassroomResponse> paginated = PaginatedResponse.<ClassroomResponse>builder()
-                .content(Collections.emptyList())
+                .content(List.of(item))
                 .currentPage(0)
                 .pageSize(10)
-                .totalElements(0L)
-                .totalPages(0)
+                .totalElements(1L)
+                .totalPages(1)
                 .build();
 
         when(classroomService.getTeacherClassrooms(any(), any(Pageable.class), any(UserPrincipal.class)))
@@ -255,7 +269,8 @@ class ClassroomControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.pagination.totalElements").value(0));
+                .andExpect(jsonPath("$.data[0].dailyTokenQuota").value(5000))
+                .andExpect(jsonPath("$.pagination.totalElements").value(1));
     }
 
     @Test

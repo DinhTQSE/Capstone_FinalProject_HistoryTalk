@@ -52,6 +52,10 @@ public class Classroom {
     private String description;
 
     @Builder.Default
+    @Column(name = "daily_token_quota", nullable = false)
+    private Integer dailyTokenQuota = 0;
+
+    @Builder.Default
     @Column(name = "status", length = 20, nullable = false)
     private String status = "ACTIVE";
 
