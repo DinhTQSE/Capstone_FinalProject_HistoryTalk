@@ -158,7 +158,7 @@ Frontend cần phân biệt rõ 2 mã lỗi `403 Forbidden` trả về từ Back
 
 #### A. Chuyển giao Năm học (`POST /api/v1/school-admin/academic-year/rollover`)
 * **Role:** `ROLE_SCHOOL_ADMIN`
-* **Mô tả:** Chuyển toàn bộ lớp học của năm học cũ sang trạng thái `ARCHIVED`, thu hồi toàn bộ token dư trong ngày của học sinh về Quỹ trường, và tự động vô hiệu hóa (`DEACTIVATED`) tài khoản học sinh Khối 12 đã tốt nghiệp.
+* **Mô tả:** Chuyển toàn bộ lớp học của năm học cũ sang trạng thái `ARCHIVED`, đặt lại bộ đếm chi tiêu ngày của học sinh, và tự động vô hiệu hóa (`DEACTIVATED`) tài khoản học sinh Khối 12 đã tốt nghiệp (Toàn bộ token chưa dùng luôn nằm nguyên 100% trong Quỹ chung của trường).
 
 ```json
 {
@@ -176,16 +176,16 @@ Frontend cần phân biệt rõ 2 mã lỗi `403 Forbidden` trả về từ Back
     "schoolId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "completedAcademicYear": 2025,
     "archivedClassroomsCount": 18,
-    "reclaimedTokensToPool": 64500,
+    "reclaimedTokensToPool": 0,
     "deactivatedGraduatedStudentsCount": 210,
-    "remainingSchoolTokenPool": 1064500
+    "remainingSchoolTokenPool": 1000000
   }
 }
 ```
 
 #### B. Vô hiệu hóa Học sinh Chuyển trường / Ra trường lẻ (`PUT /api/v1/school-admin/students/{uid}/deactivate`)
 * **Role:** `ROLE_SCHOOL_ADMIN`
-* **Mô tả:** Thu hồi toàn bộ token dư của học sinh về Quỹ trường và chuyển trạng thái tài khoản sang `DEACTIVATED` (khóa đăng nhập vĩnh viễn).
+* **Mô tả:** Chuyển trạng thái tài khoản học sinh sang `DEACTIVATED` (khóa đăng nhập vĩnh viễn) khi học sinh chuyển trường hoặc tốt nghiệp.
 
 ```json
 {

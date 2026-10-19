@@ -175,16 +175,22 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
             int availablePool = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
             if (availablePool < tokensToGrant) {
                 throw new InvalidRequestException(String.format(
-                        "Quỹ Token chung của trường không đủ để cấp thêm (yêu cầu: %,d, còn lại: %,d).",
+                        "Quỹ Token chung của trường không đủ để cấp thêm hạn mức (yêu cầu: %,d, còn lại trong quỹ: %,d).",
                         tokensToGrant, availablePool));
             }
 
-            school.setUnallocatedTokenQuota(availablePool - tokensToGrant);
-            schoolRepository.save(school);
-
             User student = boostRequest.getStudent();
-            int currentStudentToken = student.getToken() != null ? student.getToken() : 0;
-            student.setToken(currentStudentToken + tokensToGrant);
+            LocalDate today = LocalDate.now();
+            if (student.getLastTokenResetAt() == null || student.getLastTokenResetAt().toLocalDate().isBefore(today)) {
+                student.setDailyTokensUsed(0);
+                student.setDailyBonusTokens(0);
+            }
+
+            int currentBonus = student.getDailyBonusTokens() != null ? Math.max(0, student.getDailyBonusTokens()) : 0;
+            student.setDailyBonusTokens(currentBonus + tokensToGrant);
+
+            int currentDisplayToken = student.getToken() != null ? Math.max(0, student.getToken()) : 0;
+            student.setToken(Math.min(availablePool, currentDisplayToken + tokensToGrant));
             student.setLastTokenResetAt(LocalDateTime.now());
             userRepository.save(student);
 
@@ -193,8 +199,8 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
             boostRequest.setReviewedBy(reviewer);
             boostRequest.setReviewNote(reviewDto.getReviewNote());
 
-            log.info("Approved token boost request {} by {}: +{} tokens granted to student {}",
-                    requestId, reviewer.getUserName(), tokensToGrant, student.getUserName());
+            log.info("Approved token boost request {} by {}: +{} daily bonus tokens granted to student {} (school pool remains {})",
+                    requestId, reviewer.getUserName(), tokensToGrant, student.getUserName(), availablePool);
         } else if ("REJECT".equals(action) || "REJECTED".equals(action)) {
             boostRequest.setStatus(TokenBoostRequestStatus.REJECTED);
             boostRequest.setApprovedTokens(0);

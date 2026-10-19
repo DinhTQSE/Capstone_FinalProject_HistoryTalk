@@ -15,10 +15,12 @@ ALTER TABLE school
 ALTER TABLE classroom
     ADD COLUMN IF NOT EXISTS daily_token_quota INTEGER;
 
--- 3. Extend "user" table to track account_status (ACTIVE / DEACTIVATED for graduated/transferred students)
+-- 3. Extend "user" table to track account_status and daily student token usage against school shared pool
 ALTER TABLE "user"
     ADD COLUMN IF NOT EXISTS account_status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
-    ADD COLUMN IF NOT EXISTS deactivated_reason VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS deactivated_reason VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS daily_tokens_used INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS daily_bonus_tokens INTEGER NOT NULL DEFAULT 0;
 
 -- 4. Create token_boost_request table for daily student token boost workflow (US-SP7-17)
 CREATE TABLE IF NOT EXISTS token_boost_request (

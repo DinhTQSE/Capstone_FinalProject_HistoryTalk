@@ -166,12 +166,20 @@ public class MessageServiceImpl implements MessageService {
         Message savedAssistantMsg = messageRepository.save(assistantMsg);
 
         int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
-        if (totalToken != null && totalToken > 0 &&
-                (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER
-                        || session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT)) {
-            userRepository.deductTokens(session.getUser().getUid(), totalToken);
-            remainingTokens = Math.max(0, remainingTokens - totalToken);
-            session.getUser().setToken(remainingTokens);
+        if (totalToken != null && totalToken > 0) {
+            if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
+                userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                remainingTokens = Math.max(0, remainingTokens - totalToken);
+                session.getUser().setToken(remainingTokens);
+            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+                if (dailyTokenAllowanceService != null) {
+                    remainingTokens = dailyTokenAllowanceService.recordStudentTokenUsage(session.getUser(), totalToken);
+                } else {
+                    userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                    remainingTokens = Math.max(0, remainingTokens - totalToken);
+                    session.getUser().setToken(remainingTokens);
+                }
+            }
         }
 
         // Update session lastMessageAt
@@ -319,12 +327,20 @@ public class MessageServiceImpl implements MessageService {
 
                         int totalToken = promptToken.get() + completionToken.get();
                         int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
-                        if (totalToken > 0 &&
-                                (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER
-                                        || session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT)) {
-                            userRepository.deductTokens(session.getUser().getUid(), totalToken);
-                            remainingTokens = Math.max(0, remainingTokens - totalToken);
-                            session.getUser().setToken(remainingTokens);
+                        if (totalToken > 0) {
+                            if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
+                                userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                                remainingTokens = Math.max(0, remainingTokens - totalToken);
+                                session.getUser().setToken(remainingTokens);
+                            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+                                if (dailyTokenAllowanceService != null) {
+                                    remainingTokens = dailyTokenAllowanceService.recordStudentTokenUsage(session.getUser(), totalToken);
+                                } else {
+                                    userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                                    remainingTokens = Math.max(0, remainingTokens - totalToken);
+                                    session.getUser().setToken(remainingTokens);
+                                }
+                            }
                         }
 
                         session.setLastMessageAt(LocalDateTime.now());
