@@ -58,7 +58,7 @@ public class TeacherLocalContentController {
 
         LocalContentResponse response = localContentService.createLocalContext(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Local context created successfully (DRAFT)"));
+                .body(ApiResponse.success(response, "Local context created successfully"));
     }
 
     @GetMapping("/contexts")
@@ -92,8 +92,7 @@ public class TeacherLocalContentController {
     @PutMapping("/contexts/{contextId}")
     @Operation(
             summary = "Cập nhật bối cảnh địa phương",
-            description = "Chỉ Teacher là tác giả mới được sửa. " +
-                    "Thay đổi contentScope sẽ reset trạng thái về DRAFT và xóa approval.")
+            description = "Chỉ Teacher là tác giả mới được sửa.")
     public ResponseEntity<ApiResponse<LocalContentResponse>> updateLocalContext(
             @PathVariable String contextId,
             @Valid @RequestBody UpdateLocalContextRequest request,
@@ -115,14 +114,27 @@ public class TeacherLocalContentController {
 
     @PutMapping("/contexts/{contextId}/submit")
     @Operation(
-            summary = "Gửi bối cảnh lên để Admin duyệt",
-            description = "Chuyển trạng thái từ DRAFT → PENDING_REVIEW. Admin sẽ thấy trong queue chờ duyệt.")
+            summary = "Xuất bản bối cảnh lên kho tư liệu trường",
+            description = "Giáo viên tự do xuất bản bối cảnh (chuyển sang ACTIVE) để hiển thị cho học sinh.")
     public ResponseEntity<ApiResponse<LocalContentResponse>> submitLocalContext(
             @PathVariable String contextId,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.submitLocalContext(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Context submitted for review successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Context published successfully"));
+    }
+
+    @PutMapping("/contexts/{contextId}/status")
+    @Operation(
+            summary = "Giáo viên thay đổi trạng thái bối cảnh",
+            description = "Giáo viên cập nhật trạng thái bối cảnh của mình (ACTIVE / DRAFT / INACTIVE).")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> updateLocalContextStatus(
+            @PathVariable String contextId,
+            @Valid @RequestBody UpdateLocalContentStatusRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.updateLocalContextStatus(contextId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Context status updated to " + request.getStatus()));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -132,14 +144,14 @@ public class TeacherLocalContentController {
     @PostMapping("/characters")
     @Operation(
             summary = "Tạo nhân vật lịch sử địa phương",
-            description = "Teacher tạo nhân vật mới gắn với trường, mặc định DRAFT + CLASS_ONLY.")
+            description = "Teacher tạo nhân vật mới gắn với trường, tự do xuất bản vào kho tư liệu trường.")
     public ResponseEntity<ApiResponse<LocalContentResponse>> createLocalCharacter(
             @Valid @RequestBody CreateLocalCharacterRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.createLocalCharacter(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Local character created successfully (DRAFT)"));
+                .body(ApiResponse.success(response, "Local character created successfully"));
     }
 
     @GetMapping("/characters")
@@ -193,14 +205,27 @@ public class TeacherLocalContentController {
 
     @PutMapping("/characters/{characterId}/submit")
     @Operation(
-            summary = "Gửi nhân vật lên để Admin duyệt",
-            description = "Chuyển trạng thái từ DRAFT → PENDING_REVIEW. Admin sẽ thấy trong queue chờ duyệt.")
+            summary = "Xuất bản nhân vật lên kho tư liệu trường",
+            description = "Giáo viên tự do xuất bản nhân vật (chuyển sang ACTIVE) để hiển thị cho học sinh.")
     public ResponseEntity<ApiResponse<LocalContentResponse>> submitLocalCharacter(
             @PathVariable String characterId,
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.submitLocalCharacter(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Character submitted for review successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Character published successfully"));
+    }
+
+    @PutMapping("/characters/{characterId}/status")
+    @Operation(
+            summary = "Giáo viên thay đổi trạng thái nhân vật",
+            description = "Giáo viên cập nhật trạng thái nhân vật của mình (ACTIVE / DRAFT / INACTIVE).")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> updateLocalCharacterStatus(
+            @PathVariable String characterId,
+            @Valid @RequestBody UpdateLocalContentStatusRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        LocalContentResponse response = localContentService.updateLocalCharacterStatus(characterId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Character status updated to " + request.getStatus()));
     }
 
     // ── Document endpoints — Context ──────────────────────────────────────────

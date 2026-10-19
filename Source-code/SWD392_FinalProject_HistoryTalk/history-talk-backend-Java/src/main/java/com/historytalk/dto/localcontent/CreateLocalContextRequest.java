@@ -79,4 +79,12 @@ public class CreateLocalContextRequest {
     /** IDs of classrooms to assign this context to on creation. */
     @JsonProperty("classIds")
     private List<String> classIds;
+
+    /**
+     * Whether the local context is published immediately upon creation.
+     * Defaults to true (teachers can self-publish without admin approval).
+     */
+    @Builder.Default
+    @JsonProperty("isPublished")
+    private Boolean isPublished = true;
 }

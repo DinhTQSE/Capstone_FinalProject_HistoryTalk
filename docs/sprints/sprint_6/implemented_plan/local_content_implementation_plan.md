@@ -93,34 +93,30 @@ WHERE school_id = :mySchool
   AND deleted_at IS NULL
 ```
 
-### 3.3 Scope Change → Reset Approval
-```java
-if (req.getContentScope() != null && req.getContentScope() != ctx.getContentScope()) {
-    ctx.setIsPublished(false);   // reset
-    ctx.setApprovedBy(null);     // clear approval
-}
-```
+### 3.3 Scope Change & Trạng Thái Xuất Bản
+Giáo viên có thể tự do thay đổi `contentScope` (`CLASS_ONLY` ↔ `SCHOOL_WIDE`). Thay đổi này **không** làm mất trạng thái phê duyệt và không reset về `DRAFT`, giúp nội dung đã duyệt/publish vẫn giữ nguyên hiệu lực.
 
 ### 3.4 School Isolation
-- `school_id` lấy từ `UserPrincipal.getSchoolId()` (set từ JWT khi login).
+- `school_id` được resolve an toàn từ JWT/SecurityContext thông qua `SecurityUtils.getUserId()` và `userRepository.findById()` (tránh NPE khi `principal` type mismatch).
 - Không nhận `school_id` từ request body (không thể giả mạo).
 - Mọi query đều filter `school_id = :schoolId`.
 
 ---
 
-## 4. Status Lifecycle
+## 4. Status Lifecycle (Teacher Self-Publishing)
 
 ```
-Tạo mới ──────────────────────────────────► DRAFT (is_published=false)
-                                                │
-                         School Admin ACTIVE ◄──┤──► School Admin DRAFT (revert)
-                                                │
-                        PUBLISHED (is_published=true, approved_by = admin_id)
-                                                │
-                         School Admin INACTIVE ◄┘
-                        INACTIVE (is_published=false, approved_by giữ nguyên)
-                                                │
-                          Teacher DELETE ────────► soft-deleted (deleted_at set)
+Tạo mới ──────────────────────────────────► ACTIVE (is_published=true, approved_by=teacher)
+  │ (nếu isPublished=false)                     │
+  └────────────────────────► DRAFT              │
+                               │                │
+            Teacher submit /   │                │
+          Teacher set ACTIVE ──┤                │
+                               ▼                ▼
+                 PUBLISHED (is_published=true, approved_by = teacher_id/admin_id)
+                               │                ▲
+          Teacher/Admin set    │                │  Teacher/Admin set ACTIVE
+          INACTIVE / DRAFT ────┴────────────────┘
 ```
 
 ---
@@ -129,8 +125,8 @@ Tạo mới ──────────────────────�
 
 | Scope | Teacher tác giả | GV khác cùng trường | GV trường khác | School Admin | Student |
 |-------|----------------|--------------------|----|---|---|
-| `CLASS_ONLY` | ✅ Xem & sửa | ❌ | ❌ | ✅ Xem & duyệt | ✅ (nếu PUBLISHED) |
-| `SCHOOL_WIDE` | ✅ Xem & sửa | ✅ Xem (read-only) | ❌ | ✅ Xem & duyệt | ✅ (nếu PUBLISHED) |
+| `CLASS_ONLY` | ✅ Xem & sửa | ❌ | ❌ | ✅ Xem (giám sát) | ✅ (nếu PUBLISHED) |
+| `SCHOOL_WIDE` | ✅ Xem & sửa | ✅ Xem (read-only) | ❌ | ✅ Xem (giám sát) | ✅ (nếu PUBLISHED) |
 
 ---
 
@@ -139,24 +135,28 @@ Tạo mới ──────────────────────�
 ### Teacher (`TEACHER` role)
 | Method | Path | Mô tả |
 |--------|------|-------|
-| POST | `/teacher/local-contents/contexts` | Tạo context |
+| POST | `/teacher/local-contents/contexts` | Tạo context (mặc định ACTIVE, publish ngay) |
 | GET | `/teacher/local-contents/contexts` | Danh sách (có pagination + search) |
 | GET | `/teacher/local-contents/contexts/{id}` | Chi tiết |
-| PUT | `/teacher/local-contents/contexts/{id}` | Cập nhật |
+| PUT | `/teacher/local-contents/contexts/{id}` | Cập nhật (giữ nguyên trạng thái) |
 | DELETE | `/teacher/local-contents/contexts/{id}` | Xóa mềm |
-| POST | `/teacher/local-contents/characters` | Tạo character |
+| PUT | `/teacher/local-contents/contexts/{id}/submit` | Xuất bản nhanh context sang ACTIVE |
+| PUT | `/teacher/local-contents/contexts/{id}/status` | Đổi trạng thái context (ACTIVE/DRAFT/INACTIVE) |
+| POST | `/teacher/local-contents/characters` | Tạo character (mặc định ACTIVE, publish ngay) |
 | GET | `/teacher/local-contents/characters` | Danh sách |
 | GET | `/teacher/local-contents/characters/{id}` | Chi tiết |
-| PUT | `/teacher/local-contents/characters/{id}` | Cập nhật |
+| PUT | `/teacher/local-contents/characters/{id}` | Cập nhật (giữ nguyên trạng thái) |
 | DELETE | `/teacher/local-contents/characters/{id}` | Xóa mềm |
+| PUT | `/teacher/local-contents/characters/{id}/submit` | Xuất bản nhanh character sang ACTIVE |
+| PUT | `/teacher/local-contents/characters/{id}/status` | Đổi trạng thái character (ACTIVE/DRAFT/INACTIVE) |
 
-### School Admin (`SCHOOL_ADMIN` role)
+### School Admin (`SCHOOL_ADMIN` role - Giám sát & Quản trị trường)
 | Method | Path | Mô tả |
 |--------|------|-------|
 | GET | `/school-admin/local-contents/contexts` | Tất cả context trong trường |
-| PUT | `/school-admin/local-contents/contexts/{id}/status` | Approve/Reject |
+| PUT | `/school-admin/local-contents/contexts/{id}/status` | Giám sát / thay đổi trạng thái (ACTIVE/DRAFT/INACTIVE) |
 | GET | `/school-admin/local-contents/characters` | Tất cả character trong trường |
-| PUT | `/school-admin/local-contents/characters/{id}/status` | Approve/Reject |
+| PUT | `/school-admin/local-contents/characters/{id}/status` | Giám sát / thay đổi trạng thái (ACTIVE/DRAFT/INACTIVE) |
 
 ### Student (`SCHOOL_STUDENT` role)
 | Method | Path | Mô tả |
@@ -174,7 +174,7 @@ Tạo mới ──────────────────────�
 | POST | `/teacher/local-contents/characters/{id}/documents` | Thêm document vào character |
 | DELETE | `/teacher/local-contents/characters/{id}/documents/{docId}` | Xóa mềm document |
 
-**Tổng: 22 endpoints**
+**Tổng: 26 endpoints**
 
 ---
 
