@@ -5,6 +5,8 @@ import com.historytalk.entity.enums.ContentScope;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.List;
+
 /**
  * Request body for Teacher updating their own local character.
  * All fields are optional (partial update).
@@ -67,4 +69,16 @@ public class UpdateLocalCharacterRequest {
      */
     @JsonProperty("contentScope")
     private ContentScope contentScope;
+
+    /** Replace linked context IDs. Pass null to keep existing; pass empty list to clear all. */
+    @JsonProperty("contextIds")
+    private List<String> contextIds;
+
+    /** IDs of classrooms to assign this character to (replaces existing assignments). */
+    @JsonProperty("classIds")
+    private List<String> classIds;
+
+    /** Publish or unpublish the local character. */
+    @JsonProperty("isPublished")
+    private Boolean isPublished;
 }

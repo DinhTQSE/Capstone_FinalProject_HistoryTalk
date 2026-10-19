@@ -24,7 +24,7 @@ public interface LocalContentService {
 
     LocalContentResponse getLocalContextById(String contextId, UserPrincipal principal);
 
-    PaginatedResponse<LocalContentResponse> getLocalContexts(String search, int page, int size, UserPrincipal principal);
+    PaginatedResponse<LocalContentResponse> getLocalContexts(String search, String status, int page, int size, UserPrincipal principal);
 
     // ── Teacher: Character ───────────────────────────────────────────────────
 
@@ -36,17 +36,37 @@ public interface LocalContentService {
 
     LocalContentResponse getLocalCharacterById(String characterId, UserPrincipal principal);
 
-    PaginatedResponse<LocalContentResponse> getLocalCharacters(String search, int page, int size, UserPrincipal principal);
+    PaginatedResponse<LocalContentResponse> getLocalCharacters(String search, String status, int page, int size, UserPrincipal principal);
+
+    // ── Teacher: Submit / Publish / Status ────────────────────────────────────
+    
+    /** Teacher publishes / submits a local context (sets to ACTIVE). */
+    LocalContentResponse submitLocalContext(String contextId, UserPrincipal principal);
+
+    /** Teacher publishes / submits a local character (sets to ACTIVE). */
+    LocalContentResponse submitLocalCharacter(String characterId, UserPrincipal principal);
+
+    /** Teacher changes status of their own local context (ACTIVE / DRAFT / INACTIVE). */
+    LocalContentResponse updateLocalContextStatus(String contextId, UpdateLocalContentStatusRequest request, UserPrincipal principal);
+
+    /** Teacher changes status of their own local character (ACTIVE / DRAFT / INACTIVE). */
+    LocalContentResponse updateLocalCharacterStatus(String characterId, UpdateLocalContentStatusRequest request, UserPrincipal principal);
 
     // ── School Admin: review panel ───────────────────────────────────────────
 
-    PaginatedResponse<LocalContentResponse> getSchoolLocalContexts(String search, String scope, int page, int size, UserPrincipal principal);
+    PaginatedResponse<LocalContentResponse> getSchoolLocalContexts(String search, String scope, String status, int page, int size, UserPrincipal principal);
 
-    PaginatedResponse<LocalContentResponse> getSchoolLocalCharacters(String search, String scope, int page, int size, UserPrincipal principal);
+    PaginatedResponse<LocalContentResponse> getSchoolLocalCharacters(String search, String scope, String status, int page, int size, UserPrincipal principal);
 
     LocalContentResponse approveLocalContext(String contextId, UpdateLocalContentStatusRequest request, UserPrincipal principal);
 
     LocalContentResponse approveLocalCharacter(String characterId, UpdateLocalContentStatusRequest request, UserPrincipal principal);
+
+    // ── Student: Published content ───────────────────────────────────────────
+
+    LocalContentResponse getPublishedLocalContextById(String contextId, UserPrincipal principal);
+
+    LocalContentResponse getPublishedLocalCharacterById(String characterId, UserPrincipal principal);
 
     // ── Document management for local content ────────────────────────────────
 
