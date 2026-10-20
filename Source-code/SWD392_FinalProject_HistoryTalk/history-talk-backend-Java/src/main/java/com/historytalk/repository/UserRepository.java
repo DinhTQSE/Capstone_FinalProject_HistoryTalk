@@ -18,6 +18,9 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.school WHERE u.uid = :uid")
+    Optional<User> findByIdWithSchool(@Param("uid") UUID uid);
+
     Optional<User> findByEmailIgnoreCase(String email);
 
     Optional<User> findByUserNameIgnoreCase(String userName);

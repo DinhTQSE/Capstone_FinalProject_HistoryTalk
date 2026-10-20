@@ -47,7 +47,7 @@ public class SchoolSubscriptionGuardInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        User user = userRepository.findById(uid).orElse(null);
+        User user = userRepository.findByIdWithSchool(uid).orElse(null);
         if (user == null) {
             return true;
         }
