@@ -1,18 +1,27 @@
 package com.historytalk.controller.chat;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.PaginatedApiResponse;
+import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.chat.ChatHistoryGroupResponse;
+import com.historytalk.dto.chat.ChatScenarioResponse;
 import com.historytalk.dto.chat.ChatSessionResponse;
 import com.historytalk.dto.chat.CreateChatSessionRequest;
 import com.historytalk.dto.chat.GetMessagesResponse;
 import com.historytalk.dto.chat.SendMessageRequest;
 import com.historytalk.dto.chat.SendMessageResponse;
+import com.historytalk.entity.enums.EventEra;
 import com.historytalk.service.chat.ChatHistoryService;
 import com.historytalk.service.chat.ChatSessionService;
 import com.historytalk.service.chat.MessageService;
 import com.historytalk.utils.SecurityUtils;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,11 +31,28 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/chat")
 @RequiredArgsConstructor
+@Tag(name = "Chat", description = "Chat sessions, messaging, and scenario catalog endpoints")
 public class ChatController {
 
     private final ChatSessionService chatSessionService;
     private final MessageService messageService;
     private final ChatHistoryService chatHistoryService;
+
+    /**
+     * GET /api/v1/chat/scenarios
+     * Returns paginated list of chat scenarios (character + historical context pairs).
+     */
+    @GetMapping("/scenarios")
+    @Operation(summary = "Get all chat scenarios (character + context pairs)",
+               description = "Returns paginated list of chat scenarios with search, era filter and school scope awareness")
+    public ResponseEntity<PaginatedApiResponse<ChatScenarioResponse>> getScenarios(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) EventEra era,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+
+        PaginatedResponse<ChatScenarioResponse> response = chatSessionService.getScenarios(search, era, pageable);
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Scenarios retrieved successfully"));
+    }
 
     /**
      * GET /v1/chat/sessions?contextId=&characterId=

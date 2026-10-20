@@ -44,3 +44,6 @@
 ### 3. 📂 Implemented Plans (Kế hoạch Triển khai Chi tiết):
 * 📋 **[school_subscription_daily_token_and_lifecycle_plan.md](implemented_plan/school_subscription_daily_token_and_lifecycle_plan.md):** Kế hoạch 6 Phase triển khai Flyway Migration `V38`, Quỹ Token Chung theo Ngày, Khóa phân tầng Gói vs AI và Quản lý Vòng đời Học sinh (`US-SP7-14` ~ `US-SP7-18`).
 
+### 4. 📦 FE Contracts (API Contract cho Frontend):
+* 📑 **[school_subscription_daily_token_and_lifecycle_api_contract.md](fe_contracts/school_subscription_daily_token_and_lifecycle_api_contract.md):** Đặc tả chi tiết 10 REST API endpoints cho Chu kỳ Gói Trường học (`01/09` – `31/05`), Cấu hình Hạn mức Ngày, Xin/Duyệt Token trong ngày và Chuyển giao Năm học (`ARCHIVED` / `DEACTIVATED`).
+

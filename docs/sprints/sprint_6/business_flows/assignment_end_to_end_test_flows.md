@@ -136,11 +136,11 @@ sequenceDiagram
     BE-->>S: 200 OK (score, status, submittedAt)
 ```
 
-1. **Xem bài tập:** `GET /api/v1/student/assignments`
+1. **Xem bài tập:** `GET /api/v1/student/assignments` (hoặc xem danh mục kịch bản roleplay qua `GET /api/v1/chat/scenarios`).
 2. **Bắt đầu làm bài:** `POST /api/v1/student/assignments/{{ASSIGNMENT_ID}}/start`
-3. **Tạo phiên chat:** `POST /api/v1/chat/sessions` với `{ "characterId": "{{CHARACTER_ID}}" }` $\rightarrow$ Lưu `chatSessionId`.
+3. **Tạo phiên chat:** `POST /api/v1/chat/sessions` với `{ "characterId": "{{CHARACTER_ID}}" }` (hoặc kèm `"contextId": "{{CONTEXT_ID}}"` nếu muốn chọn bối cảnh cụ thể) $\rightarrow$ Lưu `chatSessionId`.
 4. **Chat với nhân vật:** `POST /api/v1/chat/messages` với `{ "sessionId": "{{CHAT_SESSION_ID}}", "content": "..." }` (gửi 4-5 tin nhắn).
-5. **Nộp bài tập:** `POST /api/v1/student/assignments/{{ASSIGNMENT_ID}}/submit` với `{ "chatSessionId": "{{CHAT_SESSION_ID}}" }`.
+5. **Nộp bài tập:** `POST /api/v1/student/assignments/{{ASSIGNMENT_ID}}/submit` (không cần truyền body, hoặc truyền `{ "chatSessionId": "{{CHAT_SESSION_ID}}" }` nếu muốn chỉ định phiên chat cụ thể).
    - **Kỳ vọng:** `200 OK`, `score: 8.00` (nếu chat 4/5 tin nhắn) hoặc `10.00` (nếu chat >= 5 tin nhắn), `status: "SUBMITTED"`.
 
 ---
@@ -150,9 +150,9 @@ sequenceDiagram
 ### Bản chất Nghiệp vụ (Business Rules)
 1. Học sinh làm bài thi trắc nghiệm qua Module Quiz (`/api/v1/quizzes/...`).
 2. Module Quiz chấm điểm thô (`score` là số câu trả lời đúng) và ghi nhận `endTime`.
-3. Khi học sinh nộp bài tập lớp, Frontend gửi `quizSessionId`:
+3. Khi học sinh nộp bài tập lớp (có thể truyền `quizSessionId` hoặc để trống để Server tự động lấy phiên làm bài hoàn thành điểm cao nhất):
    - Server kiểm tra bài thi phải thuộc về học sinh và đã nộp (`endTime != null`).
-   - Server đọc số câu đúng và tổng số câu hỏi của Quiz.
+   - Server đọc số câu đúng và tổng số câu hỏi của Quiz (hỗ trợ cả câu hỏi gắn từ Question Bank).
    - Điểm số = $\frac{\text{Số câu đúng}}{\text{Tổng số câu hỏi}} \times 10.0$.
 
 ### Chuỗi API Thực thi
@@ -172,8 +172,8 @@ sequenceDiagram
     S->>BE: POST /api/v1/quizzes/submit {sessionId, answers[]} (Nộp bài thi trắc nghiệm)
     BE-->>S: 200 OK (correctAnswers: 8, total: 10)
 
-    S->>BE: POST /api/v1/student/assignments/{assignmentId}/submit {quizSessionId}
-    BE->>DB: Xác thực quizSession -> Tính điểm (8/10 * 10 = 8.00)
+    S->>BE: POST /api/v1/student/assignments/{assignmentId}/submit
+    BE->>DB: Tự động lấy quizSession hoàn thành -> Tính điểm (8/10 * 10 = 8.00)
     BE->>DB: UPDATE status='SUBMITTED', score=8.00
     BE-->>S: 200 OK (score: 8.00, status: SUBMITTED)
 ```
@@ -181,7 +181,7 @@ sequenceDiagram
 1. **Bắt đầu làm bài:** `POST /api/v1/student/assignments/{{ASSIGNMENT_ID}}/start`
 2. **Bắt đầu thi Quiz:** `POST /api/v1/quizzes/{{QUIZ_ID}}/start` $\rightarrow$ Lưu `quizSessionId`.
 3. **Nộp bài thi trắc nghiệm:** `POST /api/v1/quizzes/submit` với `{ "sessionId": "{{QUIZ_SESSION_ID}}", "answers": [...] }`.
-4. **Nộp bài tập cho lớp:** `POST /api/v1/student/assignments/{{ASSIGNMENT_ID}}/submit` với `{ "quizSessionId": "{{QUIZ_SESSION_ID}}" }`.
+4. **Nộp bài tập cho lớp:** `POST /api/v1/student/assignments/{{ASSIGNMENT_ID}}/submit` (không cần truyền body, hoặc truyền `{ "quizSessionId": "{{QUIZ_SESSION_ID}}" }`).
    - **Kỳ vọng:** `200 OK`, `score: 8.00` (nếu đúng 8/10 câu), `status: "SUBMITTED"`.
 
 ---

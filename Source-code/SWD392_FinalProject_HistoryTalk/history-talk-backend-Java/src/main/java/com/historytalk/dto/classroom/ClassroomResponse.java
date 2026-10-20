@@ -24,6 +24,7 @@ public class ClassroomResponse {
     private Integer gradeLevel;
     private Integer academicYear;
     private String description;
+    private Integer dailyTokenQuota;
     private String status;
 
     private TeacherSummaryDto teacher;

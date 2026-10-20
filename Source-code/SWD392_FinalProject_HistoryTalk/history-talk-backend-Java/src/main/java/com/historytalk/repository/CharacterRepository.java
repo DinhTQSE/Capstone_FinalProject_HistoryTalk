@@ -5,6 +5,7 @@ import com.historytalk.entity.enums.EventEra;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,16 +17,16 @@ import java.util.UUID;
 public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query("""
-                                    SELECT DISTINCT c FROM Character c
-                                    JOIN c.historicalContexts hc
-                                    WHERE hc.contextId = :contextId
-                                           AND (:includeDraft = true OR c.isPublished = true)
-                                           AND (:includeDeleted = true OR c.deletedAt IS NULL)
-                                    ORDER BY c.name ASC
+            SELECT DISTINCT c FROM Character c
+            JOIN c.historicalContexts hc
+            WHERE hc.contextId = :contextId
+              AND (:includeDraft = true OR c.isPublished = true)
+              AND (:includeDeleted = true OR c.deletedAt IS NULL)
+            ORDER BY c.name ASC
            """)
-              List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId,
-                                                                                                                                                                               @Param("includeDraft") boolean includeDraft,
-                                                                                                                                                                               @Param("includeDeleted") boolean includeDeleted);
+    List<Character> findByContextIdOrderByNameAsc(@Param("contextId") UUID contextId,
+                                                 @Param("includeDraft") boolean includeDraft,
+                                                 @Param("includeDeleted") boolean includeDeleted);
 
     List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
@@ -38,8 +39,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
               LEFT JOIN c.historicalContexts hc
             JOIN FETCH c.createdBy u
            WHERE (:search IS NULL OR :search = ''
-                 OR c.name ILIKE CONCAT('%', :search, '%')
-                 OR c.background ILIKE CONCAT('%', :search, '%'))
+                 OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                 OR LOWER(c.background) LIKE LOWER(CONCAT('%', :search, '%')))
            AND (:era IS NULL OR hc.era = :era)
            AND (:includeDraft = true OR c.isPublished = true)
            AND (:includeDeleted = true OR c.deletedAt IS NULL)
@@ -49,32 +50,32 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             SELECT COUNT(DISTINCT c) FROM Character c
             LEFT JOIN c.historicalContexts hc
             WHERE (:search IS NULL OR :search = ''
-                   OR c.name ILIKE CONCAT('%', :search, '%')
-                   OR c.background ILIKE CONCAT('%', :search, '%'))
+                   OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(c.background) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:era IS NULL OR hc.era = :era)
           AND (:includeDraft = true OR c.isPublished = true)
           AND (:includeDeleted = true OR c.deletedAt IS NULL)
             """)
     Page<Character> findAllWithFilter(@Param("search") String search,
-                                  @Param("era") EventEra era,
-                                  @Param("includeDraft") boolean includeDraft,
-                                  @Param("includeDeleted") boolean includeDeleted,
-                                  Pageable pageable);
+                                      @Param("era") EventEra era,
+                                      @Param("includeDraft") boolean includeDraft,
+                                      @Param("includeDeleted") boolean includeDeleted,
+                                      Pageable pageable);
 
-    @Query(value = """
-           SELECT * FROM historical_schema."character" c
-           WHERE c.deleted_at IS NOT NULL
+    @Query("""
+           SELECT c FROM Character c
+           WHERE c.deletedAt IS NOT NULL
            ORDER BY c.name ASC
-           """, nativeQuery = true)
+           """)
     List<Character> findAllDeleted();
 
-    @Query(value = """
-           UPDATE historical_schema."character"
-           SET deleted_at = NULL
-           WHERE character_id = :characterId
-             AND deleted_at IS NOT NULL
-           """, nativeQuery = true)
-    @org.springframework.data.jpa.repository.Modifying
+    @Modifying
+    @Query("""
+           UPDATE Character c
+           SET c.deletedAt = NULL
+           WHERE c.characterId = :characterId
+             AND c.deletedAt IS NOT NULL
+           """)
     int restoreById(@Param("characterId") UUID characterId);
 
     @Query("SELECT COUNT(c) FROM Character c")
@@ -85,4 +86,46 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query("SELECT COUNT(c) FROM Character c WHERE c.deletedAt IS NULL AND c.isPublished = true")
     long countActive();
+
+    @Query(value = """
+            SELECT c, hc FROM Character c
+            JOIN c.historicalContexts hc
+            WHERE c.deletedAt IS NULL AND hc.deletedAt IS NULL
+              AND c.isPublished = true AND hc.isPublished = true
+              AND (:search IS NULL OR :search = ''
+                   OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:era IS NULL OR hc.era = :era)
+              AND (
+                  (:schoolId IS NULL AND c.school IS NULL AND hc.school IS NULL)
+                  OR (:schoolId IS NOT NULL AND (
+                      (c.school IS NULL AND hc.school IS NULL)
+                      OR (c.school.id = :schoolId)
+                      OR (hc.school.id = :schoolId)
+                  ))
+              )
+            ORDER BY hc.createdAt DESC, c.name ASC
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Character c
+            JOIN c.historicalContexts hc
+            WHERE c.deletedAt IS NULL AND hc.deletedAt IS NULL
+              AND c.isPublished = true AND hc.isPublished = true
+              AND (:search IS NULL OR :search = ''
+                   OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:era IS NULL OR hc.era = :era)
+              AND (
+                  (:schoolId IS NULL AND c.school IS NULL AND hc.school IS NULL)
+                  OR (:schoolId IS NOT NULL AND (
+                      (c.school IS NULL AND hc.school IS NULL)
+                      OR (c.school.id = :schoolId)
+                      OR (hc.school.id = :schoolId)
+                  ))
+              )
+            """)
+    Page<Object[]> findScenarios(@Param("search") String search,
+                                 @Param("era") EventEra era,
+                                 @Param("schoolId") UUID schoolId,
+                                 Pageable pageable);
 }

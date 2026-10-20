@@ -22,4 +22,9 @@ public interface SchoolRepository extends JpaRepository<School, UUID> {
 
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(s.totalSchoolTokenQuota), 0) FROM School s WHERE s.deletedAt IS NULL")
     long sumTotalSchoolTokenQuota();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(s.unallocatedTokenQuota), 0) FROM School s WHERE s.deletedAt IS NULL")
+    long sumUnallocatedSchoolTokenQuota();
+
+    long countByStatusAndDeletedAtIsNull(com.historytalk.entity.enums.SchoolStatus status);
 }

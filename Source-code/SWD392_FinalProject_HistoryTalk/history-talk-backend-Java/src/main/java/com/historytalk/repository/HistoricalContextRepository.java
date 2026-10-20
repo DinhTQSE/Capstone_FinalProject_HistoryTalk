@@ -6,6 +6,7 @@ import com.historytalk.entity.historicalContext.HistoricalContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -26,8 +27,8 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
        @Query("""
                      SELECT hc FROM HistoricalContext hc
                      WHERE (:search IS NULL OR :search = ''
-                            OR hc.name ILIKE CONCAT('%', :search, '%')
-                            OR hc.description ILIKE CONCAT('%', :search, '%'))
+                            OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                            OR LOWER(hc.description) LIKE LOWER(CONCAT('%', :search, '%')))
                      AND (:era IS NULL OR hc.era = :era)
                      AND (:category IS NULL OR hc.category = :category)
                      AND (:includeDraft = true OR hc.isPublished = true)
@@ -44,8 +45,8 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
        @Query("""
                      SELECT hc FROM HistoricalContext hc
                      WHERE (:search IS NULL OR :search = ''
-                            OR hc.name ILIKE CONCAT('%', :search, '%')
-                            OR hc.description ILIKE CONCAT('%', :search, '%'))
+                            OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                            OR LOWER(hc.description) LIKE LOWER(CONCAT('%', :search, '%')))
                      AND (:includeDraft = true OR hc.isPublished = true)
                      AND (:includeDeleted = true OR hc.deletedAt IS NULL)
                      ORDER BY hc.createdAt DESC
@@ -54,20 +55,20 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                                              @Param("includeDraft") boolean includeDraft,
                                              @Param("includeDeleted") boolean includeDeleted);
 
-       @Query(value = """
-               SELECT * FROM historical_schema.historical_context hc
-               WHERE hc.deleted_at IS NOT NULL
-               ORDER BY hc.created_at DESC
-               """, nativeQuery = true)
+       @Query("""
+               SELECT hc FROM HistoricalContext hc
+               WHERE hc.deletedAt IS NOT NULL
+               ORDER BY hc.createdAt DESC
+               """)
        List<HistoricalContext> findAllDeleted();
 
-       @Query(value = """
-               UPDATE historical_schema.historical_context
-               SET deleted_at = NULL
-               WHERE context_id = :contextId
-                 AND deleted_at IS NOT NULL
-               """, nativeQuery = true)
-       @org.springframework.data.jpa.repository.Modifying
+       @Modifying
+       @Query("""
+               UPDATE HistoricalContext hc
+               SET hc.deletedAt = NULL
+               WHERE hc.contextId = :contextId
+                 AND hc.deletedAt IS NOT NULL
+               """)
        int restoreById(@Param("contextId") UUID contextId);
 
        @Query("SELECT COUNT(hc) FROM HistoricalContext hc")

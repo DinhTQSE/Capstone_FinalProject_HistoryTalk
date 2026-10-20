@@ -100,6 +100,18 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
                 // CASE 1: Học sinh ĐÃ TỒN TẠI trong trường
                 Optional<ClassStudent> existingCs = classStudentRepository.findByClassroomIdAndStudentUid(classroom.getId(), existingStudent.getUid());
                 boolean isCurrentlyActive = existingCs.isPresent() && "ACTIVE".equals(existingCs.get().getStatus());
+                if (!isCurrentlyActive) {
+                    List<Classroom> activeClasses = classStudentRepository.findActiveClassroomsByStudentUid(existingStudent.getUid());
+                    Optional<Classroom> otherActiveClass = activeClasses.stream()
+                            .filter(c -> !c.getId().equals(classroom.getId()))
+                            .findFirst();
+                    if (otherActiveClass.isPresent()) {
+                        addError(resultDto, row.getRowNumber(), rawCode, "student_code",
+                                String.format("Học sinh đã thuộc lớp đang hoạt động %s (mỗi học sinh chỉ được ở 1 lớp)",
+                                        otherActiveClass.get().getClassName()));
+                        continue;
+                    }
+                }
                 plans.add(new RowPlan(row, existingStudent, true, isCurrentlyActive));
             } else {
                 // CASE 2: Học sinh MỚI TINH cần onboarding
