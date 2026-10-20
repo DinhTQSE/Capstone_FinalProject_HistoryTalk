@@ -116,9 +116,9 @@ public class CharacterController {
     }
 
     @PostMapping("/{characterId}/contexts/{contextId}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Map context to character", description = "Create a character-context mapping (Staff/Admin only)")
+    @Operation(summary = "Map context to character", description = "Create a character-context mapping (Staff/Admin/Teacher only)")
     public ResponseEntity<ApiResponse<?>> addContextToCharacter(
             @PathVariable String characterId,
             @PathVariable String contextId) {
@@ -130,7 +130,7 @@ public class CharacterController {
     }
 
     @DeleteMapping("/{characterId}/contexts/{contextId}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Unmap context from character", description = "Remove a character-context mapping (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> removeContextFromCharacter(

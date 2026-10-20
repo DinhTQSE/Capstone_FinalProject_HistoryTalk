@@ -83,6 +83,13 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
         }
 
+        // School Isolation: Local school character is only accessible to users of the same school
+        if (character.getSchool() != null && !"SYSTEM_ADMIN".equalsIgnoreCase(userRole)) {
+            if (user.getSchool() == null || !user.getSchool().getId().equals(character.getSchool().getId())) {
+                throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
+            }
+        }
+
         HistoricalContext context = null;
         if (request.getContextId() != null && !request.getContextId().isBlank()) {
             context = contextRepository.findById(UUID.fromString(request.getContextId()))
@@ -90,6 +97,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             if (context != null && !isStaffOrAdmin(userRole)
                     && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
                 context = null; // Ignore if not visible
+            }
+            if (context != null && context.getSchool() != null && !"SYSTEM_ADMIN".equalsIgnoreCase(userRole)) {
+                if (user.getSchool() == null || !user.getSchool().getId().equals(context.getSchool().getId())) {
+                    context = null; // Not visible across schools
+                }
             }
             if (context != null) {
                 final UUID targetContextId = context.getContextId();

@@ -87,4 +87,10 @@ public class CreateLocalContextRequest {
     @Builder.Default
     @JsonProperty("isPublished")
     private Boolean isPublished = true;
+
+    /**
+     * Optional. Full battleMap object (version, mode, imageUrl, factions[], symbols[]).
+     */
+    @JsonProperty("battleMap")
+    private Object battleMap;
 }

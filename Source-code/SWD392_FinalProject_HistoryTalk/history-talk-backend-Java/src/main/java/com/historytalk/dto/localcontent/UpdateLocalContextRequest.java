@@ -75,4 +75,10 @@ public class UpdateLocalContextRequest {
     /** Publish or unpublish the local context. */
     @JsonProperty("isPublished")
     private Boolean isPublished;
+
+    /**
+     * Optional. Full battleMap object to persist. Pass null to explicitly clear the battle map.
+     */
+    @JsonProperty("battleMap")
+    private Object battleMap;
 }

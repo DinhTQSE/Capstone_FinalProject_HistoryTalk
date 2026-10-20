@@ -3,7 +3,7 @@
 > **Base URL:** `http://localhost:8080/Historical-tell`  
 > **Auth:** Bearer JWT required for all endpoints  
 > **Viết cho:** Frontend (Thành) & Mobile (nếu cần)  
-> **Last updated:** 19/10/2026 — v3 (GV tự do upload & tự publish lên School's History Bank, không cần School Admin duyệt)
+> **Last updated:** 20/10/2026 — v4 (Full Feature Parity: Giáo viên và Trường học sở hữu 100% tính năng như Content Admin: Battle Map, Sửa tài liệu, Gắn kết Nhân vật - Bối cảnh động, Thùng rác trường học & Khôi phục, Ngân hàng Quiz & Câu hỏi, Map Pins & Focuses, Bảo mật cách ly phòng Chat)
 
 ---
 
@@ -11,18 +11,22 @@
 
 Local Content là nội dung lịch sử **do Giáo viên tự soạn**, gắn với trường học, **không phải nội dung toàn cầu** của platform.
 
-**Cơ chế mới (v3):**
-- Giáo viên có quyền tự do tải lên và **tự xuất bản (self-publish)** nội dung vào ngân hàng lịch sử của trường (School's History Bank) tương tự quyền của Content Admin đối với nội dung toàn cầu.
-- Mặc định khi tạo mới, nội dung sẽ được xuất bản ngay (`isPublished = true`, `status = ACTIVE`, `approvedBy = { teacher }`).
-- Giáo viên có thể tùy chọn lưu bản nháp (`isPublished: false`) và xuất bản sau bằng API `/submit` hoặc API `/status`.
-- Thay đổi phạm vi chia sẻ (`contentScope`: `CLASS_ONLY` ↔ `SCHOOL_WIDE`) **KHÔNG** làm reset trạng thái về `DRAFT`.
+**Cơ chế hoàn thiện (v4):**
+- Giáo viên có quyền tự do tải lên và **tự xuất bản (self-publish)** nội dung vào ngân hàng lịch sử của trường (School's History Bank) với đầy đủ 100% quyền năng tương đương Content Admin.
+- **Battle Map:** Bối cảnh địa phương hỗ trợ trường `battleMap` (JSON object) chứa tọa độ địa lý, boundaries, historical layers...
+- **Document Updating:** Giáo viên có thể chỉnh sửa tài liệu (`PUT /contexts/{id}/documents/{docId}` và `PUT /characters/{id}/documents/{docId}`), backend tự động kích hoạt AI re-vectorize async.
+- **Dynamic Character-Context Linking:** Liên kết động giữa nhân vật và bối cảnh của trường (`POST/DELETE/GET /characters/{id}/contexts`).
+- **School Trash & Restore:** Quản lý thùng rác riêng của trường (`/trash/contexts`, `/trash/characters`), hỗ trợ khôi phục (`restore`) và xóa vĩnh viễn (`permanent`).
+- **School Quiz & Question Bank:** Giáo viên tạo, sửa, xóa, duyệt xuất bản Quiz và ngân hàng câu hỏi gắn liền với bối cảnh lịch sử trường.
+- **Map Pins & Focuses:** Giáo viên và School Admin có toàn quyền tạo Map Pins giáo dục và điều chỉnh Map Camera Focuses trên bối cảnh trường mình.
+- **Chat Security Isolation:** Học sinh và giáo viên chỉ có thể chat với bối cảnh/nhân vật của trường mình (hoặc nội dung toàn cầu). Không thể chat chéo sang trường khác.
 
 | Role | Quyền |
 |------|-------|
-| `TEACHER` | Tạo / Sửa / Xóa / Tự xuất bản (Publish) nội dung của mình. Quản lý trạng thái (`ACTIVE`, `DRAFT`, `INACTIVE`). Xem nội dung `SCHOOL_WIDE` của GV khác cùng trường. |
-| `SCHOOL_ADMIN` | Xem tất cả nội dung trong trường. Có quyền giám sát, thay đổi trạng thái (Ẩn `INACTIVE` / Kích hoạt lại `ACTIVE` / Đưa về `DRAFT`) nếu cần can thiệp. |
-| `SCHOOL_STUDENT` | Xem nội dung đã được PUBLISHED (`ACTIVE` & `isPublished = true`) trong trường của mình. |
-| `CUSTOMER`, `CONTENT_ADMIN`, `SYSTEM_ADMIN` | Không có quyền truy cập |
+| `TEACHER` | Tạo / Sửa / Xóa / Tự xuất bản (Publish) nội dung của mình. Quản lý tài liệu, gắn bối cảnh, quiz, câu hỏi, bản đồ chiến sự, thùng rác trường. Xem nội dung `SCHOOL_WIDE` của GV khác cùng trường. |
+| `SCHOOL_ADMIN` | Xem tất cả nội dung trong trường. Có quyền giám sát, thay đổi trạng thái, quản lý thùng rác, khôi phục nội dung toàn trường. |
+| `SCHOOL_STUDENT` | Xem nội dung đã được PUBLISHED (`ACTIVE` & `isPublished = true`) trong trường của mình; làm Quiz, chat với nhân vật/bối cảnh của trường mình. |
+| `CUSTOMER`, `CONTENT_ADMIN`, `SYSTEM_ADMIN` | Không có quyền truy cập vào nội dung trường học của trường khác |
 
 ---
 
@@ -68,11 +72,17 @@ Content-Type: application/json
   "location": "Mê Linh, Vĩnh Phúc",
   "imageUrl": "https://...",
   "videoUrl": "https://...",
+  "battleMap": {
+    "center": [21.1856, 105.7231],
+    "zoom": 14,
+    "layers": []
+  },
   "contentScope": "SCHOOL_WIDE",
   "isPublished": true
 }
 ```
 
+> `battleMap`: *(JSON Object - optional)* Bản đồ chiến sự / bản đồ số tương tác (tọa độ, geojson layer, zoom, markers...)  
 > `contentScope`: `CLASS_ONLY` (default) hoặc `SCHOOL_WIDE`  
 > `isPublished`: `true` (default - tự publish ngay) hoặc `false` (lưu nháp DRAFT)  
 > `era`: `ANCIENT` | `MEDIEVAL` | `MODERN` | `CONTEMPORARY`  
@@ -181,6 +191,10 @@ Content-Type: application/json
   "location": "...",
   "imageUrl": "...",
   "videoUrl": "...",
+  "battleMap": {
+    "center": [21.1856, 105.7231],
+    "zoom": 15
+  },
   "contentScope": "SCHOOL_WIDE",
   "isPublished": true
 }
@@ -820,13 +834,520 @@ Content-Type: multipart/form-data
 
 ---
 
+### 34. Sửa tài liệu bối cảnh địa phương (Update Context Document)
+```
+PUT /api/v1/teacher/local-contents/contexts/{contextId}/documents/{docId}
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "Tên tài liệu cập nhật",
+  "documentType": "TEXT",
+  "content": "Nội dung văn bản lịch sử mới...",
+  "author": "GS. Sử Học",
+  "publishedYear": 2024,
+  "confidenceScore": 0.95
+}
+```
+> 💡 *Tự động:* Backend sẽ tự động cập nhật tài liệu và trigger AI vector reprocessing ở chế độ bất đồng bộ (async).
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Context document updated successfully",
+  "data": {
+    "id": "uuid-doc",
+    "historicalContextId": "uuid-context",
+    "title": "Tên tài liệu cập nhật",
+    "documentType": "TEXT",
+    "content": "Nội dung văn bản lịch sử mới...",
+    "author": "GS. Sử Học",
+    "publishedYear": 2024,
+    "confidenceScore": 0.95,
+    "createdAt": "2026-10-20T...",
+    "updatedAt": "2026-10-20T..."
+  }
+}
+```
+
+---
+
+### 35. Sửa tài liệu nhân vật địa phương (Update Character Document)
+```
+PUT /api/v1/teacher/local-contents/characters/{characterId}/documents/{docId}
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "Tên tài liệu nhân vật cập nhật",
+  "documentType": "TEXT",
+  "content": "Tiểu sử chi tiết cập nhật của nhân vật...",
+  "author": "Ban Sử học Trường",
+  "publishedYear": 2024,
+  "confidenceScore": 0.98
+}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character document updated successfully",
+  "data": {
+    "id": "uuid-doc",
+    "title": "Tên tài liệu nhân vật cập nhật",
+    "documentType": "TEXT",
+    "content": "Tiểu sử chi tiết cập nhật...",
+    "author": "Ban Sử học Trường",
+    "publishedYear": 2024,
+    "confidenceScore": 0.98
+  }
+}
+```
+
+---
+
+### 36. Gắn nhân vật vào bối cảnh địa phương (Link Character to Context)
+```
+POST /api/v1/teacher/local-contents/characters/{characterId}/contexts/{contextId}
+(Hoặc: POST /api/v1/characters/{characterId}/contexts/{contextId})
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+> Cho phép Teacher liên kết một nhân vật thuộc trường với một bối cảnh thuộc trường mình hoặc bối cảnh toàn cầu.
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character linked to context successfully",
+  "data": null
+}
+```
+
+---
+
+### 37. Hủy liên kết nhân vật khỏi bối cảnh (Unlink Character from Context)
+```
+DELETE /api/v1/teacher/local-contents/characters/{characterId}/contexts/{contextId}
+(Hoặc: DELETE /api/v1/characters/{characterId}/contexts/{contextId})
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character unlinked from context successfully",
+  "data": null
+}
+```
+
+---
+
+### 38. Lấy danh sách bối cảnh gắn với nhân vật (Get Character's Contexts)
+```
+GET /api/v1/teacher/local-contents/characters/{characterId}/contexts
+(Hoặc: GET /api/v1/characters/{characterId}/contexts)
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character contexts retrieved successfully",
+  "data": [
+    {
+      "id": "uuid-context",
+      "name": "Khởi nghĩa Hai Bà Trưng tại Mê Linh",
+      "era": "ANCIENT",
+      "category": "WAR",
+      "year": 40
+    }
+  ]
+}
+```
+
+---
+
+### 39. Xem thùng rác bối cảnh của trường (Get Trashed Contexts)
+```
+GET /api/v1/teacher/local-contents/trash/contexts?page=1&size=10
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Trashed contexts retrieved successfully",
+  "data": {
+    "content": [
+      {
+        "id": "uuid",
+        "name": "Bối cảnh đã xóa tạm thời",
+        "deletedAt": "2026-10-20T...",
+        "schoolId": "uuid-school"
+      }
+    ],
+    "totalElements": 1,
+    "totalPages": 1,
+    "currentPage": 1,
+    "pageSize": 10
+  }
+}
+```
+
+---
+
+### 40. Khôi phục bối cảnh từ thùng rác (Restore Context)
+```
+POST /api/v1/teacher/local-contents/trash/contexts/{id}/restore
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Local context restored successfully",
+  "data": null
+}
+```
+
+---
+
+### 41. Xóa vĩnh viễn bối cảnh khỏi hệ thống (Permanent Delete Context)
+```
+DELETE /api/v1/teacher/local-contents/trash/contexts/{id}/permanent
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+> ⚠️ **Hành động không thể hoàn tác:** Xóa hoàn toàn bản ghi khỏi CSDL (hard-delete).
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Local context permanently deleted successfully",
+  "data": null
+}
+```
+
+---
+
+### 42. Xem thùng rác nhân vật của trường (Get Trashed Characters)
+```
+GET /api/v1/teacher/local-contents/trash/characters?page=1&size=10
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Trashed characters retrieved successfully",
+  "data": {
+    "content": [
+      {
+        "id": "uuid",
+        "name": "Nhân vật đã xóa tạm",
+        "deletedAt": "2026-10-20T..."
+      }
+    ],
+    "totalElements": 1,
+    "totalPages": 1,
+    "currentPage": 1,
+    "pageSize": 10
+  }
+}
+```
+
+---
+
+### 43. Khôi phục nhân vật từ thùng rác (Restore Character)
+```
+POST /api/v1/teacher/local-contents/trash/characters/{id}/restore
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Local character restored successfully",
+  "data": null
+}
+```
+
+---
+
+### 44. Xóa vĩnh viễn nhân vật khỏi hệ thống (Permanent Delete Character)
+```
+DELETE /api/v1/teacher/local-contents/trash/characters/{id}/permanent
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Local character permanently deleted successfully",
+  "data": null
+}
+```
+
+---
+
+### 45. Lấy danh sách Quiz của bối cảnh trường (Get Local Context Quizzes)
+```
+GET /api/v1/teacher/local-contents/contexts/{contextId}/quizzes?page=1&size=10
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Context quizzes retrieved successfully",
+  "data": {
+    "content": [
+      {
+        "id": "uuid-quiz",
+        "title": "Kiểm tra kiến thức Hai Bà Trưng",
+        "description": "Bài ôn tập 15 phút",
+        "passingScore": 7,
+        "isPublished": true,
+        "contextId": "uuid-context"
+      }
+    ],
+    "totalElements": 1,
+    "totalPages": 1,
+    "currentPage": 1,
+    "pageSize": 10
+  }
+}
+```
+
+---
+
+### 46. Tạo mới Quiz cho bối cảnh trường (Create Local Quiz)
+```
+POST /api/v1/teacher/local-contents/contexts/{contextId}/quizzes
+(Hoặc: POST /api/v1/staff/quizzes)
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "Kiểm tra kiến thức Hai Bà Trưng",
+  "description": "Bài ôn tập 15 phút",
+  "passingScore": 7,
+  "isPublished": true
+}
+```
+
+**Response `201 Created`:**
+```json
+{
+  "success": true,
+  "message": "Quiz created successfully",
+  "data": {
+    "id": "uuid-quiz",
+    "title": "Kiểm tra kiến thức Hai Bà Trưng",
+    "description": "Bài ôn tập 15 phút",
+    "passingScore": 7,
+    "isPublished": true,
+    "contextId": "uuid-context",
+    "questions": []
+  }
+}
+```
+
+---
+
+### 47. Xem chi tiết Quiz kèm bộ câu hỏi (Get Local Quiz Details)
+```
+GET /api/v1/teacher/local-contents/quizzes/{quizId}
+(Hoặc: GET /api/v1/staff/quizzes/{quizId})
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Quiz retrieved successfully",
+  "data": {
+    "id": "uuid-quiz",
+    "title": "Kiểm tra kiến thức Hai Bà Trưng",
+    "description": "...",
+    "passingScore": 7,
+    "isPublished": true,
+    "questions": [
+      {
+        "id": "uuid-question",
+        "content": "Cuộc khởi nghĩa Hai Bà Trưng bùng nổ vào năm nào?",
+        "options": ["Năm 40", "Năm 43", "Năm 938", "Năm 1010"],
+        "correctOption": 0,
+        "explanation": "Cuộc khởi nghĩa Hai Bà Trưng nổ ra vào mùa xuân năm 40 sau CN."
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 48. Sửa Quiz của trường (Update Local Quiz)
+```
+PUT /api/v1/teacher/local-contents/quizzes/{quizId}
+(Hoặc: PUT /api/v1/staff/quizzes/{quizId})
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "Tiêu đề Quiz sửa đổi",
+  "description": "Mô tả mới",
+  "passingScore": 8,
+  "isPublished": true
+}
+```
+
+---
+
+### 49. Xóa mềm Quiz của trường (Delete Local Quiz)
+```
+DELETE /api/v1/teacher/local-contents/quizzes/{quizId}
+(Hoặc: DELETE /api/v1/staff/quizzes/{quizId})
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+---
+
+### 50. Bật/Tắt Publish Quiz của trường (Toggle Publish Quiz)
+```
+PATCH /api/v1/teacher/local-contents/quizzes/{quizId}/publish
+(Hoặc: PATCH /api/v1/staff/quizzes/{quizId}/publish)
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+**Response `200 OK`:** Trả về đối tượng Quiz với `isPublished` đã được chuyển đổi.
+
+---
+
+### 51. Thêm câu hỏi vào Quiz trường (Add Question to Local Quiz)
+```
+POST /api/v1/teacher/local-contents/quizzes/{quizId}/questions
+(Hoặc: POST /api/v1/staff/quizzes/{quizId}/questions)
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "content": "Ai là người cùng Trưng Trắc lãnh đạo cuộc khởi nghĩa?",
+  "options": ["Trưng Nhị", "Lê Chân", "Bát Nàn", "Triệu Thị Trinh"],
+  "correctOption": 0,
+  "explanation": "Hai chị em Trưng Trắc, Trưng Nhị đã phất cờ khởi nghĩa."
+}
+```
+
+**Response `201 Created`:**
+```json
+{
+  "success": true,
+  "message": "Question added successfully",
+  "data": {
+    "id": "uuid-question",
+    "content": "Ai là người cùng Trưng Trắc lãnh đạo cuộc khởi nghĩa?",
+    "options": ["Trưng Nhị", "Lê Chân", "Bát Nàn", "Triệu Thị Trinh"],
+    "correctOption": 0,
+    "explanation": "..."
+  }
+}
+```
+
+---
+
+### 52. Cập nhật câu hỏi trong Quiz (Update Question)
+```
+PUT /api/v1/teacher/local-contents/quizzes/questions/{questionId}
+(Hoặc: PUT /api/v1/staff/quizzes/questions/{questionId})
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "content": "Nội dung câu hỏi cập nhật...",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctOption": 1,
+  "explanation": "Giải thích chi tiết..."
+}
+```
+
+---
+
+### 53. Xóa câu hỏi khỏi Quiz (Delete Question)
+```
+DELETE /api/v1/teacher/local-contents/quizzes/questions/{questionId}
+(Hoặc: DELETE /api/v1/staff/quizzes/questions/{questionId})
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+---
+
+### 54. Quản lý Map Pins & Camera Focuses (Bản đồ số tương tác)
+
+Giáo viên (`TEACHER`) và `SCHOOL_ADMIN` được cấp quyền quản lý bản đồ trên các bối cảnh thuộc trường mình:
+- **Map Pins (`/api/v1/map-pins`):**
+  - Giáo viên có thể tạo pin loại `EDUCATIONAL` (`pinType: "EDUCATIONAL"`) trên bối cảnh trường mình qua `POST /api/v1/map-pins`.
+  - Giáo viên có thể cập nhật và xóa các pin mà mình hoặc trường mình đã tạo (`PUT /api/v1/map-pins/{id}`, `DELETE /api/v1/map-pins/{id}`).
+- **Camera Focuses (`/api/v1/historical-contexts/{contextId}/map-focuses`):**
+  - Giáo viên và School Admin có toàn quyền tạo mới (`POST`), sắp xếp thứ tự (`PUT /reorder`), sửa (`PUT /{id}`), xóa (`DELETE /{id}`) các góc camera định vị điểm nhấn chiến sự trên bản đồ bối cảnh của trường.
+
+---
+
+### 55. Quy tắc bảo mật cách ly phòng Chat (Chat Security Isolation)
+
+- **Nguyên tắc cô lập:** Nhân vật và bối cảnh lịch sử thuộc trường học là tài sản dữ liệu nội bộ của trường đó.
+- **Quyền hạn truy cập chat (`POST /api/v1/chat/sessions`):**
+  - **Học sinh trường (`SCHOOL_STUDENT`):** Chỉ được chat với nhân vật/bối cảnh toàn cầu HOẶC nhân vật/bối cảnh của chính trường học mình đang theo học.
+  - **Giáo viên trường (`TEACHER`):** Chỉ được chat với nhân vật/bối cảnh toàn cầu HOẶC nhân vật/bối cảnh của trường mình.
+  - **Người dùng khác (`CUSTOMER`, học sinh trường khác, v.v.):** Cố tình tạo phòng chat với nhân vật/bối cảnh địa phương của một trường sẽ nhận lỗi `403 FORBIDDEN` ngay lập tức:
+    ```json
+    {
+      "success": false,
+      "message": "Access denied: Character/Context belongs to another educational institution",
+      "data": null
+    }
+    ```
+
+---
+
 ## ❌ Error Responses
 
 | HTTP | Code | Trường hợp |
 |------|------|-----------|
 | `400` | `INVALID_REQUEST` | Thiếu field bắt buộc, scope không hợp lệ |
 | `401` | `UNAUTHORIZED` | Chưa đăng nhập hoặc token hết hạn |
-| `403` | `UNAUTHORIZED` | Sai role, hoặc Teacher cố sửa nội dung của GV khác, hoặc chưa liên kết trường |
+| `403` | `UNAUTHORIZED` | Sai role, hoặc Teacher cố sửa nội dung của GV khác, hoặc chưa liên kết trường, hoặc truy cập nội dung trường khác |
 | `404` | `NOT_FOUND` | Content không tồn tại hoặc không thuộc trường của bạn |
 
 **Error Response format:**
@@ -862,6 +1383,7 @@ interface LocalContentResponse {
   isBC?: boolean;
   location?: string;
   videoUrl?: string;
+  battleMap?: Record<string, any> | null;  // GeoJSON, Map layers & coordinates
 
   // Character-specific (null cho CONTEXT)
   title?: string;

@@ -59,6 +59,14 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
             @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 
+    @Query("""
+            SELECT q FROM Quiz q
+            WHERE q.historicalContext.contextId = :contextId
+              AND q.deletedAt IS NULL
+            ORDER BY q.createdAt DESC
+            """)
+    Page<Quiz> findByContextIdAndDeletedAtIsNull(@Param("contextId") UUID contextId, Pageable pageable);
+
     /**
      * Duplicate title check for new quiz creation.
      */

@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
  * Request DTO for updating historical context document
  */
 @Data
-
+@NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class UpdateHistoricalContextDocumentRequest {

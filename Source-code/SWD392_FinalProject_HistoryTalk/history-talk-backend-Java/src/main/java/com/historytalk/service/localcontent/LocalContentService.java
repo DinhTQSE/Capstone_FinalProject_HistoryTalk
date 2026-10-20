@@ -98,4 +98,59 @@ public interface LocalContentService {
 
     /** Soft-delete a document from a local character */
     void deleteLocalCharacterDocument(String characterId, String docId, UserPrincipal principal);
+
+    /** Update an existing document attached to a local context */
+    HistoricalContextDocumentResponse updateLocalContextDocument(String contextId, String docId,
+            com.historytalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest request, UserPrincipal principal);
+
+    /** Update an existing document attached to a local character */
+    HistoricalContextDocumentResponse updateLocalCharacterDocument(String characterId, String docId,
+            com.historytalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest request, UserPrincipal principal);
+
+    // ── Dynamic Context-Character Linking ────────────────────────────────────
+
+    void linkCharacterToContext(String characterId, String contextId, UserPrincipal principal);
+
+    void unlinkCharacterFromContext(String characterId, String contextId, UserPrincipal principal);
+
+    List<LocalContentResponse> getCharacterContexts(String characterId, UserPrincipal principal);
+
+    // ── School Trash & Restore ───────────────────────────────────────────────
+
+    PaginatedResponse<LocalContentResponse> getTrashedContexts(int page, int size, UserPrincipal principal);
+
+    LocalContentResponse restoreLocalContext(String contextId, UserPrincipal principal);
+
+    void permanentDeleteLocalContext(String contextId, UserPrincipal principal);
+
+    PaginatedResponse<LocalContentResponse> getTrashedCharacters(int page, int size, UserPrincipal principal);
+
+    LocalContentResponse restoreLocalCharacter(String characterId, UserPrincipal principal);
+
+    void permanentDeleteLocalCharacter(String characterId, UserPrincipal principal);
+
+    // ── Local Quizzes & Questions ─────────────────────────────────────────────
+
+    PaginatedResponse<com.historytalk.dto.quiz.QuizStaffResponse> getLocalContextQuizzes(
+            String contextId, int page, int size, UserPrincipal principal);
+
+    com.historytalk.dto.quiz.QuizStaffResponse createLocalQuiz(
+            String contextId, com.historytalk.dto.quiz.CreateQuizRequest request, UserPrincipal principal);
+
+    com.historytalk.dto.quiz.QuizStaffResponse getLocalQuizById(String quizId, UserPrincipal principal);
+
+    com.historytalk.dto.quiz.QuizStaffResponse updateLocalQuiz(
+            String quizId, com.historytalk.dto.quiz.UpdateQuizRequest request, UserPrincipal principal);
+
+    void deleteLocalQuiz(String quizId, UserPrincipal principal);
+
+    com.historytalk.dto.quiz.QuizStaffResponse togglePublishLocalQuiz(String quizId, UserPrincipal principal);
+
+    com.historytalk.dto.quiz.QuestionResponse addLocalQuizQuestion(
+            String quizId, com.historytalk.dto.quiz.QuestionRequest request, UserPrincipal principal);
+
+    void updateLocalQuizQuestion(
+            String quizId, String questionId, com.historytalk.dto.quiz.QuestionRequest request, UserPrincipal principal);
+
+    void deleteLocalQuizQuestion(String quizId, String questionId, UserPrincipal principal);
 }
