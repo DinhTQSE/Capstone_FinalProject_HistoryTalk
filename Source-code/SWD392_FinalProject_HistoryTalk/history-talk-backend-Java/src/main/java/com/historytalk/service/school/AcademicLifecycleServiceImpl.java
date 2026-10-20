@@ -150,6 +150,10 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
             school.setDefaultDailyStudentQuota(request.getDefaultDailyStudentQuota());
             schoolRepository.save(school);
         }
+        if (request.getDefaultDailyTeacherQuota() != null) {
+            school.setDefaultDailyTeacherQuota(request.getDefaultDailyTeacherQuota());
+            schoolRepository.save(school);
+        }
 
         if (request.getClassroomId() != null && request.getClassroomDailyQuota() != null) {
             Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(request.getClassroomId(), schoolId)
@@ -330,6 +334,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
                 .totalSchoolTokenQuota(school.getTotalSchoolTokenQuota())
                 .unallocatedTokenQuota(school.getUnallocatedTokenQuota())
                 .defaultDailyStudentQuota(school.getDefaultDailyStudentQuota())
+                .defaultDailyTeacherQuota(school.getDefaultDailyTeacherQuota())
                 .subscriptionStartDate(school.getSubscriptionStartDate())
                 .subscriptionEndDate(school.getSubscriptionEndDate())
                 .renewedForNextYear(school.getRenewedForNextYear())
