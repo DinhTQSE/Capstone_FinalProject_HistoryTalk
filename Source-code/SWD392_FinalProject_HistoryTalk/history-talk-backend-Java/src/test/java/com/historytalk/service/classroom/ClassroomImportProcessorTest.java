@@ -17,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -29,7 +28,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +72,7 @@ class ClassroomImportProcessorTest {
                 .id(schoolId)
                 .schoolCode("CVA")
                 .name("THPT Chu Văn An")
+                .defaultDailyStudentQuota(1000)
                 .unallocatedTokenQuota(50000)
                 .build();
 
@@ -102,7 +101,7 @@ class ClassroomImportProcessorTest {
                 .email("nam@cva.edu.vn")
                 .school(school)
                 .role(UserRole.SCHOOL_STUDENT)
-                .token(15000)
+                .token(1000)
                 .build();
 
         StudentImportContext context = StudentImportContext.builder()
@@ -123,7 +122,7 @@ class ClassroomImportProcessorTest {
         assertEquals(0, result.getFailureCount());
         assertEquals(50000, result.getRemainingSchoolTokens()); // Không bị trừ token
         assertEquals("(Tài khoản hiện có)", result.getSuccessfulAccounts().get(0).getInitialPassword());
-        assertEquals(0, result.getSuccessfulAccounts().get(0).getAllocatedToken());
+        assertEquals(1000, result.getSuccessfulAccounts().get(0).getAllocatedToken());
 
         verify(classStudentRepository, times(1)).save(any(ClassStudent.class));
         verify(schoolRepository, never()).save(any(School.class)); // Không trừ token trường
@@ -218,10 +217,10 @@ class ClassroomImportProcessorTest {
     }
 
     @Test
-    @DisplayName("Import CSV: Học sinh mới tinh -> Tạo tài khoản, trừ token trường và gán vào lớp")
-    void testProcessImport_NewStudent_CreatesAndEnrollsAndDeductsTokens() {
+    @DisplayName("Import CSV: Học sinh mới tinh -> Tạo tài khoản theo Pure Shared Pool (không trừ trước quỹ trường) và gán vào lớp")
+    void testProcessImport_NewStudent_CreatesAndEnrollsInSharedPoolMode() {
         String csv = "student_code,full_name,email,dob,gender,phone_number,password,additional_token\n"
-                + "HS002,Lê Thảo Vy,,2009-08-20,FEMALE,0987654321,,5000\n";
+                + "HS002,Lê Thảo Vy,,2009-08-20,FEMALE,0987654321,,500\n";
         MockMultipartFile file = new MockMultipartFile("file", "students.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
 
         StudentImportContext context = StudentImportContext.builder()
@@ -246,38 +245,17 @@ class ClassroomImportProcessorTest {
 
         assertEquals(1, result.getSuccessCount());
         assertEquals(0, result.getFailureCount());
-        // Initial token = 10000 + 5000 additional = 15000. Remaining: 50000 - 15000 = 35000
-        assertEquals(35000, school.getUnallocatedTokenQuota());
-        assertEquals(35000, result.getRemainingSchoolTokens());
-        assertEquals(15000, result.getSuccessfulAccounts().get(0).getAllocatedToken());
+        // Pure Shared Pool: 0 upfront deduction from school.unallocatedTokenQuota (remains 50000)
+        assertEquals(50000, school.getUnallocatedTokenQuota());
+        assertEquals(50000, result.getRemainingSchoolTokens());
+        assertEquals(0, result.getTotalTokensAllocated());
+        // Daily limit = 1000 + 500 bonus = 1500
+        assertEquals(1500, result.getSuccessfulAccounts().get(0).getAllocatedToken());
         assertEquals("HS002@2026", result.getSuccessfulAccounts().get(0).getInitialPassword());
 
-        verify(schoolRepository, times(1)).save(school);
+        verify(schoolRepository, never()).save(school);
         verify(userRepository, times(1)).save(any(User.class));
         verify(classStudentRepository, times(1)).save(any(ClassStudent.class));
-    }
-
-    @Test
-    @DisplayName("Import CSV: Không đủ quota token cho học sinh mới -> Ném InvalidRequestException")
-    void testProcessImport_InsufficientTokens_ThrowsInvalidRequest() {
-        school.setUnallocatedTokenQuota(5000); // Only 5000 available
-
-        String csv = "student_code,full_name,email,dob,gender,phone_number,password,additional_token\n"
-                + "HS002,Lê Thảo Vy,,2009-08-20,FEMALE,0987654321,,10000\n"; // Requires 10000 (base) + 10000 (extra) = 20000
-        MockMultipartFile file = new MockMultipartFile("file", "students.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
-
-        StudentImportContext context = StudentImportContext.builder()
-                .schoolId(schoolId)
-                .classroomId(classroomId)
-                .defaultInitialToken(10000)
-                .build();
-
-        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
-        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
-        when(userRepository.findBySchoolIdAndStudentCodeIgnoreCase(schoolId, "HS002")).thenReturn(Optional.empty());
-
-        assertThrows(InvalidRequestException.class, () -> processor.processImport(file, context));
-        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

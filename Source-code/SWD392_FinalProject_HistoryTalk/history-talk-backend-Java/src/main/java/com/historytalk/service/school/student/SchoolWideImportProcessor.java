@@ -7,7 +7,6 @@ import com.historytalk.dto.school.StudentImportRowDto;
 import com.historytalk.entity.classroom.ClassStudent;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
-import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
@@ -47,24 +46,11 @@ public class SchoolWideImportProcessor extends AbstractStudentImportProcessor {
             List<StudentImportRowDto> rows,
             StudentImportContext context,
             School school) {
-
-        int baseToken = context.getDefaultInitialToken() != null ? context.getDefaultInitialToken() : 10000;
-
-        int totalTokensNeeded = rows.stream()
-                .mapToInt(r -> baseToken + (r.getAdditionalToken() != null ? Math.max(0, r.getAdditionalToken()) : 0))
-                .sum();
-
-        int availableTokens = school.getUnallocatedTokenQuota();
-        if (availableTokens < totalTokensNeeded) {
-            throw new InvalidRequestException(String.format(
-                    "Insufficient unallocated token quota: Import requires %,d tokens but the school only has %,d available tokens.",
-                    totalTokensNeeded, availableTokens));
-        }
-
-        school.setUnallocatedTokenQuota(availableTokens - totalTokensNeeded);
-        schoolRepository.save(school);
-        log.info("Deducted %,d tokens from school {} quota. Remaining quota: %,d tokens",
-                totalTokensNeeded, school.getSchoolCode(), school.getUnallocatedTokenQuota());
+        // Pure Shared Pool (Pay-As-You-Go):
+        // Do NOT deduct upfront tokens from school.unallocatedTokenQuota when importing students.
+        // Tokens remain 100% in school.unallocatedTokenQuota and are deducted only when students chat with AI.
+        log.info("Pure Shared Pool mode: Skipping upfront token deduction for {} imported students in school {}. Pool remains: {}",
+                rows.size(), school.getSchoolCode(), school.getUnallocatedTokenQuota());
     }
 
     @Override
