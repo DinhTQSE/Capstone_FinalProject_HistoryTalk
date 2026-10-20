@@ -36,7 +36,7 @@ public class PdfExtractionController {
     private final DocumentContentService documentContentService;
 
     @PostMapping(value = "/extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Extract raw text from PDF file for frontend drafting (STATELESS - no DB persistence)")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> extractText(
@@ -48,7 +48,7 @@ public class PdfExtractionController {
     }
 
     @PostMapping(value = "/upload-and-extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF and extract raw text for document drafting")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> uploadAndExtract(
@@ -65,7 +65,7 @@ public class PdfExtractionController {
     }
 
     @PostMapping(value = "/upload-and-extract/stream", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF and stream extraction progress via SSE")
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter uploadAndExtractStream(
@@ -74,22 +74,22 @@ public class PdfExtractionController {
             @org.springframework.web.bind.annotation.RequestParam(required = false) String entityId) {
         String staffId = SecurityUtils.getUserId();
         log.info("POST /api/v1/documents/pdf/upload-and-extract/stream by user {}", staffId);
-        
+
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(15 * 60 * 1000L);
-        
+
         java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 PdfExtractionResponse result = pdfExtractionService.extractText(file);
                 if (result.getFileUrl() == null || result.getFileUrl().isBlank()) {
                     result.setFileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded_document.pdf");
                 }
-                
+
                 int totalPages = result.getPageCount();
                 for (int i = 1; i <= totalPages; i++) {
                     String progressJson = String.format("{\"type\":\"progress\",\"page\":%d,\"total\":%d}", i, totalPages);
                     emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event().data(progressJson));
                 }
-                
+
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 String dataJson = mapper.writeValueAsString(result);
                 String doneJson = String.format("{\"type\":\"done\",\"data\":%s}", dataJson);
@@ -106,19 +106,19 @@ public class PdfExtractionController {
                 emitter.completeWithError(e);
             }
         });
-        
+
         return emitter;
     }
 
     @PostMapping("/{docId}/save-content")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Save user-edited content to document")
     public ResponseEntity<ApiResponse<DocumentFileResponse>> saveContent(
             @RequestBody @Valid SaveDocumentRequest request) {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
-        log.info("POST /api/v1/documents/{}/save-content by user {}", request.getDocId(), staffId);
+        log.info("POST /api/v1/documents/{}/save-content by user {} (role={})", request.getDocId(), staffId, staffRole);
         DocumentFileResponse response = documentContentService.saveDocumentContent(request, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(response, "Document content saved successfully"));
     }

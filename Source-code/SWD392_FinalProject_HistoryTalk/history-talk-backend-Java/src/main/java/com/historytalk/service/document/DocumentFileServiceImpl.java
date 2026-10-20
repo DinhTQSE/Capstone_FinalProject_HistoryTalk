@@ -68,7 +68,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     @Override
     @Transactional(readOnly = true)
     public DocumentPdfUrl createPdfUrl(String docId, String userId, String userRole) {
-        if (!isStaffOrAdmin(userRole)) {
+        if (!isStaffOrAdminOrStudent(userRole)) {
             throw new InvalidRequestException("Bạn không có quyền tải xuống file tài liệu này");
         }
 
@@ -102,8 +102,14 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         return role != null && (
                 "CONTENT_ADMIN".equalsIgnoreCase(role)
                         || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "TEACHER".equalsIgnoreCase(role)
+                        || "SCHOOL_ADMIN".equalsIgnoreCase(role)
                         || "STAFF".equalsIgnoreCase(role)
                         || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    private boolean isStaffOrAdminOrStudent(String role) {
+        return isStaffOrAdmin(role) || "SCHOOL_STUDENT".equalsIgnoreCase(role);
     }
 }
