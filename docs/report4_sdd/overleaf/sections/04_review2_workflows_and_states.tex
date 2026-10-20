@@ -5,26 +5,26 @@
 
 \subsection{Entity State Machine Diagrams}
 
-To ensure 100\% consistency between the Software Design Document and the Java domain enumerations (\texttt{com.historytalk.entity.enums}), Figures~\ref{fig:stm_01_content_and_account}, \ref{fig:stm_02_assignment_and_token}, and \ref{fig:stm_03_payment_lifecycle} model the complete finite state machines of all 9 stateful domain lifecycles in HistoryTalk.
+To ensure 100\% consistency between the Software Design Document and the Java domain enumerations (\texttt{com.historytalk.\ab entity.enums}), Figures~\ref{fig:stm_01_content_and_account}, \ref{fig:stm_02_assignment_and_token}, and \ref{fig:stm_03_payment_lifecycle} model the complete finite state machines of all 9 stateful domain lifecycles in HistoryTalk.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.98\textwidth]{figures/stm_01_content_and_account.png}
-    \caption{State Machine Diagrams -- \texttt{ContentStatus}, \texttt{AccountStatus} \& \texttt{SchoolStatus} Lifecycles}
+    \includegraphics[width=0.98\textwidth,height=0.25\textheight,keepaspectratio]{figures/stm_01_content_and_account.png}
+    \caption[State Machine Diagrams -- Content, Account \& School Status Lifecycles]{State Machine Diagrams -- \texttt{ContentStatus}, \texttt{AccountStatus} \& \texttt{SchoolStatus} Lifecycles}
     \label{fig:stm_01_content_and_account}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.98\textwidth]{figures/stm_02_assignment_and_token.png}
-    \caption{State Machine Diagrams -- \texttt{AssignmentStatus}, \texttt{SubmissionStatus} \& \texttt{TokenBoostRequestStatus} Lifecycles}
+    \includegraphics[width=0.98\textwidth,height=0.25\textheight,keepaspectratio]{figures/stm_02_assignment_and_token.png}
+    \caption[State Machine Diagrams -- Assignment, Submission \& Token Boost Lifecycles]{State Machine Diagrams -- \texttt{AssignmentStatus}, \texttt{SubmissionStatus} \& \texttt{TokenBoost\ab RequestStatus} Lifecycles}
     \label{fig:stm_02_assignment_and_token}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.98\textwidth]{figures/stm_03_payment_lifecycle.png}
-    \caption{State Machine Diagrams -- \texttt{PaymentOrderStatus}, \texttt{PaymentFulfillmentStatus} \& \texttt{PaymentTransactionStatus} Lifecycles}
+    \includegraphics[width=0.98\textwidth,height=0.25\textheight,keepaspectratio]{figures/stm_03_payment_lifecycle.png}
+    \caption[State Machine Diagrams -- Payment Order, Fulfillment \& Transaction Lifecycles]{State Machine Diagrams -- \texttt{PaymentOrderStatus}, \texttt{PaymentFulfillment\ab Status} \& \texttt{PaymentTransaction\ab Status} Lifecycles}
     \label{fig:stm_03_payment_lifecycle}
 \end{figure}
 
@@ -32,29 +32,29 @@ To ensure 100\% consistency between the Software Design Document and the Java do
 Table~\ref{tab:state_transitions} maps every state enumeration in the codebase to its valid transitions and triggering API endpoints/schedulers.
 
 \footnotesize
-\begin{longtable}{|L{3.2cm}|L{3.2cm}|L{3.8cm}|L{5.3cm}|}
+\begin{longtable}{|L{3.5cm}|L{2.8cm}|L{3.7cm}|L{4.9cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{Entity / Enum} & \textbf{States in Code} & \textbf{Valid Transitions} & \textbf{Triggering Feature / API / Scheduler} \\
 \hline
 \endhead
-\texttt{HistoricalContext}, \texttt{Character}, \texttt{Document}\newline(\texttt{ContentStatus}) & \texttt{DRAFT}, \texttt{PENDING\_REVIEW}, \texttt{ACTIVE}, \texttt{INACTIVE} & \texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_REVIEW}\newline\texttt{PENDING\_REVIEW} $\rightarrow$ \texttt{ACTIVE} / \texttt{DRAFT}\newline\texttt{DRAFT} $\leftrightarrow$ \texttt{ACTIVE}\newline\texttt{DRAFT}/\texttt{ACTIVE} $\rightarrow$ \texttt{INACTIVE}\newline\texttt{INACTIVE} $\rightarrow$ \texttt{DRAFT} & Teacher submits local content (\texttt{PUT /submit-review}); School Admin approves/rejects (\texttt{PUT /local-content/\{id\}/status}); Content Admin publishes/deletes/restores (\texttt{SystemTrashController}). \\
+\texttt{HistoricalContext}, \texttt{Character}, \texttt{Document}\newline(\texttt{ContentStatus}) & \texttt{DRAFT}, \texttt{PENDING\_\ab REVIEW}, \texttt{ACTIVE}, \texttt{INACTIVE} & \texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_\ab REVIEW}\newline\texttt{PENDING\_\ab REVIEW} $\rightarrow$ \texttt{ACTIVE} / \texttt{DRAFT}\newline\texttt{DRAFT} $\leftrightarrow$ \texttt{ACTIVE}\newline\texttt{DRAFT}/\texttt{ACTIVE} $\rightarrow$ \texttt{INACTIVE}\newline\texttt{INACTIVE} $\rightarrow$ \texttt{DRAFT} & Teacher submits local content (\texttt{PUT /submit-review}); School Admin approves/rejects (\texttt{PUT /local-content/\ab \{id\}/status}); Content Admin publishes/deletes/restores (\texttt{SystemTrash\ab Controller}). \\
 \hline
-\texttt{User}\newline(\texttt{AccountStatus}) & \texttt{ACTIVE}, \texttt{DEACTIVATED} & \texttt{ACTIVE} $\leftrightarrow$ \texttt{DEACTIVATED} & Admin deactivates/restores user (\texttt{AdminUserController}); End-of-year Grade 12 rollover (\texttt{AcademicLifecycleServiceImpl}). \\
+\texttt{User}\newline(\texttt{AccountStatus}) & \texttt{ACTIVE}, \texttt{DEACTIVATED} & \texttt{ACTIVE} $\leftrightarrow$ \texttt{DEACTIVATED} & Admin deactivates/restores user (\texttt{AdminUser\ab Controller}); End-of-year Grade 12 rollover (\texttt{AcademicLifecycle\ab ServiceImpl}). \\
 \hline
-\texttt{School}\newline(\texttt{SchoolStatus}) & \texttt{ACTIVE}, \texttt{INACTIVE}, \texttt{SUSPENDED}, \texttt{EXPIRED} & \texttt{ACTIVE} $\leftrightarrow$ \texttt{SUSPENDED}\newline\texttt{ACTIVE} $\leftrightarrow$ \texttt{EXPIRED}\newline\texttt{ACTIVE}/\texttt{EXPIRED} $\rightarrow$ \texttt{INACTIVE} & System Admin updates status or renews package (\texttt{AdminSchoolController}); Subscription expiry check after \texttt{31/05}. \\
+\texttt{School}\newline(\texttt{SchoolStatus}) & \texttt{ACTIVE}, \texttt{INACTIVE}, \texttt{SUSPENDED}, \texttt{EXPIRED} & \texttt{ACTIVE} $\leftrightarrow$ \texttt{SUSPENDED}\newline\texttt{ACTIVE} $\leftrightarrow$ \texttt{EXPIRED}\newline\texttt{ACTIVE}/\texttt{EXPIRED} $\rightarrow$ \texttt{INACTIVE} & System Admin updates status or renews package (\texttt{AdminSchool\ab Controller}); Subscription expiry check after \texttt{31/05}. \\
 \hline
-\texttt{Assignment}\newline(\texttt{AssignmentStatus}) & \texttt{ACTIVE}, \texttt{CANCELLED}, \texttt{ARCHIVED} & \texttt{ACTIVE} $\rightarrow$ \texttt{ARCHIVED}\newline\texttt{ACTIVE} $\rightarrow$ \texttt{CANCELLED} & Teacher creates, cancels, or archives classroom assignment (\texttt{TeacherAssignmentController}). \\
+\texttt{Assignment}\newline(\texttt{AssignmentStatus}) & \texttt{ACTIVE}, \texttt{CANCELLED}, \texttt{ARCHIVED} & \texttt{ACTIVE} $\rightarrow$ \texttt{ARCHIVED}\newline\texttt{ACTIVE} $\rightarrow$ \texttt{CANCELLED} & Teacher creates, cancels, or archives classroom assignment (\texttt{TeacherAssignment\ab Controller}). \\
 \hline
-\texttt{AssignmentSubmission}\newline(\texttt{SubmissionStatus}) & \texttt{NOT\_STARTED}, \texttt{IN\_PROGRESS}, \texttt{SUBMITTED}, \texttt{LATE\_SUBMITTED}, \texttt{MISSED}, \texttt{EXEMPTED} & \texttt{NOT\_STARTED} $\rightarrow$ \texttt{IN\_PROGRESS}\newline\texttt{IN\_PROGRESS} $\rightarrow$ \texttt{SUBMITTED} / \texttt{LATE\_SUBMITTED}\newline\texttt{NOT\_STARTED}/\texttt{IN\_PROGRESS} $\rightarrow$ \texttt{MISSED}\newline\texttt{[*] $\rightarrow$ EXEMPTED} & Student starts/submits assignment (\texttt{StudentAssignmentController}); Quiz/Chat sync hooks; Late student enrollment auto-exemption (\texttt{ClassroomImportProcessor}). \\
+\texttt{Assignment\ab Submission}\newline(\texttt{SubmissionStatus}) & \texttt{NOT\_STARTED}, \texttt{IN\_PROGRESS}, \texttt{SUBMITTED}, \texttt{LATE\_\ab SUBMITTED}, \texttt{MISSED}, \texttt{EXEMPTED} & \texttt{NOT\_STARTED} $\rightarrow$ \texttt{IN\_PROGRESS}\newline\texttt{IN\_PROGRESS} $\rightarrow$ \texttt{SUBMITTED} / \texttt{LATE\_\ab SUBMITTED}\newline\texttt{NOT\_STARTED}/\texttt{IN\_PROGRESS} $\rightarrow$ \texttt{MISSED}\newline\texttt{[*]} $\rightarrow$ \texttt{EXEMPTED} & Student starts/submits assignment (\texttt{StudentAssignment\ab Controller}); Quiz/Chat sync hooks; Late student enrollment auto-exemption (\texttt{ClassroomImport\ab Processor}). \\
 \hline
-\texttt{TokenBoostRequest}\newline(\texttt{TokenBoostRequestStatus}) & \texttt{PENDING}, \texttt{APPROVED}, \texttt{REJECTED} & \texttt{PENDING} $\rightarrow$ \texttt{APPROVED}\newline\texttt{PENDING} $\rightarrow$ \texttt{REJECTED} & Student requests boost (\texttt{POST /token-boost-requests}); Teacher/School Admin reviews (\texttt{PUT /token-boost-requests/\{id\}/review}). \\
+\texttt{TokenBoostRequest}\newline(\texttt{TokenBoost\ab RequestStatus}) & \texttt{PENDING}, \texttt{APPROVED}, \texttt{REJECTED} & \texttt{PENDING} $\rightarrow$ \texttt{APPROVED}\newline\texttt{PENDING} $\rightarrow$ \texttt{REJECTED} & Student requests boost (\texttt{POST /token-boost-\ab requests}); Teacher/School Admin reviews (\texttt{PUT /token-boost-\ab requests/\ab \{id\}/review}). \\
 \hline
-\texttt{PaymentOrder}\newline(\texttt{PaymentOrderStatus}) & \texttt{PENDING}, \texttt{PAID}, \texttt{CANCELLED}, \texttt{EXPIRED}, \texttt{FAILED} & \texttt{PENDING} $\rightarrow$ \texttt{PAID} / \texttt{CANCELLED} / \texttt{EXPIRED} / \texttt{FAILED} & PayOS Webhook (\texttt{PayOSWebhookController}), User cancel (\texttt{PaymentController}), Expiry job (\texttt{PaymentExpiryScheduler}). \\
+\texttt{PaymentOrder}\newline(\texttt{PaymentOrder\ab Status}) & \texttt{PENDING}, \texttt{PAID}, \texttt{CANCELLED}, \texttt{EXPIRED}, \texttt{FAILED} & \texttt{PENDING} $\rightarrow$ \texttt{PAID} / \texttt{CANCELLED} / \texttt{EXPIRED} / \texttt{FAILED} & PayOS Webhook (\texttt{PayOSWebhook\ab Controller}), User cancel (\texttt{PaymentController}), Expiry job (\texttt{PaymentExpiry\ab Scheduler}). \\
 \hline
-\texttt{PaymentOrder}\newline(\texttt{PaymentFulfillmentStatus}) & \texttt{PENDING}, \texttt{PROCESSING}, \texttt{FULFILLED}, \texttt{FAILED} & \texttt{PENDING} $\rightarrow$ \texttt{PROCESSING} $\rightarrow$ \texttt{FULFILLED} / \texttt{FAILED}\newline\texttt{FAILED} $\rightarrow$ \texttt{PROCESSING} & \texttt{PaymentFulfillmentService} and \texttt{PaymentFulfillmentReconciliationScheduler}. \\
+\texttt{PaymentOrder}\newline(\texttt{PaymentFulfillment\ab Status}) & \texttt{PENDING}, \texttt{PROCESSING}, \texttt{FULFILLED}, \texttt{FAILED} & \texttt{PENDING} $\rightarrow$ \texttt{PROCESSING} $\rightarrow$ \texttt{FULFILLED} / \texttt{FAILED}\newline\texttt{FAILED} $\rightarrow$ \texttt{PROCESSING} & \texttt{PaymentFulfillment\ab Service} and \texttt{PaymentFulfillment\ab Reconciliation\ab Scheduler}. \\
 \hline
-\texttt{PaymentTransaction}\newline(\texttt{PaymentTransactionStatus}) & \texttt{PENDING}, \texttt{SUCCESS}, \texttt{FAILED} & \texttt{PENDING} $\rightarrow$ \texttt{SUCCESS} / \texttt{FAILED} & Webhook verification in \texttt{PaymentWebhookService}. \\
+\texttt{PaymentTransaction}\newline(\texttt{PaymentTransaction\ab Status}) & \texttt{PENDING}, \texttt{SUCCESS}, \texttt{FAILED} & \texttt{PENDING} $\rightarrow$ \texttt{SUCCESS} / \texttt{FAILED} & Webhook verification in \texttt{PaymentWebhook\ab Service}. \\
 \hline
 \caption{Complete State Machine Traceability Matrix}
 \label{tab:state_transitions}
@@ -66,57 +66,59 @@ Table~\ref{tab:state_transitions} maps every state enumeration in the codebase t
 
 In accordance with Review 2 Guidelines (Section 06 \& Section 09.1), HistoryTalk defines \textbf{5 end-to-end Main Business Workflows} (\texttt{WF-01} to \texttt{WF-05}), each owned by one team member, involving $\ge 2$ actors across $\ge 3$ mandatory features, and transitioning the state of core domain entities.
 
-\begin{longtable}{|C{1.4cm}|L{4.5cm}|L{2.8cm}|L{3.5cm}|L{3.3cm}|}
+{\small
+\begin{longtable}{|C{1.2cm}|L{3.4cm}|L{2.2cm}|L{2.7cm}|L{5.2cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{ID} & \textbf{Workflow Name} & \textbf{Owner} & \textbf{Actors Involved} & \textbf{Primary Entities \& State Changes} \\
 \hline
 \endhead
-\textbf{WF-01} & B2B School Onboarding, Classroom Setup \& Bulk CSV Student Enrollment & Nguyen Minh Tri & System Admin, School Admin, Teacher, School Student & \texttt{School} (\texttt{ACTIVE}), \texttt{Classroom} (\texttt{ACTIVE}), \texttt{User} (\texttt{ACTIVE}), \texttt{ClassStudent}, \texttt{AssignmentSubmission} (\texttt{EXEMPTED}) \\
+\textbf{WF-01} & B2B School Onboarding, Classroom Setup \& Bulk CSV Student Enrollment & Nguyen Minh Tri & System Admin, School Admin, Teacher, School Student & \texttt{School} (\texttt{ACTIVE}), \texttt{Classroom} (\texttt{ACTIVE}), \texttt{User} (\texttt{ACTIVE}), \texttt{ClassStudent}, \texttt{Assignment\ab Submission} (\texttt{EXEMPTED}) \\
 \hline
-\textbf{WF-02} & Historical Content, PDF OCR Ingestion, RAG Indexing \& Local Content Approval & Do Quoc Bao & Content Admin, Teacher, School Admin & \texttt{HistoricalContext}, \texttt{Character}, \texttt{Document} (\texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_REVIEW} $\rightarrow$ \texttt{ACTIVE}), \texttt{VectorChunk} \\
+\textbf{WF-02} & Historical Content, PDF OCR Ingestion, RAG Indexing \& Local Content Approval & Do Quoc Bao & Content Admin, Teacher, School Admin & \texttt{Historical\ab Context}, \texttt{Character}, \texttt{Document} (\texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_\ab REVIEW} $\rightarrow$ \texttt{ACTIVE}), \texttt{VectorChunk} \\
 \hline
-\textbf{WF-03} & Grounded AI Historical Roleplay Chat, Daily Token Quota \& Boost Approval & Nguyen Cong Thanh & School Student / Customer, Teacher, School Admin & \texttt{ChatSession}, \texttt{Message}, \texttt{User} (\texttt{dailyTokensUsed}), \texttt{TokenBoostRequest} (\texttt{PENDING} $\rightarrow$ \texttt{APPROVED}) \\
+\textbf{WF-03} & Grounded AI Historical Roleplay Chat, Daily Token Quota \& Boost Approval & Nguyen Cong Thanh & School Student / Customer, Teacher, School Admin & \texttt{ChatSession}, \texttt{Message}, \texttt{User} (\texttt{dailyTokens\ab Used}), \texttt{TokenBoost\ab Request} (\texttt{PENDING} $\rightarrow$ \texttt{APPROVED}) \\
 \hline
-\textbf{WF-04} & Classroom Assignment Dispatch, Multi-Type Quiz Execution \& Auto-Grading & Vo Dong Duc Khai & Teacher, School Student & \texttt{Assignment} (\texttt{ACTIVE}), \texttt{QuizSession}, \texttt{QuizAnswerDetail}, \texttt{AssignmentSubmission} (\texttt{NOT\_STARTED} $\rightarrow$ \texttt{IN\_PROGRESS} $\rightarrow$ \texttt{SUBMITTED}) \\
+\textbf{WF-04} & Classroom Assignment Dispatch, Multi-Type Quiz Execution \& Auto-Grading & Vo Dong Duc Khai & Teacher, School Student & \texttt{Assignment} (\texttt{ACTIVE}), \texttt{QuizSession}, \texttt{QuizAnswer\ab Detail}, \texttt{Assignment\ab Submission} (\texttt{NOT\_STARTED} $\rightarrow$ \texttt{IN\_PROGRESS} $\rightarrow$ \texttt{SUBMITTED}) \\
 \hline
-\textbf{WF-05} & B2C Subscription Upgrade via PayOS Webhook \& Daily Gamification Rewards & Tran Quoc Van Dinh & Customer, PayOS Gateway, System Admin & \texttt{PaymentOrder} (\texttt{PENDING} $\rightarrow$ \texttt{PAID}, \texttt{FULFILLED}), \texttt{UserTier} (\texttt{isActive}), \texttt{UserQuestProgress} (\texttt{claimed}) \\
+\textbf{WF-05} & B2C Subscription Upgrade via PayOS Webhook \& Daily Gamification Rewards & Tran Quoc Van Dinh & Customer, PayOS Gateway, System Admin & \texttt{PaymentOrder} (\texttt{PENDING} $\rightarrow$ \texttt{PAID}, \texttt{FULFILLED}), \texttt{UserTier} (\texttt{isActive}), \texttt{UserQuest\ab Progress} (\texttt{claimed}) \\
 \hline
 \caption{Main Business Workflows Summary \& Ownership Matrix}
 \label{tab:main_workflows}
 \end{longtable}
+}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth,height=0.80\textheight,keepaspectratio]{figures/act_wf01_school_onboarding_and_enrollment.png}
-    \caption{Activity Diagram WF-01 -- B2B School Onboarding, Classroom Setup \& Bulk Student Enrollment}
+    \includegraphics[width=0.95\textwidth,height=0.42\textheight,keepaspectratio]{figures/act_wf01_school_onboarding_and_enrollment.png}
+    \caption[Activity Diagram WF-01 -- School Onboarding \& Bulk Student Enrollment]{Activity Diagram WF-01 -- B2B School Onboarding, Classroom Setup \& Bulk Student Enrollment}
     \label{fig:act_wf01}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{figures/act_wf02_rag_content_and_local_approval.png}
-    \caption{Activity Diagram WF-02 -- Historical Document OCR Ingestion, RAG Indexing \& Local Content Approval}
+    \includegraphics[width=0.95\textwidth,height=0.42\textheight,keepaspectratio]{figures/act_wf02_rag_content_and_local_approval.png}
+    \caption[Activity Diagram WF-02 -- Document OCR, RAG Indexing \& Local Content Approval]{Activity Diagram WF-02 -- Historical Document OCR Ingestion, RAG Indexing \& Local Content Approval}
     \label{fig:act_wf02}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{figures/act_wf03_ai_character_roleplay_and_token_boost.png}
-    \caption{Activity Diagram WF-03 -- Grounded AI Historical Roleplay Chat \& Daily Token Boost Workflow}
+    \includegraphics[width=0.95\textwidth,height=0.42\textheight,keepaspectratio]{figures/act_wf03_ai_character_roleplay_and_token_boost.png}
+    \caption[Activity Diagram WF-03 -- Grounded AI Roleplay Chat \& Token Boost]{Activity Diagram WF-03 -- Grounded AI Historical Roleplay Chat \& Daily Token Boost Workflow}
     \label{fig:act_wf03}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{figures/act_wf04_classroom_assignment_and_quiz_grading.png}
-    \caption{Activity Diagram WF-04 -- Classroom Assignment Dispatch, Multi-Type Quiz \& Automated Grading}
+    \includegraphics[width=0.95\textwidth,height=0.42\textheight,keepaspectratio]{figures/act_wf04_classroom_assignment_and_quiz_grading.png}
+    \caption[Activity Diagram WF-04 -- Classroom Assignment \& Multi-Type Quiz Grading]{Activity Diagram WF-04 -- Classroom Assignment Dispatch, Multi-Type Quiz \& Automated Grading}
     \label{fig:act_wf04}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{figures/act_wf05_b2c_payos_subscription_and_gamification.png}
-    \caption{Activity Diagram WF-05 -- B2C Subscription Upgrade via PayOS \& Daily Gamification Rewards}
+    \includegraphics[width=0.95\textwidth,height=0.42\textheight,keepaspectratio]{figures/act_wf05_b2c_payos_subscription_and_gamification.png}
+    \caption[Activity Diagram WF-05 -- B2C PayOS Subscription \& Gamification Rewards]{Activity Diagram WF-05 -- B2C Subscription Upgrade via PayOS \& Daily Gamification Rewards}
     \label{fig:act_wf05}
 \end{figure}

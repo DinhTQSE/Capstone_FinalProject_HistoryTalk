@@ -1,5 +1,5 @@
 @startuml
-skinparam dpi 180
+scale max 2800 width
 skinparam classAttributeIconSize 0
 skinparam defaultFontName Arial
 skinparam shadowing false
