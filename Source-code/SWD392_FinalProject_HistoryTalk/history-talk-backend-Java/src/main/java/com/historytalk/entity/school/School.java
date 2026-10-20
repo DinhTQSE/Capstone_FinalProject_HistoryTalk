@@ -80,6 +80,10 @@ public class School {
     private Integer defaultDailyStudentQuota = 1000;
 
     @Builder.Default
+    @Column(name = "default_daily_teacher_quota", nullable = false)
+    private Integer defaultDailyTeacherQuota = 10000;
+
+    @Builder.Default
     @Column(name = "local_history_policy_accepted", nullable = false)
     private Boolean localHistoryPolicyAccepted = false;
 

@@ -65,7 +65,11 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .role(UserRole.TEACHER)
                 .school(school)
                 .mustChangePassword(true)
-                .token(0)
+                .token(Math.min(school.getDefaultDailyTeacherQuota() != null ? school.getDefaultDailyTeacherQuota() : 10000,
+                        school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 10000))
+                .dailyTokensUsed(0)
+                .dailyBonusTokens(0)
+                .lastTokenResetAt(LocalDateTime.now())
                 .build();
 
         User saved = userRepository.save(teacher);
