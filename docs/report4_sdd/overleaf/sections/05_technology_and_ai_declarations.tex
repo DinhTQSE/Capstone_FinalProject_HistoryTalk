@@ -8,14 +8,14 @@
 In compliance with the SWP490 Review 2 Guidelines (Section 03 \& Section 10), Table~\ref{tab:tech_declaration} declares all third-party services, development technologies with exact versions, source control and CI/CD pipelines, deployment environments, and AI tools used across the project lifecycle.
 
 \footnotesize
-\begin{longtable}{|L{3.1cm}|L{4.0cm}|L{8.1cm}|}
+\begin{longtable}{|L{2.9cm}|L{3.8cm}|L{7.6cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{Category} & \textbf{Component / Service} & \textbf{Purpose, Version \& Data Exchanged} \\
 \hline
 \endhead
 
-\multirow{7}{3.1cm}{\textbf{1. Third-Party Services}}
+\multirow{7}{2.9cm}{\textbf{1. Third-Party Services}}
 & \textbf{Google OAuth 2.0} (\texttt{spring-boot-\ab starter-\ab oauth2-client}) & \textbf{Purpose:} Single Sign-On (SSO) authentication for Customers.\newline\textbf{Data Exchanged:} OAuth authorization code exchanged for verified user email, display name, and avatar URL. \\
 \cline{2-3}
 & \textbf{Cloudflare R2 / Supabase S3 Storage} & \textbf{Purpose:} Object storage for uploaded PDF documents, 2D historical illustrations, interactive battle-map rasters, and 3D character models (\texttt{.glb}).\newline\textbf{Data Exchanged:} Binary media streams and presigned upload/view URLs. \\
@@ -31,7 +31,7 @@ In compliance with the SWP490 Review 2 Guidelines (Section 03 \& Section 10), Ta
 & \textbf{Supabase PgVector Cloud} (\texttt{supabase-py 2.3+}) & \textbf{Purpose:} Hosted vector database storing 768-D embeddings and executing \texttt{match\_history\_\ab chunks} similarity RPC.\newline\textbf{Data Exchanged:} Document chunk texts, 768-D float vectors, and entity UUID filters. \\
 \hline
 
-\multirow{5}{3.1cm}{\textbf{2. Development Technologies}}
+\multirow{5}{2.9cm}{\textbf{2. Development Technologies}}
 & \textbf{Frontend Web} & \textbf{Next.js 14+ / React 18 / TypeScript 5}, TailwindCSS, Axios, Leaflet / Mapbox GeoJSON, Three.js / React Three Fiber (3D \texttt{.glb} rendering). \\
 \cline{2-3}
 & \textbf{Core Backend} & \textbf{Java 21 LTS}, \textbf{Spring Boot 3.2.5}, Spring Security 6, Spring Data JPA (Hibernate 6), \textbf{jjwt 0.12.5}, \textbf{Flyway Core}, \textbf{Lombok 1.18.32}, \textbf{SpringDoc OpenAPI 2.2.0}. \\
@@ -43,7 +43,7 @@ In compliance with the SWP490 Review 2 Guidelines (Section 03 \& Section 10), Ta
 & \textbf{Database \& Observability} & \textbf{PostgreSQL 16} (\texttt{postgresql 42.7.1} driver), \textbf{PgVector Extension} (HNSW index), \textbf{Micrometer Prometheus} + \textbf{Prometheus \& Grafana} Docker monitoring stack. \\
 \hline
 
-\multirow{3}{3.1cm}{\textbf{3. Source Control \& DevOps}}
+\multirow{3}{2.9cm}{\textbf{3. Source Control \& DevOps}}
 & \textbf{Repository \& Branching} & \textbf{Git / GitHub} monorepo (\texttt{Source-code/\ab SWD392\_\ab FinalProject\_\ab HistoryTalk/}). Branching strategy: \texttt{main} (protected release branch tagged \texttt{review-2}), \texttt{develop}, and topic branches (\texttt{feature/*}, \texttt{fix/*}). \\
 \cline{2-3}
 & \textbf{CI/CD Pipeline} & \textbf{GitHub Actions} automated workflow executing \texttt{mvn clean test} (JUnit 5 + Spring Security Test) for Java Backend and syntax/unit validation for Python AI Service on every pull request and push. \\
@@ -51,7 +51,7 @@ In compliance with the SWP490 Review 2 Guidelines (Section 03 \& Section 10), Ta
 & \textbf{Containerization} & Multi-service \textbf{Docker \& Docker Compose} (\texttt{Dockerfile} for Java Backend, Python AI Service, and \texttt{docker-compose.\ab monitoring.yml} for Prometheus/Grafana). \\
 \hline
 
-\multirow{3}{3.1cm}{\textbf{4. Deployment Environments}}
+\multirow{3}{2.9cm}{\textbf{4. Deployment Environments}}
 & \textbf{Development (Local)} & Local PostgreSQL / Supabase dev schema, Java Spring Boot on port \texttt{8080}, FastAPI AI service on port \texttt{8001}, seeded via deterministic SQL scripts (\texttt{seed\_all\_\ab rows.sql}). \\
 \cline{2-3}
 & \textbf{Staging \& Production} & Deployed on \textbf{AWS EC2 (\texttt{c6a.large})} behind \textbf{Nginx Reverse Proxy} with SSL/TLS termination, Docker Compose orchestration, and managed PostgreSQL / Supabase PgVector. \\
@@ -59,7 +59,7 @@ In compliance with the SWP490 Review 2 Guidelines (Section 03 \& Section 10), Ta
 & \textbf{Deployment \& Rollback Strategy} & Immutable Docker image tags + Flyway versioned schema migrations (\texttt{V1}--\texttt{V38}). Rollback is performed by re-deploying the previous verified Git tag/Docker image and restoring pre-migration database snapshots if needed. \\
 \hline
 
-\multirow{4}{3.1cm}{\textbf{5. AI Tools Used in Development}}
+\multirow{4}{2.9cm}{\textbf{5. AI Tools Used in Development}}
 & \textbf{Specification \& Design} & \textbf{Gemini / Claude / ChatGPT}: Assisted in refining SRS use case descriptions, generating PlantUML (\texttt{.puml}) sequence/class/state diagrams, and formatting LaTeX tables. All outputs were manually verified against business rules. \\
 \cline{2-3}
 & \textbf{Coding \& Refactoring} & \textbf{GitHub Copilot / Cursor / Antigravity Coding Agent}: Assisted in boilerplate DTO/mapper generation, Flyway migration drafting, and REST API contract alignment. \\
@@ -85,7 +85,7 @@ Because HistoryTalk incorporates Conversational AI and Retrieval-Augmented Gener
     \label{fig:arch_ai_rag_pipeline}
 \end{figure}
 
-\begin{longtable}{|C{0.8cm}|L{3.5cm}|L{10.9cm}|}
+\begin{longtable}{|C{0.7cm}|L{3.3cm}|L{10.3cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{\#} & \textbf{Specification Item} & \textbf{HistoryTalk Implementation Details} \\

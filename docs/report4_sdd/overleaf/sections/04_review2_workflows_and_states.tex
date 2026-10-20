@@ -32,7 +32,7 @@ To ensure 100\% consistency between the Software Design Document and the Java do
 Table~\ref{tab:state_transitions} maps every state enumeration in the codebase to its valid transitions and triggering API endpoints/schedulers.
 
 \footnotesize
-\begin{longtable}{|L{3.5cm}|L{2.8cm}|L{3.7cm}|L{4.9cm}|}
+\begin{longtable}{|L{3.3cm}|L{2.6cm}|L{3.5cm}|L{4.7cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{Entity / Enum} & \textbf{States in Code} & \textbf{Valid Transitions} & \textbf{Triggering Feature / API / Scheduler} \\
@@ -67,21 +67,21 @@ Table~\ref{tab:state_transitions} maps every state enumeration in the codebase t
 In accordance with Review 2 Guidelines (Section 06 \& Section 09.1), HistoryTalk defines \textbf{5 end-to-end Main Business Workflows} (\texttt{WF-01} to \texttt{WF-05}), each owned by one team member, involving $\ge 2$ actors across $\ge 3$ mandatory features, and transitioning the state of core domain entities.
 
 {\small
-\begin{longtable}{|C{1.2cm}|L{3.4cm}|L{2.2cm}|L{2.7cm}|L{5.2cm}|}
+\begin{longtable}{|C{1.1cm}|L{3.2cm}|L{2.3cm}|L{2.5cm}|L{4.8cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{ID} & \textbf{Workflow Name} & \textbf{Owner} & \textbf{Actors Involved} & \textbf{Primary Entities \& State Changes} \\
 \hline
 \endhead
-\textbf{WF-01} & B2B School Onboarding, Classroom Setup \& Bulk CSV Student Enrollment & Nguyen Minh Tri & System Admin, School Admin, Teacher, School Student & \texttt{School} (\texttt{ACTIVE}), \texttt{Classroom} (\texttt{ACTIVE}), \texttt{User} (\texttt{ACTIVE}), \texttt{ClassStudent}, \texttt{Assignment\ab Submission} (\texttt{EXEMPTED}) \\
+\textbf{WF-01} & B2B School Onboarding, Classroom Setup \& Bulk CSV Student Enrollment & \vn{Nguyễn Minh Trí}\newline(SE192645) & System Admin, School Admin, Teacher, School Student & \texttt{School} (\texttt{ACTIVE}), \texttt{Classroom} (\texttt{ACTIVE}), \texttt{User} (\texttt{ACTIVE}), \texttt{ClassStudent}, \texttt{Assignment\ab Submission} (\texttt{EXEMPTED}) \\
 \hline
-\textbf{WF-02} & Historical Content, PDF OCR Ingestion, RAG Indexing \& Local Content Approval & Do Quoc Bao & Content Admin, Teacher, School Admin & \texttt{Historical\ab Context}, \texttt{Character}, \texttt{Document} (\texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_\ab REVIEW} $\rightarrow$ \texttt{ACTIVE}), \texttt{VectorChunk} \\
+\textbf{WF-02} & Historical Content, PDF OCR Ingestion, RAG Indexing \& Local Content Approval & \vn{Đỗ Quốc Bảo}\newline(SE193803) & Content Admin, Teacher, School Admin & \texttt{Historical\ab Context}, \texttt{Character}, \texttt{Document} (\texttt{DRAFT} $\rightarrow$ \texttt{PENDING\_\ab REVIEW} $\rightarrow$ \texttt{ACTIVE}), \texttt{VectorChunk} \\
 \hline
-\textbf{WF-03} & Grounded AI Historical Roleplay Chat, Daily Token Quota \& Boost Approval & Nguyen Cong Thanh & School Student / Customer, Teacher, School Admin & \texttt{ChatSession}, \texttt{Message}, \texttt{User} (\texttt{dailyTokens\ab Used}), \texttt{TokenBoost\ab Request} (\texttt{PENDING} $\rightarrow$ \texttt{APPROVED}) \\
+\textbf{WF-03} & Grounded AI Historical Roleplay Chat, Daily Token Quota \& Boost Approval & \vn{Nguyễn Công Thành}\newline(SE196309) & School Student / Customer, Teacher, School Admin & \texttt{ChatSession}, \texttt{Message}, \texttt{User} (\texttt{dailyTokens\ab Used}), \texttt{TokenBoost\ab Request} (\texttt{PENDING} $\rightarrow$ \texttt{APPROVED}) \\
 \hline
-\textbf{WF-04} & Classroom Assignment Dispatch, Multi-Type Quiz Execution \& Auto-Grading & Vo Dong Duc Khai & Teacher, School Student & \texttt{Assignment} (\texttt{ACTIVE}), \texttt{QuizSession}, \texttt{QuizAnswer\ab Detail}, \texttt{Assignment\ab Submission} (\texttt{NOT\_STARTED} $\rightarrow$ \texttt{IN\_PROGRESS} $\rightarrow$ \texttt{SUBMITTED}) \\
+\textbf{WF-04} & Classroom Assignment Dispatch, Multi-Type Quiz Execution \& Auto-Grading & \vn{Võ Đồng Đức Khải}\newline(SE196405) & Teacher, School Student & \texttt{Assignment} (\texttt{ACTIVE}), \texttt{QuizSession}, \texttt{QuizAnswer\ab Detail}, \texttt{Assignment\ab Submission} (\texttt{NOT\_STARTED} $\rightarrow$ \texttt{IN\_PROGRESS} $\rightarrow$ \texttt{SUBMITTED}) \\
 \hline
-\textbf{WF-05} & B2C Subscription Upgrade via PayOS Webhook \& Daily Gamification Rewards & Tran Quoc Van Dinh & Customer, PayOS Gateway, System Admin & \texttt{PaymentOrder} (\texttt{PENDING} $\rightarrow$ \texttt{PAID}, \texttt{FULFILLED}), \texttt{UserTier} (\texttt{isActive}), \texttt{UserQuest\ab Progress} (\texttt{claimed}) \\
+\textbf{WF-05} & B2C Subscription Upgrade via PayOS Webhook \& Daily Gamification Rewards & \vn{Trần Quốc Dinh}\newline(SE196495) & Customer, PayOS Gateway, System Admin & \texttt{PaymentOrder} (\texttt{PENDING} $\rightarrow$ \texttt{PAID}, \texttt{FULFILLED}), \texttt{UserTier} (\texttt{isActive}), \texttt{UserQuest\ab Progress} (\texttt{claimed}) \\
 \hline
 \caption{Main Business Workflows Summary \& Ownership Matrix}
 \label{tab:main_workflows}
