@@ -668,6 +668,158 @@ Authorization: Bearer {TEACHER_TOKEN}
 
 ---
 
+## 📸 TEACHER — Media & File Upload APIs (Tải lên ảnh/video/tài liệu)
+
+> Hỗ trợ giáo viên tải ảnh, video, 3D model và file PDF khi tạo hoặc cập nhật bối cảnh / nhân vật lịch sử địa phương.
+
+### 27. Tải ảnh nhanh (Standalone Upload trước khi tạo bối cảnh / nhân vật)
+```
+POST /api/v1/teacher/local-contents/media/upload
+(Hoặc: POST /api/v1/media/map-image)
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+- `file`: File ảnh nhị phân (`PNG`, `JPG`, `JPEG`, `WebP`, tối đa 2 MB).
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Media uploaded successfully",
+  "data": {
+    "url": "https://...supabase.co/storage/v1/object/public/documents/battle-maps/..."
+  }
+}
+```
+> 💡 *Sử dụng:* Dùng khi giáo viên chọn ảnh ở màn hình tạo mới, FE gọi API này để lấy URL công khai và gán vào trường `imageUrl` khi gọi `POST /contexts` hoặc `POST /characters`.
+
+---
+
+### 28. Tải trực tiếp Media cho bối cảnh địa phương (Context Media Upload)
+```
+POST /api/v1/historical-contexts/{contextId}/media/upload-direct?mediaType=IMAGE_2D
+(Hoặc: POST /api/v1/teacher/local-contents/contexts/{contextId}/media/upload-direct?mediaType=IMAGE_2D)
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: multipart/form-data
+```
+
+**Query Params:**
+- `mediaType`: `IMAGE_2D` (ảnh tối đa 10MB) hoặc `VIDEO` (video tối đa 100MB).
+- `width`: integer (optional).
+- `height`: integer (optional).
+
+**Form Data:**
+- `file`: File nhị phân (`file`).
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Context media uploaded successfully",
+  "data": {
+    "metadataId": "uuid",
+    "entityType": "CONTEXT",
+    "entityId": "uuid-of-context",
+    "mediaType": "IMAGE_2D",
+    "publicUrl": "https://...",
+    "viewUrl": "https://...",
+    "url": "https://...",
+    "storagePath": "CONTEXT/uuid/filename.png",
+    "objectPath": "CONTEXT/uuid/filename.png"
+  }
+}
+```
+> 💡 *Tự động:* Backend sẽ tự động cập nhật trường `imageUrl` hoặc `videoUrl` của bối cảnh trong DB mà không cần gọi thêm lệnh cập nhật.
+
+---
+
+### 29. Xóa Media khỏi bối cảnh địa phương
+```
+DELETE /api/v1/historical-contexts/{contextId}/media
+(Hoặc: DELETE /api/v1/teacher/local-contents/contexts/{contextId}/media)
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+---
+
+### 30. Tải trực tiếp Media cho nhân vật địa phương (Character Media Upload)
+```
+POST /api/v1/characters/{characterId}/media/upload-direct?mediaType=IMAGE_2D
+(Hoặc: POST /api/v1/teacher/local-contents/characters/{characterId}/media/upload-direct?mediaType=IMAGE_2D)
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: multipart/form-data
+```
+
+**Query Params:**
+- `mediaType`: `IMAGE_2D` (ảnh tối đa 10MB) hoặc `MODEL_3D` (mô hình 3D tối đa 100MB).
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Character media uploaded successfully",
+  "data": {
+    "metadataId": "uuid",
+    "entityType": "CHARACTER",
+    "entityId": "uuid-of-character",
+    "mediaType": "IMAGE_2D",
+    "publicUrl": "https://...",
+    "viewUrl": "https://...",
+    "url": "https://...",
+    "storagePath": "CHARACTER/uuid/filename.png",
+    "objectPath": "CHARACTER/uuid/filename.png"
+  }
+}
+```
+> 💡 *Tự động:* Backend sẽ tự động cập nhật `imageUrl` (nếu là ảnh) hoặc `modelUrl` (nếu là 3D model) của nhân vật.
+
+---
+
+### 31. Xóa Media khỏi nhân vật địa phương
+```
+DELETE /api/v1/characters/{characterId}/media
+(Hoặc: DELETE /api/v1/teacher/local-contents/characters/{characterId}/media)
+Authorization: Bearer {TEACHER_TOKEN}
+```
+
+---
+
+### 32. Tải lên và trích xuất text từ file PDF (PDF Extraction)
+```
+POST /api/v1/documents/pdf/upload-and-extract
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+- `file`: File PDF tài liệu.
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "PDF text extracted successfully",
+  "data": {
+    "text": "Nội dung trích xuất tự động từ PDF...",
+    "fileUrl": "uploaded_document.pdf"
+  }
+}
+```
+> 💡 *Sử dụng:* Dùng khi giáo viên tải lên tài liệu PDF để tự động điền nội dung vào form tài liệu bối cảnh/nhân vật.
+
+---
+
+### 33. Đính kèm file PDF gốc vào tài liệu
+```
+POST /api/v1/documents/{docId}/upload-pdf
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: multipart/form-data
+```
+
+---
+
 ## ❌ Error Responses
 
 | HTTP | Code | Trường hợp |
