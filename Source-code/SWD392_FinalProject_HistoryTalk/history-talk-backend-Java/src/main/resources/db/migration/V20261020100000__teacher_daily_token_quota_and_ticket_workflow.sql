@@ -10,12 +10,12 @@ ALTER TABLE historical_schema.school
     ADD COLUMN IF NOT EXISTS default_daily_teacher_quota INTEGER NOT NULL DEFAULT 10000;
 
 ALTER TABLE historical_schema.token_boost_request
-    ADD COLUMN IF NOT EXISTS requester_uid VARCHAR(36) REFERENCES historical_schema."user"(uid) ON DELETE CASCADE,
+    ADD COLUMN IF NOT EXISTS requester_uid UUID REFERENCES historical_schema."user"(uid) ON DELETE CASCADE,
     ADD COLUMN IF NOT EXISTS requester_role VARCHAR(30) NOT NULL DEFAULT 'SCHOOL_STUDENT',
-    ADD COLUMN IF NOT EXISTS teacher_reviewed_by_uid VARCHAR(36) REFERENCES historical_schema."user"(uid) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS teacher_reviewed_by_uid UUID REFERENCES historical_schema."user"(uid) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS teacher_review_note TEXT,
     ADD COLUMN IF NOT EXISTS teacher_reviewed_at TIMESTAMP,
-    ADD COLUMN IF NOT EXISTS admin_reviewed_by_uid VARCHAR(36) REFERENCES historical_schema."user"(uid) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS admin_reviewed_by_uid UUID REFERENCES historical_schema."user"(uid) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS admin_review_note TEXT,
     ADD COLUMN IF NOT EXISTS admin_reviewed_at TIMESTAMP;
 
