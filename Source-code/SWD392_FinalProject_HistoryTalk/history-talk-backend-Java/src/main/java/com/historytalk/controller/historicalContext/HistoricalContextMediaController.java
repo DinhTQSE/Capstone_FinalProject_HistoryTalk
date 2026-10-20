@@ -30,7 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/contexts/{contextId}/media")
+@RequestMapping({"/api/v1/contexts/{contextId}/media", "/api/v1/historical-contexts/{contextId}/media"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Historical Context Media", description = "Media upload and management APIs for Historical Contexts")

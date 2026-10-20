@@ -43,6 +43,7 @@ public class TeacherLocalContentController {
 
     private final LocalContentService localContentService;
     private final MediaService mediaService;
+    private final com.historytalk.service.media.MapImageUploadService mapImageUploadService;
 
     // ══════════════════════════════════════════════════════════════════════════
     // LOCAL CONTEXTS
@@ -147,7 +148,7 @@ public class TeacherLocalContentController {
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadContextMediaDirect(
             @PathVariable String contextId,
             @RequestPart("file") MultipartFile file,
-            @RequestParam("mediaType") String mediaType,
+            @RequestParam(value = "mediaType", defaultValue = "IMAGE_2D") String mediaType,
             @RequestParam(value = "width", required = false) Integer width,
             @RequestParam(value = "height", required = false) Integer height) {
 
@@ -284,7 +285,7 @@ public class TeacherLocalContentController {
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadCharacterMediaDirect(
             @PathVariable String characterId,
             @RequestPart("file") MultipartFile file,
-            @RequestParam("mediaType") String mediaType,
+            @RequestParam(value = "mediaType", defaultValue = "IMAGE_2D") String mediaType,
             @RequestParam(value = "width", required = false) Integer width,
             @RequestParam(value = "height", required = false) Integer height) {
 
@@ -435,4 +436,22 @@ public class TeacherLocalContentController {
         localContentService.deleteLocalCharacterDocument(characterId, docId, principal);
         return ResponseEntity.ok(ApiResponse.success(null, "Document deleted successfully"));
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MEDIA UPLOAD
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping(value = "/media/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Giáo viên tải ảnh lên kho lưu trữ trường",
+            description = "Tải file ảnh (PNG, JPG, WebP tối đa 2MB) và nhận URL công khai để điền vào imageUrl khi tạo bối cảnh / nhân vật.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadMedia(
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file) {
+
+        String userId = com.historytalk.utils.SecurityUtils.getUserId();
+        String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
+        String url = mapImageUploadService.uploadMapImage(file, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Media uploaded successfully"));
+    }
+
 }
