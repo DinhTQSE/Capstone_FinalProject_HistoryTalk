@@ -42,6 +42,8 @@ import org.springframework.web.bind.annotation.*;
 public class TeacherLocalContentController {
 
     private final LocalContentService localContentService;
+    private final com.historytalk.service.media.MediaService mediaService;
+    private final com.historytalk.service.media.MapImageUploadService mapImageUploadService;
 
     // ══════════════════════════════════════════════════════════════════════════
     // LOCAL CONTEXTS
@@ -311,5 +313,84 @@ public class TeacherLocalContentController {
 
         localContentService.deleteLocalCharacterDocument(characterId, docId, principal);
         return ResponseEntity.ok(ApiResponse.success(null, "Document deleted successfully"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MEDIA UPLOAD
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping(value = "/media/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Giáo viên tải ảnh lên kho lưu trữ trường",
+            description = "Tải file ảnh (PNG, JPG, WebP tối đa 2MB) và nhận URL công khai để điền vào imageUrl khi tạo bối cảnh / nhân vật.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadMedia(
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file) {
+
+        String userId = com.historytalk.utils.SecurityUtils.getUserId();
+        String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
+        String url = mapImageUploadService.uploadMapImage(file, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Media uploaded successfully"));
+    }
+
+    @PostMapping(value = "/contexts/{contextId}/media/upload-direct", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Giáo viên tải trực tiếp media cho bối cảnh địa phương",
+            description = "Tải ảnh (tối đa 10MB) hoặc video/model cho bối cảnh. Tự động đồng bộ imageUrl của bối cảnh.")
+    public ResponseEntity<ApiResponse<com.historytalk.dto.document.DocumentMediaMetadataResponse>> uploadContextMedia(
+            @PathVariable String contextId,
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "mediaType", defaultValue = "IMAGE_2D") String mediaType,
+            @RequestParam(value = "width", required = false) Integer width,
+            @RequestParam(value = "height", required = false) Integer height) {
+
+        String userId = com.historytalk.utils.SecurityUtils.getUserId();
+        String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
+        java.util.UUID contextUuid = java.util.UUID.fromString(contextId);
+
+        var response = mediaService.uploadDirectBinary(
+                contextUuid, com.historytalk.entity.enums.EntityType.CONTEXT, file, mediaType, width, height, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(response, "Context media uploaded successfully"));
+    }
+
+    @DeleteMapping("/contexts/{contextId}/media")
+    @Operation(summary = "Xóa media khỏi bối cảnh địa phương")
+    public ResponseEntity<ApiResponse<Void>> deleteContextMedia(@PathVariable String contextId) {
+        String userId = com.historytalk.utils.SecurityUtils.getUserId();
+        String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
+        java.util.UUID contextUuid = java.util.UUID.fromString(contextId);
+
+        mediaService.deleteMedia(contextUuid, com.historytalk.entity.enums.EntityType.CONTEXT, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Context media deleted successfully"));
+    }
+
+    @PostMapping(value = "/characters/{characterId}/media/upload-direct", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Giáo viên tải trực tiếp media cho nhân vật địa phương",
+            description = "Tải ảnh (tối đa 10MB) hoặc 3D model (tối đa 100MB) cho nhân vật. Tự động đồng bộ imageUrl / modelUrl của nhân vật.")
+    public ResponseEntity<ApiResponse<com.historytalk.dto.document.DocumentMediaMetadataResponse>> uploadCharacterMedia(
+            @PathVariable String characterId,
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "mediaType", defaultValue = "IMAGE_2D") String mediaType,
+            @RequestParam(value = "width", required = false) Integer width,
+            @RequestParam(value = "height", required = false) Integer height) {
+
+        String userId = com.historytalk.utils.SecurityUtils.getUserId();
+        String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
+        java.util.UUID characterUuid = java.util.UUID.fromString(characterId);
+
+        var response = mediaService.uploadDirectBinary(
+                characterUuid, com.historytalk.entity.enums.EntityType.CHARACTER, file, mediaType, width, height, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(response, "Character media uploaded successfully"));
+    }
+
+    @DeleteMapping("/characters/{characterId}/media")
+    @Operation(summary = "Xóa media khỏi nhân vật địa phương")
+    public ResponseEntity<ApiResponse<Void>> deleteCharacterMedia(@PathVariable String characterId) {
+        String userId = com.historytalk.utils.SecurityUtils.getUserId();
+        String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
+        java.util.UUID characterUuid = java.util.UUID.fromString(characterId);
+
+        mediaService.deleteMedia(characterUuid, com.historytalk.entity.enums.EntityType.CHARACTER, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "Character media deleted successfully"));
     }
 }

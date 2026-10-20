@@ -9,8 +9,10 @@ import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.MediaType;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
+import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.DocumentMediaMetadataRepository;
 import com.historytalk.repository.DocumentRepository;
+import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.service.media.MediaService;
 import com.historytalk.service.media.DirectBinaryUploadStrategy;
 import com.historytalk.service.media.MediaUploadStrategy;
@@ -35,6 +37,8 @@ public class DocumentMediaServiceImpl implements MediaService {
 
     private final DocumentRepository documentRepository;
     private final DocumentMediaMetadataRepository mediaMetadataRepository;
+    private final HistoricalContextRepository historicalContextRepository;
+    private final CharacterRepository characterRepository;
     private final SupabaseDocumentStorageService supabaseDocumentStorageService;
     private final DirectBinaryUploadStrategy directBinaryUploadStrategy;
     private final org.springframework.core.env.Environment environment;
@@ -104,7 +108,9 @@ public class DocumentMediaServiceImpl implements MediaService {
 
             log.info("Direct binary upload completed for entity {}:{} with storage path {}", entityType, entityId, storagePath);
 
-            return mapToResponse(metadata);
+            DocumentMediaMetadataResponse response = mapToResponse(metadata);
+            updateEntityMediaUrl(entityType, entityId, mediaTypeEnum, response.getPublicUrl());
+            return response;
 
         } catch (IOException e) {
             throw new InvalidRequestException("Không thể đọc file: " + e.getMessage());
@@ -149,8 +155,50 @@ public class DocumentMediaServiceImpl implements MediaService {
         supabaseDocumentStorageService.deleteFile(metadata.getStoragePath());
 
         mediaMetadataRepository.delete(metadata);
+        clearEntityMediaUrl(entityType, entityId);
 
         log.info("Deleted media for entity {}:{}", entityType, entityId);
+    }
+
+    private void updateEntityMediaUrl(EntityType entityType, UUID entityId, MediaType mediaType, String publicUrl) {
+        if (publicUrl == null) return;
+        if (entityType == EntityType.CONTEXT && historicalContextRepository != null) {
+            historicalContextRepository.findById(entityId).ifPresent(ctx -> {
+                if (mediaType == MediaType.IMAGE_2D) {
+                    ctx.setImageUrl(publicUrl);
+                } else if (mediaType == MediaType.VIDEO) {
+                    ctx.setVideoUrl(publicUrl);
+                }
+                historicalContextRepository.save(ctx);
+                log.info("Updated HistoricalContext {} media url: {}", entityId, publicUrl);
+            });
+        } else if (entityType == EntityType.CHARACTER && characterRepository != null) {
+            characterRepository.findById(entityId).ifPresent(chr -> {
+                if (mediaType == MediaType.IMAGE_2D) {
+                    chr.setImageUrl(publicUrl);
+                } else if (mediaType == MediaType.MODEL_3D) {
+                    chr.setModelUrl(publicUrl);
+                }
+                characterRepository.save(chr);
+                log.info("Updated Character {} media url: {}", entityId, publicUrl);
+            });
+        }
+    }
+
+    private void clearEntityMediaUrl(EntityType entityType, UUID entityId) {
+        if (entityType == EntityType.CONTEXT && historicalContextRepository != null) {
+            historicalContextRepository.findById(entityId).ifPresent(ctx -> {
+                ctx.setImageUrl(null);
+                ctx.setVideoUrl(null);
+                historicalContextRepository.save(ctx);
+            });
+        } else if (entityType == EntityType.CHARACTER && characterRepository != null) {
+            characterRepository.findById(entityId).ifPresent(chr -> {
+                chr.setImageUrl(null);
+                chr.setModelUrl(null);
+                characterRepository.save(chr);
+            });
+        }
     }
 
     private String generateStoragePath(EntityType entityType, UUID entityId, UUID documentId, String fileName) {
@@ -219,11 +267,12 @@ public class DocumentMediaServiceImpl implements MediaService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && (
-                "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                        || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role)
-        );
+        if (role == null) return false;
+        String r = role.toUpperCase(Locale.ROOT).replace("ROLE_", "");
+        return "CONTENT_ADMIN".equals(r)
+                || "SYSTEM_ADMIN".equals(r)
+                || "STAFF".equals(r)
+                || "ADMIN".equals(r)
+                || "TEACHER".equals(r);
     }
 }

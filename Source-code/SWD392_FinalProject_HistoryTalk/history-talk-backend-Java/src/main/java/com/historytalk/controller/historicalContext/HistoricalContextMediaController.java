@@ -30,7 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/contexts/{contextId}/media")
+@RequestMapping({"/api/v1/contexts/{contextId}/media", "/api/v1/historical-contexts/{contextId}/media"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Historical Context Media", description = "Media upload and management APIs for Historical Contexts")
@@ -39,7 +39,7 @@ public class HistoricalContextMediaController {
     private final MediaService mediaService;
 
     @PostMapping(value = "/upload-direct", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
         summary = "Upload media directly via multipart/form-data",
@@ -91,7 +91,7 @@ public class HistoricalContextMediaController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete media from context")
     public ResponseEntity<ApiResponse<Void>> deleteMedia(
