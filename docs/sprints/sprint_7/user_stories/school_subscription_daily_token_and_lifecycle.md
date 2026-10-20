@@ -1,6 +1,6 @@
-# 📋 USER STORIES: SCHOOL SUBSCRIPTION, DAILY TOKEN POOL & ACADEMIC YEAR LIFECYCLE
-> **Sprint:** Sprint 7 (18/10/2026 – 30/10/2026)  
-> **Phân hệ:** Quản trị Gói B2B Trường học theo Năm học, Quỹ Token Chung theo Ngày (Daily Allowance) & Vòng đời Học sinh qua các Năm học  
+# 📋 USER STORIES: SCHOOL SUBSCRIPTION, PAY-AS-YOU-GO SHARED TOKEN POOL, TEACHER TOKEN TRANSFER & TICKET WORKFLOW
+> **Sprint:** Sprint 7 (16/10/2026 – 30/10/2026)  
+> **Phân hệ:** Quản trị Gói B2B Trường học theo Năm học, Quỹ Token Chung Pay-As-You-Go, Luồng Giáo viên Cấp Token & Ticket Duyệt Token, Upload Tài liệu PDF Giáo viên & Vòng đời Học sinh  
 > **Lập trình viên phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)  
 
 ---
@@ -10,10 +10,12 @@
 | Story ID | Tên User Story | Actor | Developer | API Endpoint chính |
 | :--- | :--- | :--- | :--- | :--- |
 | **`US-SP7-14`** | Chu kỳ Gói Trường học (01/09 – 31/05), Gia hạn Tháng 5, Top-up & Khóa phân tầng | `System Admin`, `School Admin` | 🔵 Dinh (`DinhTQ`) | `POST /api/v1/admin/schools/{id}/renew`<br>`POST /api/v1/admin/schools/{id}/top-up` |
-| **`US-SP7-15`** | Quỹ Token Chung (Shared Pool) & Tự động Cấp Hạn mức Ngày (Daily Token Limit) | `System`, `School Student` | 🔵 Dinh (`DinhTQ`) | Internal Interceptor / Lazy Daily Reset & AI Chat Guard |
-| **`US-SP7-16`** | Cấu hình Định mức Token Ngày & Bảng Ước tính Gói Enterprise | `School Admin` | 🔵 Dinh (`DinhTQ`) | `PUT /api/v1/school-admin/token-policy` |
-| **`US-SP7-17`** | Học sinh Xin thêm Token trong ngày & Giáo viên / School Admin Duyệt cấp nhanh | `School Student`, `Teacher`, `School Admin` | 🔵 Dinh (`DinhTQ`) | `POST /api/v1/student/token-requests`<br>`PUT /api/v1/teacher/token-requests/{id}/review` |
+| **`US-SP7-15`** | Quỹ Token Chung Pay-As-You-Go (Không cấp cứng khi Import) & Hạn mức Ngày cho Học sinh (`1.000`) và Giáo viên (`10.000`) | `System`, `School Student`, `Teacher` | 🔵 Dinh (`DinhTQ`) | Student/Teacher Import & AI Chat Pay-As-You-Go Guard |
+| **`US-SP7-16`** | Cấu hình Định mức Token Ngày (Học sinh & Giáo viên) & Bảng Ước tính Gói Enterprise | `School Admin` | 🔵 Dinh (`DinhTQ`) | `PUT /api/v1/school-admin/token-policy` |
+| **`US-SP7-17`** | Giáo viên Cấp Token của mình cho Học sinh ngay lập tức & Tạo Ticket lên School Admin khi Giáo viên hết Token (Cả 3 Role đều View được Ticket) | `School Student`, `Teacher`, `School Admin` | 🔵 Dinh (`DinhTQ`) | `POST /api/v1/student/token-requests`<br>`POST /api/v1/teacher/students/{studentId}/grant-tokens`<br>`POST /api/v1/teacher/token-requests`<br>`PUT /api/v1/teacher/token-requests/{id}/review`<br>`PUT /api/v1/school-admin/token-requests/{id}/review`<br>`GET /api/v1/token-requests` |
 | **`US-SP7-18`** | Vòng đời Năm học: Lên lớp / Đổi lớp (`ARCHIVED`) & Khóa Tài khoản khi Ra trường / Chuyển trường (`DEACTIVATED`) | `School Admin` | 🔵 Dinh (`DinhTQ`) | `POST /api/v1/school-admin/academic-year/rollover`<br>`PUT /api/v1/school-admin/students/{uid}/deactivate` |
+| **`US-SP7-19`** | Giáo viên Upload Tài liệu PDF cho Bối cảnh & Nhân vật Lịch sử Địa phương | `Teacher`, `School Admin` | 🔵 Dinh (`DinhTQ`) | `POST /api/v1/teacher/local-contents/contexts/{contextId}/documents/upload-pdf`<br>`POST /api/v1/teacher/local-contents/characters/{characterId}/documents/upload-pdf` |
+| **`US-SP7-20`** | Khắc phục lỗi `NullPointerException` trên Dashboard School Admin & lỗi 500 trên API Classrooms | `School Admin`, `Teacher` | 🔵 Dinh (`DinhTQ`) | `GET /api/v1/school-admin/dashboard`<br>`GET /api/v1/school-admin/classrooms` |
 
 ---
 
@@ -22,101 +24,119 @@
 ### 🆔 US-SP7-14: Chu kỳ Gói Trường học (01/09 – 31/05), Gia hạn Tháng 5, Top-up & Cơ chế Khóa phân tầng
 * **Actor:** `System Admin`, `School Admin`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
-* **Bối cảnh vấn đề:**  
-  Trước đây gói trường học chỉ là "một cục token" vô thời hạn, không rõ trường mua trong bao lâu, hết năm học hay hết token giữa chừng xử lý thế nào.
 * **User Story:**  
   Là **School Admin / System Admin**, tôi muốn gói B2B của trường được định nghĩa theo chu kỳ năm học chính thức (**từ 01/09 đến hết 31/05**), có cửa sổ gia hạn trong **tháng 5** (kích hoạt từ **01/09** năm học mới), hỗ trợ nạp thêm (**Top-up**) khi cạn token giữa năm, và phân tách rõ ràng giữa hành vi **Hết hạn gói** với **Hết Token AI**.
 * **Acceptance Criteria (AC):**
-  1. **Chu kỳ gói chuẩn (Academic Subscription Cycle):**
-     * Mọi gói đăng ký B2B của trường bắt đầu có hiệu lực từ **`01/09/{startYear} 00:00:00`** và kết thúc vào **`31/05/{endYear} 23:59:59`** (9 tháng năm học).
-  2. **Quy tắc Gia hạn (Renewal in May):**
-     * Trường phải thực hiện gia hạn **trong tháng 5** (`01/05` – `31/05`).
-     * Sau khi gia hạn thành công trong tháng 5, gói của năm học kế tiếp ở trạng thái `RENEWED_PENDING` và **bắt đầu sử dụng được từ ngày `01/09`** đầu năm học mới.
-     * Nếu trường gia hạn đúng hạn trong tháng 5, tối đa **20% lượng token còn dư** của năm cũ được cộng dồn (rollover) sang Quỹ chung của năm học mới vào ngày `01/09`.
-  3. **Hết hạn gói mà chưa gia hạn (Subscription Expired $\rightarrow$ Khóa toàn bộ nền tảng):**
-     * Sau ngày `31/05`, nếu trường chưa gia hạn (hoặc đang trong kỳ nghỉ hè chưa đến ngày `01/09` kích hoạt gói mới), trạng thái trường chuyển sang `EXPIRED`.
-     * Khi trường ở trạng thái `EXPIRED` hoặc `SUSPENDED`: **Khóa toàn bộ nền tảng của trường** (Mọi API nghiệp vụ của `ROLE_SCHOOL_ADMIN`, `ROLE_TEACHER`, `ROLE_STUDENT` thuộc trường đều bị chặn với mã lỗi `403 SCHOOL_SUBSCRIPTION_EXPIRED`, ngoại trừ API xem thông tin gói/yêu cầu gia hạn của School Admin).
-  4. **Còn hạn gói nhưng Hết Token giữa chừng (Out of Tokens $\rightarrow$ Chỉ khóa tính năng AI):**
-     * Khi trường vẫn trong thời hạn (`01/09` – `31/05`, `status = ACTIVE`) nhưng Quỹ chung của trường (`unallocatedTokenQuota == 0`) và học sinh đã hết hạn mức ngày:
-     * **Chỉ khóa tính năng AI** (Chat với nhân vật lịch sử trả về `403 AI_QUOTA_EXCEEDED`).
-     * **Các tính năng khác dùng bình thường:** Làm bài Quiz, xem tài liệu lịch sử/Local Content, Giáo viên giao bài tập, Học sinh nộp bài, xem Dashboard thống kê vẫn hoạt động 100%.
-  5. **Luồng Nạp thêm giữa năm (Top-up Token):**
-     * Khi hết hoặc sắp hết token giữa năm học, School Admin gửi yêu cầu hoặc System Admin thực hiện `POST /api/v1/admin/schools/{id}/top-up` để cộng thêm token thẳng vào Quỹ chung (`totalSchoolTokenQuota` và `unallocatedTokenQuota`) mà không làm thay đổi ngày hết hạn `31/05`.
+  1. **Chu kỳ gói chuẩn:** Từ **`01/09/{startYear} 00:00:00`** đến **`31/05/{endYear} 23:59:59`**.
+  2. **Gia hạn trong Tháng 5:** Trường gia hạn trong tháng 5 (`01/05` – `31/05`), kích hoạt vào `01/09` và bảo lưu tối đa **20% lượng token còn dư** của năm cũ sang Quỹ chung năm mới.
+  3. **Hết hạn gói (`EXPIRED` $\rightarrow$ Khóa toàn bộ nền tảng):** Trả về `403 SCHOOL_SUBSCRIPTION_EXPIRED`.
+  4. **Còn hạn gói nhưng Hết Token (`Out of Tokens` $\rightarrow$ Chỉ khóa tính năng AI):** Chỉ chặn Chat AI (`403 AI_QUOTA_EXCEEDED`), các tính năng Quiz, Tài liệu, Assignment, Dashboard vẫn hoạt động bình thường.
 
 ---
 
-### 🆔 US-SP7-15: Quỹ Token Chung 100% (Pure Shared Pool) & Hạn mức Chi tiêu theo Ngày (Daily Spending Limit)
-* **Actor:** `System`, `School Student`
+### 🆔 US-SP7-15: Quỹ Token Chung Pay-As-You-Go (Không cấp cứng khi Import) & Hạn mức Ngày cho Học sinh (`1.000`) và Giáo viên (`10.000`)
+* **Actor:** `System`, `School Student`, `Teacher`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
 * **Bối cảnh vấn đề:**  
-  Nếu chia đứt token cả năm hoặc chia trước vào tài khoản từng học sinh rồi cuối ngày phải thu hồi: vừa phức tạp vừa dễ gây "giam token" (*stranded tokens*) của những học sinh không sử dụng.
+  Trước đây khi Import học sinh (`ClassroomImportProcessor` / `SchoolWideImportProcessor`), hệ thống cấp cứng một lượng token cố định (ví dụ `10.000 token`) cho mỗi tài khoản học sinh ngay lúc tạo tài khoản và trừ thẳng vào `school.unallocatedTokenQuota`. Cách làm này khiến trường bị trừ sạch quỹ token ngay khi import danh sách học sinh dù học sinh chưa hề sử dụng, gây "giam token" (*stranded tokens*). Ngoài ra, Giáo viên cũng cần hạn mức token theo ngày lớn hơn Học sinh để vừa phục vụ giảng dạy/chat AI vừa trích token cấp thêm cho học sinh khi cần.
 * **User Story:**  
-  Là **Hệ thống**, tôi muốn giữ **100% token của trường nằm cố định trong Quỹ chung (`school.unallocatedTokenQuota`)** và quản lý học sinh bằng **Bộ đếm chi tiêu theo ngày (`dailyTokensUsed`) so với Hạn mức ngày (`dailyTokenLimit`)** — học sinh dùng câu nào thì trừ trực tiếp vào Quỹ trường câu đó, không chia trước vào ví cá nhân và không cần thu hồi cuối ngày.
+  Là **Hệ thống**, tôi muốn khi tạo/import tài khoản Học sinh hoặc Giáo viên thì **không trừ cứng token từ Quỹ trường trước**, mà giữ **100% token trong Quỹ chung (`school.unallocatedTokenQuota`)**; mỗi người dùng được thiết lập **Hạn mức chi tiêu theo ngày** (**Học sinh mặc định `1.000 token/ngày`**, **Giáo viên mặc định `10.000 token/ngày`**) và **dùng bao nhiêu mới trừ bấy nhiêu vào tổng token của trường**.
 * **Acceptance Criteria (AC):**
-  1. **Mô hình 100% Quỹ chung + Hạn mức Chi tiêu Ngày (Direct Pool Deduction):**
-     * Toàn bộ token của trường luôn nằm tại `school.unallocatedTokenQuota`. Không bao giờ rút trước token từ Quỹ trường bỏ vào ví học sinh đầu ngày.
-     * Mỗi học sinh có hạn mức được phép tiêu tối đa trong ngày (`dailyTokenLimit`, mặc định `1.000 token/học sinh/ngày` + `dailyBonusTokens` nếu được giáo viên duyệt thêm trong ngày).
-  2. **Cơ chế Kiểm tra & Khấu trừ trực tiếp (Pay-as-you-go):**
-     * Khi bước sang ngày mới (`user.lastTokenResetAt < today.atStartOfDay()`), hệ thống chỉ reset bộ đếm `user.dailyTokensUsed = 0` và `user.dailyBonusTokens = 0` (hoàn toàn không động chạm hay rút trước từ `school.unallocatedTokenQuota`).
-     * Mỗi khi học sinh chat AI tiêu tốn `totalToken`:
-       * Hệ thống trừ trực tiếp `totalToken` vào `school.unallocatedTokenQuota` và cộng `totalToken` vào bộ đếm `user.dailyTokensUsed`.
-     * Học sinh nào không chat AI hoặc dùng ít hơn hạn mức ngày thì phần không dùng tới vốn dĩ vẫn nằm nguyên 100% trong Quỹ chung của trường $\rightarrow$ **Không bao giờ có "token chết" và không cần thu hồi cuối ngày hay cuối năm**.
-  3. **Chống xài lố trong ngày:**
-     * Khi `user.dailyTokensUsed >= effectiveDailyLimit` (hoặc `school.unallocatedTokenQuota <= 0`), hệ thống chỉ khóa tính năng Chat AI của học sinh đó trong phần còn lại của ngày (`403 AI_QUOTA_EXCEEDED`); các tính năng làm Quiz, đọc bài, nộp bài tập vẫn dùng bình thường. Qua `00:00` ngày hôm sau bộ đếm `dailyTokensUsed` tự động về `0`.
+  1. **Import Học sinh & Tạo Giáo viên không trừ trước Quỹ trường (`totalTokensDeducted = 0`):**
+     * Khi import danh sách học sinh (`POST /api/v1/school-admin/students/import` hoặc `/api/v1/school-admin/classrooms/{id}/students/import`), hệ thống khởi tạo hạn mức khả dụng trong ngày cho học sinh (`user.token = COALESCE(classroom.dailyTokenQuota, school.defaultDailyStudentQuota, 1000)`), `dailyTokensUsed = 0`, `dailyBonusTokens = 0`.
+     * **Tuyệt đối không trừ `school.unallocatedTokenQuota` lúc tạo tài khoản hay lúc cấp hạn mức ngày**.
+     * Khi tạo tài khoản Giáo viên, hệ thống khởi tạo hạn mức khả dụng trong ngày của Giáo viên theo `school.defaultDailyTeacherQuota` (mặc định **`10.000 token/ngày`**).
+  2. **Hạn mức Ngày của Giáo viên lớn hơn Học sinh (`10.000` vs `1.000`):**
+     * Học sinh (`ROLE_SCHOOL_STUDENT`): Hạn mức mặc định **`1.000 token/ngày`** (hoặc theo cấu hình lớp/trường).
+     * Giáo viên (`ROLE_TEACHER`): Hạn mức mặc định **`10.000 token/ngày`** (`school.defaultDailyTeacherQuota`) để Giáo viên vừa thoải mái chat với AI vừa có quỹ hạn mức trong ngày để trích cấp trực tiếp cho học sinh trong lớp khi học sinh hết token.
+  3. **Khấu trừ Pay-As-You-Go khi Chat AI (`MessageServiceImpl` $\rightarrow$ `DailyTokenAllowanceService`):**
+     * Sang ngày mới (`lastTokenResetAt < today.atStartOfDay()`), hệ thống tự động reset `dailyTokensUsed = 0`, `dailyBonusTokens = 0` cho cả Học sinh và Giáo viên.
+     * Khi Học sinh hoặc Giáo viên chat với AI hết `totalToken`: Hệ thống trừ trực tiếp `totalToken` vào `school.unallocatedTokenQuota` và cộng `totalToken` vào `user.dailyTokensUsed`, đồng thời đồng bộ lại `user.token` hiển thị số dư còn được tiêu trong ngày.
 
 ---
 
-### 🆔 US-SP7-16: Cấu hình Định mức Token Ngày & Bảng Ước tính Gói Enterprise cho School Admin
+### 🆔 US-SP7-16: Cấu hình Định mức Token Ngày (Học sinh & Giáo viên) & Bảng Ước tính Gói Enterprise
 * **Actor:** `School Admin`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
-* **Bối cảnh vấn đề:**  
-  School Admin không có căn cứ ước tính một học sinh dùng bao nhiêu token và gói trường mua đáp ứng được bao nhiêu học sinh.
 * **User Story:**  
-  Là **School Admin**, tôi muốn xem bảng tham chiếu định mức sử dụng của từng gói `EnterprisePackage` và có thể điều chỉnh hạn mức token ngày (`dailyTokenLimit`) chung cho trường hoặc riêng theo từng khối lớp (`gradeLevel`), để phân phối tài nguyên hợp lý (ví dụ ưu tiên Khối 12 ôn thi).
+  Là **School Admin**, tôi muốn cấu hình được cả hạn mức ngày mặc định của Học sinh (`defaultDailyStudentQuota`), hạn mức ngày mặc định của Giáo viên (`defaultDailyTeacherQuota`), và hạn mức riêng cho từng khối/lớp (`classroomDailyQuota`).
 * **Acceptance Criteria (AC):**
-  1. **Định mức chuẩn gợi ý (Benchmark Metadata):**
-     * Định mức mặc định hệ thống: **`1.000 token/học sinh/ngày`** ($\approx$ 15–20 câu hỏi đáp sâu với AI mỗi ngày học).
-     * Khuyến nghị quy mô trường cho 9 tháng năm học (`01/09` – `31/05`):
-       * `ENTERPRISE_SMALL (5.000.000 token)`: Phù hợp quy mô **~350 – 400 học sinh**.
-       * `ENTERPRISE_MEDIUM (20.000.000 token)`: Phù hợp quy mô **~1.500 học sinh**.
-       * `ENTERPRISE_LARGE (50.000.000 token)`: Phù hợp quy mô **~3.500+ học sinh**.
-  2. **API Cấu hình Hạn mức Ngày (`PUT /api/v1/school-admin/token-policy`):**
-     * Cho phép School Admin cập nhật `defaultDailyStudentQuota` của trường (ví dụ từ `1.000` lên `1.500 token/ngày`) hoặc thiết lập `dailyStudentQuota` riêng cho từng lớp/khối (`Classroom.dailyTokenQuota`).
+  1. `PUT /api/v1/school-admin/token-policy` hỗ trợ cập nhật:
+     * `defaultDailyStudentQuota` (mặc định `1.000 token/ngày`).
+     * `defaultDailyTeacherQuota` (mặc định `10.000 token/ngày`, tự động đồng bộ lại hạn mức ngày khả dụng cho các Giáo viên trong trường).
+     * `classroomId` hoặc `gradeLevel` + `classroomDailyQuota` cho từng lớp/khối cụ thể.
 
 ---
 
-### 🆔 US-SP7-17: Luồng Học sinh Xin thêm Hạn mức Token trong ngày & Giáo viên / School Admin Duyệt cấp nhanh
+### 🆔 US-SP7-17: Luồng Giáo viên Tự Cấp Token của mình cho Học sinh & Tạo Ticket lên School Admin khi Giáo viên hết Token (Cả 3 Role đều View được Ticket)
 * **Actor:** `School Student`, `Teacher`, `School Admin`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
 * **Bối cảnh vấn đề:**  
-  Khi học sinh tích cực học tập hoặc làm bài tập AI chạm trần hạn mức ngày thì không có luồng xin cấp thêm, làm gián đoạn việc học.
+  Nếu học sinh hết token trong ngày mà phải đợi Giáo viên duyệt rồi lại phải chờ tiếp School Admin duyệt thì quá lâu, làm gián đoạn tiết học. Do đó, Giáo viên có hạn mức ngày lớn hơn (`10.000 token/ngày`) sẽ **tự trích trực tiếp từ hạn mức ngày của Giáo viên để cấp ngay cho học sinh**. Chỉ khi nào **Giáo viên cũng hết hạn mức token trong ngày** thì Giáo viên mới **tạo Ticket / chuyển tiếp Ticket lên cho School Admin duyệt cấp thêm**.
 * **User Story:**  
-  Là **Học sinh**, khi chạm hạn mức token trong ngày, tôi muốn gửi yêu cầu **Xin thêm Hạn mức Token (Daily Quota Boost)** kèm lý do để **Giáo viên phụ trách lớp** (hoặc **School Admin**) duyệt mở thêm hạn mức chi tiêu ngay trong ngày.
+  Là **Học sinh / Giáo viên / School Admin**, tôi muốn:
+  1. Khi **Học sinh hết token trong ngày**: Học sinh tạo yêu cầu xin thêm token + lý do $\rightarrow$ **Giáo viên duyệt là trích ngay từ hạn mức token ngày của Giáo viên đưa cho Học sinh dùng luôn** (hoặc Giáo viên chủ động bấm cấp token của mình cho học sinh mà không cần chờ đơn), không phải chờ School Admin.
+  2. Khi **Giáo viên hết hạn mức token trong ngày**: Giáo viên có thể **tạo Ticket xin cấp thêm token cho học sinh (hoặc cho chính mình)** hoặc **chuyển tiếp (Escalate) đơn của học sinh lên cho School Admin duyệt**.
+  3. Khi Ticket được tạo, **cả 3 role (`SCHOOL_STUDENT`, `TEACHER`, `SCHOOL_ADMIN`) đều xem được danh sách và chi tiết Ticket**.
 * **Acceptance Criteria (AC):**
-  1. **Học sinh gửi yêu cầu (`POST /api/v1/student/token-requests`):**
-     * Chỉ cho phép gửi khi học sinh đang thuộc lớp `ACTIVE` và chưa có yêu cầu nào đang ở trạng thái `PENDING` trong cùng ngày.
-     * Payload gồm: `requestedTokens` (mặc định gợi ý `1.000` hoặc tối đa `3.000 token`), `reason` (lý do xin thêm).
-  2. **Giáo viên / School Admin duyệt yêu cầu (`PUT /api/v1/teacher/token-requests/{requestId}/review`):**
-     * Giáo viên chỉ được duyệt yêu cầu của học sinh thuộc lớp do chính mình phụ trách (`classroom.teacher_id == teacher.uid`); School Admin duyệt được mọi yêu cầu trong trường.
-     * Khi duyệt (`APPROVED`): Cộng số lượng `approvedTokens` vào hạn mức cộng thêm trong ngày của học sinh (`student.dailyBonusTokens += approvedTokens`). Token thực tế chỉ bị trừ từ `school.unallocatedTokenQuota` khi học sinh thực sự chat với AI.
-     * Khi từ chối (`REJECTED`): Lưu lý do phản hồi `reviewNote`.
+  1. **Trường hợp 1 — Học sinh hết token, Giáo viên còn hạn mức ngày (Cấp ngay lập tức - 1 bước):**
+     * **Cách 1 (Học sinh tạo đơn $\rightarrow$ Giáo viên bấm `APPROVE`):**
+       * Học sinh gọi `POST /api/v1/student/token-requests` với `requestedTokens` và `reason` $\rightarrow$ Ticket được tạo với trạng thái `PENDING`.
+       * Giáo viên phụ trách lớp gọi `PUT /api/v1/teacher/token-requests/{requestId}/review` với `action = "APPROVE"`.
+       * Hệ thống kiểm tra hạn mức ngày còn lại của Giáo viên (`teacherRemainingToday >= approvedTokens`):
+         * Trừ vào hạn mức ngày của Giáo viên: `teacher.dailyTokensUsed += approvedTokens` (giảm `teacher.token`).
+         * Cộng ngay vào hạn mức thưởng trong ngày của Học sinh: `student.dailyBonusTokens += approvedTokens` (tăng `student.token`).
+         * Chuyển trạng thái Ticket sang **`APPROVED`** ngay lập tức (không cần qua School Admin).
+     * **Cách 2 (Giáo viên chủ động chuyển token của mình cho học sinh):**
+       * Giáo viên gọi `POST /api/v1/teacher/students/{studentId}/grant-tokens` với `tokens` và `reason`.
+       * Hệ thống trích ngay từ hạn mức ngày của Giáo viên sang Học sinh và lưu lịch sử Ticket ở trạng thái **`APPROVED`**.
+  2. **Trường hợp 2 — Giáo viên hết hạn mức ngày $\rightarrow$ Tạo Ticket / Chuyển tiếp Ticket lên School Admin (`PENDING_ADMIN`):**
+     * **Cách 1 (Chuyển tiếp đơn `PENDING` của học sinh lên Admin):**
+       * Khi Giáo viên không đủ hạn mức ngày để tự cấp, Giáo viên gọi `PUT /api/v1/teacher/token-requests/{requestId}/review` với `action = "ESCALATE"` và `reviewNote`.
+       * Hoặc nếu Giáo viên bấm `APPROVE` lúc đã cạn sạch hạn mức ngày (`0 token`), thông báo lỗi hướng dẫn Giáo viên dùng `ESCALATE` hoặc tạo Ticket lên School Admin.
+       * Trạng thái Ticket chuyển từ `PENDING` $\rightarrow$ **`PENDING_ADMIN`**.
+     * **Cách 2 (Giáo viên trực tiếp tạo Ticket gửi School Admin):**
+       * Giáo viên gọi `POST /api/v1/teacher/token-requests` với `{ studentUid (optional), requestedTokens, reason }`.
+       * Ticket được tạo trực tiếp với trạng thái **`PENDING_ADMIN`** (`requesterRole = "TEACHER"`). Nếu có `studentUid`, khi Admin duyệt sẽ cộng token cho học sinh đó; nếu không truyền `studentUid`, khi Admin duyệt sẽ cộng thêm hạn mức ngày cho chính Giáo viên.
+     * **School Admin duyệt Ticket (`PUT /api/v1/school-admin/token-requests/{requestId}/review`):**
+       * School Admin duyệt (`action = "APPROVE"`): Cấp thêm `dailyBonusTokens` từ Quỹ chung của trường (`school.unallocatedTokenQuota`), chuyển trạng thái Ticket sang **`APPROVED`**.
+  3. **Cả 3 Role đều xem được Ticket (`GET /api/v1/token-requests` & `GET /api/v1/token-requests/{requestId}`):**
+     * `ROLE_SCHOOL_STUDENT`: Xem toàn bộ các Ticket của mình (bao gồm cả Ticket do mình tạo và Ticket do Giáo viên tạo/cấp cho mình), thấy rõ tiến độ (`PENDING`, `PENDING_ADMIN`, `APPROVED`, `REJECTED`), ghi chú của Giáo viên và ghi chú của School Admin.
+     * `ROLE_TEACHER`: Xem toàn bộ các Ticket của các lớp mình phụ trách và các Ticket do chính mình tạo.
+     * `ROLE_SCHOOL_ADMIN`: Xem toàn bộ các Ticket trong phạm vi toàn trường.
 
 ---
 
 ### 🆔 US-SP7-18: Vòng đời Năm học: Lên lớp / Đổi lớp (`ARCHIVED`) & Vô hiệu hóa Tài khoản khi Ra trường / Chuyển trường (`DEACTIVATED`)
 * **Actor:** `School Admin`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
-* **Bối cảnh vấn đề:**  
-  Chưa định nghĩa vòng đời qua các năm học: khi học sinh lên lớp, đổi lớp thì lớp cũ xử lý sao? Khi học sinh tốt nghiệp ra trường hoặc chuyển trường đi nơi khác thì tài khoản xử lý thế nào?
-* **User Story:**  
-  Là **School Admin**, tôi muốn lưu trữ (`ARCHIVED`) các lớp của năm học cũ để xếp học sinh lên lớp/đổi lớp trong năm học mới trên cùng tài khoản, đồng thời **vô hiệu hóa hoàn toàn (`DEACTIVATED` — khóa đăng nhập)** đối với tài khoản của học sinh đã ra trường hoặc chuyển trường.
 * **Acceptance Criteria (AC):**
-  1. **Kết thúc năm học & Lên lớp / Đổi lớp (Class Promotion & Transfer across Academic Years):**
-     * Khi kết thúc năm học (`31/05`) hoặc khi School Admin chạy thao tác Chuyển giao năm học (`POST /api/v1/school-admin/academic-year/rollover`): Toàn bộ các lớp của năm học cũ chuyển `status` từ `ACTIVE` $\rightarrow$ `ARCHIVED`.
-     * Học sinh vẫn giữ nguyên tài khoản `User` (cùng `uid`, `studentCode`, `email`) và toàn bộ lịch sử làm bài các năm trước.
-     * Sang năm học mới (`01/09`), học sinh được gán/import vào lớp mới của `academicYear` mới. Quy tắc: Tại một thời điểm, mỗi học sinh chỉ thuộc **tối đa 1 lớp đang `ACTIVE`**, nhưng có thể có nhiều lớp lịch sử ở trạng thái `ARCHIVED`.
-  2. **Ra trường (Tốt nghiệp Khối 12) hoặc Chuyển trường (Graduation / Transfer Out $\rightarrow$ Deactivate Account):**
-     * Khi học sinh ra trường hoặc chuyển trường (`PUT /api/v1/school-admin/students/{uid}/deactivate` hoặc đánh dấu tốt nghiệp hàng loạt khối 12):
-       * Vì token nằm 100% ở Quỹ chung của trường nên không có token nào bị kẹt lại trong tài khoản học sinh.
-       * Cập nhật trạng thái tài khoản học sinh sang **`DEACTIVATED`** (`accountStatus = DEACTIVATED`, `deletedAt = now()`).
-       * **Khóa đăng nhập hoàn toàn:** Tài khoản học sinh đã `DEACTIVATED` không thể đăng nhập (`POST /api/v1/auth/login` trả về `403 ACCOUNT_DEACTIVATED`) và mọi JWT cũ bị từ chối tại `JwtAuthenticationFilter`.
+  1. Chuyển giao năm học (`POST /api/v1/school-admin/academic-year/rollover`): Lưu trữ lớp cũ (`ARCHIVED`), giữ nguyên tài khoản cho học sinh Khối 10, 11 lên lớp mới.
+  2. Vô hiệu hóa học sinh tốt nghiệp Khối 12 hoặc chuyển trường (`PUT /api/v1/school-admin/students/{uid}/deactivate`): Chuyển `accountStatus = DEACTIVATED`, khóa đăng nhập hoàn toàn (`403 ACCOUNT_DEACTIVATED`).
+
+---
+
+### 🆔 US-SP7-19: Giáo viên Upload Tài liệu PDF cho Bối cảnh & Nhân vật Lịch sử Địa phương
+* **Actor:** `Teacher`, `School Admin`
+* **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
+* **Bối cảnh vấn đề:**  
+  Trước đây chỉ có `STAFF` và `ADMIN` mới được gọi các API trích xuất/upload PDF (`PdfExtractionController`, `DocumentFileController`), còn `TEACHER` chỉ có API truyền JSON text thủ công mà chưa có API upload file PDF trực tiếp cho Local Context / Local Character.
+* **User Story:**  
+  Là **Giáo viên (`ROLE_TEACHER`)**, tôi muốn upload trực tiếp file PDF (`multipart/form-data`) vào Bối cảnh Lịch sử Địa phương (Local Context) hoặc Nhân vật Lịch sử Địa phương (Local Character) để hệ thống tự động trích xuất nội dung văn bản, lưu trữ file PDF và đồng bộ sang AI Service phục vụ RAG.
+* **Acceptance Criteria (AC):**
+  1. Cung cấp API upload PDF 1 bước (`multipart/form-data`) cho Giáo viên:
+     * `POST /api/v1/teacher/local-contents/contexts/{contextId}/documents/upload-pdf` (`file`, `title` optional).
+     * `POST /api/v1/teacher/local-contents/characters/{characterId}/documents/upload-pdf` (`file`, `title` optional).
+  2. Cho phép `TEACHER` và `SCHOOL_ADMIN` sử dụng các API hỗ trợ PDF:
+     * `POST /api/v1/documents/extract-pdf`
+     * `PUT /api/v1/documents/{docId}/pdf`
+     * `GET /api/v1/documents/{docId}/view-url` (cho phép cả `TEACHER`, `SCHOOL_ADMIN`, `SCHOOL_STUDENT`).
+
+---
+
+### 🆔 US-SP7-20: Khắc phục lỗi NullPointerException trên Dashboard School Admin & lỗi 500 trên API Classrooms
+* **Actor:** `School Admin`, `Teacher`
+* **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
+* **Acceptance Criteria (AC):**
+  1. **`GET /api/v1/school-admin/dashboard`:** Khắc phục triệt để lỗi `"Cannot invoke com.historytalk.security.UserPrincipal.getUsername() because principal is null"` bằng cách fallback qua `SecurityUtils.getUserId()` khi `JwtAuthenticationFilter` lưu `AuthenticatedPrincipal` trong `SecurityContext`.
+  2. **`GET /api/v1/school-admin/classrooms?page=0&size=200&academicYear=2026&sort=className,asc`:** Đồng bộ lịch sử Flyway (`V38`, `V39`, `V40`) và schema cơ sở dữ liệu để API phân trang và sắp xếp danh sách lớp trả về `200 OK`.
