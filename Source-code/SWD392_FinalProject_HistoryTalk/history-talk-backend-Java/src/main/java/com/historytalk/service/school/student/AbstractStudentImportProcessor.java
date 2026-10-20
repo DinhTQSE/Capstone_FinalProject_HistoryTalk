@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -73,7 +74,7 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
         // Step 2: Validate each row
         List<StudentImportRowDto> validRows = validateRows(rawRows, context, resultDto);
 
-        // Step 3: Polymorphic - Verify & deduct Token Quota
+        // Step 3: Polymorphic - Verify & deduct Token Quota (Shared Pool: 0 upfront deduction)
         verifyAndDeductQuota(validRows, context, school);
 
         // Step 4: Persist Accounts & Generate Passwords
@@ -81,9 +82,10 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
 
         resultDto.setSuccessCount(resultDto.getSuccessfulAccounts().size());
         resultDto.setFailureCount(resultDto.getErrors().size());
-        resultDto.setRemainingSchoolTokens(school.getUnallocatedTokenQuota());
+        resultDto.setTotalTokensAllocated(0);
+        resultDto.setRemainingSchoolTokens(school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0);
 
-        log.info("Finished student import for school {}: {} succeeded, {} failed",
+        log.info("Finished student import for school {}: {} succeeded, {} failed (Pure Shared Pool - 0 upfront tokens deducted)",
                 school.getSchoolCode(), resultDto.getSuccessCount(), resultDto.getFailureCount());
 
         return resultDto;
@@ -217,7 +219,10 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
             School school,
             StudentImportResultDto resultDto) {
 
-        int baseToken = context.getDefaultInitialToken() != null ? context.getDefaultInitialToken() : 10000;
+        int dailyBaseLimit = (school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
+                ? school.getDefaultDailyStudentQuota()
+                : 1000;
+        int schoolPool = school.getUnallocatedTokenQuota() != null ? Math.max(0, school.getUnallocatedTokenQuota()) : 0;
         int currentYear = Year.now().getValue() % 100;
         long existingStudentCount = userRepository.countBySchoolIdAndRole(school.getId(), UserRole.SCHOOL_STUDENT);
 
@@ -239,7 +244,7 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                     : studentCode + "@2026";
 
             int extraToken = row.getAdditionalToken() != null ? Math.max(0, row.getAdditionalToken()) : 0;
-            int totalTokens = baseToken + extraToken;
+            int effectiveDailyAvailable = Math.min(dailyBaseLimit + extraToken, schoolPool);
 
             Gender gender = null;
             if (row.getGender() != null && !row.getGender().trim().isEmpty()) {
@@ -262,7 +267,10 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                     .studentCode(studentCode)
                     .role(UserRole.SCHOOL_STUDENT)
                     .school(school)
-                    .token(totalTokens)
+                    .token(effectiveDailyAvailable)
+                    .dailyTokensUsed(0)
+                    .dailyBonusTokens(extraToken)
+                    .lastTokenResetAt(LocalDateTime.now())
                     .mustChangePassword(true)
                     .build();
 
@@ -274,7 +282,7 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
                     .userName(userName)
                     .fullName(saved.getFullName())
                     .email(email)
-                    .allocatedToken(totalTokens)
+                    .allocatedToken(effectiveDailyAvailable)
                     .initialPassword(rawPassword)
                     .build());
         }
