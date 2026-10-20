@@ -224,6 +224,8 @@ public class DocumentMediaServiceImpl implements MediaService {
                         || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                         || "STAFF".equalsIgnoreCase(role)
                         || "ADMIN".equalsIgnoreCase(role)
+                        || "TEACHER".equalsIgnoreCase(role)
+                        || "SCHOOL_ADMIN".equalsIgnoreCase(role)
         );
     }
 }

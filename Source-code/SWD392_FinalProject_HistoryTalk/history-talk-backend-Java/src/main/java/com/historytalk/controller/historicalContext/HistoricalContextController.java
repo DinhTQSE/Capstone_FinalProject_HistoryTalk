@@ -90,7 +90,7 @@ public class HistoricalContextController {
      * Create a new historical context (Staff only)
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new historical context", description = "Create a new historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createContext(
@@ -111,7 +111,7 @@ public class HistoricalContextController {
      * Update an existing historical context
      */
     @PutMapping("/{contextId}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
         @Operation(summary = "Update a historical context", description = "Update an existing historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateContext(

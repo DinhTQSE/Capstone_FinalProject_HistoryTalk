@@ -432,7 +432,7 @@ public class CharacterServiceImpl implements CharacterService {
                 "CONTENT_ADMIN".equalsIgnoreCase(role)
                         || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                         || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role)
+                        || "ADMIN".equalsIgnoreCase(role) || "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role)
         );
     }
 
