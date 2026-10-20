@@ -3,6 +3,7 @@ package com.historytalk.service.school.token;
 import com.historytalk.entity.classroom.Classroom;
 import com.historytalk.entity.enums.AccountStatus;
 import com.historytalk.entity.enums.SchoolStatus;
+import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.UserRepository;
@@ -23,7 +24,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceService {
 
-    private static final int DEFAULT_DAILY_QUOTA = 1000;
+    private static final int DEFAULT_DAILY_STUDENT_QUOTA = 1000;
+    private static final int DEFAULT_DAILY_TEACHER_QUOTA = 10000;
 
     private final SchoolRepository schoolRepository;
     private final UserRepository userRepository;
@@ -31,50 +33,55 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
 
     @Override
     @Transactional
-    public int verifyAndPrepareDailyAllowance(User student) {
-        if (student.getDeletedAt() != null || student.getAccountStatus() == AccountStatus.DEACTIVATED) {
-            throw new AccessDeniedException("ACCOUNT_DEACTIVATED: Tài khoản học sinh đã bị vô hiệu hóa do đã ra trường hoặc chuyển trường.");
+    public int verifyAndPrepareDailyAllowance(User user) {
+        if (user.getDeletedAt() != null || user.getAccountStatus() == AccountStatus.DEACTIVATED) {
+            throw new AccessDeniedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa do đã ra trường hoặc chuyển trường.");
         }
 
-        School school = student.getSchool();
+        School school = user.getSchool();
         if (school == null) {
-            throw new AccessDeniedException("Tài khoản học sinh không thuộc trường học nào.");
+            throw new AccessDeniedException("Tài khoản không thuộc trường học nào.");
         }
 
         verifySchoolSubscriptionActive(school);
 
         LocalDate today = LocalDate.now();
-        boolean needsDailyReset = student.getLastTokenResetAt() == null
-                || student.getLastTokenResetAt().toLocalDate().isBefore(today);
+        boolean needsDailyReset = user.getLastTokenResetAt() == null
+                || user.getLastTokenResetAt().toLocalDate().isBefore(today);
 
         if (needsDailyReset) {
             // Pure Shared Pool: All school tokens remain in school.unallocatedTokenQuota until spent.
-            // On a new day, simply reset the student's daily usage counter and daily bonus allowance to 0.
-            student.setDailyTokensUsed(0);
-            student.setDailyBonusTokens(0);
-            student.setLastTokenResetAt(LocalDateTime.now());
+            // On a new day, simply reset the user's daily usage counter and daily bonus allowance to 0.
+            user.setDailyTokensUsed(0);
+            user.setDailyBonusTokens(0);
+            user.setLastTokenResetAt(LocalDateTime.now());
         }
 
-        int baseDailyLimit = resolveStudentDailyLimit(student, school);
-        int bonusToday = student.getDailyBonusTokens() != null ? Math.max(0, student.getDailyBonusTokens()) : 0;
-        int usedToday = student.getDailyTokensUsed() != null ? Math.max(0, student.getDailyTokensUsed()) : 0;
+        int baseDailyLimit = resolveUserDailyLimit(user, school);
+        int bonusToday = user.getDailyBonusTokens() != null ? Math.max(0, user.getDailyBonusTokens()) : 0;
+        int usedToday = user.getDailyTokensUsed() != null ? Math.max(0, user.getDailyTokensUsed()) : 0;
         int effectiveDailyLimit = baseDailyLimit + bonusToday;
 
         int remainingDailyLimit = Math.max(0, effectiveDailyLimit - usedToday);
         int schoolPool = school.getUnallocatedTokenQuota() != null ? Math.max(0, school.getUnallocatedTokenQuota()) : 0;
         int effectiveAvailableToday = Math.min(remainingDailyLimit, schoolPool);
 
-        // Sync student.token with effectiveAvailableToday for UI display convenience (no tokens removed from schoolPool upfront)
-        student.setToken(effectiveAvailableToday);
+        // Sync user.token with effectiveAvailableToday for UI display convenience (no tokens removed from schoolPool upfront)
+        user.setToken(effectiveAvailableToday);
         if (needsDailyReset) {
-            userRepository.save(student);
+            userRepository.save(user);
         }
 
         if (effectiveAvailableToday <= 0) {
+            if (user.getRole() == UserRole.TEACHER) {
+                throw new AccessDeniedException(
+                        "AI_QUOTA_EXCEEDED: Bạn đã sử dụng hết hạn mức Token trong ngày của Giáo viên (đã bao gồm phần cấp cho học sinh). " +
+                        "Bạn có thể tạo Ticket gửi Quản trị viên Trường (School Admin) để được cấp thêm hạn mức.");
+            }
             throw new AccessDeniedException(
                     "AI_QUOTA_EXCEEDED: Bạn đã hết hạn mức Token AI trong ngày (hoặc Quỹ Token chung của trường đã hết). " +
                     "Các tính năng làm bài Quiz, đọc tài liệu và nộp bài tập vẫn sử dụng bình thường. " +
-                    "Bạn có thể bấm 'Xin thêm Token' để giáo viên phụ trách lớp duyệt cấp thêm.");
+                    "Bạn có thể bấm 'Xin thêm Token' để giáo viên phụ trách lớp cấp thêm từ quỹ giáo viên.");
         }
 
         return effectiveAvailableToday;
@@ -82,35 +89,35 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
 
     @Override
     @Transactional
-    public int recordStudentTokenUsage(User student, int tokensUsed) {
-        if (tokensUsed <= 0 || student == null || student.getSchool() == null) {
-            return student != null && student.getToken() != null ? student.getToken() : 0;
+    public int recordStudentTokenUsage(User user, int tokensUsed) {
+        if (tokensUsed <= 0 || user == null || user.getSchool() == null) {
+            return user != null && user.getToken() != null ? user.getToken() : 0;
         }
 
-        School school = student.getSchool();
+        School school = user.getSchool();
         int currentPool = school.getUnallocatedTokenQuota() != null ? Math.max(0, school.getUnallocatedTokenQuota()) : 0;
         int updatedPool = Math.max(0, currentPool - tokensUsed);
         school.setUnallocatedTokenQuota(updatedPool);
 
-        int usedToday = student.getDailyTokensUsed() != null ? Math.max(0, student.getDailyTokensUsed()) : 0;
+        int usedToday = user.getDailyTokensUsed() != null ? Math.max(0, user.getDailyTokensUsed()) : 0;
         int updatedUsedToday = usedToday + tokensUsed;
-        student.setDailyTokensUsed(updatedUsedToday);
+        user.setDailyTokensUsed(updatedUsedToday);
 
-        int baseDailyLimit = resolveStudentDailyLimit(student, school);
-        int bonusToday = student.getDailyBonusTokens() != null ? Math.max(0, student.getDailyBonusTokens()) : 0;
+        int baseDailyLimit = resolveUserDailyLimit(user, school);
+        int bonusToday = user.getDailyBonusTokens() != null ? Math.max(0, user.getDailyBonusTokens()) : 0;
         int remainingDailyLimit = Math.max(0, (baseDailyLimit + bonusToday) - updatedUsedToday);
         int effectiveRemaining = Math.min(remainingDailyLimit, updatedPool);
 
-        student.setToken(effectiveRemaining);
-        if (student.getLastTokenResetAt() == null) {
-            student.setLastTokenResetAt(LocalDateTime.now());
+        user.setToken(effectiveRemaining);
+        if (user.getLastTokenResetAt() == null) {
+            user.setLastTokenResetAt(LocalDateTime.now());
         }
 
         schoolRepository.save(school);
-        userRepository.save(student);
+        userRepository.save(user);
 
-        log.info("Recorded {} tokens used by student {} directly from school {} pool. UsedToday={}/{}, RemainingPool={}",
-                tokensUsed, student.getUserName(), school.getSchoolCode(),
+        log.info("Recorded {} tokens used by {} ({}) directly from school {} pool. UsedToday={}/{}, RemainingPool={}",
+                tokensUsed, user.getUserName(), user.getRole(), school.getSchoolCode(),
                 updatedUsedToday, (baseDailyLimit + bonusToday), updatedPool);
 
         return effectiveRemaining;
@@ -153,8 +160,14 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
         }
     }
 
-    private int resolveStudentDailyLimit(User student, School school) {
-        List<Classroom> activeClassrooms = classStudentRepository.findActiveClassroomsByStudentUid(student.getUid());
+    private int resolveUserDailyLimit(User user, School school) {
+        if (user.getRole() == UserRole.TEACHER) {
+            if (school.getDefaultDailyTeacherQuota() != null && school.getDefaultDailyTeacherQuota() > 0) {
+                return school.getDefaultDailyTeacherQuota();
+            }
+            return DEFAULT_DAILY_TEACHER_QUOTA;
+        }
+        List<Classroom> activeClassrooms = classStudentRepository.findActiveClassroomsByStudentUid(user.getUid());
         for (Classroom c : activeClassrooms) {
             if (c.getDailyTokenQuota() != null && c.getDailyTokenQuota() > 0) {
                 return c.getDailyTokenQuota();
@@ -163,6 +176,6 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
         if (school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0) {
             return school.getDefaultDailyStudentQuota();
         }
-        return DEFAULT_DAILY_QUOTA;
+        return DEFAULT_DAILY_STUDENT_QUOTA;
     }
 }

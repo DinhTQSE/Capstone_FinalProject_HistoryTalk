@@ -10,6 +10,7 @@ import com.historytalk.dto.school.RenewSchoolSubscriptionRequest;
 import com.historytalk.dto.school.ReviewTokenBoostRequestDto;
 import com.historytalk.dto.school.SchoolResponse;
 import com.historytalk.dto.school.StudentResponse;
+import com.historytalk.dto.school.TeacherGrantStudentTokenRequest;
 import com.historytalk.dto.school.TokenBoostRequestResponse;
 import com.historytalk.dto.school.TopUpSchoolTokensRequest;
 import com.historytalk.dto.school.UpdateSchoolTokenPolicyRequest;
@@ -40,7 +41,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 @Tag(name = "School Subscription, Daily Token Pool & Academic Lifecycle",
-        description = "Endpoints for US-SP7-14 to US-SP7-18: Academic subscription (01/09 - 31/05), Daily Token Allowance, Boost Requests, and Student Lifecycle")
+        description = "Endpoints for US-SP7-14 to US-SP7-18: Academic subscription (01/09 - 31/05), Daily Token Allowance, Teacher Token Transfer & Ticket Workflow, and Student Lifecycle")
 public class SchoolLifecycleAndTokenController {
 
     private final AcademicLifecycleService academicLifecycleService;
@@ -82,11 +83,11 @@ public class SchoolLifecycleAndTokenController {
         return ResponseEntity.ok(ApiResponse.success(response, "School token pool topped up successfully"));
     }
 
-    // ── US-SP7-16: Configure Daily Student Token Quota Policy ───────────────
+    // ── US-SP7-16: Configure Daily Student & Teacher Token Quota Policy ─────
 
     @PutMapping("/school-admin/token-policy")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
-    @Operation(summary = "Update default daily student token quota for school, grade level, or classroom (US-SP7-16)")
+    @Operation(summary = "Update default daily student/teacher token quota for school, grade level, or classroom (US-SP7-16)")
     public ResponseEntity<ApiResponse<SchoolResponse>> updateSchoolTokenPolicy(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody UpdateSchoolTokenPolicyRequest request) {
@@ -95,11 +96,11 @@ public class SchoolLifecycleAndTokenController {
         return ResponseEntity.ok(ApiResponse.success(response, "Daily token quota policy updated successfully"));
     }
 
-    // ── US-SP7-17: Daily Token Boost Request & Teacher/Admin Approval ───────
+    // ── US-SP7-17: Teacher Direct Token Transfer & Ticket Workflow ──────────
 
     @PostMapping("/student/token-requests")
     @PreAuthorize("hasRole('SCHOOL_STUDENT')")
-    @Operation(summary = "Student requests additional daily tokens from classroom teacher / school admin (US-SP7-17)")
+    @Operation(summary = "Student requests additional daily tokens from classroom teacher (US-SP7-17)")
     public ResponseEntity<ApiResponse<TokenBoostRequestResponse>> createTokenBoostRequest(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CreateTokenBoostRequestDto request) {
@@ -119,9 +120,34 @@ public class SchoolLifecycleAndTokenController {
         return ResponseEntity.ok(ApiResponse.success(response, "Student token boost requests retrieved successfully"));
     }
 
+    @PostMapping("/teacher/students/{studentId}/grant-tokens")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(summary = "Teacher directly transfers tokens from Teacher's own daily allowance to a student (US-SP7-17)")
+    public ResponseEntity<ApiResponse<TokenBoostRequestResponse>> grantTokensFromTeacherToStudent(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable("studentId") UUID studentId,
+            @Valid @RequestBody TeacherGrantStudentTokenRequest request) {
+        log.info("POST /api/v1/teacher/students/{}/grant-tokens (+{} tokens)", studentId, request.getTokens());
+        TokenBoostRequestResponse response =
+                tokenBoostRequestService.grantTokensFromTeacherToStudent(principal, studentId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Tokens transferred from teacher daily allowance to student successfully"));
+    }
+
+    @PostMapping("/teacher/token-requests")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(summary = "Teacher creates a ticket to School Admin when Teacher runs out of daily token allowance (US-SP7-17)")
+    public ResponseEntity<ApiResponse<TokenBoostRequestResponse>> createTeacherAdminTicket(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CreateTokenBoostRequestDto request) {
+        log.info("POST /api/v1/teacher/token-requests");
+        TokenBoostRequestResponse response = tokenBoostRequestService.createTeacherAdminTicket(principal, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Ticket submitted to School Admin successfully"));
+    }
+
     @GetMapping("/teacher/token-requests")
     @PreAuthorize("hasAnyRole('TEACHER', 'SCHOOL_ADMIN')")
-    @Operation(summary = "Teacher or School Admin views student token boost requests (US-SP7-17)")
+    @Operation(summary = "Teacher or School Admin views token boost tickets (US-SP7-17)")
     public ResponseEntity<ApiResponse<PaginatedResponse<TokenBoostRequestResponse>>> getTokenBoostRequestsForReviewer(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(value = "status", required = false) TokenBoostRequestStatus status,
@@ -136,7 +162,7 @@ public class SchoolLifecycleAndTokenController {
 
     @PutMapping("/teacher/token-requests/{requestId}/review")
     @PreAuthorize("hasAnyRole('TEACHER', 'SCHOOL_ADMIN')")
-    @Operation(summary = "Teacher or School Admin approves or rejects a student's daily token boost request (US-SP7-17)")
+    @Operation(summary = "Teacher approves from Teacher's daily allowance (or escalates to School Admin), or School Admin approves from school pool (US-SP7-17)")
     public ResponseEntity<ApiResponse<TokenBoostRequestResponse>> reviewTokenBoostRequest(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable("requestId") UUID requestId,
@@ -145,6 +171,60 @@ public class SchoolLifecycleAndTokenController {
         TokenBoostRequestResponse response =
                 tokenBoostRequestService.reviewBoostRequest(principal, requestId, reviewDto);
         return ResponseEntity.ok(ApiResponse.success(response, "Token boost request reviewed successfully"));
+    }
+
+    @GetMapping("/school-admin/token-requests")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin views all token boost tickets across the school (US-SP7-17)")
+    public ResponseEntity<ApiResponse<PaginatedResponse<TokenBoostRequestResponse>>> getSchoolAdminTokenBoostRequests(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(value = "status", required = false) TokenBoostRequestStatus status,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        log.info("GET /api/v1/school-admin/token-requests?status={}", status);
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, limit));
+        PaginatedResponse<TokenBoostRequestResponse> response =
+                tokenBoostRequestService.getBoostRequestsForReviewer(principal, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response, "School Admin token boost requests retrieved successfully"));
+    }
+
+    @PutMapping("/school-admin/token-requests/{requestId}/review")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin approves or rejects a token boost ticket from school shared pool (US-SP7-17)")
+    public ResponseEntity<ApiResponse<TokenBoostRequestResponse>> reviewSchoolAdminTokenBoostRequest(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable("requestId") UUID requestId,
+            @Valid @RequestBody ReviewTokenBoostRequestDto reviewDto) {
+        log.info("PUT /api/v1/school-admin/token-requests/{}/review ({})", requestId, reviewDto.getAction());
+        TokenBoostRequestResponse response =
+                tokenBoostRequestService.reviewBoostRequest(principal, requestId, reviewDto);
+        return ResponseEntity.ok(ApiResponse.success(response, "Token boost request reviewed by School Admin successfully"));
+    }
+
+    @GetMapping("/token-requests")
+    @PreAuthorize("hasAnyRole('SCHOOL_STUDENT', 'TEACHER', 'SCHOOL_ADMIN')")
+    @Operation(summary = "Unified endpoint for all 3 roles (Student, Teacher, School Admin) to view token boost tickets (US-SP7-17)")
+    public ResponseEntity<ApiResponse<PaginatedResponse<TokenBoostRequestResponse>>> getUnifiedTokenBoostRequests(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(value = "status", required = false) TokenBoostRequestStatus status,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        log.info("GET /api/v1/token-requests?status={}", status);
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, limit));
+        PaginatedResponse<TokenBoostRequestResponse> response =
+                tokenBoostRequestService.getBoostRequestsForReviewer(principal, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response, "Token boost requests retrieved successfully"));
+    }
+
+    @GetMapping("/token-requests/{requestId}")
+    @PreAuthorize("hasAnyRole('SCHOOL_STUDENT', 'TEACHER', 'SCHOOL_ADMIN')")
+    @Operation(summary = "Unified endpoint for all 3 roles (Student, Teacher, School Admin) to view ticket details by ID (US-SP7-17)")
+    public ResponseEntity<ApiResponse<TokenBoostRequestResponse>> getTokenBoostRequestById(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable("requestId") UUID requestId) {
+        log.info("GET /api/v1/token-requests/{}", requestId);
+        TokenBoostRequestResponse response = tokenBoostRequestService.getBoostRequestById(principal, requestId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Token boost request details retrieved successfully"));
     }
 
     // ── US-SP7-18: Academic Year Rollover (ARCHIVED) & Student Deactivation ─

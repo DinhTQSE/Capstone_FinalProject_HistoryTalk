@@ -171,7 +171,7 @@ public class MessageServiceImpl implements MessageService {
                 userRepository.deductTokens(session.getUser().getUid(), totalToken);
                 remainingTokens = Math.max(0, remainingTokens - totalToken);
                 session.getUser().setToken(remainingTokens);
-            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT || session.getUser().getRole() == com.historytalk.entity.enums.UserRole.TEACHER) {
                 if (dailyTokenAllowanceService != null) {
                     remainingTokens = dailyTokenAllowanceService.recordStudentTokenUsage(session.getUser(), totalToken);
                 } else {
@@ -332,7 +332,7 @@ public class MessageServiceImpl implements MessageService {
                                 userRepository.deductTokens(session.getUser().getUid(), totalToken);
                                 remainingTokens = Math.max(0, remainingTokens - totalToken);
                                 session.getUser().setToken(remainingTokens);
-                            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+                            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT || session.getUser().getRole() == com.historytalk.entity.enums.UserRole.TEACHER) {
                                 if (dailyTokenAllowanceService != null) {
                                     remainingTokens = dailyTokenAllowanceService.recordStudentTokenUsage(session.getUser(), totalToken);
                                 } else {
@@ -389,12 +389,12 @@ public class MessageServiceImpl implements MessageService {
             if (user.getToken() == null || user.getToken() <= 0) {
                 throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
             }
-        } else if (user.getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+        } else if (user.getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT
+                || user.getRole() == com.historytalk.entity.enums.UserRole.TEACHER) {
             if (dailyTokenAllowanceService != null) {
                 dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(user);
             }
-        } else if (user.getRole() == com.historytalk.entity.enums.UserRole.TEACHER
-                || user.getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN) {
+        } else if (user.getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN) {
             if (dailyTokenAllowanceService != null) {
                 dailyTokenAllowanceService.verifySchoolSubscriptionForStaff(user);
             }

@@ -185,4 +185,31 @@ class DailyTokenAllowanceServiceImplTest {
 
         assertTrue(ex.getMessage().contains("ACCOUNT_DEACTIVATED"));
     }
+
+    @Test
+    @DisplayName("US-SP7-15 & US-SP7-17: Teacher gets larger daily quota (default 10,000) and deducts pay-as-you-go from school pool")
+    void verifyAndRecordUsage_TeacherGetsLargerDailyQuota() {
+        activeSchool.setDefaultDailyTeacherQuota(10_000);
+        User teacher = User.builder()
+                .uid(UUID.randomUUID())
+                .userName("cva_gv_01")
+                .fullName("Nguyen Thi Mai")
+                .role(UserRole.TEACHER)
+                .accountStatus(AccountStatus.ACTIVE)
+                .school(activeSchool)
+                .token(0)
+                .dailyTokensUsed(500)
+                .lastTokenResetAt(LocalDateTime.now().minusDays(1))
+                .build();
+
+        int available = dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(teacher);
+        assertEquals(10_000, available);
+        assertEquals(0, teacher.getDailyTokensUsed());
+        assertEquals(10_000, teacher.getToken());
+
+        int remainingAfterChat = dailyTokenAllowanceService.recordStudentTokenUsage(teacher, 400);
+        assertEquals(9_600, remainingAfterChat);
+        assertEquals(400, teacher.getDailyTokensUsed());
+        assertEquals(99_600, activeSchool.getUnallocatedTokenQuota());
+    }
 }

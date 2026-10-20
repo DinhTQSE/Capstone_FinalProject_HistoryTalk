@@ -68,6 +68,12 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final AiServiceClient aiServiceClient;
     private final ClassLocalContentRepository classLocalContentRepo;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.historytalk.service.document.PdfExtractionService pdfExtractionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
+
     // ══════════════════════════════════════════════════════════════════════════
     // TEACHER — Context
     // ══════════════════════════════════════════════════════════════════════════
@@ -838,6 +844,62 @@ public class LocalContentServiceImpl implements LocalContentService {
 
     @Override
     @Transactional
+    public HistoricalContextDocumentResponse uploadLocalContextPdfDocument(
+            String contextId, org.springframework.web.multipart.MultipartFile file, String title, UserPrincipal principal) {
+        if (file == null || file.isEmpty()) {
+            throw new InvalidRequestException("File PDF không được để trống");
+        }
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+
+        String resolvedTitle = StringUtils.hasText(title) ? title.trim()
+                : (file.getOriginalFilename() != null ? file.getOriginalFilename() : "Tài liệu PDF");
+
+        String extractedText = "";
+        if (pdfExtractionService != null) {
+            try {
+                var extraction = pdfExtractionService.extractText(file);
+                if (extraction != null && StringUtils.hasText(extraction.getRawText())) {
+                    extractedText = extraction.getRawText();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to extract text from PDF for context {}: {}", contextId, e.getMessage());
+            }
+        }
+        if (!StringUtils.hasText(extractedText)) {
+            extractedText = resolvedTitle;
+        }
+
+        Document doc = Document.builder()
+                .entityId(ctx.getContextId())
+                .entityType(EntityType.CONTEXT)
+                .createdBy(teacher)
+                .title(resolvedTitle)
+                .content(extractedText)
+                .fileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "document.pdf")
+                .documentType(DocumentType.PDF)
+                .build();
+        Document saved = documentRepository.save(doc);
+
+        if (supabaseDocumentStorageService != null) {
+            try {
+                var uploaded = supabaseDocumentStorageService.uploadPdf(EntityType.CONTEXT, ctx.getContextId(), saved.getDocId(), file);
+                saved.setFileUrl(uploaded.objectPath());
+                saved = documentRepository.save(saved);
+            } catch (Exception e) {
+                log.warn("Could not upload PDF to Supabase storage (keeping extracted text): {}", e.getMessage());
+            }
+        }
+
+        aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        log.info("Teacher {} uploaded PDF document {} to local context {}", teacher.getUid(), saved.getDocId(), contextId);
+        return mapDocumentToResponse(saved);
+    }
+
+    @Override
+    @Transactional
     public void deleteLocalContextDocument(String contextId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         UUID teacherId = resolveUserId(principal);
@@ -889,6 +951,62 @@ public class LocalContentServiceImpl implements LocalContentService {
         Document saved = documentRepository.save(doc);
         aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
         log.info("Teacher {} added document {} to local character {}", teacher.getUid(), saved.getDocId(), characterId);
+        return mapDocumentToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public HistoricalContextDocumentResponse uploadLocalCharacterPdfDocument(
+            String characterId, org.springframework.web.multipart.MultipartFile file, String title, UserPrincipal principal) {
+        if (file == null || file.isEmpty()) {
+            throw new InvalidRequestException("File PDF không được để trống");
+        }
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+
+        String resolvedTitle = StringUtils.hasText(title) ? title.trim()
+                : (file.getOriginalFilename() != null ? file.getOriginalFilename() : "Tài liệu PDF");
+
+        String extractedText = "";
+        if (pdfExtractionService != null) {
+            try {
+                var extraction = pdfExtractionService.extractText(file);
+                if (extraction != null && StringUtils.hasText(extraction.getRawText())) {
+                    extractedText = extraction.getRawText();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to extract text from PDF for character {}: {}", characterId, e.getMessage());
+            }
+        }
+        if (!StringUtils.hasText(extractedText)) {
+            extractedText = resolvedTitle;
+        }
+
+        Document doc = Document.builder()
+                .entityId(character.getCharacterId())
+                .entityType(EntityType.CHARACTER)
+                .createdBy(teacher)
+                .title(resolvedTitle)
+                .content(extractedText)
+                .fileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "document.pdf")
+                .documentType(DocumentType.PDF)
+                .build();
+        Document saved = documentRepository.save(doc);
+
+        if (supabaseDocumentStorageService != null) {
+            try {
+                var uploaded = supabaseDocumentStorageService.uploadPdf(EntityType.CHARACTER, character.getCharacterId(), saved.getDocId(), file);
+                saved.setFileUrl(uploaded.objectPath());
+                saved = documentRepository.save(saved);
+            } catch (Exception e) {
+                log.warn("Could not upload PDF to Supabase storage (keeping extracted text): {}", e.getMessage());
+            }
+        }
+
+        aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        log.info("Teacher {} uploaded PDF document {} to local character {}", teacher.getUid(), saved.getDocId(), characterId);
         return mapDocumentToResponse(saved);
     }
 

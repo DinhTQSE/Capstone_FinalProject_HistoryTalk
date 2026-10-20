@@ -5,6 +5,7 @@ import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequ
 import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
 import com.historytalk.dto.localcontent.*;
 import com.historytalk.security.UserPrincipal;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -39,7 +40,7 @@ public interface LocalContentService {
     PaginatedResponse<LocalContentResponse> getLocalCharacters(String search, String status, int page, int size, UserPrincipal principal);
 
     // ── Teacher: Submit / Publish / Status ────────────────────────────────────
-    
+
     /** Teacher publishes / submits a local context (sets to ACTIVE). */
     LocalContentResponse submitLocalContext(String contextId, UserPrincipal principal);
 
@@ -77,6 +78,10 @@ public interface LocalContentService {
     HistoricalContextDocumentResponse addLocalContextDocument(String contextId,
             CreateHistoricalContextDocumentRequest request, UserPrincipal principal);
 
+    /** Upload a PDF file directly to a local context (extracts text, uploads PDF to storage, embeds to AI) */
+    HistoricalContextDocumentResponse uploadLocalContextPdfDocument(String contextId,
+            MultipartFile file, String title, UserPrincipal principal);
+
     /** Soft-delete a document from a local context (only document creator or school admin) */
     void deleteLocalContextDocument(String contextId, String docId, UserPrincipal principal);
 
@@ -86,6 +91,10 @@ public interface LocalContentService {
     /** Attach a new document to a local character */
     HistoricalContextDocumentResponse addLocalCharacterDocument(String characterId,
             CreateHistoricalContextDocumentRequest request, UserPrincipal principal);
+
+    /** Upload a PDF file directly to a local character (extracts text, uploads PDF to storage, embeds to AI) */
+    HistoricalContextDocumentResponse uploadLocalCharacterPdfDocument(String characterId,
+            MultipartFile file, String title, UserPrincipal principal);
 
     /** Soft-delete a document from a local character */
     void deleteLocalCharacterDocument(String characterId, String docId, UserPrincipal principal);

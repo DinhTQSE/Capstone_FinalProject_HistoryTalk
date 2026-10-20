@@ -1,7 +1,6 @@
 package com.historytalk.service.dashboard;
 
 import com.historytalk.dto.dashboard.*;
-import com.historytalk.entity.classroom.ClassStudent;
 import com.historytalk.entity.classroom.Classroom;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.enums.UserRole;
@@ -10,7 +9,9 @@ import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
+import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.*;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
@@ -20,6 +21,7 @@ import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -53,22 +55,36 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Override
     @Transactional(readOnly = true)
     public SchoolAdminDashboardResponse getSchoolAdminDashboard(UUID schoolId) {
-        log.info("Fetching School Admin Dashboard for schoolId: {}", schoolId);
-        School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + schoolId));
+        UUID resolvedSchoolId = schoolId;
+        if (resolvedSchoolId == null) {
+            UserPrincipal resolvedPrincipal = resolvePrincipal(null);
+            resolvedSchoolId = resolvedPrincipal.getSchoolId();
+        }
+        if (resolvedSchoolId == null) {
+            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
+        }
 
-        long totalClassrooms = classroomRepository.countBySchoolIdAndDeletedAtIsNull(schoolId);
-        long totalTeachers = userRepository.countBySchoolIdAndRole(schoolId, UserRole.TEACHER);
-        long totalStudents = userRepository.countBySchoolIdAndRole(schoolId, UserRole.SCHOOL_STUDENT);
+        UUID finalSchoolId = resolvedSchoolId;
+        log.info("Fetching School Admin Dashboard for schoolId: {}", finalSchoolId);
+        School school = schoolRepository.findById(finalSchoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + finalSchoolId));
+
+        long totalClassrooms = classroomRepository.countBySchoolIdAndDeletedAtIsNull(finalSchoolId);
+        long totalTeachers = userRepository.countBySchoolIdAndRole(finalSchoolId, UserRole.TEACHER);
+        long totalStudents = userRepository.countBySchoolIdAndRole(finalSchoolId, UserRole.SCHOOL_STUDENT);
 
         int totalQuota = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0;
         int unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
         int allocated = Math.max(0, totalQuota - unallocated);
-        long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(schoolId);
+        long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(finalSchoolId);
         int defaultDailyQuota = school.getDefaultDailyStudentQuota() != null ? school.getDefaultDailyStudentQuota() : 1000;
-        long pendingBoostRequests = tokenBoostRequestRepository != null
-                ? tokenBoostRequestRepository.countBySchool_IdAndStatus(schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
-                : 0L;
+        long pendingBoostRequests = 0L;
+        if (tokenBoostRequestRepository != null) {
+            pendingBoostRequests = tokenBoostRequestRepository.countBySchool_IdAndStatus(
+                    finalSchoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
+                    + tokenBoostRequestRepository.countBySchool_IdAndStatus(
+                    finalSchoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING_ADMIN);
+        }
 
         // Assignment progress distribution
         SchoolAdminDashboardResponse.AssignmentStats assignmentStats = SchoolAdminDashboardResponse.AssignmentStats.builder()
@@ -105,8 +121,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Override
     @Transactional(readOnly = true)
     public TeacherClassroomDashboardResponse getTeacherClassroomDashboard(UUID classId, UserPrincipal principal) {
-        UUID schoolId = principal.getSchoolId();
-        UUID teacherUid = UUID.fromString(principal.getUid());
+        UserPrincipal resolvedPrincipal = resolvePrincipal(principal);
+        UUID schoolId = resolvedPrincipal.getSchoolId();
+        UUID teacherUid = UUID.fromString(resolvedPrincipal.getUid());
         log.info("Fetching Teacher Classroom Dashboard for classId: {} by teacher: {}", classId, teacherUid);
 
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classId, schoolId)
@@ -196,7 +213,8 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Override
     @Transactional(readOnly = true)
     public StudentPersonalDashboardResponse getStudentDashboard(UserPrincipal principal) {
-        UUID studentUid = UUID.fromString(principal.getUid());
+        UserPrincipal resolvedPrincipal = resolvePrincipal(principal);
+        UUID studentUid = UUID.fromString(resolvedPrincipal.getUid());
         log.info("Fetching Student Personal Dashboard for studentUid: {}", studentUid);
 
         User student = userRepository.findById(studentUid)
@@ -278,7 +296,8 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Override
     @Transactional(readOnly = true)
     public CustomerPersonalDashboardResponse getCustomerDashboard(UserPrincipal principal) {
-        UUID userUid = UUID.fromString(principal.getUid());
+        UserPrincipal resolvedPrincipal = resolvePrincipal(principal);
+        UUID userUid = UUID.fromString(resolvedPrincipal.getUid());
         log.info("Fetching Customer B2C Dashboard for userUid: {}", userUid);
 
         User user = userRepository.findById(userUid)
@@ -443,6 +462,19 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .topWrongQuestions(topWrong)
                 .platformOverview(platformOverview)
                 .build();
+    }
+
+    private UserPrincipal resolvePrincipal(UserPrincipal principal) {
+        if (principal != null) {
+            return principal;
+        }
+        String userId = SecurityUtils.getUserId();
+        if (userId == null || userId.isBlank()) {
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
+        }
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+        return new UserPrincipal(user);
     }
 
     private double calculateSessionPercentage(QuizSession session) {

@@ -28,6 +28,7 @@ public class SchoolResponse {
     private Integer totalSchoolTokenQuota;
     private Integer unallocatedTokenQuota;
     private Integer defaultDailyStudentQuota;
+    private Integer defaultDailyTeacherQuota;
     private LocalDate subscriptionStartDate;
     private LocalDate subscriptionEndDate;
     private Boolean renewedForNextYear;
