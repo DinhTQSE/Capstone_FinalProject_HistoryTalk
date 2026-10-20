@@ -12,6 +12,7 @@ import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.MapFocusRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -49,9 +50,10 @@ public class MapFocusServiceImpl implements MapFocusService {
         UUID ctxUuid = parseUuid(contextId, "context");
         HistoricalContext context = loadActiveContext(ctxUuid, contextId, role);
 
+        String callerId = SecurityUtils.getUserId();
         List<MapFocus> focuses;
-        if (isAdminRole(role)) {
-            // Admin: all non-deleted focuses, including inactive
+        if (isAdminRole(role) || isEducationalManager(role, callerId, context)) {
+            // Admin or school manager: all non-deleted focuses, including inactive
             focuses = focusRepository.findByHistoricalContext_ContextIdAndDeletedAtIsNull(
                     ctxUuid, ORDER_BY_INDEX);
         } else {
@@ -74,10 +76,9 @@ public class MapFocusServiceImpl implements MapFocusService {
                                         String callerId, String role) {
         log.info("createFocus contextId={} role={}", contextId, role);
 
-        requireAdminRole(role);
-
         UUID ctxUuid = parseUuid(contextId, "context");
         HistoricalContext context = loadNonDeletedContext(ctxUuid, contextId);
+        requireAdminOrSchoolManager(role, callerId, context);
 
         User creator = userRepository.findById(UUID.fromString(callerId))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + callerId));
@@ -122,10 +123,11 @@ public class MapFocusServiceImpl implements MapFocusService {
                                         String callerId, String role) {
         log.info("updateFocus focusId={} contextId={} role={}", focusId, contextId, role);
 
-        requireAdminRole(role);
-
         UUID ctxUuid   = parseUuid(contextId, "context");
         UUID focusUuid = parseUuid(focusId, "focus");
+
+        HistoricalContext context = loadNonDeletedContext(ctxUuid, contextId);
+        requireAdminOrSchoolManager(role, callerId, context);
 
         MapFocus focus = focusRepository.findByFocusIdAndDeletedAtIsNull(focusUuid)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -180,10 +182,10 @@ public class MapFocusServiceImpl implements MapFocusService {
         log.info("reorderFocuses contextId={} count={} role={}",
                 contextId, request.getFocusIds().size(), role);
 
-        requireAdminRole(role);
-
         UUID ctxUuid = parseUuid(contextId, "context");
-        loadNonDeletedContext(ctxUuid, contextId);    // verify context exists
+        HistoricalContext context = loadNonDeletedContext(ctxUuid, contextId);    // verify context exists
+        String callerId = SecurityUtils.getUserId();
+        requireAdminOrSchoolManager(role, callerId, context);
 
         // Build a lookup map of all non-deleted focuses for this context
         Map<UUID, MapFocus> focusByUuid = focusRepository
@@ -221,10 +223,12 @@ public class MapFocusServiceImpl implements MapFocusService {
     public void deleteFocus(String contextId, String focusId, String role) {
         log.info("deleteFocus focusId={} contextId={} role={}", focusId, contextId, role);
 
-        requireAdminRole(role);
-
         UUID ctxUuid   = parseUuid(contextId, "context");
         UUID focusUuid = parseUuid(focusId, "focus");
+
+        HistoricalContext context = loadNonDeletedContext(ctxUuid, contextId);
+        String callerId = SecurityUtils.getUserId();
+        requireAdminOrSchoolManager(role, callerId, context);
 
         MapFocus focus = focusRepository.findByFocusIdAndDeletedAtIsNull(focusUuid)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -283,7 +287,8 @@ public class MapFocusServiceImpl implements MapFocusService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
-        if (!isAdminRole(role)) {
+        String callerId = SecurityUtils.getUserId();
+        if (!isAdminRole(role) && !isEducationalManager(role, callerId, context)) {
             if (context.getDeletedAt() != null || !Boolean.TRUE.equals(context.getIsPublished())) {
                 throw new ResourceNotFoundException(
                         "Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
@@ -322,10 +327,29 @@ public class MapFocusServiceImpl implements MapFocusService {
                 .build();
     }
 
-    private void requireAdminRole(String role) {
-        if (!isAdminRole(role)) {
-            throw new InvalidRequestException(
-                    "Bạn không có quyền thực hiện thao tác này");
+    private void requireAdminOrSchoolManager(String role, String callerId, HistoricalContext context) {
+        if (isAdminRole(role)) {
+            return;
+        }
+        if (isEducationalManager(role, callerId, context)) {
+            return;
+        }
+        throw new InvalidRequestException("Bạn không có quyền thực hiện thao tác này");
+    }
+
+    private boolean isEducationalManager(String role, String callerId, HistoricalContext context) {
+        if (context == null || context.getSchool() == null || callerId == null) {
+            return false;
+        }
+        if (!"TEACHER".equalsIgnoreCase(role) && !"SCHOOL_ADMIN".equalsIgnoreCase(role)) {
+            return false;
+        }
+        try {
+            return userRepository.findById(UUID.fromString(callerId))
+                    .map(u -> u.getSchool() != null && u.getSchool().getId().equals(context.getSchool().getId()))
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
         }
     }
 

@@ -85,6 +85,10 @@ public class LocalContentResponse {
     @JsonProperty("longitude")
     private Double longitude;
 
+    /** Battle map overlay configuration (context only). */
+    @JsonProperty("battleMap")
+    private Object battleMap;
+
     // ── Character-specific ───────────────────────────────────────────────────
     @JsonProperty("title")
     private String title;

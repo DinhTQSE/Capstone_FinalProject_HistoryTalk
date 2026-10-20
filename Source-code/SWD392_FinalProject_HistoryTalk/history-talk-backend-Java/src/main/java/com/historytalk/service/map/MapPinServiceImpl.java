@@ -59,20 +59,22 @@ public class MapPinServiceImpl implements MapPinService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
+        boolean isEduManager = isEducationalManager(role, callerId, context);
+
         // Non-admin callers can only query published contexts
-        if (!isAdminRole(role) && context.getDeletedAt() != null) {
+        if (!isEduManager && !isAdminRole(role) && context.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
-        if (!isAdminRole(role) && !Boolean.TRUE.equals(context.getIsPublished())) {
+        if (!isEduManager && !isAdminRole(role) && !Boolean.TRUE.equals(context.getIsPublished())) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
 
         List<MapPin> pins;
-        if (callerId != null && !isAdminRole(role)) {
+        if (callerId != null && !isAdminRole(role) && !isEduManager) {
             // Authenticated regular user: admin pins + own user pins
             pins = mapPinRepository.findVisiblePinsForUser(ctxUuid, year, UUID.fromString(callerId));
         } else {
-            // Guest (callerId=null) or admin: ADMIN pins only
+            // Guest (callerId=null), admin, or educational manager: ADMIN pins only
             pins = mapPinRepository.findAdminPinsByContextAndYear(ctxUuid, year);
         }
 
@@ -105,8 +107,8 @@ public class MapPinServiceImpl implements MapPinService {
         String pinOwnerType;
         String pinType;
 
-        if (isAdminRole(role)) {
-            // Admin creates an educational ADMIN pin.
+        if (isAdminRole(role) || isEducationalManager(role, callerId, context)) {
+            // Admin or school teacher/admin creates an educational ADMIN pin.
             // pinType classification (ALLIED_FORCE / ENEMY_FORCE) is not yet used by the FE;
             // stored as null until the frontend adopts it.
             pinOwnerType = PIN_OWNER_ADMIN;
@@ -121,7 +123,7 @@ public class MapPinServiceImpl implements MapPinService {
             pinOwnerType = PIN_OWNER_USER;
             pinType = null;
         } else {
-            // SCHOOL_ADMIN and other non-learning roles may not place pins
+            // Other non-learning roles may not place pins
             throw new ForbiddenException("Bạn không có quyền tạo ghim bản đồ");
         }
 
@@ -164,8 +166,8 @@ public class MapPinServiceImpl implements MapPinService {
             throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
         }
 
-        if (isAdminRole(role)) {
-            // Admins can only delete ADMIN pins, not user's personal pins
+        if (isAdminRole(role) || isEducationalManager(role, callerId, pin.getHistoricalContext())) {
+            // Admins or educational managers can only delete ADMIN pins, not user's personal pins
             if (!PIN_OWNER_ADMIN.equals(pin.getPinOwnerType())) {
                 throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
             }
@@ -204,8 +206,8 @@ public class MapPinServiceImpl implements MapPinService {
         }
 
         // Ownership check — same 404-on-mismatch pattern as deletePin
-        if (isAdminRole(role)) {
-            // Admins can only update ADMIN pins
+        if (isAdminRole(role) || isEducationalManager(role, callerId, pin.getHistoricalContext())) {
+            // Admins or educational managers can only update ADMIN pins
             if (!PIN_OWNER_ADMIN.equals(pin.getPinOwnerType())) {
                 throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
             }
@@ -298,6 +300,22 @@ public class MapPinServiceImpl implements MapPinService {
                 || "STAFF".equalsIgnoreCase(role)
                 || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    private boolean isEducationalManager(String role, String callerId, HistoricalContext context) {
+        if (context == null || context.getSchool() == null || callerId == null) {
+            return false;
+        }
+        if (!"TEACHER".equalsIgnoreCase(role) && !"SCHOOL_ADMIN".equalsIgnoreCase(role)) {
+            return false;
+        }
+        try {
+            return userRepository.findById(UUID.fromString(callerId))
+                    .map(u -> u.getSchool() != null && u.getSchool().getId().equals(context.getSchool().getId()))
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

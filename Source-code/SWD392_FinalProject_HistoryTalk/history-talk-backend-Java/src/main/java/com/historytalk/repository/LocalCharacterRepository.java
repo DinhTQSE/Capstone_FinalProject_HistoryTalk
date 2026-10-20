@@ -88,4 +88,22 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
 
     @Query("SELECT COUNT(c) FROM Character c WHERE c.school.id = :schoolId AND c.isPublished = true AND c.deletedAt IS NULL")
     long countPublishedBySchool(@Param("schoolId") UUID schoolId);
+
+    // ── Trash & Restore queries ───────────────────────────────────────────────
+
+    @Query("""
+            SELECT c FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.deletedAt IS NOT NULL
+            ORDER BY c.deletedAt DESC
+            """)
+    Page<Character> findTrashBySchool(@Param("schoolId") UUID schoolId, Pageable pageable);
+
+    @Query("""
+            SELECT c FROM Character c
+            WHERE c.characterId = :id
+              AND c.school.id = :schoolId
+              AND c.deletedAt IS NOT NULL
+            """)
+    Optional<Character> findTrashedByIdAndSchool(@Param("id") UUID id, @Param("schoolId") UUID schoolId);
 }

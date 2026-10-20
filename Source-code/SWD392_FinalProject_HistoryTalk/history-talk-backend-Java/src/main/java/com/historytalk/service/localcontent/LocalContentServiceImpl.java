@@ -3,6 +3,12 @@ package com.historytalk.service.localcontent;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequest;
 import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
+import com.historytalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
+import com.historytalk.dto.quiz.CreateQuizRequest;
+import com.historytalk.dto.quiz.QuestionRequest;
+import com.historytalk.dto.quiz.QuestionResponse;
+import com.historytalk.dto.quiz.QuizStaffResponse;
+import com.historytalk.dto.quiz.UpdateQuizRequest;
 import com.historytalk.dto.localcontent.*;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.document.Document;
@@ -67,6 +73,11 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final DocumentRepository documentRepository;
     private final AiServiceClient aiServiceClient;
     private final ClassLocalContentRepository classLocalContentRepo;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.historytalk.service.historicalContext.strategy.DocumentProcessorFactory documentProcessorFactory;
+    private final com.historytalk.repository.QuizRepository quizRepository;
+    private final com.historytalk.repository.QuestionRepository questionRepository;
+    private final com.historytalk.service.quiz.QuizService quizService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.historytalk.service.document.PdfExtractionService pdfExtractionService;
@@ -106,6 +117,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .latitude(req.getLatitude())
                 .longitude(req.getLongitude())
                 .createdBy(teacher)
+                .battleMap(serializeBattleMap(req.getBattleMap()))
                 .build();
 
         ctx = localContextRepo.save(ctx);
@@ -136,6 +148,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (StringUtils.hasText(req.getVideoUrl()))    ctx.setVideoUrl(req.getVideoUrl());
         if (req.getLatitude() != null)                 ctx.setLatitude(req.getLatitude());
         if (req.getLongitude() != null)                ctx.setLongitude(req.getLongitude());
+        if (req.getBattleMap() != null)                ctx.setBattleMap(serializeBattleMap(req.getBattleMap()));
 
         if (req.getIsPublished() != null) {
             ctx.setIsPublished(req.getIsPublished());
@@ -724,6 +737,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .videoUrl(ctx.getVideoUrl())
                 .latitude(ctx.getLatitude())
                 .longitude(ctx.getLongitude())
+                .battleMap(deserializeJson(ctx.getBattleMap()))
                 .classIds(classIds.isEmpty() ? null : classIds)
                 .createdBy(createdByInfo)
                 .approvedBy(approvedByInfo)
@@ -1046,5 +1060,369 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .updatedDate(doc.getUpdatedAt())
                 .deletedAt(doc.getDeletedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public HistoricalContextDocumentResponse updateLocalContextDocument(
+            String contextId, String docId,
+            UpdateHistoricalContextDocumentRequest req,
+            UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        UUID teacherId = resolveUserId(principal);
+        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+        Document doc = documentRepository.findById(UUID.fromString(docId))
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        if (!doc.getEntityId().equals(UUID.fromString(contextId))) {
+            throw new ResourceNotFoundException("Document does not belong to this context");
+        }
+        if (!doc.getCreatedBy().getUid().equals(teacherId)) {
+            throw new UnauthorizedException("You can only edit documents you uploaded");
+        }
+
+        if (StringUtils.hasText(req.getTitle())) {
+            doc.setTitle(req.getTitle());
+        }
+        if (req.getFileUrl() != null) {
+            doc.setFileUrl(req.getFileUrl());
+        }
+        if (req.getType() != null) {
+            doc.setDocumentType(req.getType());
+        }
+        boolean contentChanged = false;
+        if (StringUtils.hasText(req.getContent())) {
+            var processor = documentProcessorFactory.getStrategy(doc.getDocumentType());
+            doc.setContent(processor.processContent(req.getContent()));
+            contentChanged = true;
+        }
+        Document saved = documentRepository.save(doc);
+        if (contentChanged) {
+            aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        }
+        log.info("Teacher {} updated document {} for local context {}", teacherId, docId, contextId);
+        return mapDocumentToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public HistoricalContextDocumentResponse updateLocalCharacterDocument(
+            String characterId, String docId,
+            UpdateHistoricalContextDocumentRequest req,
+            UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        UUID teacherId = resolveUserId(principal);
+        localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+        Document doc = documentRepository.findById(UUID.fromString(docId))
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        if (!doc.getEntityId().equals(UUID.fromString(characterId))) {
+            throw new ResourceNotFoundException("Document does not belong to this character");
+        }
+        if (!doc.getCreatedBy().getUid().equals(teacherId)) {
+            throw new UnauthorizedException("You can only edit documents you uploaded");
+        }
+
+        if (StringUtils.hasText(req.getTitle())) {
+            doc.setTitle(req.getTitle());
+        }
+        if (req.getFileUrl() != null) {
+            doc.setFileUrl(req.getFileUrl());
+        }
+        if (req.getType() != null) {
+            doc.setDocumentType(req.getType());
+        }
+        boolean contentChanged = false;
+        if (StringUtils.hasText(req.getContent())) {
+            var processor = documentProcessorFactory.getStrategy(doc.getDocumentType());
+            doc.setContent(processor.processContent(req.getContent()));
+            contentChanged = true;
+        }
+        Document saved = documentRepository.save(doc);
+        if (contentChanged) {
+            aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        }
+        log.info("Teacher {} updated document {} for local character {}", teacherId, docId, characterId);
+        return mapDocumentToResponse(saved);
+    }
+
+    // ── Dynamic Context-Character Linking ────────────────────────────────────
+
+    @Override
+    @Transactional
+    public void linkCharacterToContext(String characterId, String contextId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+        HistoricalContext context = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+
+        if (!character.getHistoricalContexts().contains(context)) {
+            character.getHistoricalContexts().add(context);
+            localCharacterRepo.save(character);
+            log.info("Teacher {} linked local character {} to context {}", teacher.getUid(), characterId, contextId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void unlinkCharacterFromContext(String characterId, String contextId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+        HistoricalContext context = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+
+        if (character.getHistoricalContexts().remove(context)) {
+            localCharacterRepo.save(character);
+            log.info("Teacher {} unlinked local character {} from context {}", teacher.getUid(), characterId, contextId);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LocalContentResponse> getCharacterContexts(String characterId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
+        if (character.getHistoricalContexts() == null) {
+            return List.of();
+        }
+        return character.getHistoricalContexts().stream()
+                .filter(ctx -> ctx.getDeletedAt() == null)
+                .map(this::mapContextToResponse)
+                .toList();
+    }
+
+    // ── School Trash & Restore ───────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<LocalContentResponse> getTrashedContexts(int page, int size, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
+        Page<HistoricalContext> p = localContextRepo.findTrashBySchool(schoolId, pageable);
+        return buildPage(p.map(this::mapContextToResponse));
+    }
+
+    @Override
+    @Transactional
+    public LocalContentResponse restoreLocalContext(String contextId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        HistoricalContext ctx = localContextRepo.findTrashedByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Context not found in trash"));
+        ctx.setDeletedAt(null);
+        ctx.setContentStatus(Boolean.TRUE.equals(ctx.getIsPublished()) ? ContentStatus.ACTIVE : ContentStatus.DRAFT);
+        ctx = localContextRepo.save(ctx);
+        log.info("Restored local context {} for school {}", contextId, schoolId);
+        return mapContextToResponse(ctx);
+    }
+
+    @Override
+    @Transactional
+    public void permanentDeleteLocalContext(String contextId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        HistoricalContext ctx = localContextRepo.findTrashedByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Context not found in trash"));
+        localContextRepo.delete(ctx);
+        log.info("Permanently deleted local context {} for school {}", contextId, schoolId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<LocalContentResponse> getTrashedCharacters(int page, int size, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
+        Page<Character> p = localCharacterRepo.findTrashBySchool(schoolId, pageable);
+        return buildPage(p.map(this::mapCharacterToResponse));
+    }
+
+    @Override
+    @Transactional
+    public LocalContentResponse restoreLocalCharacter(String characterId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        Character c = localCharacterRepo.findTrashedByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found in trash"));
+        c.setDeletedAt(null);
+        c.setContentStatus(Boolean.TRUE.equals(c.getIsPublished()) ? ContentStatus.ACTIVE : ContentStatus.DRAFT);
+        c = localCharacterRepo.save(c);
+        log.info("Restored local character {} for school {}", characterId, schoolId);
+        return mapCharacterToResponse(c);
+    }
+
+    @Override
+    @Transactional
+    public void permanentDeleteLocalCharacter(String characterId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        Character c = localCharacterRepo.findTrashedByIdAndSchool(UUID.fromString(characterId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found in trash"));
+        localCharacterRepo.delete(c);
+        log.info("Permanently deleted local character {} for school {}", characterId, schoolId);
+    }
+
+    // ── Local Quizzes & Questions ─────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<QuizStaffResponse> getLocalContextQuizzes(
+            String contextId, int page, int size, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
+        Page<com.historytalk.entity.quiz.Quiz> p = quizRepository.findByContextIdAndDeletedAtIsNull(UUID.fromString(contextId), pageable);
+        return buildPage(p.map(this::mapQuizToStaffResponse));
+    }
+
+    @Override
+    @Transactional
+    public QuizStaffResponse createLocalQuiz(
+            String contextId, CreateQuizRequest request, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        User teacher = resolveUser(principal);
+        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
+        request.setContextId(contextId);
+        return quizService.createQuiz(request, teacher.getUid());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QuizStaffResponse getLocalQuizById(String quizId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        var quiz = quizRepository.findById(UUID.fromString(quizId))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found"));
+        if (quiz.getHistoricalContext() == null || quiz.getHistoricalContext().getSchool() == null
+                || !quiz.getHistoricalContext().getSchool().getId().equals(schoolId)) {
+            throw new UnauthorizedException("You do not have access to this quiz");
+        }
+        return quizService.getQuizByIdForStaff(quizId);
+    }
+
+    @Override
+    @Transactional
+    public QuizStaffResponse updateLocalQuiz(String quizId, UpdateQuizRequest request, UserPrincipal principal) {
+        getLocalQuizById(quizId, principal); // validates school ownership
+        return quizService.updateQuiz(quizId, request);
+    }
+
+    @Override
+    @Transactional
+    public void deleteLocalQuiz(String quizId, UserPrincipal principal) {
+        getLocalQuizById(quizId, principal); // validates school ownership
+        quizService.softDeleteQuiz(quizId);
+    }
+
+    @Override
+    @Transactional
+    public QuizStaffResponse togglePublishLocalQuiz(String quizId, UserPrincipal principal) {
+        getLocalQuizById(quizId, principal); // validates school ownership
+        var quiz = quizRepository.findById(UUID.fromString(quizId))
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found"));
+        quiz.setIsPublished(!Boolean.TRUE.equals(quiz.getIsPublished()));
+        quizRepository.save(quiz);
+        return quizService.getQuizByIdForStaff(quizId);
+    }
+
+    @Override
+    @Transactional
+    public QuestionResponse addLocalQuizQuestion(String quizId, QuestionRequest request, UserPrincipal principal) {
+        getLocalQuizById(quizId, principal); // validates school ownership
+        return quizService.addQuestion(quizId, request);
+    }
+
+    @Override
+    @Transactional
+    public void updateLocalQuizQuestion(String quizId, String questionId, QuestionRequest request, UserPrincipal principal) {
+        getLocalQuizById(quizId, principal); // validates school ownership
+        quizService.updateQuestion(quizId, questionId, request);
+    }
+
+    @Override
+    @Transactional
+    public void deleteLocalQuizQuestion(String quizId, String questionId, UserPrincipal principal) {
+        getLocalQuizById(quizId, principal); // validates school ownership
+        quizService.deleteQuestion(quizId, questionId);
+    }
+
+    private QuizStaffResponse mapQuizToStaffResponse(com.historytalk.entity.quiz.Quiz quiz) {
+        return quizService.getQuizByIdForStaff(quiz.getQuizId().toString());
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // battleMap JSON helpers
+    // ────────────────────────────────────────────────────────────────────────
+
+    private static final java.util.Set<String> VALID_BATTLE_MAP_MODES = java.util.Set.of("custom", "image");
+
+    private static final java.util.Set<String> VALID_SYMBOL_TYPES = java.util.Set.of(
+            "arrow", "flank", "march", "retreat",
+            "infantry", "cavalry", "archer", "artillery", "armor",
+            "navy", "airforce", "headquarters", "fort", "camp",
+            "defenseLine", "stakes", "ambush", "clash", "victory",
+            "destroyed", "step", "label"
+    );
+
+    private String serializeBattleMap(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            String json = raw instanceof String s ? s : objectMapper.writeValueAsString(raw);
+            java.util.Map<String, Object> map =
+                    objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {});
+
+            Object version = map.get("version");
+            if (!Integer.valueOf(1).equals(version) && !"1".equals(String.valueOf(version))) {
+                throw new InvalidRequestException("battleMap.version phải là 1");
+            }
+
+            Object mode = map.get("mode");
+            if (mode == null || !VALID_BATTLE_MAP_MODES.contains(mode.toString())) {
+                throw new InvalidRequestException(
+                        "battleMap.mode phải là 'custom' hoặc 'image'. Nhận: " + mode);
+            }
+
+            Object imageUrl = map.get("imageUrl");
+            if (imageUrl == null || imageUrl.toString().isBlank()) {
+                throw new InvalidRequestException("battleMap.imageUrl không được để trống");
+            }
+
+            Object imageSource = map.get("imageSource");
+            if (imageSource != null && imageSource.toString().length() > 500) {
+                throw new InvalidRequestException("battleMap.imageSource tối đa 500 ký tự");
+            }
+
+            Object symbolsRaw = map.get("symbols");
+            if (symbolsRaw instanceof java.util.List<?> symbols) {
+                for (Object sym : symbols) {
+                    if (sym instanceof java.util.Map<?, ?> symMap) {
+                        Object symType = symMap.get("type");
+                        if (symType != null && !VALID_SYMBOL_TYPES.contains(symType.toString())) {
+                            throw new InvalidRequestException(
+                                    "battleMap.symbols[].type không hợp lệ: " + symType);
+                        }
+                    }
+                }
+            }
+
+            return json;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+            throw new InvalidRequestException("battleMap không phải JSON hợp lệ: " + ex.getMessage());
+        }
+    }
+
+    private Object deserializeJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Object>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+            log.warn("Could not deserialize battleMap: {}", ex.getMessage());
+            return json;
+        }
     }
 }

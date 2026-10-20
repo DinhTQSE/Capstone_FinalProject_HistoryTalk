@@ -102,4 +102,22 @@ public interface LocalContextRepository extends JpaRepository<HistoricalContext,
 
     @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school.id = :schoolId AND hc.isPublished = true AND hc.deletedAt IS NULL")
     long countPublishedBySchool(@Param("schoolId") UUID schoolId);
+
+    // ── Trash & Restore queries ───────────────────────────────────────────────
+
+    @Query("""
+            SELECT hc FROM HistoricalContext hc
+            WHERE hc.school.id = :schoolId
+              AND hc.deletedAt IS NOT NULL
+            ORDER BY hc.deletedAt DESC
+            """)
+    Page<HistoricalContext> findTrashBySchool(@Param("schoolId") UUID schoolId, Pageable pageable);
+
+    @Query("""
+            SELECT hc FROM HistoricalContext hc
+            WHERE hc.contextId = :id
+              AND hc.school.id = :schoolId
+              AND hc.deletedAt IS NOT NULL
+            """)
+    Optional<HistoricalContext> findTrashedByIdAndSchool(@Param("id") UUID id, @Param("schoolId") UUID schoolId);
 }

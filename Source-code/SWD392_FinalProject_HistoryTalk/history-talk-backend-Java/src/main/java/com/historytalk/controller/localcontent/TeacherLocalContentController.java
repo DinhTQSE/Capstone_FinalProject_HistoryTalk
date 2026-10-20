@@ -4,6 +4,12 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.historicalContext.CreateHistoricalContextDocumentRequest;
 import com.historytalk.dto.historicalContext.HistoricalContextDocumentResponse;
+import com.historytalk.dto.historicalContext.UpdateHistoricalContextDocumentRequest;
+import com.historytalk.dto.quiz.CreateQuizRequest;
+import com.historytalk.dto.quiz.QuestionRequest;
+import com.historytalk.dto.quiz.QuestionResponse;
+import com.historytalk.dto.quiz.QuizStaffResponse;
+import com.historytalk.dto.quiz.UpdateQuizRequest;
 import com.historytalk.dto.localcontent.*;
 import com.historytalk.dto.document.DocumentMediaMetadataResponse;
 import com.historytalk.dto.document.SignedViewUrlResponse;
@@ -25,6 +31,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -454,4 +461,237 @@ public class TeacherLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Media uploaded successfully"));
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // DOCUMENT UPDATES
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PutMapping("/contexts/{contextId}/documents/{docId}")
+    @Operation(summary = "Cập nhật tài liệu bối cảnh địa phương", description = "Chỉ người upload tài liệu mới sửa được.")
+    public ResponseEntity<ApiResponse<HistoricalContextDocumentResponse>> updateLocalContextDocument(
+            @PathVariable String contextId,
+            @PathVariable String docId,
+            @Valid @RequestBody UpdateHistoricalContextDocumentRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var doc = localContentService.updateLocalContextDocument(contextId, docId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(doc, "Document updated successfully"));
+    }
+
+    @PutMapping("/characters/{characterId}/documents/{docId}")
+    @Operation(summary = "Cập nhật tài liệu nhân vật địa phương", description = "Chỉ người upload tài liệu mới sửa được.")
+    public ResponseEntity<ApiResponse<HistoricalContextDocumentResponse>> updateLocalCharacterDocument(
+            @PathVariable String characterId,
+            @PathVariable String docId,
+            @Valid @RequestBody UpdateHistoricalContextDocumentRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var doc = localContentService.updateLocalCharacterDocument(characterId, docId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(doc, "Document updated successfully"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DYNAMIC CONTEXT-CHARACTER LINKING
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping("/characters/{characterId}/contexts/{contextId}")
+    @Operation(summary = "Liên kết nhân vật địa phương với bối cảnh lịch sử")
+    public ResponseEntity<ApiResponse<Void>> linkCharacterToContext(
+            @PathVariable String characterId,
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.linkCharacterToContext(characterId, contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Context linked to character successfully"));
+    }
+
+    @DeleteMapping("/characters/{characterId}/contexts/{contextId}")
+    @Operation(summary = "Hủy liên kết nhân vật địa phương với bối cảnh lịch sử")
+    public ResponseEntity<ApiResponse<Void>> unlinkCharacterFromContext(
+            @PathVariable String characterId,
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.unlinkCharacterFromContext(characterId, contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Context unlinked from character successfully"));
+    }
+
+    @GetMapping("/characters/{characterId}/contexts")
+    @Operation(summary = "Danh sách bối cảnh gắn với nhân vật địa phương")
+    public ResponseEntity<ApiResponse<List<LocalContentResponse>>> getCharacterContexts(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var list = localContentService.getCharacterContexts(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(list, "Character contexts retrieved successfully"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // TRASH & RESTORE (THÙNG RÁC NỘI BỘ TRƯỜNG)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @GetMapping("/trash/contexts")
+    @Operation(summary = "Danh sách bối cảnh trong thùng rác của trường")
+    public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getTrashedContexts(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.getTrashedContexts(page, size, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Trashed contexts retrieved successfully"));
+    }
+
+    @PatchMapping("/trash/contexts/{contextId}/restore")
+    @Operation(summary = "Khôi phục bối cảnh từ thùng rác")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> restoreLocalContext(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.restoreLocalContext(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Local context restored successfully"));
+    }
+
+    @DeleteMapping("/trash/contexts/{contextId}/permanent")
+    @Operation(summary = "Xóa vĩnh viễn bối cảnh khỏi thùng rác")
+    public ResponseEntity<ApiResponse<Void>> permanentDeleteLocalContext(
+            @PathVariable String contextId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.permanentDeleteLocalContext(contextId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Local context permanently deleted"));
+    }
+
+    @GetMapping("/trash/characters")
+    @Operation(summary = "Danh sách nhân vật trong thùng rác của trường")
+    public ResponseEntity<ApiResponse<PaginatedResponse<LocalContentResponse>>> getTrashedCharacters(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.getTrashedCharacters(page, size, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Trashed characters retrieved successfully"));
+    }
+
+    @PatchMapping("/trash/characters/{characterId}/restore")
+    @Operation(summary = "Khôi phục nhân vật từ thùng rác")
+    public ResponseEntity<ApiResponse<LocalContentResponse>> restoreLocalCharacter(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.restoreLocalCharacter(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Local character restored successfully"));
+    }
+
+    @DeleteMapping("/trash/characters/{characterId}/permanent")
+    @Operation(summary = "Xóa vĩnh viễn nhân vật khỏi thùng rác")
+    public ResponseEntity<ApiResponse<Void>> permanentDeleteLocalCharacter(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.permanentDeleteLocalCharacter(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Local character permanently deleted"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // LOCAL QUIZ & QUESTION BANK (TRẮC NGHIỆM BỐI CẢNH NỘI BỘ TRƯỜNG)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @GetMapping("/contexts/{contextId}/quizzes")
+    @Operation(summary = "Danh sách bài trắc nghiệm của bối cảnh nội bộ")
+    public ResponseEntity<ApiResponse<PaginatedResponse<QuizStaffResponse>>> getLocalContextQuizzes(
+            @PathVariable String contextId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.getLocalContextQuizzes(contextId, page, size, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Local quizzes retrieved successfully"));
+    }
+
+    @PostMapping("/contexts/{contextId}/quizzes")
+    @Operation(summary = "Tạo bài trắc nghiệm cho bối cảnh nội bộ")
+    public ResponseEntity<ApiResponse<QuizStaffResponse>> createLocalQuiz(
+            @PathVariable String contextId,
+            @Valid @RequestBody CreateQuizRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.createLocalQuiz(contextId, request, principal);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(res, "Local quiz created successfully"));
+    }
+
+    @GetMapping("/quizzes/{quizId}")
+    @Operation(summary = "Chi tiết bài trắc nghiệm nội bộ")
+    public ResponseEntity<ApiResponse<QuizStaffResponse>> getLocalQuizById(
+            @PathVariable String quizId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.getLocalQuizById(quizId, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Local quiz retrieved successfully"));
+    }
+
+    @PutMapping("/quizzes/{quizId}")
+    @Operation(summary = "Cập nhật bài trắc nghiệm nội bộ")
+    public ResponseEntity<ApiResponse<QuizStaffResponse>> updateLocalQuiz(
+            @PathVariable String quizId,
+            @Valid @RequestBody UpdateQuizRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.updateLocalQuiz(quizId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Local quiz updated successfully"));
+    }
+
+    @DeleteMapping("/quizzes/{quizId}")
+    @Operation(summary = "Xóa bài trắc nghiệm nội bộ (soft-delete)")
+    public ResponseEntity<ApiResponse<Void>> deleteLocalQuiz(
+            @PathVariable String quizId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.deleteLocalQuiz(quizId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Local quiz deleted successfully"));
+    }
+
+    @PatchMapping("/quizzes/{quizId}/publish")
+    @Operation(summary = "Bật/tắt công khai bài trắc nghiệm nội bộ")
+    public ResponseEntity<ApiResponse<QuizStaffResponse>> togglePublishLocalQuiz(
+            @PathVariable String quizId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.togglePublishLocalQuiz(quizId, principal);
+        return ResponseEntity.ok(ApiResponse.success(res, "Quiz publish status updated successfully"));
+    }
+
+    @PostMapping("/quizzes/{quizId}/questions")
+    @Operation(summary = "Thêm câu hỏi vào bài trắc nghiệm nội bộ")
+    public ResponseEntity<ApiResponse<QuestionResponse>> addLocalQuizQuestion(
+            @PathVariable String quizId,
+            @Valid @RequestBody QuestionRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var res = localContentService.addLocalQuizQuestion(quizId, request, principal);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(res, "Question added successfully"));
+    }
+
+    @PutMapping("/quizzes/{quizId}/questions/{questionId}")
+    @Operation(summary = "Cập nhật câu hỏi trong bài trắc nghiệm nội bộ")
+    public ResponseEntity<ApiResponse<Void>> updateLocalQuizQuestion(
+            @PathVariable String quizId,
+            @PathVariable String questionId,
+            @Valid @RequestBody QuestionRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.updateLocalQuizQuestion(quizId, questionId, request, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Question updated successfully"));
+    }
+
+    @DeleteMapping("/quizzes/{quizId}/questions/{questionId}")
+    @Operation(summary = "Xóa câu hỏi khỏi bài trắc nghiệm nội bộ")
+    public ResponseEntity<ApiResponse<Void>> deleteLocalQuizQuestion(
+            @PathVariable String quizId,
+            @PathVariable String questionId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        localContentService.deleteLocalQuizQuestion(quizId, questionId, principal);
+        return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
+    }
 }
