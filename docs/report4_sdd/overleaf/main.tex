@@ -163,17 +163,22 @@
 
 {\small
 \renewcommand{\arraystretch}{1.25}
-\begin{longtable}{|C{2.2cm}|C{1.8cm}|L{3.5cm}|L{6.8cm}|}
+\begin{longtable}{|C{2.2cm}|C{1.6cm}|L{3.5cm}|L{7.0cm}|}
 \hline
 \rowcolor{tableheader}
 \textbf{\textcolor{rocbrown}{Date}} & \textbf{\textcolor{rocbrown}{A* M, D}} & \textbf{\textcolor{rocbrown}{In charge}} & \textbf{\textcolor{rocbrown}{Change Description}} \\
 \hline
 \endhead
-30/06/2026 & A & \vn{Nguyễn Minh Trí} & Initial Software Design Document baseline (B2C core context, character, chat, and quiz models). \\
+30/06/2026 & A & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải} & Initial Software Design Document (SDD v1.0) baseline: System Architecture, Database ERD, and Detailed Design for B2C core modules. \\
 \hline
-14/09/2026 & M & \vn{Trần Quốc Dinh}, \vn{Đỗ Quốc Bảo} & Review 1 Update: Added decoupled Java Spring Boot + Python FastAPI microservices architecture, PostgreSQL 16 + Supabase PgVector schema, PayOS payment integration, and Gamification design. \\
+14/09/2026 & M & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải} & Review 1 SDD Update (v1.5): Added decoupled Java Spring Boot + Python FastAPI microservices architecture, PostgreSQL 16 + Supabase PgVector schema, PayOS payment integration, and Gamification design. \\
 \hline
-20/10/2026 & M & \vn{Nguyễn Minh Trí}, \vn{Trần Quốc Dinh}, \vn{Võ Đồng Đức Khải}, \vn{Nguyễn Công Thành}, \vn{Đỗ Quốc Bảo} & Review 2 SDD Release (Tag \texttt{review-2}): Expanded to 32-table B2B2C Multi-Tenant SaaS architecture (Schools, Classrooms, Student CSV Import, Daily Token Quota \& Boost Requests, Local Content Approval, Multi-Type Question Bank, Classroom Assignments, GeoJSON Battle Maps, Hybrid PDFBox/Tess4J OCR, State Machines, 5 Main Workflow Activity Diagrams, and Technology \& AI/RAG Declarations). \\
+20/10/2026 & M & \textbf{\vn{Trần Quốc Dinh}},\newline\textbf{\vn{Võ Đồng Đức Khải}}\newline\textit{(Main In-Charge)}\newline\& All Team Members & \textbf{Review 2 SDD Release (v2.0 -- Tag \texttt{review-2}):}\newline
+$\bullet$ \textbf{\vn{Trần Quốc Dinh} (SE196495):} Full 32-table Database ERD \& Data Dictionary (\texttt{V1}--\texttt{V38}), 9 Entity State Machines, B2C PayOS Billing \& Gamification design (\textbf{WF-05}).\newline
+$\bullet$ \textbf{\vn{Võ Đồng Đức Khải} (SE196405):} Multi-Type Quiz Question Bank (\texttt{MULTIPLE\_CHOICE}, \texttt{FILL\_IN\_BLANK}, \texttt{MATCHING}), Classroom Assignments \& Gradebook Analytics design (\textbf{WF-04}).\newline
+$\bullet$ \textbf{\vn{Nguyễn Minh Trí} (SE192645):} System Architecture, Multi-Tenant SaaS School Lifecycle, Daily Token Allowance \& Boost design (\textbf{WF-01}).\newline
+$\bullet$ \textbf{\vn{Nguyễn Công Thành} (SE196309):} Conversational AI Roleplay, Hybrid RAG Pipeline (\texttt{bge-m3} + Kaggle Reranker), PDFBox/Tess4J OCR \& AI/RAG 5-Item Specification (\textbf{WF-03}).\newline
+$\bullet$ \textbf{\vn{Đỗ Quốc Bảo} (SE193803):} Historical Context, Character, Interactive GeoJSON Battle Map \& Local Content Approval design (\textbf{WF-02}). \\
 \hline
  &  &  &  \\
 \hline
@@ -193,11 +198,11 @@
 \textbf{Student ID} & \textbf{Member Name} & \textbf{Role} & \textbf{Owned SDD Modules \& Main Workflows} \\
 \hline
 \endhead
+SE196495 & \textbf{\vn{Trần Quốc Dinh}} & Backend Developer \& DevOps \textit{(SDD Lead)} & Database ERD \& 32-Table Data Dictionary, State Machines, B2C PayOS Billing \& Gamification (\textbf{WF-05}) \\
+\hline
+SE196405 & \textbf{\vn{Võ Đồng Đức Khải}} & Backend Developer \& Tester \textit{(SDD Co-Lead)} & Multi-Type Quiz Question Bank, Classroom Assignments \& Gradebook Analytics (\textbf{WF-04}) \\
+\hline
 SE192645 & \vn{Nguyễn Minh Trí} & Leader \& AI Engineer \& Backend Dev & System Architecture, Multi-Tenant SaaS School Lifecycle, Daily Token Allowance \& Boost (\textbf{WF-01}) \\
-\hline
-SE196495 & \vn{Trần Quốc Dinh} & Backend Developer \& DevOps & Database ERD \& 32-Table Data Dictionary, State Machines, B2C PayOS Billing \& Gamification (\textbf{WF-05}) \\
-\hline
-SE196405 & \vn{Võ Đồng Đức Khải} & Backend Developer \& Tester & Multi-Type Quiz Question Bank, Classroom Assignments \& Gradebook Analytics (\textbf{WF-04}) \\
 \hline
 SE196309 & \vn{Nguyễn Công Thành} & Frontend Developer \& Tester & Conversational AI Roleplay, Hybrid RAG Pipeline (BGE-M3 + Kaggle Reranker), PDFBox/Tess4J OCR (\textbf{WF-03}) \\
 \hline
