@@ -19,16 +19,18 @@ public class StudentPersonalDashboardResponse {
     private String studentCode;
     private String schoolName;
 
-    // Số dư & Tiêu thụ Token
-    private int currentTokens;
-    private long tokensUsedToday;
+    // Hạn mức Chi tiêu Token theo Ngày (Pure Shared Pool + Daily Limit)
+    private int dailyTokenLimit;
+    private int dailyBonusTokens;
+    private int currentTokens;     // Hạn mức còn lại được phép tiêu hôm nay
+    private long tokensUsedToday;  // Số token đã tiêu hôm nay
 
     // Học tập Quiz
     private long totalQuizzesAttempted;
     private double averageScorePercentage;
     private List<RecentQuizItem> recentQuizzes;
 
-    // Danh sách lớp học đang theo
+    // Danh sách lớp học (ACTIVE hiện tại & ARCHIVED các năm trước)
     private List<EnrolledClassroomItem> enrolledClassrooms;
 
     // Bài tập sắp đến hạn (Upcoming Deadlines)
@@ -53,6 +55,8 @@ public class StudentPersonalDashboardResponse {
         private UUID classId;
         private String className;
         private String classCode;
+        private Integer academicYear;
+        private String status;
         private String teacherName;
     }
 

@@ -45,24 +45,24 @@
 
 ---
 
-### 🆔 US-SP7-15: Quỹ Token Chung (Shared Pool) & Tự động Cấp Hạn mức Ngày (Daily Token Limit)
+### 🆔 US-SP7-15: Quỹ Token Chung 100% (Pure Shared Pool) & Hạn mức Chi tiêu theo Ngày (Daily Spending Limit)
 * **Actor:** `System`, `School Student`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
 * **Bối cảnh vấn đề:**  
-  Nếu chia đứt token 1 lần cho cả năm vào ví từng học sinh: học sinh dùng nhiều sẽ tiêu sạch trong vài tuần đầu, còn học sinh ít dùng thì token bị "chết" (*stranded tokens*) trong tài khoản; học sinh vào trường giữa năm cũng không rõ lấy token từ đâu.
+  Nếu chia đứt token cả năm hoặc chia trước vào tài khoản từng học sinh rồi cuối ngày phải thu hồi: vừa phức tạp vừa dễ gây "giam token" (*stranded tokens*) của những học sinh không sử dụng.
 * **User Story:**  
-  Là **Hệ thống**, tôi muốn giữ toàn bộ token của trường trong **Quỹ chung (`School Shared Pool`)** và cấp cho mỗi học sinh theo **Hạn mức tiêu dùng theo ngày (`Daily Token Allowance`)**, tự động làm mới sau `00:00` mỗi ngày, để không bao giờ xảy ra tình trạng "token chết" hay tiêu lố sạch quỹ cả năm.
+  Là **Hệ thống**, tôi muốn giữ **100% token của trường nằm cố định trong Quỹ chung (`school.unallocatedTokenQuota`)** và quản lý học sinh bằng **Bộ đếm chi tiêu theo ngày (`dailyTokensUsed`) so với Hạn mức ngày (`dailyTokenLimit`)** — học sinh dùng câu nào thì trừ trực tiếp vào Quỹ trường câu đó, không chia trước vào ví cá nhân và không cần thu hồi cuối ngày.
 * **Acceptance Criteria (AC):**
-  1. **Mô hình Quỹ chung + Hạn mức Ngày:**
-     * Không chia đứt token cả năm khi import học sinh.
-     * Học sinh vào đầu năm hay bổ sung vào giữa năm đều tự động hưởng định mức ngày (`dailyTokenLimit`, mặc định `1.000 token/học sinh/ngày`).
-  2. **Cơ chế Cấp & Khấu trừ theo Ngày (Lazy Daily Reset):**
-     * Mỗi ngày, khi học sinh thực hiện phiên tương tác AI đầu tiên trong ngày (kiểm tra `user.lastTokenResetAt < today.atStartOfDay()`):
-       * Nếu `user.token` của ngày hôm trước còn dư chưa dùng hết: Thu hồi phần dư đó trả về Quỹ chung của trường (`school.unallocatedTokenQuota`) để **không bị mất/chết token**.
-       * Rút tối đa `dailyTokenLimit` (ví dụ `1.000 token`, hoặc phần còn lại nếu quỹ trường còn ít hơn) từ `school.unallocatedTokenQuota` nạp vào `user.token` cho ngày hôm nay và cập nhật `user.lastTokenResetAt = now()`.
-     * Học sinh nào **không sử dụng AI trong ngày** thì không rút token khỏi Quỹ trường $\rightarrow$ Tiết kiệm 100% token cho nhà trường.
+  1. **Mô hình 100% Quỹ chung + Hạn mức Chi tiêu Ngày (Direct Pool Deduction):**
+     * Toàn bộ token của trường luôn nằm tại `school.unallocatedTokenQuota`. Không bao giờ rút trước token từ Quỹ trường bỏ vào ví học sinh đầu ngày.
+     * Mỗi học sinh có hạn mức được phép tiêu tối đa trong ngày (`dailyTokenLimit`, mặc định `1.000 token/học sinh/ngày` + `dailyBonusTokens` nếu được giáo viên duyệt thêm trong ngày).
+  2. **Cơ chế Kiểm tra & Khấu trừ trực tiếp (Pay-as-you-go):**
+     * Khi bước sang ngày mới (`user.lastTokenResetAt < today.atStartOfDay()`), hệ thống chỉ reset bộ đếm `user.dailyTokensUsed = 0` và `user.dailyBonusTokens = 0` (hoàn toàn không động chạm hay rút trước từ `school.unallocatedTokenQuota`).
+     * Mỗi khi học sinh chat AI tiêu tốn `totalToken`:
+       * Hệ thống trừ trực tiếp `totalToken` vào `school.unallocatedTokenQuota` và cộng `totalToken` vào bộ đếm `user.dailyTokensUsed`.
+     * Học sinh nào không chat AI hoặc dùng ít hơn hạn mức ngày thì phần không dùng tới vốn dĩ vẫn nằm nguyên 100% trong Quỹ chung của trường $\rightarrow$ **Không bao giờ có "token chết" và không cần thu hồi cuối ngày hay cuối năm**.
   3. **Chống xài lố trong ngày:**
-     * Khi học sinh tiêu hết số token trong ngày (`user.token <= 0`), hệ thống chỉ khóa tính năng Chat AI của học sinh đó trong phần còn lại của ngày; các tính năng làm Quiz, đọc bài, nộp bài tập vẫn dùng bình thường. Qua `00:00` ngày hôm sau tự động có lại hạn mức ngày mới.
+     * Khi `user.dailyTokensUsed >= effectiveDailyLimit` (hoặc `school.unallocatedTokenQuota <= 0`), hệ thống chỉ khóa tính năng Chat AI của học sinh đó trong phần còn lại của ngày (`403 AI_QUOTA_EXCEEDED`); các tính năng làm Quiz, đọc bài, nộp bài tập vẫn dùng bình thường. Qua `00:00` ngày hôm sau bộ đếm `dailyTokensUsed` tự động về `0`.
 
 ---
 
@@ -85,20 +85,20 @@
 
 ---
 
-### 🆔 US-SP7-17: Luồng Học sinh Xin thêm Token trong ngày & Giáo viên / School Admin Duyệt cấp nhanh
+### 🆔 US-SP7-17: Luồng Học sinh Xin thêm Hạn mức Token trong ngày & Giáo viên / School Admin Duyệt cấp nhanh
 * **Actor:** `School Student`, `Teacher`, `School Admin`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
 * **Bối cảnh vấn đề:**  
   Khi học sinh tích cực học tập hoặc làm bài tập AI chạm trần hạn mức ngày thì không có luồng xin cấp thêm, làm gián đoạn việc học.
 * **User Story:**  
-  Là **Học sinh**, khi chạm hạn mức token trong ngày, tôi muốn gửi yêu cầu **Xin thêm Token (Daily Quota Boost)** kèm lý do để **Giáo viên phụ trách lớp** (hoặc **School Admin**) duyệt cấp bổ sung ngay trong ngày.
+  Là **Học sinh**, khi chạm hạn mức token trong ngày, tôi muốn gửi yêu cầu **Xin thêm Hạn mức Token (Daily Quota Boost)** kèm lý do để **Giáo viên phụ trách lớp** (hoặc **School Admin**) duyệt mở thêm hạn mức chi tiêu ngay trong ngày.
 * **Acceptance Criteria (AC):**
   1. **Học sinh gửi yêu cầu (`POST /api/v1/student/token-requests`):**
      * Chỉ cho phép gửi khi học sinh đang thuộc lớp `ACTIVE` và chưa có yêu cầu nào đang ở trạng thái `PENDING` trong cùng ngày.
      * Payload gồm: `requestedTokens` (mặc định gợi ý `1.000` hoặc tối đa `3.000 token`), `reason` (lý do xin thêm).
   2. **Giáo viên / School Admin duyệt yêu cầu (`PUT /api/v1/teacher/token-requests/{requestId}/review`):**
      * Giáo viên chỉ được duyệt yêu cầu của học sinh thuộc lớp do chính mình phụ trách (`classroom.teacher_id == teacher.uid`); School Admin duyệt được mọi yêu cầu trong trường.
-     * Khi duyệt (`APPROVED`): Trừ trực tiếp số token được duyệt từ `school.unallocatedTokenQuota` và cộng ngay vào `student.token` để học sinh tiếp tục chat AI ngay lập tức.
+     * Khi duyệt (`APPROVED`): Cộng số lượng `approvedTokens` vào hạn mức cộng thêm trong ngày của học sinh (`student.dailyBonusTokens += approvedTokens`). Token thực tế chỉ bị trừ từ `school.unallocatedTokenQuota` khi học sinh thực sự chat với AI.
      * Khi từ chối (`REJECTED`): Lưu lý do phản hồi `reviewNote`.
 
 ---
@@ -107,7 +107,7 @@
 * **Actor:** `School Admin`
 * **Phụ trách:** 🔵 Trần Quốc Dinh (`DinhTQ`)
 * **Bối cảnh vấn đề:**  
-  Chưa định nghĩa vòng đời qua các năm học: khi học sinh lên lớp, đổi lớp thì lớp cũ xử lý sao? Khi học sinh tốt nghiệp ra trường hoặc chuyển trường đi nơi khác thì tài khoản và token xử lý thế nào?
+  Chưa định nghĩa vòng đời qua các năm học: khi học sinh lên lớp, đổi lớp thì lớp cũ xử lý sao? Khi học sinh tốt nghiệp ra trường hoặc chuyển trường đi nơi khác thì tài khoản xử lý thế nào?
 * **User Story:**  
   Là **School Admin**, tôi muốn lưu trữ (`ARCHIVED`) các lớp của năm học cũ để xếp học sinh lên lớp/đổi lớp trong năm học mới trên cùng tài khoản, đồng thời **vô hiệu hóa hoàn toàn (`DEACTIVATED` — khóa đăng nhập)** đối với tài khoản của học sinh đã ra trường hoặc chuyển trường.
 * **Acceptance Criteria (AC):**
@@ -117,6 +117,6 @@
      * Sang năm học mới (`01/09`), học sinh được gán/import vào lớp mới của `academicYear` mới. Quy tắc: Tại một thời điểm, mỗi học sinh chỉ thuộc **tối đa 1 lớp đang `ACTIVE`**, nhưng có thể có nhiều lớp lịch sử ở trạng thái `ARCHIVED`.
   2. **Ra trường (Tốt nghiệp Khối 12) hoặc Chuyển trường (Graduation / Transfer Out $\rightarrow$ Deactivate Account):**
      * Khi học sinh ra trường hoặc chuyển trường (`PUT /api/v1/school-admin/students/{uid}/deactivate` hoặc đánh dấu tốt nghiệp hàng loạt khối 12):
-       * Thu hồi toàn bộ số `user.token` còn dư trong ngày của học sinh đó trả về Quỹ chung của trường (`school.unallocatedTokenQuota`), đặt `user.token = 0`.
-       * Cập nhật trạng thái tài khoản học sinh sang **`DEACTIVATED`** (`accountStatus = DEACTIVATED` / `deletedAt = now()`).
+       * Vì token nằm 100% ở Quỹ chung của trường nên không có token nào bị kẹt lại trong tài khoản học sinh.
+       * Cập nhật trạng thái tài khoản học sinh sang **`DEACTIVATED`** (`accountStatus = DEACTIVATED`, `deletedAt = now()`).
        * **Khóa đăng nhập hoàn toàn:** Tài khoản học sinh đã `DEACTIVATED` không thể đăng nhập (`POST /api/v1/auth/login` trả về `403 ACCOUNT_DEACTIVATED`) và mọi JWT cũ bị từ chối tại `JwtAuthenticationFilter`.

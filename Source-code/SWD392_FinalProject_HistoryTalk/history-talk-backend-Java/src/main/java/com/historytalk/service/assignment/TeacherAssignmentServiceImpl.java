@@ -23,6 +23,7 @@ import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -71,7 +72,11 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
 
         int minRequirement = request.getMinRequirement() != null && request.getMinRequirement() > 0
                 ? request.getMinRequirement()
-                : (request.getAssignmentType() == AssignmentType.AI_CHAT_ROLEPLAY ? 5 : 180);
+                : switch (request.getAssignmentType()) {
+                    case AI_CHAT_ROLEPLAY -> 5;
+                    case QUIZ_TEST -> 1;
+                    case CONTEXT_READING -> 180;
+                };
 
         User teacher = userRepository.findById(teacherUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin Giáo viên"));
@@ -378,14 +383,15 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
     }
 
     private UserPrincipal resolvePrincipal(UserPrincipal principal) {
-        if (principal != null) {
+        if (principal != null && principal.getSchoolId() != null) {
             return principal;
         }
-        org.springframework.security.core.Authentication auth =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof UserPrincipal up) {
-            return up;
+        String userId = SecurityUtils.getUserId();
+        if (userId == null) {
+            throw new AccessDeniedException("Chưa xác thực hoặc token không hợp lệ");
         }
-        throw new AccessDeniedException("Chưa xác thực hoặc token không hợp lệ");
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new AccessDeniedException("Không tìm thấy thông tin tài khoản người dùng"));
+        return new UserPrincipal(user);
     }
 }

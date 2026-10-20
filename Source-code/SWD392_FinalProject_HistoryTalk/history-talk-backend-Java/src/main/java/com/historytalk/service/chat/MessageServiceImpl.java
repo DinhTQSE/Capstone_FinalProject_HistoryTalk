@@ -45,6 +45,7 @@ public class MessageServiceImpl implements MessageService {
     private final ObjectMapper objectMapper;
     private final com.historytalk.repository.UserRepository userRepository;
     private final com.historytalk.service.gamification.GamificationService gamificationService;
+    private final com.historytalk.service.school.token.DailyTokenAllowanceService dailyTokenAllowanceService;
 
     // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
@@ -87,9 +88,7 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
 
-        if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER && session.getUser().getToken() <= 0) {
-            throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
-        }
+        verifyUserTokenAndSubscriptionBeforeChat(session.getUser());
 
         // Load existing history BEFORE saving new user message
         List<Message> existingMessages = messageRepository
@@ -167,10 +166,20 @@ public class MessageServiceImpl implements MessageService {
         Message savedAssistantMsg = messageRepository.save(assistantMsg);
 
         int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
-        if (totalToken != null && totalToken > 0 && session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
-            userRepository.deductTokens(session.getUser().getUid(), totalToken);
-            remainingTokens = Math.max(0, remainingTokens - totalToken);
-            session.getUser().setToken(remainingTokens);
+        if (totalToken != null && totalToken > 0) {
+            if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
+                userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                remainingTokens = Math.max(0, remainingTokens - totalToken);
+                session.getUser().setToken(remainingTokens);
+            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+                if (dailyTokenAllowanceService != null) {
+                    remainingTokens = dailyTokenAllowanceService.recordStudentTokenUsage(session.getUser(), totalToken);
+                } else {
+                    userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                    remainingTokens = Math.max(0, remainingTokens - totalToken);
+                    session.getUser().setToken(remainingTokens);
+                }
+            }
         }
 
         // Update session lastMessageAt
@@ -213,9 +222,7 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
 
-        if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER && session.getUser().getToken() <= 0) {
-            throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
-        }
+        verifyUserTokenAndSubscriptionBeforeChat(session.getUser());
 
         // Save user message immediately
         Message userMsg = Message.builder()
@@ -320,10 +327,20 @@ public class MessageServiceImpl implements MessageService {
 
                         int totalToken = promptToken.get() + completionToken.get();
                         int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
-                        if (totalToken > 0 && session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
-                            userRepository.deductTokens(session.getUser().getUid(), totalToken);
-                            remainingTokens = Math.max(0, remainingTokens - totalToken);
-                            session.getUser().setToken(remainingTokens);
+                        if (totalToken > 0) {
+                            if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
+                                userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                                remainingTokens = Math.max(0, remainingTokens - totalToken);
+                                session.getUser().setToken(remainingTokens);
+                            } else if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+                                if (dailyTokenAllowanceService != null) {
+                                    remainingTokens = dailyTokenAllowanceService.recordStudentTokenUsage(session.getUser(), totalToken);
+                                } else {
+                                    userRepository.deductTokens(session.getUser().getUid(), totalToken);
+                                    remainingTokens = Math.max(0, remainingTokens - totalToken);
+                                    session.getUser().setToken(remainingTokens);
+                                }
+                            }
                         }
 
                         session.setLastMessageAt(LocalDateTime.now());
@@ -363,6 +380,26 @@ public class MessageServiceImpl implements MessageService {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    private void verifyUserTokenAndSubscriptionBeforeChat(com.historytalk.entity.user.User user) {
+        if (user == null) {
+            return;
+        }
+        if (user.getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {
+            if (user.getToken() == null || user.getToken() <= 0) {
+                throw new IllegalArgumentException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
+            }
+        } else if (user.getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_STUDENT) {
+            if (dailyTokenAllowanceService != null) {
+                dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(user);
+            }
+        } else if (user.getRole() == com.historytalk.entity.enums.UserRole.TEACHER
+                || user.getRole() == com.historytalk.entity.enums.UserRole.SCHOOL_ADMIN) {
+            if (dailyTokenAllowanceService != null) {
+                dailyTokenAllowanceService.verifySchoolSubscriptionForStaff(user);
+            }
+        }
+    }
 
     private MessageResponse mapToMessageResponse(Message message) {
         return MessageResponse.builder()

@@ -146,9 +146,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new UnauthorizedException("Email hoặc mật khẩu không hợp lệ"));
 
-        // Reject soft-deleted (deactivated) users
-        if (user.getDeletedAt() != null) {
-            throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
+        // Reject soft-deleted or deactivated (graduated/transferred) users
+        if (user.getDeletedAt() != null
+                || user.getAccountStatus() == com.historytalk.entity.enums.AccountStatus.DEACTIVATED) {
+            throw new UnauthorizedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa");
         }
 
         UserPrincipal principal = new UserPrincipal(user);

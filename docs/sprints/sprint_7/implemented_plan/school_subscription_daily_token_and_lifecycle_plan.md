@@ -16,18 +16,18 @@ Kế hoạch này giải quyết triệt để 5 bài toán cốt lõi của mô
    * Gia hạn trong tháng 5, kích hoạt từ `01/09` năm học kế tiếp (bảo lưu tối đa 20% token dư).
    * **Hết hạn gói (`EXPIRED`):** Khóa toàn bộ nền tảng của trường (`SchoolSubscriptionGuardInterceptor`).
    * **Còn hạn nhưng Hết Token:** Chỉ khóa tính năng AI, các tính năng khác (Quiz, Tài liệu, Bài tập, Dashboard) dùng bình thường.
-2. **`US-SP7-15` (Quỹ Token Chung & Hạn mức Ngày - Daily Allowance):**
-   * Bỏ cơ chế cấp đứt cả năm. Toàn bộ token nằm trong `school.unallocated_token_quota`.
-   * Tự động hoàn trả token dư của ngày cũ về Quỹ trường và cấp hạn mức ngày mới (`daily_token_limit`, mặc định `1.000 token/ngày`) khi học sinh dùng AI trong ngày mới.
+2. **`US-SP7-15` (100% Quỹ Token Chung & Hạn mức Chi tiêu Ngày - Pure Shared Pool & Daily Spending Limit):**
+   * Bỏ cơ chế cấp đứt cả năm hoặc chia trước vào tài khoản cá nhân rồi thu hồi. Toàn bộ token luôn nằm trong `school.unallocated_token_quota`.
+   * Học sinh dùng câu nào trừ trực tiếp vào `school.unallocated_token_quota` câu đó và tăng bộ đếm `user.daily_tokens_used` (giới hạn bởi `daily_token_limit`, mặc định `1.000 token/ngày`). Sang ngày mới bộ đếm tự động về `0`.
 3. **`US-SP7-16` (Cấu hình Định mức Ngày & Gợi ý Gói Enterprise):**
    * Cung cấp thông tin định mức gợi ý (`EnterprisePackage`: Small ~350 HS, Medium ~1.500 HS, Large ~3.500 HS).
    * API cho School Admin cấu hình `default_daily_student_quota` toàn trường hoặc `daily_token_quota` riêng cho từng lớp/khối.
-4. **`US-SP7-17` (Luồng Xin & Duyệt thêm Token trong ngày):**
-   * Học sinh tạo yêu cầu xin thêm token trong ngày (`token_boost_request`).
-   * Giáo viên phụ trách lớp hoặc School Admin duyệt cấp nhanh từ Quỹ trường vào `user.token`.
+4. **`US-SP7-17` (Luồng Xin & Duyệt thêm Hạn mức Token trong ngày):**
+   * Học sinh tạo yêu cầu xin thêm hạn mức token trong ngày (`token_boost_request`).
+   * Giáo viên phụ trách lớp hoặc School Admin duyệt cộng thêm vào `user.daily_bonus_tokens` trong ngày (dùng tới đâu mới trừ từ Quỹ trường tới đó).
 5. **`US-SP7-18` (Vòng đời Năm học: Lên lớp `ARCHIVED` & Ra trường/Chuyển trường `DEACTIVATED`):**
    * Chuyển các lớp năm cũ sang `ARCHIVED` để học sinh vào lớp `ACTIVE` của năm học mới (`academic_year` mới) mà giữ nguyên tài khoản.
-   * Khi học sinh ra trường hoặc chuyển trường: Thu hồi token dư trong ngày về Quỹ trường và chuyển tài khoản sang **`DEACTIVATED` (Khóa đăng nhập hoàn toàn)**.
+   * Khi học sinh ra trường hoặc chuyển trường: Chuyển tài khoản sang **`DEACTIVATED` (Khóa đăng nhập hoàn toàn)**.
 
 ---
 
@@ -48,10 +48,12 @@ ALTER TABLE school
 ALTER TABLE classroom
     ADD COLUMN IF NOT EXISTS daily_token_quota INTEGER;
 
--- 3. Mở rộng bảng "user" để quản lý trạng thái DEACTIVATED khi học sinh ra trường / chuyển trường
+-- 3. Mở rộng bảng "user" để quản lý trạng thái DEACTIVATED và bộ đếm hạn mức ngày
 ALTER TABLE "user"
     ADD COLUMN IF NOT EXISTS account_status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
-    ADD COLUMN IF NOT EXISTS deactivated_reason VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS deactivated_reason VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS daily_tokens_used INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS daily_bonus_tokens INTEGER NOT NULL DEFAULT 0;
 
 -- 4. Tạo bảng token_boost_request cho luồng học sinh xin thêm token trong ngày (US-SP7-17)
 CREATE TABLE IF NOT EXISTS token_boost_request (

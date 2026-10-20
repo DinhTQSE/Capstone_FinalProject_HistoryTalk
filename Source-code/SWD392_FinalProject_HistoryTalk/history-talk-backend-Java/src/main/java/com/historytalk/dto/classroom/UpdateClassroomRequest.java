@@ -1,5 +1,6 @@
 package com.historytalk.dto.classroom;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,9 @@ public class UpdateClassroomRequest {
 
     @Size(max = 500, message = "Mô tả tối đa 500 ký tự")
     private String description;
+
+    @Min(value = 0, message = "Hạn mức token hàng ngày không được âm")
+    private Integer dailyTokenQuota;
 
     private String status;
 }

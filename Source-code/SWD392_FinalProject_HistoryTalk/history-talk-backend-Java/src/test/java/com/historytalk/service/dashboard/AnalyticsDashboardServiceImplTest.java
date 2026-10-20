@@ -72,6 +72,9 @@ class AnalyticsDashboardServiceImplTest {
     @Mock
     private UserTierRepository userTierRepository;
 
+    @Mock
+    private com.historytalk.repository.school.TokenBoostRequestRepository tokenBoostRequestRepository;
+
     @InjectMocks
     private AnalyticsDashboardServiceImpl dashboardService;
 
@@ -91,8 +94,15 @@ class AnalyticsDashboardServiceImplTest {
                 .id(schoolId)
                 .name("THPT Chu Văn An")
                 .schoolCode("CVA")
+                .packageType(com.historytalk.entity.enums.EnterprisePackage.ENTERPRISE_SMALL)
+                .status(com.historytalk.entity.enums.SchoolStatus.ACTIVE)
+                .subscriptionStartDate(java.time.LocalDate.of(2025, 9, 1))
+                .subscriptionEndDate(java.time.LocalDate.of(2026, 5, 31))
+                .renewedForNextYear(true)
+                .nextPackageType(com.historytalk.entity.enums.EnterprisePackage.ENTERPRISE_MEDIUM)
                 .totalSchoolTokenQuota(100000)
                 .unallocatedTokenQuota(40000)
+                .defaultDailyStudentQuota(1000)
                 .build();
 
         teacherUser = User.builder()
@@ -110,7 +120,10 @@ class AnalyticsDashboardServiceImplTest {
                 .studentCode("HS1001")
                 .role(UserRole.SCHOOL_STUDENT)
                 .school(school)
-                .token(5000)
+                .dailyTokensUsed(300)
+                .dailyBonusTokens(500)
+                .lastTokenResetAt(LocalDateTime.now())
+                .token(1200)
                 .build();
 
         customerUser = User.builder()
@@ -127,13 +140,15 @@ class AnalyticsDashboardServiceImplTest {
     }
 
     @Test
-    @DisplayName("US-SP6-06: getSchoolAdminDashboard returns accurate school statistics and token consumption")
+    @DisplayName("US-SP6-06: getSchoolAdminDashboard returns accurate school statistics, subscription cycle, and shared token pool")
     void getSchoolAdminDashboard_Success() {
         when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
         when(classroomRepository.countBySchoolIdAndDeletedAtIsNull(schoolId)).thenReturn(12L);
         when(userRepository.countBySchoolIdAndRole(schoolId, UserRole.TEACHER)).thenReturn(25L);
         when(userRepository.countBySchoolIdAndRole(schoolId, UserRole.SCHOOL_STUDENT)).thenReturn(450L);
         when(messageRepository.sumTokensUsedBySchoolStudents(schoolId)).thenReturn(15000L);
+        when(tokenBoostRequestRepository.countBySchool_IdAndStatus(
+                schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)).thenReturn(3L);
 
         SchoolAdminDashboardResponse response = dashboardService.getSchoolAdminDashboard(schoolId);
 
@@ -141,6 +156,12 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(schoolId, response.getSchoolId());
         assertEquals("THPT Chu Văn An", response.getSchoolName());
         assertEquals("CVA", response.getSchoolCode());
+        assertEquals(com.historytalk.entity.enums.EnterprisePackage.ENTERPRISE_SMALL, response.getPackageType());
+        assertEquals(350, response.getRecommendedStudents());
+        assertEquals(com.historytalk.entity.enums.SchoolStatus.ACTIVE, response.getStatus());
+        assertEquals(java.time.LocalDate.of(2025, 9, 1), response.getSubscriptionStartDate());
+        assertEquals(java.time.LocalDate.of(2026, 5, 31), response.getSubscriptionEndDate());
+        assertTrue(response.getRenewedForNextYear());
         assertEquals(12L, response.getTotalClassrooms());
         assertEquals(25L, response.getTotalTeachers());
         assertEquals(450L, response.getTotalStudents());
@@ -148,6 +169,8 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(40000, response.getUnallocatedTokenQuota());
         assertEquals(60000, response.getAllocatedTokens());
         assertEquals(15000L, response.getTokensUsedByStudents());
+        assertEquals(1000, response.getDefaultDailyStudentQuota());
+        assertEquals(3L, response.getPendingTokenBoostRequests());
     }
 
     @Test
@@ -161,7 +184,7 @@ class AnalyticsDashboardServiceImplTest {
     }
 
     @Test
-    @DisplayName("US-SP6-07: getTeacherClassroomDashboard returns classroom metrics and student analytics")
+    @DisplayName("US-SP6-07: getTeacherClassroomDashboard returns classroom metrics, daily token limit, and student analytics")
     void getTeacherClassroomDashboard_Success() {
         UUID classId = UUID.randomUUID();
         Classroom classroom = Classroom.builder()
@@ -172,10 +195,14 @@ class AnalyticsDashboardServiceImplTest {
                 .classCode("CVA-10A1-2026")
                 .gradeLevel(10)
                 .academicYear(2026)
+                .status("ACTIVE")
+                .dailyTokenQuota(1500)
                 .build();
 
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classId, schoolId))
                 .thenReturn(Optional.of(classroom));
+        when(tokenBoostRequestRepository.countByClassroom_IdAndStatus(
+                classId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)).thenReturn(2L);
         when(classStudentRepository.findEnrolledStudentUids(classId))
                 .thenReturn(List.of(studentUser.getUid()));
         when(userRepository.findAllById(List.of(studentUser.getUid())))
@@ -195,6 +222,9 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(classId, response.getClassId());
         assertEquals("10A1", response.getClassName());
         assertEquals("CVA-10A1-2026", response.getClassCode());
+        assertEquals("ACTIVE", response.getStatus());
+        assertEquals(1500, response.getDailyTokenLimit());
+        assertEquals(2L, response.getPendingTokenBoostRequests());
         assertEquals(1L, response.getStudentCount());
         assertEquals(42L, response.getTotalAiMessages());
         assertEquals(42.0, response.getAvgAiMessagesPerStudent());
@@ -204,6 +234,10 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(studentUser.getUid(), studentItem.getStudentId());
         assertEquals("Trần Quốc Dinh", studentItem.getFullName());
         assertEquals("HS1001", studentItem.getStudentCode());
+        assertEquals(1500, studentItem.getDailyTokenLimit());
+        assertEquals(500, studentItem.getDailyBonusTokens());
+        assertEquals(300, studentItem.getDailyTokensUsed());
+        assertEquals(1700, studentItem.getCurrentTokens());
         assertEquals(5L, studentItem.getQuizzesAttempted());
         assertEquals(85.5, studentItem.getAverageScorePercentage());
         assertEquals(42L, studentItem.getAiMessagesCount());
@@ -228,7 +262,7 @@ class AnalyticsDashboardServiceImplTest {
     }
 
     @Test
-    @DisplayName("US-SP6-08: getStudentDashboard returns student tokens, quiz progress, and enrolled classrooms")
+    @DisplayName("US-SP6-08: getStudentDashboard returns student daily token allowance, quiz progress, and enrolled classrooms")
     void getStudentDashboard_Success() {
         UUID studentUid = studentUser.getUid();
         when(userRepository.findById(studentUid)).thenReturn(Optional.of(studentUser));
@@ -251,6 +285,9 @@ class AnalyticsDashboardServiceImplTest {
                 .id(UUID.randomUUID())
                 .className("10A1")
                 .classCode("CVA-10A1-2026")
+                .academicYear(2026)
+                .status("ACTIVE")
+                .dailyTokenQuota(1000)
                 .teacher(teacherUser)
                 .build();
         when(classStudentRepository.findClassroomsByStudentUid(studentUid)).thenReturn(List.of(classroom));
@@ -262,7 +299,9 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals("Trần Quốc Dinh", response.getStudentName());
         assertEquals("HS1001", response.getStudentCode());
         assertEquals("THPT Chu Văn An", response.getSchoolName());
-        assertEquals(5000, response.getCurrentTokens());
+        assertEquals(1000, response.getDailyTokenLimit());
+        assertEquals(500, response.getDailyBonusTokens());
+        assertEquals(1200, response.getCurrentTokens());
         assertEquals(300L, response.getTokensUsedToday());
         assertEquals(8L, response.getTotalQuizzesAttempted());
         assertEquals(90.0, response.getAverageScorePercentage());
@@ -270,6 +309,8 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals("Chiến dịch Điện Biên Phủ", response.getRecentQuizzes().get(0).getQuizTitle());
         assertEquals(1, response.getEnrolledClassrooms().size());
         assertEquals("10A1", response.getEnrolledClassrooms().get(0).getClassName());
+        assertEquals(2026, response.getEnrolledClassrooms().get(0).getAcademicYear());
+        assertEquals("ACTIVE", response.getEnrolledClassrooms().get(0).getStatus());
         assertEquals("Nguyễn Thị Mai", response.getEnrolledClassrooms().get(0).getTeacherName());
     }
 
@@ -335,6 +376,7 @@ class AnalyticsDashboardServiceImplTest {
     @DisplayName("US-SP6-10: getSystemAdminDashboard returns JVM metrics, platform totals, and top wrong questions")
     void getSystemAdminDashboard_Success() {
         when(schoolRepository.sumTotalSchoolTokenQuota()).thenReturn(500000L);
+        when(schoolRepository.sumUnallocatedSchoolTokenQuota()).thenReturn(270000L);
         when(messageRepository.sumTokensUsedByCustomerUsers()).thenReturn(120000L);
         when(messageRepository.sumAllTokensUsed()).thenReturn(350000L);
 
@@ -349,6 +391,8 @@ class AnalyticsDashboardServiceImplTest {
                 .thenReturn(List.of(wrongQ));
 
         when(schoolRepository.count()).thenReturn(15L);
+        when(schoolRepository.countByStatusAndDeletedAtIsNull(com.historytalk.entity.enums.SchoolStatus.ACTIVE)).thenReturn(13L);
+        when(schoolRepository.countByStatusAndDeletedAtIsNull(com.historytalk.entity.enums.SchoolStatus.EXPIRED)).thenReturn(2L);
         when(userRepository.countAllUsers()).thenReturn(2500L);
         when(quizRepository.count()).thenReturn(80L);
         when(paymentOrderRepository.sumAmountByStatus(PaymentOrderStatus.PAID)).thenReturn(45000000L);
@@ -361,6 +405,8 @@ class AnalyticsDashboardServiceImplTest {
         assertTrue(response.getJvmHealth().getActiveThreadCount() > 0);
 
         assertEquals(500000L, response.getTokenSummary().getTotalTokensB2bAllocated());
+        assertEquals(270000L, response.getTokenSummary().getTotalTokensB2bRemainingInPools());
+        assertEquals(230000L, response.getTokenSummary().getTotalTokensB2bConsumed());
         assertEquals(120000L, response.getTokenSummary().getTotalTokensB2cConsumed());
         assertEquals(350000L, response.getTokenSummary().getTotalTokensSystemConsumed());
 
@@ -369,6 +415,8 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(90.0, response.getTopWrongQuestions().get(0).getWrongRate());
 
         assertEquals(15L, response.getPlatformOverview().getTotalSchools());
+        assertEquals(13L, response.getPlatformOverview().getActiveSchools());
+        assertEquals(2L, response.getPlatformOverview().getExpiredSchools());
         assertEquals(2500L, response.getPlatformOverview().getTotalUsers());
         assertEquals(80L, response.getPlatformOverview().getTotalQuizzes());
         assertEquals(45000000L, response.getPlatformOverview().getTotalRevenue());
