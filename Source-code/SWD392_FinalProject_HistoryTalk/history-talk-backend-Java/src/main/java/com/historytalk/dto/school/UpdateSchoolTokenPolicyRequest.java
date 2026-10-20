@@ -17,6 +17,9 @@ public class UpdateSchoolTokenPolicyRequest {
     @Min(value = 100, message = "Default daily student quota must be at least 100 tokens")
     private Integer defaultDailyStudentQuota;
 
+    @Min(value = 500, message = "Default daily teacher quota must be at least 500 tokens")
+    private Integer defaultDailyTeacherQuota;
+
     private UUID classroomId;
 
     private Integer gradeLevel;

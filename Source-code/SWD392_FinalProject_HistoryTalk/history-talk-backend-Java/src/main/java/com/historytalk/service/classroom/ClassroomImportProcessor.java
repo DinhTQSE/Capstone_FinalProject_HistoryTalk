@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.*;
 
@@ -148,26 +149,16 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
             }
         }
 
-        // Deduct quota ONLY for new students
-        int baseToken = context.getDefaultInitialToken() != null ? context.getDefaultInitialToken() : 10000;
-        int totalTokensNeededForNew = plans.stream()
-                .filter(p -> !p.isExisting)
-                .mapToInt(p -> baseToken + (p.row.getAdditionalToken() != null ? Math.max(0, p.row.getAdditionalToken()) : 0))
-                .sum();
-
-        int availableTokens = school.getUnallocatedTokenQuota();
-        if (availableTokens < totalTokensNeededForNew) {
-            throw new InvalidRequestException(String.format(
-                    "Insufficient unallocated token quota: Requires %,d tokens for new students, but the school only has %,d available tokens.",
-                    totalTokensNeededForNew, availableTokens));
-        }
-
-        if (totalTokensNeededForNew > 0) {
-            school.setUnallocatedTokenQuota(availableTokens - totalTokensNeededForNew);
-            schoolRepository.save(school);
-            log.info("Deducted %,d tokens for new students in classroom import. Remaining quota: %,d tokens",
-                    totalTokensNeededForNew, school.getUnallocatedTokenQuota());
-        }
+        // Pure Shared Pool (Pay-As-You-Go):
+        // Do NOT deduct upfront tokens from school.unallocatedTokenQuota when importing students.
+        // Students draw from school.unallocatedTokenQuota only as they actually chat with AI,
+        // bounded by their daily allowance (classroom.dailyTokenQuota or school.defaultDailyStudentQuota).
+        int classDailyLimit = (classroom.getDailyTokenQuota() != null && classroom.getDailyTokenQuota() > 0)
+                ? classroom.getDailyTokenQuota()
+                : ((school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
+                        ? school.getDefaultDailyStudentQuota()
+                        : 1000);
+        int schoolPool = school.getUnallocatedTokenQuota() != null ? Math.max(0, school.getUnallocatedTokenQuota()) : 0;
 
         // Persist & Enroll
         int currentYear = Year.now().getValue() % 100;
@@ -197,7 +188,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
                         .userName(student.getUserName())
                         .fullName(student.getFullName())
                         .email(student.getEmail())
-                        .allocatedToken(0)
+                        .allocatedToken(student.getToken() != null ? student.getToken() : 0)
                         .initialPassword(plan.alreadyEnrolled ? "(Đã có trong lớp từ trước)" : "(Tài khoản hiện có)")
                         .build());
             } else {
@@ -217,7 +208,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
                         : studentCode + "@2026";
 
                 int extraToken = row.getAdditionalToken() != null ? Math.max(0, row.getAdditionalToken()) : 0;
-                int totalTokens = baseToken + extraToken;
+                int effectiveDailyAvailable = Math.min(classDailyLimit + extraToken, schoolPool);
 
                 Gender gender = null;
                 if (row.getGender() != null && !row.getGender().trim().isEmpty()) {
@@ -237,7 +228,10 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
                         .studentCode(studentCode)
                         .role(UserRole.SCHOOL_STUDENT)
                         .school(school)
-                        .token(totalTokens)
+                        .token(effectiveDailyAvailable)
+                        .dailyTokensUsed(0)
+                        .dailyBonusTokens(extraToken)
+                        .lastTokenResetAt(LocalDateTime.now())
                         .mustChangePassword(true)
                         .build();
 
@@ -255,7 +249,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
                         .userName(userName)
                         .fullName(savedStudent.getFullName())
                         .email(email)
-                        .allocatedToken(totalTokens)
+                        .allocatedToken(effectiveDailyAvailable)
                         .initialPassword(rawPassword)
                         .build());
             }
@@ -263,14 +257,15 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
 
         resultDto.setSuccessCount(resultDto.getSuccessfulAccounts().size());
         resultDto.setFailureCount(resultDto.getErrors().size());
-        resultDto.setRemainingSchoolTokens(school.getUnallocatedTokenQuota());
+        resultDto.setTotalTokensAllocated(0);
+        resultDto.setRemainingSchoolTokens(schoolPool);
 
         return resultDto;
     }
 
     @Override
     protected void verifyAndDeductQuota(List<StudentImportRowDto> rows, StudentImportContext context, School school) {
-        // Handled in processImport
+        // Pure Shared Pool: Handled in processImport (0 upfront deduction)
     }
 
     private static class RowPlan {

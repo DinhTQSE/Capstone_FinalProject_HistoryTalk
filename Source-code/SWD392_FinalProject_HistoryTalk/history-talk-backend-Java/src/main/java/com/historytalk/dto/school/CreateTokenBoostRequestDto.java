@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,10 +20,20 @@ public class CreateTokenBoostRequestDto {
 
     @NotNull(message = "Requested tokens must not be null")
     @Min(value = 100, message = "Requested tokens must be at least 100")
-    @Max(value = 10000, message = "Requested tokens cannot exceed 10,000 per request")
+    @Max(value = 50000, message = "Requested tokens cannot exceed 50,000 per request")
     private Integer requestedTokens;
 
     @NotBlank(message = "Reason must not be blank")
     @Size(max = 500, message = "Reason must not exceed 500 characters")
     private String reason;
+
+    /**
+     * Optional target student ID (used when a Teacher creates a ticket for a specific student after running out of daily teacher tokens).
+     */
+    private UUID studentId;
+
+    /**
+     * Optional classroom ID (used when a Teacher creates a ticket for a classroom or student).
+     */
+    private UUID classroomId;
 }

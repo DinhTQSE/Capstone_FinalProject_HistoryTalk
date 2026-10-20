@@ -268,11 +268,12 @@ public class DocumentMediaServiceImpl implements MediaService {
 
     private boolean isStaffOrAdmin(String role) {
         if (role == null) return false;
-        String r = role.toUpperCase(Locale.ROOT).replace("ROLE_", "");
+        String r = role.toUpperCase(java.util.Locale.ROOT).replace("ROLE_", "");
         return "CONTENT_ADMIN".equals(r)
                 || "SYSTEM_ADMIN".equals(r)
                 || "STAFF".equals(r)
                 || "ADMIN".equals(r)
-                || "TEACHER".equals(r);
+                || "TEACHER".equals(r)
+                || "SCHOOL_ADMIN".equals(r);
     }
 }

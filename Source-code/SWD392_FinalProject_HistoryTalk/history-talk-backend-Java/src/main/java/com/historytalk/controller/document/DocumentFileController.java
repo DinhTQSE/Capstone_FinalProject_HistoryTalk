@@ -34,7 +34,7 @@ public class DocumentFileController {
     private final DocumentFileService documentFileService;
 
     @PostMapping(value = "/{docId}/upload-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF file for an existing document")
     public ResponseEntity<ApiResponse<DocumentFileResponse>> uploadPdfFile(
@@ -42,34 +42,19 @@ public class DocumentFileController {
             @RequestPart("file") MultipartFile file) {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
-        log.info("POST /api/v1/documents/{}/upload-pdf by user {}", docId, staffId);
+        log.info("POST /api/v1/documents/{}/upload-pdf by user {} (role={})", docId, staffId, staffRole);
         DocumentFileResponse document = documentFileService.uploadPdfFile(docId, file, staffId, staffRole);
         return ResponseEntity.ok(ApiResponse.success(document, "PDF file uploaded successfully"));
     }
 
-    // @GetMapping("/{docId}/download-pdf")
-    // @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
-    // @SecurityRequirement(name = "bearerAuth")
-    // @Operation(summary = "Download PDF file for an existing document")
-    // public ResponseEntity<byte[]> downloadPdfFile(@PathVariable String docId) {
-    //     String staffId = SecurityUtils.getUserId();
-    //     String staffRole = SecurityUtils.getRoleName();
-    //     log.info("GET /api/v1/documents/{}/download-pdf by user {}", docId, staffId);
-    //     DownloadedDocumentFile file = documentFileService.downloadPdfFile(docId, staffId, staffRole);
-    //     return ResponseEntity.ok()
-    //             .contentType(MediaType.APPLICATION_PDF)
-    //             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + docId + ".pdf\"")
-    //             .body(file.bytes());
-    // }
-
     @GetMapping("/{docId}/pdf-url")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a signed Supabase URL for an existing PDF document")
     public ResponseEntity<ApiResponse<DocumentPdfUrlResponse>> createPdfUrl(@PathVariable String docId) {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
-        log.info("GET /api/v1/documents/{}/pdf-url by user {}", docId, staffId);
+        log.info("GET /api/v1/documents/{}/pdf-url by user {} (role={})", docId, staffId, staffRole);
         DocumentPdfUrl signedUrl = documentFileService.createPdfUrl(docId, staffId, staffRole);
         DocumentPdfUrlResponse response = DocumentPdfUrlResponse.builder()
                 .url(signedUrl.url())

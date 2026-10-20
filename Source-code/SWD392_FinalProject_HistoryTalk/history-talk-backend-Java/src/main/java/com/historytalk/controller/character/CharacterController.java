@@ -63,7 +63,7 @@ public class CharacterController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new character", description = "Create a new historical character (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createCharacter(
@@ -76,7 +76,7 @@ public class CharacterController {
     }
 
     @PutMapping("/{characterId}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update a character", description = "Update character details (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateCharacter(

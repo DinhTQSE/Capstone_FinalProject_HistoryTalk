@@ -22,7 +22,7 @@ public interface TokenBoostRequestRepository extends JpaRepository<TokenBoostReq
     List<TokenBoostRequest> findByStudent_UidOrderByCreatedAtDesc(UUID studentUid);
 
     @Query("SELECT r FROM TokenBoostRequest r " +
-            "WHERE r.classroom.teacher.uid = :teacherUid " +
+            "WHERE (r.classroom.teacher.uid = :teacherUid OR r.requester.uid = :teacherUid) " +
             "AND (:status IS NULL OR r.status = :status) " +
             "ORDER BY r.createdAt DESC")
     Page<TokenBoostRequest> findByTeacherUidAndStatus(

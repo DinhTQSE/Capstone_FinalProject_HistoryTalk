@@ -34,14 +34,14 @@ public class DocumentContentServiceImpl implements DocumentContentService {
 
         doc.setContent(request.getContent());
         doc.setStatus(request.getStatus());
-        
+
         if (doc.getDocumentType() == DocumentType.TEXT) {
             doc.setDocumentType(DocumentType.MARKDOWN);
         }
 
         Document saved = documentRepository.save(doc);
         log.info("Document content saved for document {} with status {}", saved.getDocId(), saved.getStatus());
-        
+
         return mapToResponse(saved);
     }
 
@@ -62,6 +62,8 @@ public class DocumentContentServiceImpl implements DocumentContentService {
         return role != null && (
                 "CONTENT_ADMIN".equalsIgnoreCase(role)
                         || "SYSTEM_ADMIN".equalsIgnoreCase(role)
+                        || "TEACHER".equalsIgnoreCase(role)
+                        || "SCHOOL_ADMIN".equalsIgnoreCase(role)
                         || "STAFF".equalsIgnoreCase(role)
                         || "ADMIN".equalsIgnoreCase(role)
         );

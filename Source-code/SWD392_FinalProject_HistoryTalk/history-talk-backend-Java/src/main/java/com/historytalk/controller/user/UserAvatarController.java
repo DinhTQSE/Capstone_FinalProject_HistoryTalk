@@ -89,16 +89,16 @@ public class UserAvatarController {
     }
 
     private String extractUserIdFromPrincipal(UserDetails userDetails) {
-        if (userDetails == null) {
-            return null;
+        if (userDetails != null) {
+            return userDetails.getUsername();
         }
-        return userDetails.getUsername();
+        return com.historytalk.utils.SecurityUtils.getUserId();
     }
 
     private String extractRoleFromPrincipal(UserDetails userDetails) {
-        if (userDetails == null || userDetails.getAuthorities().isEmpty()) {
-            return null;
+        if (userDetails != null && !userDetails.getAuthorities().isEmpty()) {
+            return userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
         }
-        return userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+        return com.historytalk.utils.SecurityUtils.getRoleName();
     }
 }

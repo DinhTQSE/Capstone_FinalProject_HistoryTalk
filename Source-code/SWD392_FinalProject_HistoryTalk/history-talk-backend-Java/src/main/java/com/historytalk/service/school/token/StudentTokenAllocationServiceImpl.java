@@ -2,18 +2,22 @@ package com.historytalk.service.school.token;
 
 import com.historytalk.dto.school.AllocateStudentTokenRequest;
 import com.historytalk.dto.school.AllocateStudentTokenResponse;
+import com.historytalk.entity.classroom.Classroom;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -23,6 +27,7 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
 
     private final SchoolRepository schoolRepository;
     private final UserRepository userRepository;
+    private final ClassStudentRepository classStudentRepository;
 
     @Override
     @Transactional
@@ -51,12 +56,12 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
         int studentCount = targetStudentIds.size();
         int totalTokensNeeded = studentCount * tokenAmount;
 
-        // 2. Kiểm tra quỹ Token khả dụng của trường
+        // 2. Kiểm tra quỹ Token khả dụng của trường (chỉ kiểm tra đủ sức chứa, KHÔNG trừ trước)
         int availableTokens = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
-        if (availableTokens < totalTokensNeeded) {
+        if (availableTokens < tokenAmount) {
             throw new InvalidRequestException(String.format(
-                    "Insufficient token quota: Requires %,d tokens for %d students, but the school only has %,d available tokens.",
-                    totalTokensNeeded, studentCount, availableTokens));
+                    "Insufficient token quota: School shared pool only has %,d available tokens.",
+                    availableTokens));
         }
 
         // 3. Truy vấn và xác thực học sinh
@@ -76,26 +81,52 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
             }
         }
 
-        // 4. Trừ quỹ trường và cộng token cho học sinh
-        school.setUnallocatedTokenQuota(availableTokens - totalTokensNeeded);
-        schoolRepository.save(school);
+        // 4. Pure Shared Pool: Không trừ trước quỹ trường (school.unallocatedTokenQuota giữ nguyên).
+        // Tăng dailyBonusTokens của học sinh để nâng trần sử dụng trong ngày; chỉ trừ quỹ trường khi học sinh thực sự chat AI.
+        LocalDate today = LocalDate.now();
+        int defaultDailyQuota = (school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
+                ? school.getDefaultDailyStudentQuota()
+                : 1000;
 
         for (User student : students) {
-            int currentToken = student.getToken() != null ? student.getToken() : 0;
-            student.setToken(currentToken + tokenAmount);
+            boolean isNewDay = student.getLastTokenResetAt() == null
+                    || student.getLastTokenResetAt().toLocalDate().isBefore(today);
+            if (isNewDay) {
+                student.setDailyTokensUsed(0);
+                student.setDailyBonusTokens(0);
+                student.setLastTokenResetAt(LocalDateTime.now());
+            }
+
+            int currentBonus = student.getDailyBonusTokens() != null ? Math.max(0, student.getDailyBonusTokens()) : 0;
+            int updatedBonus = currentBonus + tokenAmount;
+            student.setDailyBonusTokens(updatedBonus);
+
+            int baseLimit = defaultDailyQuota;
+            if (classStudentRepository != null && student.getUid() != null) {
+                List<Classroom> activeClasses = classStudentRepository.findActiveClassroomsByStudentUid(student.getUid());
+                for (Classroom c : activeClasses) {
+                    if (c.getDailyTokenQuota() != null && c.getDailyTokenQuota() > 0) {
+                        baseLimit = c.getDailyTokenQuota();
+                        break;
+                    }
+                }
+            }
+            int usedToday = student.getDailyTokensUsed() != null ? Math.max(0, student.getDailyTokensUsed()) : 0;
+            int remainingDaily = Math.max(0, (baseLimit + updatedBonus) - usedToday);
+            student.setToken(Math.min(remainingDaily, availableTokens));
         }
         userRepository.saveAll(students);
 
-        log.info("Successfully allocated {} tokens ({}/student) to {} students of school {}. Remaining school quota: {}",
-                totalTokensNeeded, tokenAmount, studentCount, school.getSchoolCode(), school.getUnallocatedTokenQuota());
+        log.info("Successfully granted {} daily bonus tokens ({}/student) to {} students of school {}. Shared pool remains: {}",
+                totalTokensNeeded, tokenAmount, studentCount, school.getSchoolCode(), availableTokens);
 
         return AllocateStudentTokenResponse.builder()
                 .schoolId(school.getId())
                 .totalTokensAllocated(totalTokensNeeded)
                 .affectedStudentCount(studentCount)
                 .tokenAmountPerStudent(tokenAmount)
-                .remainingSchoolTokens(school.getUnallocatedTokenQuota())
-                .message(String.format("Allocated %,d tokens to %d students successfully", totalTokensNeeded, studentCount))
+                .remainingSchoolTokens(availableTokens)
+                .message(String.format("Granted %,d daily bonus tokens to %d students successfully (Pure Shared Pool)", totalTokensNeeded, studentCount))
                 .build();
     }
 }

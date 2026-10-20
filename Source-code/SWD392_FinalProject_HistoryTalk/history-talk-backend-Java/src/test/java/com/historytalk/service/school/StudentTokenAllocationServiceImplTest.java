@@ -8,6 +8,7 @@ import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.service.school.token.StudentTokenAllocationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,9 @@ class StudentTokenAllocationServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ClassStudentRepository classStudentRepository;
+
     @InjectMocks
     private StudentTokenAllocationServiceImpl allocationService;
 
@@ -48,6 +52,7 @@ class StudentTokenAllocationServiceImplTest {
                 .id(schoolId)
                 .schoolCode("CVA")
                 .name("THPT Chu Văn An")
+                .defaultDailyStudentQuota(1000)
                 .unallocatedTokenQuota(50000)
                 .totalSchoolTokenQuota(100000)
                 .build();
@@ -70,7 +75,7 @@ class StudentTokenAllocationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Allocate tokens to single student successfully")
+    @DisplayName("Grant daily bonus tokens to single student successfully (Pure Shared Pool)")
     void allocateTokens_SingleStudent_Success() {
         AllocateStudentTokenRequest request = AllocateStudentTokenRequest.builder()
                 .studentId(student1.getUid())
@@ -85,15 +90,15 @@ class StudentTokenAllocationServiceImplTest {
         assertNotNull(response);
         assertEquals(5000, response.getTotalTokensAllocated());
         assertEquals(1, response.getAffectedStudentCount());
-        assertEquals(45000, response.getRemainingSchoolTokens());
+        assertEquals(50000, response.getRemainingSchoolTokens()); // Pure Shared Pool: remains 50,000 until spent
+        assertEquals(5000, student1.getDailyBonusTokens());
         assertEquals(6000, student1.getToken());
 
-        verify(schoolRepository).save(school);
         verify(userRepository).saveAll(any());
     }
 
     @Test
-    @DisplayName("Allocate tokens to multiple students successfully via studentIds list")
+    @DisplayName("Grant daily bonus tokens to multiple students successfully via studentIds list")
     void allocateTokens_MultipleStudents_Success() {
         AllocateStudentTokenRequest request = AllocateStudentTokenRequest.builder()
                 .studentIds(List.of(student1.getUid(), student2.getUid()))
@@ -108,11 +113,10 @@ class StudentTokenAllocationServiceImplTest {
         assertNotNull(response);
         assertEquals(4000, response.getTotalTokensAllocated());
         assertEquals(2, response.getAffectedStudentCount());
-        assertEquals(46000, response.getRemainingSchoolTokens());
+        assertEquals(50000, response.getRemainingSchoolTokens());
         assertEquals(3000, student1.getToken());
-        assertEquals(2500, student2.getToken());
+        assertEquals(3000, student2.getToken());
 
-        verify(schoolRepository).save(school);
         verify(userRepository).saveAll(any());
     }
 
