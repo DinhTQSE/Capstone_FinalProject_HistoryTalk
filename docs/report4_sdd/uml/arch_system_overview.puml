@@ -1,0 +1,77 @@
+@startuml
+skinparam dpi 180
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam linetype ortho
+
+title HistoryTalk - System Architecture Overview (Microservices & External Integrations)
+
+actor "Customer / Learner" as Customer
+actor "School Student" as Student
+actor "Teacher" as Teacher
+actor "School Admin" as SchoolAdmin
+actor "Content Admin" as ContentAdmin
+actor "System Admin" as SysAdmin
+
+package "Client Tier (Web & Mobile Ready)" #EEF4FF {
+    [Next.js / React Web Application\n(SSR, TailwindCSS, Mapbox/Leaflet, 3D Model Viewer)] as WebApp
+}
+
+package "Core Business Microservice (Java 21 / Spring Boot 3.2.5)" #E8F8F5 {
+    [Security & Guard Layer\n(JwtAuthenticationFilter, SchoolSubscriptionGuardInterceptor,\nOAuth2AuthenticationSuccessHandler)] as SecLayer
+    [REST API Controllers (27 Controllers)\n(Auth, School, Classroom, Assignment, Content, Character,\nChat, Quiz, Map, Gamification, Payment, Dashboard, Trash)] as JavaControllers
+    [Domain Application Services & Schedulers\n(AuthService, SchoolManagementService, AcademicLifecycleService,\nDailyTokenAllowanceService, LocalContentService, QuizService,\nPdfExtractionService / Tess4J OCR, PaymentFulfillmentService)] as JavaServices
+    [Spring Data JPA Repositories (29 Repositories)\n& Flyway Migration Engine (V1 - V38)] as JavaRepos
+}
+
+package "AI & Hybrid RAG Microservice (Python 3.11 / FastAPI / Uvicorn)" #FEF9E7 {
+    [FastAPI Presentation Layer\n(chat_router: /v1/chat/generate-reply, /generate-reply-stream,\n/process-document, /generate-title)] as AiRouter
+    [RAG & Roleplay Application Service\n(_semantic_chunking, retrieve_history_context,\ngenerate_reply_stream, prompt_builder)] as AiService
+    [Java Backend Async Client\n(JavaBackendClient - httpx)] as AiDataClient
+}
+
+package "Data Persistence & Vector Storage Tier" #F5EEF8 {
+    database "PostgreSQL 16 Relational DB\n(historical_schema - 31 Relational Tables)" as PostgresDB
+    database "Supabase PgVector DB\n(vector_chunk Table, 768-D HNSW Index,\nmatch_history_chunks RPC)" as VectorDB
+}
+
+package "External Third-Party Services & Infrastructure" #FDEDEC {
+    [Google OAuth 2.0 Identity Provider] as GoogleOAuth
+    [Cloudflare R2 / Supabase S3 Storage\n(PDFs, 2D Images, 3D GLB Models, Map Rasters)] as CloudStorage
+    [PayOS Payment Gateway\n(QR Checkout & HMAC-SHA256 Webhook)] as PayOS
+    [SMTP Mail Server\n(Password Reset & OAuth Credentials)] as SmtpServer
+    [Ollama / External LLM & Embedding Host\n(Gemma-2-9B-IT / OpenAI API + BAAI/bge-m3)] as LlmHost
+    [Kaggle Cross-Encoder Reranker API\n(/api/rerank)] as KaggleRerank
+    [Observability Stack\n(Spring Actuator, Prometheus, Grafana)] as Monitoring
+}
+
+Customer --> WebApp : HTTPS
+Student --> WebApp : HTTPS
+Teacher --> WebApp : HTTPS
+SchoolAdmin --> WebApp : HTTPS
+ContentAdmin --> WebApp : HTTPS
+SysAdmin --> WebApp : HTTPS
+
+WebApp --> SecLayer : REST API / JSON + SSE Stream\n(Bearer JWT)
+SecLayer --> JavaControllers
+JavaControllers --> JavaServices
+JavaServices --> JavaRepos
+JavaRepos --> PostgresDB : JDBC / HikariCP
+
+JavaServices --> AiRouter : Async HTTP / SSE\n(X-Internal-Api-Key)
+AiRouter --> AiService
+AiService --> AiDataClient
+AiDataClient --> JavaControllers : Fetch Character & Context Metadata
+
+AiService --> VectorDB : Supabase RPC\n(match_history_chunks / Upsert Chunks)
+AiService --> LlmHost : Embeddings (bge-m3)\n& Roleplay Chat Stream
+AiService --> KaggleRerank : Cross-Encoder Rerank\nTop-10 Chunks
+
+SecLayer --> GoogleOAuth : OAuth2 Code Exchange
+JavaServices --> CloudStorage : Presigned URL / Binary Upload
+JavaServices --> PayOS : Create Payment Link\n& Verify Webhook
+PayOS --> JavaControllers : POST /api/v1/payments/payos/webhook
+JavaServices --> SmtpServer : Send Transactional Emails
+Monitoring ..> JavaControllers : Scrape /actuator/prometheus
+@enduml

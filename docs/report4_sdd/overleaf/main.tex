@@ -1,0 +1,158 @@
+\documentclass[11pt,a4paper]{article}
+
+% ============================================================================
+% PACKAGES & PAGE SETUP (FPT UNIVERSITY CAPSTONE STANDARD)
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{hyperref}
+
+% Colors
+\definecolor{fptblue}{HTML}{004B87}
+\definecolor{fptorange}{HTML}{F37021}
+\definecolor{tableheader}{HTML}{EBF3FA}
+\definecolor{lightgray}{HTML}{F7F9FC}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=fptblue,
+    urlcolor=fptblue,
+    citecolor=fptblue,
+    pdftitle={SWP490 - Report 4: Software Design Document (SDD) - HistoryTalk},
+    pdfauthor={HistoryTalk Capstone Team}
+}
+
+% Column types for clean tables
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% Header & Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textbf{SWP490 -- Capstone Project -- Report 4 (SDD)}}
+\fancyhead[R]{\small\textbf{HistoryTalk Platform v2.0 (Review 2)}}
+\fancyfoot[L]{\small FPT University -- Software Engineering}
+\fancyfoot[R]{\small Page \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\renewcommand{\arraystretch}{1.25}
+
+\begin{document}
+
+% ============================================================================
+% COVER PAGE
+% ============================================================================
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    {\Large\textbf{FPT UNIVERSITY}\par}
+    \vspace{0.3cm}
+    {\large\textbf{DEPARTMENT OF SOFTWARE ENGINEERING}\par}
+    \vspace{2cm}
+    {\color{fptblue}\rule{\linewidth}{1.5pt}\par}
+    \vspace{0.6cm}
+    {\Huge\bfseries\color{fptblue} CAPSTONE PROJECT REPORT\par}
+    \vspace{0.4cm}
+    {\LARGE\bfseries Report 4: Software Design Document (SDD)\par}
+    \vspace{0.5cm}
+    {\Large\textbf{HistoryTalk: A Multi-Tenant SaaS Historical Education Platform\\Powered by Conversational AI and Hybrid RAG Technology}\par}
+    \vspace{0.6cm}
+    {\color{fptblue}\rule{\linewidth}{1.5pt}\par}
+    \vspace{1.8cm}
+
+    \begin{tabular}{L{4.5cm} L{9.5cm}}
+        \textbf{Subject Code:} & SWP490 / SEP490 -- Capstone Project \\
+        \textbf{Milestone:} & Review 2 (Baseline Design \& Defense 1.1 Targets) \\
+        \textbf{Project Name:} & HistoryTalk \\
+        \textbf{Document Version:} & 2.0 (Review 2 Release -- Tag \texttt{review-2}) \\
+        \textbf{Date:} & October 2026 \\
+    \end{tabular}
+
+    \vfill
+    {\large\textbf{Ho Chi Minh City, October 2026}\par}
+\end{titlepage}
+
+% ============================================================================
+% RECORD OF CHANGES & TEAM DISTRIBUTION
+% ============================================================================
+\section*{Record of Changes}
+\addcontentsline{toc}{section}{Record of Changes}
+
+\begin{longtable}{|C{1.8cm}|C{1.2cm}|L{3.5cm}|L{6.5cm}|C{2.0cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{Date} & \textbf{A/M/D*} & \textbf{In Charge} & \textbf{Change Description} & \textbf{Version} \\
+\hline
+\endhead
+30/06/2026 & A & HistoryTalk Team & Initial Requirement \& Analysis Models baseline (B2C core context, character, chat, and quiz models). & 1.0 \\
+\hline
+14/09/2026 & M & HistoryTalk Team & Review 1 Deliverable: Added decoupled Java Spring Boot + Python FastAPI microservices architecture, PostgreSQL 16 + Supabase PgVector schema, PayOS payment integration, and Gamification tables. & 1.5 \\
+\hline
+20/10/2026 & M & HistoryTalk Team & Review 2 SDD Release (Tag \texttt{review-2}): Expanded to 32-table B2B2C Multi-Tenant SaaS architecture (Schools, Classrooms, Student CSV Import, Daily Token Quota \& Boost Requests, Local Content Approval Workflow, Multi-Type Question Bank, Classroom Assignments, Interactive GeoJSON Battle Maps, Hybrid PDFBox/Tess4J OCR, State Machines, 5 Main Workflow Activity Diagrams, and Review 2 Technology \& AI/RAG Declarations). & 2.0 \\
+\hline
+\end{longtable}
+\footnotesize{*A -- Added, M -- Modified, D -- Deleted}
+\normalsize
+
+\vspace{0.5cm}
+\section*{Project Team \& SDD Ownership}
+\addcontentsline{toc}{section}{Project Team \& SDD Ownership}
+
+\begin{longtable}{|C{1.0cm}|L{4.2cm}|L{3.0cm}|L{7.0cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{No.} & \textbf{Member Name} & \textbf{Role} & \textbf{Owned SDD Modules \& Main Workflows} \\
+\hline
+\endhead
+1 & Nguyen Minh Tri & Team Leader & System Architecture, Multi-Tenant SaaS School Lifecycle, Daily Token Allowance \& Boost (\textbf{WF-01}) \\
+\hline
+2 & Nguyen Cong Thanh & AI / Backend Engineer & Conversational AI Roleplay, Hybrid RAG Pipeline (BGE-M3 + Kaggle Reranker), PDFBox/Tess4J OCR (\textbf{WF-03}) \\
+\hline
+3 & Do Quoc Bao & Backend Engineer & Historical Context, Character, Interactive GeoJSON Battle Map \& Local Content Approval (\textbf{WF-02}) \\
+\hline
+4 & Vo Dong Duc Khai & Backend Engineer & Multi-Type Quiz Question Bank, Classroom Assignments \& Gradebook Analytics (\textbf{WF-04}) \\
+\hline
+5 & Tran Quoc Van Dinh & Backend / DevOps & Database ERD \& Data Dictionary, State Machines, B2C PayOS Billing \& Gamification (\textbf{WF-05}) \\
+\hline
+\end{longtable}
+
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\listoftables
+\newpage
+
+% ============================================================================
+% DOCUMENT SECTIONS
+% ============================================================================
+\input{sections/01_system_design}
+\newpage
+\input{sections/02_database_design}
+\newpage
+\input{sections/03_detailed_design}
+\newpage
+\input{sections/04_review2_workflows_and_states}
+\newpage
+\input{sections/05_technology_and_ai_declarations}
+
+\end{document}

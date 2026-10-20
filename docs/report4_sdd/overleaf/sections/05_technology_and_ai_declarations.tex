@@ -1,0 +1,128 @@
+% ============================================================================
+% SECTION 5: TECHNOLOGY & AI / LLM / RAG DECLARATIONS (REVIEW 2 MANDATORY)
+% ============================================================================
+\section{Technology \& AI / LLM / RAG Specification}
+
+\subsection{System Technology \& AI Tool Declaration}
+
+In compliance with the SWP490 Review 2 Guidelines (Section 03 \& Section 10), Table~\ref{tab:tech_declaration} declares all third-party services, development technologies with exact versions, source control and CI/CD pipelines, deployment environments, and AI tools used across the project lifecycle.
+
+\footnotesize
+\begin{longtable}{|L{3.2cm}|L{4.0cm}|L{8.3cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{Category} & \textbf{Component / Service} & \textbf{Purpose, Version \& Data Exchanged} \\
+\hline
+\endhead
+
+\multirow{7}{3.2cm}{\textbf{1. Third-Party Services}}
+& \textbf{Google OAuth 2.0} (\texttt{spring-boot-starter-oauth2-client}) & \textbf{Purpose:} Single Sign-On (SSO) authentication for Customers.\newline\textbf{Data Exchanged:} OAuth authorization code exchanged for verified user email, display name, and avatar URL. \\
+\cline{2-3}
+& \textbf{Cloudflare R2 / Supabase S3 Storage} & \textbf{Purpose:} Object storage for uploaded PDF documents, 2D historical illustrations, interactive battle-map rasters, and 3D character models (\texttt{.glb}).\newline\textbf{Data Exchanged:} Binary media streams and presigned upload/view URLs. \\
+\cline{2-3}
+& \textbf{PayOS Payment Gateway} (\texttt{payos-java 2.0.1}) & \textbf{Purpose:} B2C subscription tier VietQR checkout and webhook payment confirmation.\newline\textbf{Data Exchanged:} Outbound \texttt{orderCode}, \texttt{amount}, and return URLs; Inbound HMAC-SHA256 signed webhook payloads. \\
+\cline{2-3}
+& \textbf{SMTP Mail Server} (\texttt{spring-boot-starter-mail}) & \textbf{Purpose:} Transactional email delivery for password reset links and initial OAuth/School credentials.\newline\textbf{Data Exchanged:} Recipient email address, reset URL, or temporary password. \\
+\cline{2-3}
+& \textbf{Ollama / External OpenAI-Compatible LLM API} & \textbf{Purpose:} Conversational AI historical roleplay generation, follow-up question suggestion, and dense text embedding (\texttt{bge-m3}).\newline\textbf{Data Exchanged:} Grounded system prompt, sanitized RAG historical passages, and dialogue turns (no PII or credentials sent). \\
+\cline{2-3}
+& \textbf{Kaggle Cross-Encoder Reranker API} & \textbf{Purpose:} Reranks Top-10 retrieved vector chunks by semantic relevance to the learner's query.\newline\textbf{Data Exchanged:} User historical question and candidate chunk texts. \\
+\cline{2-3}
+& \textbf{Supabase PgVector Cloud} (\texttt{supabase-py 2.3+}) & \textbf{Purpose:} Hosted vector database storing 768-D embeddings and executing \texttt{match\_history\_chunks} similarity RPC.\newline\textbf{Data Exchanged:} Document chunk texts, 768-D float vectors, and entity UUID filters. \\
+\hline
+
+\multirow{5}{3.2cm}{\textbf{2. Development Technologies}}
+& \textbf{Frontend Web} & \textbf{Next.js 14+ / React 18 / TypeScript 5}, TailwindCSS, Axios, Leaflet / Mapbox GeoJSON, Three.js / React Three Fiber (3D \texttt{.glb} rendering). \\
+\cline{2-3}
+& \textbf{Core Backend} & \textbf{Java 21 LTS}, \textbf{Spring Boot 3.2.5}, Spring Security 6, Spring Data JPA (Hibernate 6), \textbf{jjwt 0.12.5}, \textbf{Flyway Core}, \textbf{Lombok 1.18.32}, \textbf{SpringDoc OpenAPI 2.2.0}. \\
+\cline{2-3}
+& \textbf{Document \& OCR Engine} & \textbf{Apache PDFBox 3.0.1} (digital PDF text extraction), \textbf{Tess4J 5.10.0} with \texttt{vie.traineddata} (Vietnamese OCR fallback for scanned PDFs), \textbf{Apache Commons CSV 1.11.0} (bulk roster \& question bank imports). \\
+\cline{2-3}
+& \textbf{AI Microservice} & \textbf{Python 3.11+}, \textbf{FastAPI 0.110.0+}, \textbf{Uvicorn 0.27.0+}, \textbf{httpx 0.27.0+}, \textbf{Pydantic 2.6.0+} / \texttt{pydantic-settings 2.2.0+}. \\
+\cline{2-3}
+& \textbf{Database \& Observability} & \textbf{PostgreSQL 16} (\texttt{postgresql 42.7.1} driver), \textbf{PgVector Extension} (HNSW index), \textbf{Micrometer Prometheus} + \textbf{Prometheus \& Grafana} Docker monitoring stack. \\
+\hline
+
+\multirow{3}{3.2cm}{\textbf{3. Source Control \& DevOps}}
+& \textbf{Repository \& Branching} & \textbf{Git / GitHub} monorepo (\texttt{Source-code/SWD392\_FinalProject\_HistoryTalk/}). Branching strategy: \texttt{main} (protected release branch tagged \texttt{review-2}), \texttt{develop}, and topic branches (\texttt{feature/*}, \texttt{fix/*}). \\
+\cline{2-3}
+& \textbf{CI/CD Pipeline} & \textbf{GitHub Actions} automated workflow executing \texttt{mvn clean test} (JUnit 5 + Spring Security Test) for Java Backend and syntax/unit validation for Python AI Service on every pull request and push. \\
+\cline{2-3}
+& \textbf{Containerization} & Multi-service \textbf{Docker \& Docker Compose} (\texttt{Dockerfile} for Java Backend, Python AI Service, and \texttt{docker-compose.monitoring.yml} for Prometheus/Grafana). \\
+\hline
+
+\multirow{3}{3.2cm}{\textbf{4. Deployment Environments}}
+& \textbf{Development (Local)} & Local PostgreSQL / Supabase dev schema, Java Spring Boot on port \texttt{8080}, FastAPI AI service on port \texttt{8001}, seeded via deterministic SQL scripts (\texttt{seed\_all\_rows.sql}). \\
+\cline{2-3}
+& \textbf{Staging \& Production} & Deployed on \textbf{AWS EC2 (\texttt{c6a.large})} behind \textbf{Nginx Reverse Proxy} with SSL/TLS termination, Docker Compose orchestration, and managed PostgreSQL / Supabase PgVector. \\
+\cline{2-3}
+& \textbf{Deployment \& Rollback Strategy} & Immutable Docker image tags + Flyway versioned schema migrations (\texttt{V1}--\texttt{V38}). Rollback is performed by re-deploying the previous verified Git tag/Docker image and restoring pre-migration database snapshots if needed. \\
+\hline
+
+\multirow{4}{3.2cm}{\textbf{5. AI Tools Used in Development}}
+& \textbf{Specification \& Design} & \textbf{Gemini / Claude / ChatGPT}: Assisted in refining SRS use case descriptions, generating PlantUML (\texttt{.puml}) sequence/class/state diagrams, and formatting LaTeX tables. All outputs were manually verified against business rules. \\
+\cline{2-3}
+& \textbf{Coding \& Refactoring} & \textbf{GitHub Copilot / Cursor / Antigravity Coding Agent}: Assisted in boilerplate DTO/mapper generation, Flyway migration drafting, and REST API contract alignment. \\
+\cline{2-3}
+& \textbf{Testing \& Verification} & Assisted in scaffolding JUnit 5 / MockMvc unit and integration test cases for authentication, classroom imports, quiz grading, and payment fulfillment. \\
+\cline{2-3}
+& \textbf{Self-Review (BM02)} & Executed the official SWP490 Review 2 Self-Review Prompt across the registration form, SRS, SDD, \texttt{schema.sql}, and source code at tag \texttt{review-2}. \\
+\hline
+\caption{Technology Stack, Infrastructure \& AI Tool Usage Declaration}
+\label{tab:tech_declaration}
+\end{longtable}
+\normalsize
+
+\newpage
+\subsection{AI / LLM / RAG Technical Specification (5 Mandatory Review 2 Items)}
+
+Because HistoryTalk incorporates Conversational AI and Retrieval-Augmented Generation (RAG) as a core product value, this section documents the five mandatory AI/RAG engineering specifications required by Section 07 of the Review 2 Guidelines.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth]{figures/arch_ai_rag_pipeline.png}
+    \caption{Hybrid RAG Document Ingestion \& Conversational AI Roleplay Pipeline Architecture}
+    \label{fig:arch_ai_rag_pipeline}
+\end{figure}
+
+\begin{longtable}{|C{0.8cm}|L{3.5cm}|L{11.2cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{\#} & \textbf{Specification Item} & \textbf{HistoryTalk Implementation Details} \\
+\hline
+\endhead
+
+1 & \textbf{AI / RAG Architecture Diagram} & Modeled in Figure~\ref{fig:arch_ai_rag_pipeline} (source: \texttt{uml/arch\_ai\_rag\_pipeline.puml}) and Sequence Diagram Figure~\ref{fig:seq_07_ai_roleplay_chat_rag}, separating Phase 1 (Asynchronous PDF/OCR Ingestion \& Semantic Vector Indexing) from Phase 2 (Low-Latency Hybrid Vector Retrieval, Cross-Encoder Reranking \& SSE Streaming Persona Inference). \\
+\hline
+
+2 & \textbf{Models \& Versions} &
+$\bullet$ \textbf{Primary Roleplay \& Title LLM:} \texttt{Gemma-2-9B-IT} (hosted via Ollama with \texttt{num\_ctx=8192}, \texttt{temperature=0.3}, \texttt{repeat\_penalty=1.15}) and configurable \textbf{External OpenAI-Compatible API} (\texttt{LLM\_PROVIDER=ollama|external} in \texttt{settings.py}).\newline
+$\bullet$ \textbf{Dense Embedding Model:} \texttt{BAAI/bge-m3} (768-dimensional multilingual dense embeddings optimized for Vietnamese historical terminology).\newline
+$\bullet$ \textbf{Cross-Encoder Reranker:} Hosted \textbf{Kaggle Cross-Encoder Reranker} (\texttt{/api/rerank}) scoring query--passage pairs.\newline
+$\bullet$ \textbf{Document OCR Model:} \textbf{Tesseract 5 / Tess4J 5.10.0} with Vietnamese language pack (\texttt{vie.traineddata}). \\
+\hline
+
+3 & \textbf{End-to-End RAG Pipeline} &
+$\bullet$ \textbf{Step 1 -- Hybrid Extraction:} \texttt{PdfTypeClassifier} inspects uploaded PDFs; digital PDFs are extracted via \texttt{Apache PDFBox 3.0.1}, whereas scanned archival PDFs are routed to \texttt{OcrServiceImpl} (\texttt{Tess4J}).\newline
+$\bullet$ \textbf{Step 2 -- Dynamic Semantic Chunking (\texttt{\_semantic\_chunking}):} Splits text into sentences, computes \texttt{bge-m3} embeddings (concurrency semaphore $= 10$), calculates cosine distances between adjacent sentences, and splits chunks dynamically at the \textbf{80th percentile distance threshold} ($\ge 0.35$) or \texttt{max\_chunk\_chars = 1200}.\newline
+$\bullet$ \textbf{Step 3 -- Vector Indexing:} Generates 768-D embeddings (semaphore $= 15$) and batch-inserts (100 rows/batch) into \texttt{vector\_chunk} indexed with \textbf{PgVector HNSW} (\texttt{m = 16, ef\_construction = 64}).\newline
+$\bullet$ \textbf{Step 4 -- Filtered Retrieval \& Reranking (\texttt{retrieve\_history\_context}):} Embeds the user query, calls Supabase RPC \texttt{match\_history\_chunks} (\texttt{match\_limit = 10}, filtered by \texttt{characterId}, \texttt{contextId}, and linked context/event UUIDs), and reranks the Top-10 candidates via the Kaggle Reranker API.\newline
+$\bullet$ \textbf{Step 5 -- Grounded Persona Prompting \& Socratic Dialogue:} Injects retrieved passages into \texttt{build\_chat\_system\_prompt}, enforces 1st-person Vietnamese pronouns (\textit{Ta, Trẫm, Tôi}), applies a \textbf{30\% probability Socratic reverse-questioning directive} on follow-up turns, streams tokens via SSE, and generates 3 suggested follow-up questions. \\
+\hline
+
+4 & \textbf{Evaluation Metrics \& Target Thresholds} &
+$\bullet$ \textbf{Streaming Latency (TTFT):} Time-To-First-Token $< 1.5\text{s}$ (95th percentile) under concurrent classroom load, monitored via \texttt{AiMetricsService} and Prometheus.\newline
+$\bullet$ \textbf{Historical Faithfulness / Groundedness:} $\ge 95\%$ of factual claims in character responses must trace directly to retrieved \texttt{quotes\_used} from \texttt{vector\_chunk} or verified character biography.\newline
+$\bullet$ \textbf{Out-of-Domain / Anti-Hallucination Refusal Rate:} $100\%$ refusal accuracy on anachronistic or unverified prompts (must acknowledge \textit{``Sử sách không ghi chép''} instead of fabricating dates or events).\newline
+$\bullet$ \textbf{Retrieval Recall@10:} $\ge 90\%$ recall of ground-truth historical passages on benchmark Vietnamese history QA pairs. \\
+\hline
+
+5 & \textbf{Fallback \& Resilience Mechanisms} &
+$\bullet$ \textbf{Reranker Failure Fallback:} If the Kaggle Reranker API times out or returns HTTP 5xx, \texttt{retrieve\_history\_context} automatically falls back to the \textbf{Top-2 chunks by PgVector cosine similarity} (\texttt{texts[:2]}) without failing the chat request.\newline
+$\bullet$ \textbf{Embedding Endpoint Fallback \& Backoff:} \texttt{get\_embedding\_from\_ollama} implements 3-attempt exponential backoff ($1\text{s}, 2\text{s}, 3\text{s}$) and automatically falls back from \texttt{/api/embeddings} to \texttt{/api/embed} on HTTP 404.\newline
+$\bullet$ \textbf{Dual LLM Provider Routing:} Supports zero-code switching between self-hosted \texttt{Ollama} and external \texttt{OpenAI-compatible} endpoints via environment configuration (\texttt{LLM\_PROVIDER}).\newline
+$\bullet$ \textbf{Zero-Hallucination Prompt Guardrail:} When \texttt{rag\_context} is empty or does not contain the requested fact, strict RAG Instruction \#3 forces the character to state that historical records do not mention the detail rather than guessing. \\
+\hline
+\caption{Five-Item Technical Specification for Conversational AI \& Hybrid RAG}
+\label{tab:ai_rag_spec}
+\end{longtable}

@@ -1,0 +1,81 @@
+@startuml
+skinparam dpi 180
+skinparam packageStyle folder
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Package Diagram - Core Backend Service (com.historytalk - Java Spring Boot)
+
+package "com.historytalk" {
+    package "Presentation Layer" #EBF5FB {
+        package "controller" {
+            [authentication\n(AuthController)] as CAuth
+            [school\n(AdminSchool, SchoolLifecycleAndToken,\nSchoolAdminQuota/Teacher/Student)] as CSchool
+            [classroom & assignment\n(Classroom, ClassroomStudent,\nTeacherAssignment, StudentAssignment)] as CClass
+            [historicalContext, character & localcontent\n(Context, Character, Media, Document,\nTeacher/SchoolAdmin/Student LocalContent)] as CContent
+            [document & map\n(DocumentFile, PdfExtraction, MapPin, MapFocus)] as CMap
+            [chat & quiz\n(Chat, Quiz, StaffQuiz, StaffQuestionBank)] as CChatQuiz
+            [payment, gamification, dashboard & trash\n(Payment, PayOSWebhook, Gamification, Tier,\nAnalyticsDashboard, SystemDashboard, SystemTrash)] as CPay
+        }
+        package "dto" {
+            [Request / Response DTOs\n(14 Domain Subpackages + ApiResponse / PaginatedResponse)] as DTOs
+        }
+        package "exception" {
+            [GlobalExceptionHandler\nBaseException, ResourceNotFoundException,\nInvalidRequestException, DataConflictException] as ExHandler
+        }
+    }
+
+    package "Security & Configuration Layer" #FEF9E7 {
+        package "security" {
+            [JwtAuthenticationFilter & JwtTokenProvider] as SecJwt
+            [SchoolSubscriptionGuardInterceptor] as SecGuard
+            [OAuth2AuthenticationSuccess/FailureHandler] as SecOAuth
+        }
+        package "config" {
+            [SecurityConfig, OpenApiConfig, PayOSConfig,\nOAuth2Properties, SchoolLifecycleWebMvcConfig] as Cfg
+        }
+    }
+
+    package "Application / Business Logic Layer" #E8F8F5 {
+        package "service" {
+            [authentication & user\n(AuthServiceImpl, GoogleOAuthServiceImpl, UserServiceImpl)] as SAuth
+            [school & classroom\n(SchoolManagement, AcademicLifecycle, StudentImport,\nDailyTokenAllowance, TokenBoostRequest, Classroom)] as SSchool
+            [assignment & quiz\n(TeacherAssignmentServiceImpl, StudentAssignmentServiceImpl,\nQuizServiceImpl)] as SQuiz
+            [historicalContext, character & localcontent\n(HistoricalContextServiceImpl, CharacterServiceImpl,\nLocalContentServiceImpl, DocumentProcessorStrategy)] as SContent
+            [document, media & map\n(DocumentFileServiceImpl, PdfExtractionServiceImpl,\nOcrServiceImpl, SupabaseDocumentStorageService, MapPinServiceImpl)] as SDoc
+            [chat\n(ChatSessionServiceImpl, MessageServiceImpl,\nAiServiceClient, AiMetricsService)] as SChat
+            [payment, gamification & dashboard\n(PaymentService, PaymentFulfillmentService,\nPaymentFulfillmentReconciliationScheduler, GamificationServiceImpl)] as SPay
+        }
+        package "mapper" {
+            [CharacterMapper, UserMapper, PaymentMapper, TierMapper] as MapPkg
+        }
+        package "utils" {
+            [SecurityUtils, UuidUtils] as UtilPkg
+        }
+    }
+
+    package "Data Access & Domain Layer" #F5EEF8 {
+        package "repository" {
+            [Spring Data JPA Repositories (29 Interfaces)\n+ Dashboard Analytics Projections (16 Interfaces)] as RepoPkg
+        }
+        package "entity" {
+            [JPA Domain Entities (30 Classes across 12 Subpackages)] as EntPkg
+            [enums (23 Domain Enumerations)] as EnumPkg
+        }
+    }
+}
+
+CAuth --> DTOs
+CSchool --> SSchool
+CClass --> SQuiz
+CContent --> SContent
+CMap --> SDoc
+CChatQuiz --> SChat
+CPay --> SPay
+SecJwt --> SAuth
+SContent --> MapPkg
+SChat --> RepoPkg
+SPay --> RepoPkg
+RepoPkg --> EntPkg
+EntPkg --> EnumPkg
+@enduml

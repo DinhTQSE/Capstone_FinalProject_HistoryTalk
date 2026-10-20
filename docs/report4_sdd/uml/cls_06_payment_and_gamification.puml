@@ -1,0 +1,94 @@
+@startuml
+skinparam dpi 180
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Class Diagram 3.6 - B2C Subscription, Gamification & PayOS Payment Fulfillment
+
+class PaymentController <<Controller>> {
+    + createCheckoutOrder(tierId: UUID): ResponseEntity<ApiResponse<CreatePaymentResponse>>
+    + getOrderStatus(orderCode: Long): ResponseEntity<ApiResponse<PaymentOrderResponse>>
+    + cancelOrder(orderCode: Long): ResponseEntity<ApiResponse<PaymentOrderResponse>>
+}
+
+class PayOSWebhookController <<Controller>> {
+    + handleWebhook(payload: Map<String, Object>): ResponseEntity<Map<String, Object>>
+}
+
+class GamificationController <<Controller>> {
+    + getTodayStatus(): ResponseEntity<ApiResponse<TodayGamificationResponse>>
+    + dailyCheckIn(): ResponseEntity<ApiResponse<DailyCheckInResponse>>
+    + claimQuestReward(request: ClaimQuestRequest): ResponseEntity<ApiResponse<ClaimQuestResponse>>
+}
+
+class PaymentService <<Service>> {
+    - paymentOrderRepository: PaymentOrderRepository
+    - tierRepository: TierRepository
+    - payOS: PayOS
+    + createPaymentLink(uid: UUID, tierId: UUID): CreatePaymentResponse
+}
+
+class PaymentWebhookService <<Service>> {
+    - paymentOrderRepository: PaymentOrderRepository
+    - paymentTransactionRepository: PaymentTransactionRepository
+    - paymentFulfillmentService: PaymentFulfillmentService
+    + verifyAndProcessWebhook(rawPayload: String): void
+}
+
+class PaymentFulfillmentService <<Service>> {
+    - paymentOrderRepository: PaymentOrderRepository
+    - userTierRepository: UserTierRepository
+    - userRepository: UserRepository
+    + fulfillPaidOrder(orderId: UUID): void
+}
+
+class PaymentFulfillmentReconciliationScheduler <<Scheduler>> {
+    - paymentOrderRepository: PaymentOrderRepository
+    - paymentFulfillmentService: PaymentFulfillmentService
+    + reconcilePendingFulfillments(): void
+}
+
+class GamificationServiceImpl <<Service>> {
+    - dailyCheckInRepository: DailyCheckInRepository
+    - dailyQuestRepository: DailyQuestRepository
+    - userQuestProgressRepository: UserQuestProgressRepository
+    - userRepository: UserRepository
+    + performCheckIn(uid: UUID): DailyCheckInResponse
+    + incrementQuestProgress(uid: UUID, type: QuestType): void
+}
+
+class PaymentOrder <<Entity>> {
+    - orderId: UUID
+    - orderCode: Long
+    - amount: Integer
+    - status: PaymentOrderStatus
+    - fulfillmentStatus: PaymentFulfillmentStatus
+    - fulfillmentAttempts: Integer
+}
+
+class Tier <<Entity>> {
+    - tierId: UUID
+    - title: String
+    - amount: Integer
+    - noMonth: Integer
+    - limitedToken: Integer
+}
+
+class UserTier <<Entity>> {
+    - id: UUID
+    - startTime: LocalDateTime
+    - endTime: LocalDateTime
+    - isActive: Boolean
+}
+
+PaymentController --> PaymentService
+PayOSWebhookController --> PaymentWebhookService
+PaymentWebhookService --> PaymentFulfillmentService
+PaymentFulfillmentReconciliationScheduler --> PaymentFulfillmentService
+PaymentService --> PaymentOrder
+PaymentService --> Tier
+PaymentFulfillmentService --> PaymentOrder
+PaymentFulfillmentService --> UserTier
+GamificationController --> GamificationServiceImpl
+@enduml

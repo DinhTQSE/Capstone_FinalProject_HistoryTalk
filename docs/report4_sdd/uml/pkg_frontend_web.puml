@@ -1,0 +1,56 @@
+@startuml
+skinparam dpi 180
+skinparam packageStyle folder
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Package Diagram - Frontend Web Application (Next.js / React TypeScript)
+
+package "HistoryTalk-Frontend" {
+    package "Presentation Layer" #EBF5FB {
+        [Presentation.Pages (App Router)\n(Landing, Timeline & Interactive Map, Roleplay Chat Studio,\nQuiz Arena, Student Assignments, Teacher Portal,\nSchool Admin Console, Content & System Admin Dashboard)] as Pages
+        [Presentation.Components\n(BattleMapCanvas, Character3DViewer, StreamingChatBox,\nQuizPlayer, GradebookTable, TokenQuotaCharts)] as Comps
+        [Presentation.UI Elements\n(Buttons, Modals, DataTables, Badges, ToastAlerts, Skeleton)] as UIElem
+    }
+
+    package "Feature Modules Layer (Feature-Driven Architecture)" #E8F8F5 {
+        [Features.Auth & RBAC\n(Login, OAuth2 Callback, Role Route Guards, Profile)] as FAuth
+        [Features.SaaS School & Classroom\n(School Lifecycle, CSV Student Roster Import,\nDaily Token Quota & Boost Approval)] as FSchool
+        [Features.Historical Exploration & Map\n(Era Timeline, GeoJSON Battle Map Pins, Camera Focuses,\nLocal History Content Review)] as FMap
+        [Features.Conversational AI Chat\n(Character Selection, SSE Stream Reader,\nSuggested Questions, Historical Quotes)] as FChat
+        [Features.Quiz & Classroom Assignments\n(Multiple-Choice / Fill-in-Blank / Matching Quiz,\nAssignment Creation & Auto-Grading)] as FQuiz
+        [Features.Billing & Gamification\n(Tier Checkout via PayOS QR, Daily Check-In & Quests)] as FBill
+    }
+
+    package "Infrastructure Layer" #FEF9E7 {
+        [Infrastructure.API Client\n(Axios Instance with Bearer JWT Interceptor & Refresh Rotation)] as ApiClient
+        [Infrastructure.SSE Streaming Client\n(EventSource / Fetch Stream Reader for AI Chat)] as SseClient
+        [Infrastructure.Direct Media Upload\n(Presigned URL & Binary Upload to Cloudflare R2 / Supabase)] as MediaClient
+    }
+
+    package "Core / State Layer" #F5EEF8 {
+        [Core.Context & Stores\n(AuthContext, ChatSessionStore, QuotaNotificationStore, ThemeContext)] as State
+        [Core.Hooks\n(useAuth, useStreamingChat, useBattleMap, useTokenBalance)] as Hooks
+        [Core.Types & Constants\n(TypeScript DTO Contracts, Enum Constants, RBAC Matrix)] as Types
+    }
+}
+
+Pages --> Comps
+Comps --> UIElem
+Pages --> FAuth
+Pages --> FSchool
+Pages --> FMap
+Pages --> FChat
+Pages --> FQuiz
+Pages --> FBill
+FAuth --> ApiClient
+FSchool --> ApiClient
+FMap --> ApiClient
+FMap --> MediaClient
+FChat --> SseClient
+FQuiz --> ApiClient
+FBill --> ApiClient
+FAuth --> State
+FChat --> Hooks
+ApiClient --> Types
+@enduml

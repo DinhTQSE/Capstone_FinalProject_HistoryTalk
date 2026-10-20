@@ -1,0 +1,53 @@
+@startuml
+skinparam dpi 180
+skinparam packageStyle folder
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Package Diagram - AI & Hybrid RAG Microservice (history_talk_ai - Python FastAPI)
+
+package "src.history_talk_ai" {
+    package "presentation" #EBF5FB {
+        package "chat" as PChat {
+            [router.py\n(FastAPI APIRouter: /v1/chat)] as RouterPy
+            [schemas.py\n(GenerateReplyRequest/Response,\nProcessDocumentRequest, GenerateTitleRequest)] as SchemasPy
+        }
+    }
+
+    package "application" #E8F8F5 {
+        package "chat" as AChat {
+            [service.py\n(generate_reply, generate_reply_stream,\nretrieve_history_context, process_document,\n_semantic_chunking, get_embedding_from_ollama)] as ServicePy
+        }
+        package "prompting" {
+            [prompt_builder.py\n(build_chat_system_prompt,\nbuild_title_system_prompt)] as PromptPy
+        }
+    }
+
+    package "dataaccess" #F5EEF8 {
+        package "java_backend" {
+            [client.py\n(JavaBackendClient: fetch_character, fetch_context)] as ClientPy
+            [character_schema.py\n(CharacterData, CharacterContextItem, CharacterEventItem)] as CharSchema
+            [historical_context_schema.py\n(HistoricalContextData)] as CtxSchema
+        }
+        [Supabase PgVector Client\n(supabase-py: vector_chunk table & match_history_chunks RPC)] as SupaClient
+    }
+
+    package "common" #FEF9E7 {
+        package "config" {
+            [settings.py\n(Pydantic BaseSettings: LLM_PROVIDER, OLLAMA_BASE_URL,\nSUPABASE_URL, JAVA_BACKEND_URL, INTERNAL_API_KEY)] as SettingsPy
+        }
+        package "errors" {
+            [Exception Handlers & Standardized Error Responses] as ErrorsPy
+        }
+    }
+}
+
+RouterPy --> SchemasPy
+RouterPy --> ServicePy
+RouterPy --> ClientPy
+ServicePy --> PromptPy
+ServicePy --> SupaClient
+ServicePy --> SettingsPy
+ClientPy --> CharSchema
+ClientPy --> CtxSchema
+@enduml

@@ -1,0 +1,386 @@
+@startuml
+skinparam dpi 180
+skinparam linetype ortho
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide circle
+
+title HistoryTalk - Complete Logical Entity-Relationship Diagram (32 Tables across 6 Bounded Domains)
+
+package "1. Multi-Tenant SaaS & User Identity" #EBF5FB {
+    entity "school" as school {
+        * id : UUID <<PK>>
+        --
+        name : VARCHAR(255)
+        school_code : VARCHAR(50) <<UQ>>
+        package_type : VARCHAR(50)
+        total_school_token_quota : INT
+        unallocated_token_quota : INT
+        default_daily_student_quota : INT
+        subscription_start_date : DATE
+        subscription_end_date : DATE
+        status : VARCHAR(20)
+    }
+
+    entity "user" as user {
+        * uid : UUID <<PK>>
+        --
+        school_id : UUID <<FK>>
+        user_name : VARCHAR(100) <<UQ>>
+        email : VARCHAR(100) <<UQ>>
+        role : VARCHAR(50)
+        account_status : VARCHAR(30)
+        token : INT
+        daily_tokens_used : INT
+        daily_bonus_tokens : INT
+    }
+
+    entity "classroom" as classroom {
+        * id : UUID <<PK>>
+        --
+        school_id : UUID <<FK>>
+        teacher_id : UUID <<FK>>
+        class_name : VARCHAR(100)
+        class_code : VARCHAR(50) <<UQ>>
+        grade_level : INT
+        academic_year : INT
+        daily_token_quota : INT
+        status : VARCHAR(20)
+    }
+
+    entity "class_student" as class_student {
+        * id : UUID <<PK>>
+        --
+        classroom_id : UUID <<FK>>
+        student_id : UUID <<FK>>
+        status : VARCHAR(20)
+    }
+
+    entity "token_boost_request" as token_boost_request {
+        * id : UUID <<PK>>
+        --
+        school_id : UUID <<FK>>
+        classroom_id : UUID <<FK>>
+        student_uid : UUID <<FK>>
+        reviewed_by_uid : UUID <<FK>>
+        requested_tokens : INT
+        approved_tokens : INT
+        status : VARCHAR(20)
+    }
+}
+
+package "2. Historical Content, RAG & Map" #E8F8F5 {
+    entity "historical_context" as historical_context {
+        * context_id : UUID <<PK>>
+        --
+        created_by : UUID <<FK>>
+        school_id : UUID <<FK>>
+        approved_by : UUID <<FK>>
+        name : VARCHAR(100)
+        era : VARCHAR(50)
+        category : VARCHAR(50)
+        content_scope : VARCHAR(20)
+        content_status : VARCHAR(20)
+        is_published : BOOLEAN
+    }
+
+    entity "character" as character {
+        * character_id : UUID <<PK>>
+        --
+        created_by : UUID <<FK>>
+        school_id : UUID <<FK>>
+        approved_by : UUID <<FK>>
+        name : VARCHAR(100)
+        personality : VARCHAR(500)
+        content_scope : VARCHAR(20)
+        content_status : VARCHAR(20)
+        is_published : BOOLEAN
+    }
+
+    entity "context_character_mapping" as context_character_mapping {
+        * mapping_id : UUID <<PK>>
+        --
+        context_id : UUID <<FK>>
+        character_id : UUID <<FK>>
+    }
+
+    entity "class_local_content" as class_local_content {
+        * id : UUID <<PK>>
+        --
+        class_id : UUID <<FK>>
+        entity_id : UUID
+        entity_type : VARCHAR(20)
+    }
+
+    entity "document" as document {
+        * doc_id : UUID <<PK>>
+        --
+        uploaded_by : UUID <<FK>>
+        entity_id : UUID
+        entity_type : VARCHAR(50)
+        document_type : VARCHAR(50)
+        status : VARCHAR(50)
+    }
+
+    entity "document_media_metadata" as document_media_metadata {
+        * metadata_id : UUID <<PK>>
+        --
+        document_id : UUID <<FK>>
+        entity_type : VARCHAR(50)
+        entity_id : UUID
+        media_type : VARCHAR(20)
+        storage_path : VARCHAR(500)
+    }
+
+    entity "vector_chunk" as vector_chunk {
+        * chunk_id : UUID <<PK>>
+        --
+        doc_id : UUID <<FK>>
+        entity_id : UUID
+        embedding : vector(768)
+        sequence_number : INT
+    }
+
+    entity "map_pin" as map_pin {
+        * pin_id : UUID <<PK>>
+        --
+        context_id : UUID <<FK>>
+        created_by : UUID <<FK>>
+        pin_owner_type : VARCHAR(10)
+        latitude : FLOAT8
+        longitude : FLOAT8
+        path_geojson : JSONB
+    }
+
+    entity "map_focus" as map_focus {
+        * focus_id : UUID <<PK>>
+        --
+        context_id : UUID <<FK>>
+        created_by : UUID <<FK>>
+        latitude : FLOAT8
+        longitude : FLOAT8
+        zoom_level : FLOAT8
+    }
+}
+
+package "3. Conversational AI Chat" #FEF9E7 {
+    entity "chat_session" as chat_session {
+        * session_id : UUID <<PK>>
+        --
+        uid : UUID <<FK>>
+        context_id : UUID <<FK>>
+        character_id : UUID <<FK>>
+        title : VARCHAR(255)
+    }
+
+    entity "message" as message {
+        * message_id : UUID <<PK>>
+        --
+        session_id : UUID <<FK>>
+        is_from_ai : BOOLEAN
+        token : INT
+        suggested_questions : TEXT
+        quotes : TEXT
+    }
+}
+
+package "4. Quiz, Question Bank & Assignments" #F5EEF8 {
+    entity "quiz" as quiz {
+        * quiz_id : UUID <<PK>>
+        --
+        context_id : UUID <<FK>>
+        created_by : UUID <<FK>>
+        title : VARCHAR(255)
+        level : VARCHAR(20)
+        is_published : BOOLEAN
+    }
+
+    entity "question" as question {
+        * question_id : UUID <<PK>>
+        --
+        quiz_id : UUID <<FK>>
+        question_type : VARCHAR(40)
+        question_data : TEXT
+    }
+
+    entity "quiz_question" as quiz_question {
+        * quiz_id : UUID <<PK,FK>>
+        * question_id : UUID <<PK,FK>>
+        --
+        order_index : INT
+        points : NUMERIC(8,2)
+    }
+
+    entity "quiz_session" as quiz_session {
+        * session_id : UUID <<PK>>
+        --
+        quiz_id : UUID <<FK>>
+        uid : UUID <<FK>>
+        score : FLOAT
+    }
+
+    entity "quiz_answer_detail" as quiz_answer_detail {
+        * answer_id : UUID <<PK>>
+        --
+        session_id : UUID <<FK>>
+        question_id : UUID <<FK>>
+        answer_data : TEXT
+        score_earned : FLOAT
+        is_correct : BOOLEAN
+    }
+
+    entity "quiz_rating" as quiz_rating {
+        * rating_id : UUID <<PK>>
+        --
+        quiz_id : UUID <<FK>>
+        user_id : UUID <<FK>>
+        rating_value : INT
+    }
+
+    entity "question_report" as question_report {
+        * report_id : UUID <<PK>>
+        --
+        question_id : UUID <<FK>>
+        quiz_id : UUID <<FK>>
+        reported_by : UUID <<FK>>
+        status : VARCHAR(20)
+    }
+
+    entity "assignment" as assignment {
+        * id : UUID <<PK>>
+        --
+        classroom_id : UUID <<FK>>
+        teacher_id : UUID <<FK>>
+        assignment_type : VARCHAR(30)
+        target_id : UUID
+        deadline : TIMESTAMPTZ
+        status : VARCHAR(20)
+    }
+
+    entity "assignment_submission" as assignment_submission {
+        * id : UUID <<PK>>
+        --
+        assignment_id : UUID <<FK>>
+        student_id : UUID <<FK>>
+        quiz_session_id : UUID <<FK>>
+        chat_session_id : UUID <<FK>>
+        status : VARCHAR(20)
+        score : NUMERIC(4,2)
+    }
+}
+
+package "5. B2C Tier, PayOS Billing & Gamification" #FDEDEC {
+    entity "tier" as tier {
+        * tier_id : UUID <<PK>>
+        --
+        title : VARCHAR(50)
+        amount : INT
+        limited_token : INT
+    }
+
+    entity "user_tier" as user_tier {
+        * id : UUID <<PK>>
+        --
+        uid : UUID <<FK>>
+        tier_id : UUID <<FK>>
+        order_id : UUID <<FK>>
+        is_active : BOOLEAN
+    }
+
+    entity "payment_order" as payment_order {
+        * order_id : UUID <<PK>>
+        --
+        uid : UUID <<FK>>
+        tier_id : UUID <<FK>>
+        order_code : BIGINT <<UQ>>
+        amount : INT
+        status : VARCHAR(50)
+        fulfillment_status : VARCHAR(30)
+    }
+
+    entity "payment_transaction" as payment_transaction {
+        * transaction_id : UUID <<PK>>
+        --
+        order_id : UUID <<FK>>
+        status : VARCHAR(50)
+        amount : INT
+    }
+
+    entity "daily_quest" as daily_quest {
+        * quest_id : VARCHAR(50) <<PK>>
+        --
+        type : VARCHAR(30)
+        target : INT
+        reward_tokens : INT
+    }
+
+    entity "user_quest_progress" as user_quest_progress {
+        * id : UUID <<PK>>
+        --
+        user_uid : UUID <<FK>>
+        quest_id : VARCHAR(50) <<FK>>
+        date : DATE
+        completed : BOOLEAN
+        claimed : BOOLEAN
+    }
+
+    entity "daily_check_in" as daily_check_in {
+        * id : UUID <<PK>>
+        --
+        user_uid : UUID <<FK>>
+        date : DATE
+        streak_count : INT
+    }
+}
+
+school ||--o{ user
+school ||--o{ classroom
+school ||--o{ token_boost_request
+school ||--o{ historical_context
+school ||--o{ character
+
+classroom ||--o{ class_student
+user ||--o{ class_student
+classroom ||--o{ token_boost_request
+user ||--o{ token_boost_request
+classroom ||--o{ class_local_content
+classroom ||--o{ assignment
+
+historical_context ||--o{ context_character_mapping
+character ||--o{ context_character_mapping
+historical_context ||--o{ map_pin
+historical_context ||--o{ map_focus
+document ||--o{ document_media_metadata
+document ||--o{ vector_chunk
+
+user ||--o{ chat_session
+historical_context ||--o{ chat_session
+character ||--o{ chat_session
+chat_session ||--o{ message
+
+historical_context ||--o{ quiz
+quiz ||--o{ quiz_question
+question ||--o{ quiz_question
+quiz ||--o{ quiz_session
+user ||--o{ quiz_session
+quiz_session ||--o{ quiz_answer_detail
+question ||--o{ quiz_answer_detail
+quiz ||--o{ quiz_rating
+question ||--o{ question_report
+
+assignment ||--o{ assignment_submission
+user ||--o{ assignment_submission
+quiz_session |o--o{ assignment_submission
+chat_session |o--o{ assignment_submission
+
+tier ||--o{ user_tier
+user ||--o{ user_tier
+tier ||--o{ payment_order
+user ||--o{ payment_order
+payment_order ||--o{ payment_transaction
+payment_order |o--o| user_tier
+
+user ||--o{ user_quest_progress
+daily_quest ||--o{ user_quest_progress
+user ||--o{ daily_check_in
+@enduml

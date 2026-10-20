@@ -1,0 +1,44 @@
+@startuml
+skinparam dpi 180
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.2.2 - Daily Student Token Quota Check & Token Boost Approval
+
+actor "School Student" as Student
+actor "Teacher / School Admin" as Reviewer
+participant "SchoolLifecycleAndTokenController" as Ctrl
+participant "DailyTokenAllowanceServiceImpl" as QuotaSvc
+participant "TokenBoostRequestServiceImpl" as BoostSvc
+database "PostgreSQL\n(user, school, classroom, token_boost_request)" as DB
+
+group Flow A: Daily Lazy Reset & Effective Quota Check
+    Student -> QuotaSvc : checkAndConsumeStudentTokens(studentUid, tokensRequired)
+    QuotaSvc -> DB : Load User, Classroom, and School
+    alt user.lastTokenResetAt < Today (00:00)
+        QuotaSvc -> DB : Lazy reset: dailyTokensUsed = 0, dailyBonusTokens = 0, lastTokenResetAt = NOW()
+    end
+    QuotaSvc -> QuotaSvc : Compute effectiveLimit = COALESCE(classroom.dailyTokenQuota, school.defaultDailyStudentQuota) + user.dailyBonusTokens
+    alt (dailyTokensUsed + tokensRequired) <= effectiveLimit AND school.unallocatedTokenQuota >= tokensRequired
+        QuotaSvc -> DB : Increment user.dailyTokensUsed & Decrement school.unallocatedTokenQuota
+        QuotaSvc --> Student : ALLOW (true)
+    else Quota Exceeded
+        QuotaSvc --> Student : DENY (429 Daily Token Quota Reached)
+    end
+end
+
+group Flow B: Student Requests Daily Token Boost & Teacher/Admin Approves
+    Student -> Ctrl : POST /api/v1/schools/token-boost-requests (requestedTokens, reason)
+    Ctrl -> BoostSvc : submitBoostRequest(studentUid, requestedTokens, reason)
+    BoostSvc -> DB : INSERT INTO token_boost_request (status = PENDING)
+    BoostSvc --> Student : 201 Created
+
+    Reviewer -> Ctrl : PUT /api/v1/schools/token-boost-requests/{id}/review (APPROVED, approvedTokens)
+    Ctrl -> BoostSvc : approveOrRejectRequest(id, reviewerUid, APPROVED, approvedTokens)
+    BoostSvc -> DB : Verify school.unallocatedTokenQuota >= approvedTokens
+    BoostSvc -> DB : UPDATE token_boost_request SET status = APPROVED
+    BoostSvc -> DB : UPDATE "user" SET daily_bonus_tokens = daily_bonus_tokens + approvedTokens
+    BoostSvc --> Reviewer : 200 OK (TokenBoostResponse)
+end
+@enduml

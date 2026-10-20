@@ -1,0 +1,96 @@
+@startuml
+skinparam dpi 180
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Class Diagram 3.3 - Historical Content, Character, Document OCR & Interactive Map
+
+class HistoricalContextController <<Controller>> {
+    + createContext(request: CreateHistoricalContextRequest): ResponseEntity<ApiResponse<HistoricalContextResponse>>
+    + updateContext(id: UUID, request: UpdateHistoricalContextRequest): ResponseEntity<ApiResponse<HistoricalContextResponse>>
+    + getPublishedContexts(era, category, pageable): ResponseEntity<PaginatedApiResponse<HistoricalContextResponse>>
+}
+
+class CharacterController <<Controller>> {
+    + createCharacter(request: CreateCharacterRequest): ResponseEntity<ApiResponse<CharacterResponse>>
+    + updateCharacter(id: UUID, request: UpdateCharacterRequest): ResponseEntity<ApiResponse<CharacterResponse>>
+    + getCharactersByContext(contextId: UUID): ResponseEntity<ApiResponse<List<CharacterResponse>>>
+}
+
+class PdfExtractionController <<Controller>> {
+    + extractAndIngestPdf(file: MultipartFile, entityId: UUID, entityType: EntityType): ResponseEntity<ApiResponse<PdfExtractionResponse>>
+}
+
+class MapPinController <<Controller>> {
+    + createMapPin(request: CreateMapPinRequest): ResponseEntity<ApiResponse<MapPinResponse>>
+    + updateMapPin(pinId: UUID, request: UpdateMapPinRequest): ResponseEntity<ApiResponse<MapPinResponse>>
+    + getPinsByContext(contextId: UUID): ResponseEntity<ApiResponse<List<MapPinResponse>>>
+}
+
+class LocalContentServiceImpl <<Service>> {
+    - historicalContextRepository: HistoricalContextRepository
+    - characterRepository: CharacterRepository
+    - classLocalContentRepository: ClassLocalContentRepository
+    + createLocalContext(teacherUid: UUID, request: CreateLocalContextRequest): LocalContentResponse
+    + submitForReview(entityId: UUID, entityType: EntityType): void
+    + reviewLocalContent(adminUid: UUID, entityId: UUID, status: ContentStatus, note: String): void
+}
+
+class PdfExtractionServiceImpl <<Service>> {
+    - pdfTypeClassifier: PdfTypeClassifier
+    - ocrService: OcrService
+    - documentRepository: DocumentRepository
+    - aiServiceClient: AiServiceClient
+    + extractTextFromPdf(file: MultipartFile): PdfExtractionResponse
+}
+
+class HistoricalContext <<Entity>> {
+    - contextId: UUID
+    - name: String
+    - era: EventEra
+    - category: EventCategory
+    - battleMap: String
+    - school: School
+    - contentScope: ContentScope
+    - contentStatus: ContentStatus
+    - isPublished: Boolean
+}
+
+class Character <<Entity>> {
+    - characterId: UUID
+    - name: String
+    - personality: String
+    - modelUrl: String
+    - contentScope: ContentScope
+    - contentStatus: ContentStatus
+    - isPublished: Boolean
+}
+
+class Document <<Entity>> {
+    - docId: UUID
+    - entityId: UUID
+    - entityType: EntityType
+    - documentType: DocumentType
+    - status: ContentStatus
+}
+
+class MapPin <<Entity>> {
+    - pinId: UUID
+    - pinOwnerType: String
+    - latitude: Double
+    - longitude: Double
+    - pinYear: Integer
+    - pathGeoJson: String
+}
+
+HistoricalContextController --> HistoricalContext
+CharacterController --> Character
+PdfExtractionController --> PdfExtractionServiceImpl
+MapPinController --> MapPin
+LocalContentServiceImpl --> HistoricalContext
+LocalContentServiceImpl --> Character
+PdfExtractionServiceImpl --> Document
+HistoricalContext "many" -- "many" Character
+HistoricalContext "1" *-- "many" MapPin
+@enduml

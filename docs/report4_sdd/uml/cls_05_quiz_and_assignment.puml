@@ -1,0 +1,101 @@
+@startuml
+skinparam dpi 180
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Class Diagram 3.5 - Quiz Engine, Question Bank & Classroom Assignments
+
+class QuizController <<Controller>> {
+    + getQuizzesByContext(contextId: UUID): ResponseEntity<ApiResponse<List<QuizResponse>>>
+    + startQuizSession(quizId: UUID): ResponseEntity<ApiResponse<QuizSessionResponse>>
+    + submitQuizSession(sessionId: UUID, request: SubmitQuizRequest): ResponseEntity<ApiResponse<QuizResultResponse>>
+    + rateQuiz(quizId: UUID, rating: int): ResponseEntity<ApiResponse<Void>>
+}
+
+class StaffQuestionBankController <<Controller>> {
+    + createQuestion(request: CreateQuestionRequest): ResponseEntity<ApiResponse<QuestionResponse>>
+    + importQuestionsCsv(file: MultipartFile): ResponseEntity<ApiResponse<BulkImportResponse>>
+    + assignQuestionsToQuiz(quizId: UUID, questionIds: List<UUID>): ResponseEntity<ApiResponse<Void>>
+}
+
+class TeacherAssignmentController <<Controller>> {
+    + createAssignment(request: CreateAssignmentRequest): ResponseEntity<ApiResponse<TeacherAssignmentResponse>>
+    + updateAssignment(id: UUID, request: UpdateAssignmentRequest): ResponseEntity<ApiResponse<TeacherAssignmentResponse>>
+    + getAssignmentGradebook(id: UUID): ResponseEntity<ApiResponse<AssignmentGradebookResponse>>
+}
+
+class StudentAssignmentController <<Controller>> {
+    + getMyAssignments(classroomId: UUID): ResponseEntity<ApiResponse<List<StudentAssignmentResponse>>>
+    + startAssignment(id: UUID): ResponseEntity<ApiResponse<StudentSubmissionResponse>>
+    + submitAssignment(id: UUID, request: SubmitAssignmentRequest): ResponseEntity<ApiResponse<StudentSubmissionResponse>>
+}
+
+class QuizServiceImpl <<Service>> {
+    - quizRepository: QuizRepository
+    - questionRepository: QuestionRepository
+    - quizSessionRepository: QuizSessionRepository
+    - quizAnswerDetailRepository: QuizAnswerDetailRepository
+    + evaluateQuestionAnswer(question: Question, answerDataJson: String): EvaluationResult
+    + submitAndGradeQuiz(sessionId: UUID, answers: List<AnswerItem>): QuizResultResponse
+}
+
+class StudentAssignmentServiceImpl <<Service>> {
+    - assignmentRepository: AssignmentRepository
+    - assignmentSubmissionRepository: AssignmentSubmissionRepository
+    + recordReadingProgress(assignmentId: UUID, studentUid: UUID, seconds: int): void
+    + recordAiChatExchange(studentUid: UUID, characterId: UUID, chatSessionId: UUID): void
+    + syncQuizSubmissionScore(studentUid: UUID, quizId: UUID, quizSession: QuizSession): void
+}
+
+class Quiz <<Entity>> {
+    - quizId: UUID
+    - title: String
+    - level: QuizLevel
+    - isPublished: Boolean
+}
+
+class Question <<Entity>> {
+    - questionId: UUID
+    - content: String
+    - questionType: QuestionType
+    - questionData: String
+    - explanation: String
+}
+
+class QuizSession <<Entity>> {
+    - sessionId: UUID
+    - startTime: LocalDateTime
+    - endTime: LocalDateTime
+    - score: Float
+}
+
+class Assignment <<Entity>> {
+    - id: UUID
+    - title: String
+    - assignmentType: AssignmentType
+    - targetId: UUID
+    - deadline: LocalDateTime
+    - minRequirement: Integer
+    - status: AssignmentStatus
+}
+
+class AssignmentSubmission <<Entity>> {
+    - id: UUID
+    - status: SubmissionStatus
+    - score: BigDecimal
+    - messageCount: Integer
+    - readingDurationSeconds: Integer
+}
+
+QuizController --> QuizServiceImpl
+StaffQuestionBankController --> QuizServiceImpl
+TeacherAssignmentController --> Assignment
+StudentAssignmentController --> StudentAssignmentServiceImpl
+QuizServiceImpl --> Quiz
+QuizServiceImpl --> Question
+QuizServiceImpl --> QuizSession
+StudentAssignmentServiceImpl --> Assignment
+StudentAssignmentServiceImpl --> AssignmentSubmission
+AssignmentSubmission --> QuizSession
+@enduml

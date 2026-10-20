@@ -1,0 +1,41 @@
+@startuml
+skinparam dpi 180
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title State Machine Diagrams 4.1.1 - ContentStatus, AccountStatus & SchoolStatus Lifecycles
+
+state "1. ContentStatus Lifecycle (HistoricalContext, Character, Document)" as ContentSM #E8F8F5 {
+    [*] --> DRAFT : Create Content / Local Content\n(Teacher or Content Admin)
+    DRAFT --> PENDING_REVIEW : Teacher submits local content\nfor School Admin review
+    PENDING_REVIEW --> ACTIVE : School Admin approves\n(is_published = true)
+    PENDING_REVIEW --> DRAFT : School Admin rejects\nwith review_note
+    DRAFT --> ACTIVE : Content Admin publishes\nglobal content directly
+    ACTIVE --> DRAFT : Unpublish / Revert to Draft
+    DRAFT --> INACTIVE : Soft Delete (Move to Trash)
+    ACTIVE --> INACTIVE : Soft Delete / Archive\n(deleted_at != null)
+    INACTIVE --> DRAFT : Restore from System Trash
+}
+
+state "2. AccountStatus Lifecycle (User Entity)" as AccountSM #EBF5FB {
+    [*] --> Account_ACTIVE : Register / OAuth2 Login /\nCSV Student Import
+    state "ACTIVE" as Account_ACTIVE
+    state "DEACTIVATED" as Account_DEACTIVATED
+    Account_ACTIVE --> Account_DEACTIVATED : Admin deactivates user OR\nGrade 12 Graduation Rollover
+    Account_DEACTIVATED --> Account_ACTIVE : Admin restores account /\nRe-enrolls student
+}
+
+state "3. SchoolStatus Lifecycle (School Entity)" as SchoolSM #FEF9E7 {
+    [*] --> School_ACTIVE : System Admin provisions School\n(01/09 - 31/05 Subscription)
+    state "ACTIVE" as School_ACTIVE
+    state "SUSPENDED" as School_SUSPENDED
+    state "EXPIRED" as School_EXPIRED
+    state "INACTIVE" as School_INACTIVE
+    School_ACTIVE --> School_SUSPENDED : System Admin suspends tenant
+    School_SUSPENDED --> School_ACTIVE : System Admin reactivates tenant
+    School_ACTIVE --> School_EXPIRED : Subscription end_date (31/05) passed\nwithout renewal
+    School_EXPIRED --> School_ACTIVE : System Admin renews EnterprisePackage
+    School_ACTIVE --> School_INACTIVE : Soft Delete / Decommission School
+    School_EXPIRED --> School_INACTIVE : Decommission School
+}
+@enduml

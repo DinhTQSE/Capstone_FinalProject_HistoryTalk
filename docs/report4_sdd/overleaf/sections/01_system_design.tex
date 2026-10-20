@@ -1,0 +1,148 @@
+% ============================================================================
+% SECTION 1: SYSTEM DESIGN
+% ============================================================================
+\section{System Design}
+
+\subsection{System Architecture}
+
+HistoryTalk is architected as a cloud-native, decoupled microservices platform serving both **B2B Educational Institutions** (Multi-tenant Schools, Classrooms, Teachers, and School Students) and **B2C Self-Directed Learners** (Customers). The architecture separates high-throughput transactional business operations, role-based access control (RBAC), and institutional lifecycle management from compute-intensive Retrieval-Augmented Generation (RAG), vector similarity search, cross-encoder reranking, and streaming Large Language Model (LLM) roleplay inference.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth]{figures/arch_system_overview.png}
+    \caption{HistoryTalk System Architecture Overview (Microservices, Data Stores \& Third-Party Integrations)}
+    \label{fig:arch_system_overview}
+\end{figure}
+
+As illustrated in Figure~\ref{fig:arch_system_overview}, the system comprises four primary architectural tiers and seven external service integrations:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Client Tier (Next.js / React Web Application):} Provides role-tailored workspaces for six distinct actors (\texttt{CUSTOMER}, \texttt{SCHOOL\_STUDENT}, \texttt{TEACHER}, \texttt{SCHOOL\_ADMIN}, \texttt{CONTENT\_ADMIN}, and \texttt{SYSTEM\_ADMIN}). It renders interactive GeoJSON battle maps, 3D historical character models (\texttt{.glb}), Server-Sent Events (SSE) streaming AI dialogues, multi-type quizzes, and classroom gradebooks.
+    \item \textbf{Core Business Microservice (Java 21 / Spring Boot 3.2.5):} Acts as the central transactional backbone and API Gateway for client traffic. It enforces stateless JWT authentication (\texttt{JwtAuthenticationFilter}), school academic-year subscription guards (\texttt{SchoolSubscriptionGuardInterceptor}), multi-tenant data isolation by \texttt{school\_id}, PDF text/OCR extraction (\texttt{Apache PDFBox 3.0.1} and \texttt{Tess4J 5.10.0}), PayOS webhook fulfillment, and Flyway schema migrations (\texttt{V1}--\texttt{V38}).
+    \item \textbf{AI \& Hybrid RAG Microservice (Python 3.11 / FastAPI / Uvicorn):} A dedicated asynchronous AI engine protected by an internal API key (\texttt{X-Internal-Api-Key}). It executes dynamic 80th-percentile semantic chunking, generates 768-dimensional dense embeddings (\texttt{BAAI/bge-m3}), queries \texttt{Supabase PgVector}, invokes the \texttt{Kaggle Cross-Encoder Reranker}, and streams grounded 1st-person historical persona responses with Socratic reverse-questioning.
+    \item \textbf{Data Persistence \& Vector Storage Tier:} Combines \textbf{PostgreSQL 16} (housing 31 relational tables in \texttt{historical\_schema}) with \textbf{Supabase PgVector} (storing the \texttt{vector\_chunk} table indexed with HNSW cosine distance \texttt{m=16, ef\_construction=64} and the \texttt{match\_history\_chunks} RPC function).
+    \item \textbf{External Third-Party Integrations:} Includes \textbf{Google OAuth 2.0} (SSO), \textbf{Cloudflare R2 / Supabase S3 Storage} (binary media, PDFs, 2D images, 3D GLB models), \textbf{PayOS Payment Gateway} (VietQR checkout and HMAC-SHA256 webhooks), \textbf{SMTP Mail Server} (transactional emails), \textbf{Ollama / OpenAI-Compatible LLM Host}, \textbf{Kaggle Reranker Service}, and the \textbf{Prometheus + Grafana Observability Stack}.
+\end{enumerate}
+
+\newpage
+\subsection{Package Diagram}
+
+\subsubsection{Back-end Core Packages (Java Spring Boot)}
+
+The Java Core Backend follows a strict layered and domain-partitioned package organization under \texttt{com.historytalk}, ensuring clean separation between HTTP presentation, security filters, domain business logic, and JPA persistence.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/pkg_backend_java.png}
+    \caption{Package Diagram -- Core Backend Service (\texttt{com.historytalk} -- Java Spring Boot)}
+    \label{fig:pkg_backend_java}
+\end{figure}
+
+\paragraph{Package Descriptions (Java Core Backend)}
+\begin{longtable}{|C{0.9cm}|L{4.8cm}|L{9.8cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{No} & \textbf{Package} & \textbf{Description} \\
+\hline
+\endhead
+01 & \texttt{com.historytalk.config} & Configures Spring Security filter chains (\texttt{SecurityConfig}), OpenAPI/Swagger documentation (\texttt{OpenApiConfig}), PayOS SDK client (\texttt{PayOSConfig}), OAuth2 properties (\texttt{OAuth2Properties}), and MVC interceptors (\texttt{SchoolLifecycleWebMvcConfig}). \\
+\hline
+02 & \texttt{com.historytalk.security} & Implements JWT token parsing and signing (\texttt{JwtTokenProvider}), request authentication (\texttt{JwtAuthenticationFilter}), B2B school subscription enforcement (\texttt{SchoolSubscriptionGuardInterceptor}), and Google OAuth2 handlers (\texttt{security.oauth2}). \\
+\hline
+03 & \texttt{com.historytalk.controller.*} & Exposes 27 RESTful API controllers grouped into 14 domain subpackages (\texttt{authentication}, \texttt{user}, \texttt{school}, \texttt{classroom}, \texttt{assignment}, \texttt{historicalContext}, \texttt{character}, \texttt{localcontent}, \texttt{document}, \texttt{map}, \texttt{chat}, \texttt{quiz}, \texttt{gamification}, \texttt{payment}, \texttt{dashboard}, \texttt{trash}). \\
+\hline
+04 & \texttt{com.historytalk.dto.*} & Encapsulates strongly-typed Request and Response Data Transfer Objects across 14 domain subpackages, along with standardized envelope wrappers (\texttt{ApiResponse}, \texttt{PaginatedApiResponse}, \texttt{ValidationErrorResponse}). \\
+\hline
+05 & \texttt{com.historytalk.service.*} & Orchestrates core business rules, multi-tenant authorization checks, PDF/OCR processing (\texttt{service.document}), CSV bulk student imports (\texttt{service.school.student}), daily token quota and boost workflows (\texttt{service.school.token}), AI microservice HTTP/SSE delegation (\texttt{service.chat}), and resilient PayOS fulfillment (\texttt{service.payment}). \\
+\hline
+06 & \texttt{com.historytalk.mapper.*} & Maps internal JPA domain entities to external DTO contracts (\texttt{CharacterMapper}, \texttt{UserMapper}, \texttt{PaymentMapper}, \texttt{TierMapper}) without leaking persistence internals. \\
+\hline
+07 & \texttt{com.historytalk.repository.*} & Defines 29 Spring Data JPA repository interfaces and 16 native SQL/JPQL analytical projection interfaces (\texttt{repository.dashboard}) for system, school, and classroom analytics. \\
+\hline
+08 & \texttt{com.historytalk.entity.*} & Contains 30 persistent JPA domain entities across 12 domain subpackages (\texttt{user}, \texttt{school}, \texttt{classroom}, \texttt{assignment}, \texttt{historicalContext}, \texttt{character}, \texttt{localcontent}, \texttt{document}, \texttt{map}, \texttt{chat}, \texttt{quiz}, \texttt{gamification}, \texttt{payment}) and 23 domain enumerations (\texttt{entity.enums}). \\
+\hline
+09 & \texttt{com.historytalk.exception} & Centralizes exception handling via \texttt{GlobalExceptionHandler} and domain exception hierarchy (\texttt{BaseException}, \texttt{ResourceNotFoundException}, \texttt{InvalidRequestException}, \texttt{DataConflictException}, \texttt{ForbiddenException}, \texttt{UnauthorizedException}). \\
+\hline
+10 & \texttt{com.historytalk.utils} & Provides cross-cutting security context helpers (\texttt{SecurityUtils}) and UUID validation/conversion utilities (\texttt{UuidUtils}). \\
+\hline
+\caption{Core Backend Package Descriptions (\texttt{com.historytalk})}
+\label{tab:pkg_backend_java}
+\end{longtable}
+
+\subsubsection{AI \& Hybrid RAG Microservice Packages (Python FastAPI)}
+
+The Python AI microservice is organized under \texttt{src/history\_talk\_ai} following a clean 4-layer architecture (\texttt{presentation}, \texttt{application}, \texttt{dataaccess}, and \texttt{common}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{figures/pkg_backend_ai.png}
+    \caption{Package Diagram -- AI \& Hybrid RAG Microservice (\texttt{history\_talk\_ai} -- Python FastAPI)}
+    \label{fig:pkg_backend_ai}
+\end{figure}
+
+\paragraph{Package Descriptions (Python AI Microservice)}
+\begin{longtable}{|C{0.9cm}|L{5.2cm}|L{9.4cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{No} & \textbf{Package} & \textbf{Description} \\
+\hline
+\endhead
+01 & \texttt{presentation.chat.router} & Exposes FastAPI endpoints under \texttt{/v1/chat} (\texttt{/generate-reply}, \texttt{/generate-reply-stream}, \texttt{/generate-title}, \texttt{/process-document}, and \texttt{DELETE /documents/\{doc\_id\}}) secured by internal API key validation. \\
+\hline
+02 & \texttt{presentation.chat.schemas} & Defines Pydantic v2 request/response models (\texttt{GenerateReplyRequest}, \texttt{GenerateReplyResponse}, \texttt{MessageHistoryItem}, \texttt{ProcessDocumentRequest}, \texttt{GenerateTitleRequest}). \\
+\hline
+03 & \texttt{application.chat.service} & Implements the core RAG and LLM pipeline: dynamic semantic chunking (\texttt{\_semantic\_chunking}), BGE-M3 embedding generation (\texttt{get\_embedding\_from\_ollama}), Supabase vector retrieval + Kaggle reranking (\texttt{retrieve\_history\_context}), and SSE streaming roleplay (\texttt{generate\_reply\_stream}). \\
+\hline
+04 & \texttt{application.prompting} & Houses \texttt{prompt\_builder.py} (\texttt{build\_chat\_system\_prompt}, \texttt{build\_title\_system\_prompt}), constructing 1st-person historical persona instructions, anti-hallucination constraints, and Socratic questioning rules. \\
+\hline
+05 & \texttt{dataaccess.java\_backend} & Implements asynchronous \texttt{httpx} client (\texttt{client.py}) and typed domain schemas (\texttt{character\_schema.py}, \texttt{historical\_context\_schema.py}) to fetch character biographies, eras, and context metadata from the Java Core Backend. \\
+\hline
+06 & \texttt{common.config} & Manages environment configuration via \texttt{pydantic-settings} (\texttt{settings.py}), binding LLM provider routing (\texttt{ollama} vs. \texttt{external}), model parameters, Supabase credentials, and timeouts. \\
+\hline
+07 & \texttt{common.errors} & Provides global FastAPI exception handlers and structured JSON error responses for upstream timeout, embedding, or LLM inference failures. \\
+\hline
+\caption{AI \& Hybrid RAG Microservice Package Descriptions (\texttt{history\_talk\_ai})}
+\label{tab:pkg_backend_ai}
+\end{longtable}
+
+\subsubsection{Front-end Web Application Packages (Next.js / React)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/pkg_frontend_web.png}
+    \caption{Package Diagram -- Frontend Web Application (Next.js / React TypeScript)}
+    \label{fig:pkg_frontend_web}
+\end{figure}
+
+\paragraph{Package Descriptions (Frontend Web Application)}
+\begin{longtable}{|C{0.9cm}|L{4.8cm}|L{9.8cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{No} & \textbf{Package} & \textbf{Description} \\
+\hline
+\endhead
+01 & \texttt{Presentation.Pages} & Next.js App Router views segregated by actor role: Public/Customer Portal, School Student Learning Workspace, Teacher Classroom Console, School Admin Portal, Content Admin Studio, and System Admin Dashboard. \\
+\hline
+02 & \texttt{Presentation.Components} & Reusable domain widgets including \texttt{BattleMapCanvas} (GeoJSON pins and animated route arrows), \texttt{Character3DViewer} (Three.js/GLB model viewer), \texttt{StreamingChatBox}, \texttt{QuizPlayer}, and \texttt{GradebookTable}. \\
+\hline
+03 & \texttt{Presentation.UI Elements} & Atomic design primitives (Buttons, Dialog Modals, DataTables, Pagination, StatusBadges, Toast notifications, and Skeletons). \\
+\hline
+04 & \texttt{Features.Auth \& RBAC} & Handles credential login, Google OAuth2 callback processing, mandatory first-login password change for imported school students, and role-based route protection. \\
+\hline
+05 & \texttt{Features.SaaS School \& Classroom} & Manages B2B school onboarding, academic year lifecycle rollover, classroom creation, CSV student roster bulk import, and daily token quota/boost review workflows. \\
+\hline
+06 & \texttt{Features.Historical Exploration \& Map} & Drives timeline browsing by \texttt{EventEra} and \texttt{EventCategory}, interactive battle-map overlays, camera viewpoint focuses (\texttt{MapFocus}), and school-owned local history content workflows. \\
+\hline
+07 & \texttt{Features.Conversational AI Chat} & Manages character roleplay sessions, real-time SSE token streaming, clickable suggested follow-up questions, and cited historical quotes display. \\
+\hline
+08 & \texttt{Features.Quiz \& Assignments} & Implements interactive quiz players (\texttt{MULTIPLE\_CHOICE}, \texttt{FILL\_IN\_BLANK}, \texttt{MATCHING}), question bank CSV import, teacher assignment dispatch, and automated submission tracking. \\
+\hline
+09 & \texttt{Features.Billing \& Gamification} & Orchestrates B2C tier upgrades via PayOS QR checkout, order status polling, daily streak check-ins, and daily quest token rewards. \\
+\hline
+10 & \texttt{Infrastructure} & Configures Axios HTTP interceptors with automatic JWT refresh token rotation, SSE stream readers, and direct binary media uploads to Cloudflare R2 / Supabase Storage. \\
+\hline
+11 & \texttt{Core / State} & Provides React contexts, Zustand stores, custom hooks (\texttt{useAuth}, \texttt{useStreamingChat}, \texttt{useTokenBalance}), and TypeScript DTO interfaces synchronized with backend OpenAPI specs. \\
+\hline
+\caption{Frontend Web Application Package Descriptions}
+\label{tab:pkg_frontend_web}
+\end{longtable}

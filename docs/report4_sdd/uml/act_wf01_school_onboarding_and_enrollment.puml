@@ -1,0 +1,36 @@
+@startuml
+skinparam dpi 180
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Activity Diagram WF-01 - B2B School Onboarding, Classroom Setup & Bulk Student Enrollment
+
+|System Admin|
+start
+:Log in & provision new B2B School tenant;
+:Select EnterprisePackage (SMALL / MEDIUM / LARGE)\n& set academic cycle (01/09 - 31/05);
+:System creates School (status = ACTIVE)\nand initial School Admin account;
+
+|School Admin|
+:Log in & accept Local History Content Policy;
+:Configure default daily student token quota;
+:Create Teacher accounts & Classrooms\n(gradeLevel 6-12, academicYear);
+
+|Teacher|
+:Select target Classroom & upload Student Roster CSV;
+:System validates CSV format, emails & studentCodes;
+if (CSV rows valid?) then (Yes)
+    :Create/Update School Student accounts\n(accountStatus = ACTIVE, mustChangePassword = true);
+    :Create ClassStudent enrollment records;
+    :Auto-mark pre-existing past-deadline assignments\nas EXEMPTED for newly enrolled students;
+else (No)
+    :Return row-level validation error report;
+    stop
+endif
+
+|School Student|
+:Log in with initial credentials;
+:Complete mandatory first-login password change;
+:Access assigned Classroom Dashboard;
+stop
+@enduml

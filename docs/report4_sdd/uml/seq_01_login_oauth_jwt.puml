@@ -1,0 +1,40 @@
+@startuml
+skinparam dpi 180
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.1.1 - User Login, Google OAuth2 & Dual-Token JWT Rotation
+
+actor "User / Student" as User
+participant "Next.js Web UI" as UI
+participant "AuthController" as Ctrl
+participant "AuthServiceImpl /\nGoogleOAuthServiceImpl" as Svc
+participant "JwtTokenProvider" as Jwt
+database "UserRepository\n(PostgreSQL)" as Repo
+
+User -> UI : Enter credentials OR Click "Continue with Google"
+alt Standard Username/Email + Password Login
+    UI -> Ctrl : POST /api/v1/auth/login (LoginRequest)
+    Ctrl -> Svc : login(request)
+    Svc -> Repo : findByEmailOrUserNameAndDeletedAtIsNull()
+    Repo --> Svc : User entity
+    Svc -> Svc : Validate BCrypt password & AccountStatus == ACTIVE
+    alt User belongs to B2B School (school_id != null)
+        Svc -> Svc : Verify SchoolStatus == ACTIVE & within Subscription Dates
+    end
+else Google OAuth 2.0 SSO Login
+    UI -> Ctrl : OAuth2 Callback Code
+    Ctrl -> Svc : processOAuthPostLogin(email, fullName, avatarUrl)
+    Svc -> Repo : findByEmailAndDeletedAtIsNull(email)
+    alt First-time Google User
+        Svc -> Repo : save(New User with random BCrypt password)
+        Svc -> Svc : Send welcome credentials via GoogleOAuthPasswordEmailService
+    end
+end
+Svc -> Jwt : generateAccessToken(user) & generateRefreshToken(user)
+Jwt --> Svc : accessToken, refreshToken
+Svc --> Ctrl : LoginResponse(tokens, role, mustChangePassword)
+Ctrl --> UI : 200 OK (ApiResponse<LoginResponse>)
+UI --> User : Redirect to Role Dashboard (or Force Password Change Modal)
+@enduml
