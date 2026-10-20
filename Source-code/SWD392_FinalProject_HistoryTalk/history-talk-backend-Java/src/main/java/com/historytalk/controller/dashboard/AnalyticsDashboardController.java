@@ -34,8 +34,8 @@ public class AnalyticsDashboardController {
     @Operation(summary = "School Admin Dashboard", description = "Returns school scale, token quota allocation vs student consumption, and assignment completion rate (US-SP6-06)")
     public ResponseEntity<ApiResponse<SchoolAdminDashboardResponse>> getSchoolAdminDashboard(
             @AuthenticationPrincipal UserPrincipal principal) {
-        log.info("GET /api/v1/school-admin/dashboard by user: {}", principal.getUsername());
-        SchoolAdminDashboardResponse response = analyticsDashboardService.getSchoolAdminDashboard(principal.getSchoolId());
+        log.info("GET /api/v1/school-admin/dashboard by user: {}", principal != null ? principal.getUsername() : "security-context");
+        SchoolAdminDashboardResponse response = analyticsDashboardService.getSchoolAdminDashboard(principal != null ? principal.getSchoolId() : null);
         return ResponseEntity.ok(ApiResponse.success(response, "School Admin dashboard retrieved successfully"));
     }
 
@@ -45,7 +45,7 @@ public class AnalyticsDashboardController {
     public ResponseEntity<ApiResponse<TeacherClassroomDashboardResponse>> getTeacherClassroomDashboard(
             @PathVariable UUID classId,
             @AuthenticationPrincipal UserPrincipal principal) {
-        log.info("GET /api/v1/teacher/dashboard/classrooms/{} by teacher: {}", classId, principal.getUsername());
+        log.info("GET /api/v1/teacher/dashboard/classrooms/{} by teacher: {}", classId, principal != null ? principal.getUsername() : "security-context");
         TeacherClassroomDashboardResponse response = analyticsDashboardService.getTeacherClassroomDashboard(classId, principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Teacher classroom dashboard retrieved successfully"));
     }
@@ -55,7 +55,7 @@ public class AnalyticsDashboardController {
     @Operation(summary = "Student Personal Dashboard", description = "Returns student token balance, quiz performance, enrolled classrooms, and upcoming assignments (US-SP6-08)")
     public ResponseEntity<ApiResponse<StudentPersonalDashboardResponse>> getStudentDashboard(
             @AuthenticationPrincipal UserPrincipal principal) {
-        log.info("GET /api/v1/student/dashboard by student: {}", principal.getUsername());
+        log.info("GET /api/v1/student/dashboard by student: {}", principal != null ? principal.getUsername() : "security-context");
         StudentPersonalDashboardResponse response = analyticsDashboardService.getStudentDashboard(principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Student dashboard retrieved successfully"));
     }
@@ -65,7 +65,7 @@ public class AnalyticsDashboardController {
     @Operation(summary = "Customer B2C Personal Dashboard", description = "Returns subscription tier, token balance, quiz learning history, top AI characters, and PayOS transaction history (US-SP6-09)")
     public ResponseEntity<ApiResponse<CustomerPersonalDashboardResponse>> getCustomerDashboard(
             @AuthenticationPrincipal UserPrincipal principal) {
-        log.info("GET /api/v1/customer/dashboard by customer: {}", principal.getUsername());
+        log.info("GET /api/v1/customer/dashboard by customer: {}", principal != null ? principal.getUsername() : "security-context");
         CustomerPersonalDashboardResponse response = analyticsDashboardService.getCustomerDashboard(principal);
         return ResponseEntity.ok(ApiResponse.success(response, "Customer dashboard retrieved successfully"));
     }
