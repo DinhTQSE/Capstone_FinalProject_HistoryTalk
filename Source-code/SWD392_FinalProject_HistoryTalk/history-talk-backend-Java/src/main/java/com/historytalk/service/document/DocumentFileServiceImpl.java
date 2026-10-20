@@ -99,14 +99,14 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && (
-                "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                        || "TEACHER".equalsIgnoreCase(role)
-                        || "SCHOOL_ADMIN".equalsIgnoreCase(role)
-                        || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role)
-        );
+        if (role == null) return false;
+        String r = role.toUpperCase(java.util.Locale.ROOT).replace("ROLE_", "");
+        return "CONTENT_ADMIN".equals(r)
+                || "SYSTEM_ADMIN".equals(r)
+                || "STAFF".equals(r)
+                || "ADMIN".equals(r)
+                || "TEACHER".equals(r)
+                || "SCHOOL_ADMIN".equals(r);
     }
 
     private boolean isStaffOrAdminOrStudent(String role) {

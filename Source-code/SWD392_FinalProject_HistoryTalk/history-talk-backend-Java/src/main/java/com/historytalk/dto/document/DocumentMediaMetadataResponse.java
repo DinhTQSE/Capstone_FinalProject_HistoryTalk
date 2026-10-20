@@ -28,4 +28,19 @@ public class DocumentMediaMetadataResponse {
     private String extendedMetadata;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("viewUrl")
+    public String getViewUrl() {
+        return publicUrl;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("objectPath")
+    public String getObjectPath() {
+        return storagePath;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("url")
+    public String getUrl() {
+        return publicUrl;
+    }
 }
