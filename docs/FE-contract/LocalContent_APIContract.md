@@ -1341,6 +1341,20 @@ Giáo viên (`TEACHER`) và `SCHOOL_ADMIN` được cấp quyền quản lý b�
 
 ---
 
+### 56. Quy tắc phân tách Dữ liệu Toàn cầu và Trường học (Global vs. Local Content Isolation)
+
+- **Danh mục công cộng Platform (`/api/v1/historical-contexts`, `/api/v1/characters`):**
+  - Chỉ trả về tài nguyên toàn quốc do Platform quản lý (`school IS NULL`).
+  - Toàn bộ nội dung do Giáo viên / Trường học tạo (dù là `CLASS_ONLY` hay `SCHOOL_WIDE`, dù đã xuất bản `isPublished = true`) sẽ **KHÔNG BAO GIỜ** xuất hiện trên danh mục sự kiện hay danh mục nhân vật chung của nền tảng (không làm lộ sang Customer hay học sinh trường khác).
+  - Học sinh và giáo viên truy cập nội dung trường mình qua portal riêng: `/api/v1/student/local-contents/...` và `/api/v1/teacher/local-contents/...`.
+- **Kịch bản hội thoại (`/api/v1/chat/scenarios`):**
+  - **Customer / Người dùng tự do:** Chỉ xem và chat các kịch bản toàn cầu (`c.school IS NULL AND hc.school IS NULL`).
+  - **Người dùng trường học (`SCHOOL_STUDENT`, `TEACHER`):** Xem kịch bản toàn cầu CỘNG THÊM các kịch bản của trường mình nếu nội dung đó có phạm vi chia sẻ toàn trường (`contentScope = 'SCHOOL_WIDE'`). Các nội dung riêng tư `CLASS_ONLY` không hiển thị tự do trong danh sách kịch bản chung của trường.
+- **Xem chi tiết theo ID & Bản đồ số (`GET /historical-contexts/{id}`, `GET /characters/{id}`, `GET /map-pins`, `GET /map-focuses`):**
+  - Nếu tài nguyên có `school != null`, hệ thống kiểm tra trường học của người gọi: nếu không cùng trường học (và không phải Content/System Admin), hệ thống sẽ trả về mã lỗi `404 NOT_FOUND` (để bảo mật tuyệt đối, không lộ sự tồn tại của ID).
+
+---
+
 ## ❌ Error Responses
 
 | HTTP | Code | Trường hợp |

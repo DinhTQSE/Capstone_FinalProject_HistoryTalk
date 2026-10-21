@@ -21,6 +21,7 @@ import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.service.map.MapFocusService;
 import com.historytalk.service.map.MapPinService;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -92,6 +93,25 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (!isStaffOrAdmin(role)
                 && (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+        }
+
+        // School-owned isolation check: local content cannot be viewed by outsiders
+        if (context.getSchool() != null && !isStaffOrAdmin(role)) {
+            String userId = SecurityUtils.getUserId();
+            UUID userSchoolId = null;
+            if (userId != null) {
+                try {
+                    userSchoolId = userRepository.findById(UUID.fromString(userId))
+                            .map(User::getSchool)
+                            .map(com.historytalk.entity.school.School::getId)
+                            .orElse(null);
+                } catch (Exception ex) {
+                    log.debug("Error retrieving user school: {}", ex.getMessage());
+                }
+            }
+            if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
+                throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+            }
         }
         
         return mapToResponse(context);

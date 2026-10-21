@@ -153,6 +153,28 @@ class CharacterServiceImplTest {
 
         assertThatThrownBy(() -> characterService.createCharacter(request, UUID.randomUUID().toString()))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("Character name already exists");
+                .hasMessageContaining("Tên nhân vật đã tồn tại");
+    }
+
+    @Test
+    void getCharacterByIdRejectsOutsiderWhenCharacterBelongsToSchool() {
+        UUID schoolId = UUID.randomUUID();
+        com.historytalk.entity.school.School school = com.historytalk.entity.school.School.builder()
+                .id(schoolId)
+                .name("Test High School")
+                .schoolCode("THS")
+                .build();
+
+        Character character = Character.builder()
+                .characterId(UUID.randomUUID())
+                .name("Nguyen Hue")
+                .isPublished(true)
+                .school(school)
+                .build();
+
+        when(characterRepository.findById(character.getCharacterId())).thenReturn(java.util.Optional.of(character));
+
+        assertThatThrownBy(() -> characterService.getCharacterById(character.getCharacterId().toString(), "USER"))
+                .isInstanceOf(com.historytalk.exception.ResourceNotFoundException.class);
     }
 }

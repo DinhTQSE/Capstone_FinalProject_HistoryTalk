@@ -89,6 +89,25 @@ class HistoricalContextServiceImplTest {
         assertThat(json).doesNotContain("deletedAt");
     }
 
+    @Test
+    void getContextByIdRejectsOutsiderWhenContextBelongsToSchool() {
+        UUID schoolId = UUID.randomUUID();
+        com.historytalk.entity.school.School school = com.historytalk.entity.school.School.builder()
+                .id(schoolId)
+                .name("Test High School")
+                .schoolCode("THS")
+                .build();
+
+        HistoricalContext context = activeContext();
+        context.setSchool(school);
+
+        when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                historicalContextService.getContextById(context.getContextId().toString(), "USER"))
+                .isInstanceOf(com.historytalk.exception.ResourceNotFoundException.class);
+    }
+
     private HistoricalContext activeContext() {
         User creator = User.builder()
                 .uid(UUID.randomUUID())

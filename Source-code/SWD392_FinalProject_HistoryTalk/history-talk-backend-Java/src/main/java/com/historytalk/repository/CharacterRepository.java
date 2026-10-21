@@ -38,7 +38,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             SELECT DISTINCT c FROM Character c
               LEFT JOIN c.historicalContexts hc
             JOIN FETCH c.createdBy u
-           WHERE (:search IS NULL OR :search = ''
+           WHERE c.school IS NULL
+             AND (:search IS NULL OR :search = ''
                  OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                  OR LOWER(c.background) LIKE LOWER(CONCAT('%', :search, '%')))
            AND (:era IS NULL OR hc.era = :era)
@@ -49,7 +50,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
             countQuery = """
             SELECT COUNT(DISTINCT c) FROM Character c
             LEFT JOIN c.historicalContexts hc
-            WHERE (:search IS NULL OR :search = ''
+            WHERE c.school IS NULL
+              AND (:search IS NULL OR :search = ''
                    OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(c.background) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:era IS NULL OR hc.era = :era)
@@ -64,7 +66,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query("""
            SELECT c FROM Character c
-           WHERE c.deletedAt IS NOT NULL
+           WHERE c.school IS NULL AND c.deletedAt IS NOT NULL
            ORDER BY c.name ASC
            """)
     List<Character> findAllDeleted();
@@ -78,13 +80,13 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
            """)
     int restoreById(@Param("characterId") UUID characterId);
 
-    @Query("SELECT COUNT(c) FROM Character c")
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.school IS NULL")
     long countCurrent();
 
-    @Query("SELECT COUNT(c) FROM Character c WHERE c.isPublished = true")
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.school IS NULL AND c.isPublished = true")
     long countPublished();
 
-    @Query("SELECT COUNT(c) FROM Character c WHERE c.deletedAt IS NULL AND c.isPublished = true")
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.school IS NULL AND c.deletedAt IS NULL AND c.isPublished = true")
     long countActive();
 
     @Query(value = """
@@ -100,8 +102,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                   (:schoolId IS NULL AND c.school IS NULL AND hc.school IS NULL)
                   OR (:schoolId IS NOT NULL AND (
                       (c.school IS NULL AND hc.school IS NULL)
-                      OR (c.school.id = :schoolId)
-                      OR (hc.school.id = :schoolId)
+                      OR (c.school.id = :schoolId AND (c.contentScope IS NULL OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
+                      OR (hc.school.id = :schoolId AND (hc.contentScope IS NULL OR hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
                   ))
               )
             ORDER BY hc.createdAt DESC, c.name ASC
@@ -119,8 +121,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
                   (:schoolId IS NULL AND c.school IS NULL AND hc.school IS NULL)
                   OR (:schoolId IS NOT NULL AND (
                       (c.school IS NULL AND hc.school IS NULL)
-                      OR (c.school.id = :schoolId)
-                      OR (hc.school.id = :schoolId)
+                      OR (c.school.id = :schoolId AND (c.contentScope IS NULL OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
+                      OR (hc.school.id = :schoolId AND (hc.contentScope IS NULL OR hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
                   ))
               )
             """)

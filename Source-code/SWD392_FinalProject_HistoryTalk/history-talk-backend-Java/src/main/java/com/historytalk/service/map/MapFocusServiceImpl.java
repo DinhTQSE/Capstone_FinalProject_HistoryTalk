@@ -293,6 +293,20 @@ public class MapFocusServiceImpl implements MapFocusService {
                 throw new ResourceNotFoundException(
                         "Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
             }
+            if (context.getSchool() != null) {
+                UUID userSchoolId = null;
+                if (callerId != null) {
+                    try {
+                        userSchoolId = userRepository.findById(UUID.fromString(callerId))
+                                .map(User::getSchool)
+                                .map(com.historytalk.entity.school.School::getId)
+                                .orElse(null);
+                    } catch (Exception ignored) {}
+                }
+                if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
+                    throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+                }
+            }
         }
         return context;
     }

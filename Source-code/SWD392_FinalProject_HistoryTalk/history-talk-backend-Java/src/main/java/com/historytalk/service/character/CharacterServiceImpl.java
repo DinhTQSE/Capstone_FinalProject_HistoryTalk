@@ -17,6 +17,7 @@ import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -82,16 +83,77 @@ public class CharacterServiceImpl implements CharacterService {
         if (!isStaffOrAdmin(role) && character.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
         }
+
+        // School-owned isolation check: local characters cannot be viewed by outsiders
+        if (character.getSchool() != null && !isStaffOrAdmin(role)) {
+            String userId = SecurityUtils.getUserId();
+            UUID userSchoolId = null;
+            if (userId != null) {
+                try {
+                    userSchoolId = userRepository.findById(UUID.fromString(userId))
+                            .map(User::getSchool)
+                            .map(com.historytalk.entity.school.School::getId)
+                            .orElse(null);
+                } catch (Exception ex) {
+                    log.debug("Error retrieving user school: {}", ex.getMessage());
+                }
+            }
+            if (userSchoolId == null || !userSchoolId.equals(character.getSchool().getId())) {
+                throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
+            }
+        }
+
         return mapToResponse(character);
     }
 
     @Transactional(readOnly = true)
     public List<CharacterResponse> getCharactersByContext(String contextId, String role) {
         log.info("Fetching characters for context: {}", contextId);
+
+        HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
+
+        if (!isStaffOrAdmin(role)) {
+            if (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null) {
+                throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+            }
+            if (context.getSchool() != null) {
+                String userId = SecurityUtils.getUserId();
+                UUID userSchoolId = null;
+                if (userId != null) {
+                    try {
+                        userSchoolId = userRepository.findById(UUID.fromString(userId))
+                                .map(User::getSchool)
+                                .map(com.historytalk.entity.school.School::getId)
+                                .orElse(null);
+                    } catch (Exception ex) {
+                        log.debug("Error retrieving user school: {}", ex.getMessage());
+                    }
+                }
+                if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
+                    throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+                }
+            }
+        }
+
         boolean includeDraft = isStaffOrAdmin(role);
         boolean includeDeleted = false;
         return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
                 .stream()
+                .filter(c -> {
+                    if (c.getSchool() == null || isStaffOrAdmin(role)) return true;
+                    String userId = SecurityUtils.getUserId();
+                    UUID userSchoolId = null;
+                    if (userId != null) {
+                        try {
+                            userSchoolId = userRepository.findById(UUID.fromString(userId))
+                                    .map(User::getSchool)
+                                    .map(com.historytalk.entity.school.School::getId)
+                                    .orElse(null);
+                        } catch (Exception ignored) {}
+                    }
+                    return userSchoolId != null && userSchoolId.equals(c.getSchool().getId());
+                })
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

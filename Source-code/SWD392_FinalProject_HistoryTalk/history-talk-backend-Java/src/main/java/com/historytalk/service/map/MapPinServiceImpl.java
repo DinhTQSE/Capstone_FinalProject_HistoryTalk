@@ -69,6 +69,22 @@ public class MapPinServiceImpl implements MapPinService {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
 
+        // School-owned isolation check: outsiders cannot load pins of school-owned context
+        if (context.getSchool() != null && !isAdminRole(role) && !isEduManager) {
+            UUID userSchoolId = null;
+            if (callerId != null) {
+                try {
+                    userSchoolId = userRepository.findById(UUID.fromString(callerId))
+                            .map(User::getSchool)
+                            .map(com.historytalk.entity.school.School::getId)
+                            .orElse(null);
+                } catch (Exception ignored) {}
+            }
+            if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
+                throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+            }
+        }
+
         List<MapPin> pins;
         if (callerId != null && !isAdminRole(role) && !isEduManager) {
             // Authenticated regular user: admin pins + own user pins
