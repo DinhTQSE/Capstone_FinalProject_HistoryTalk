@@ -1,7 +1,7 @@
 @startuml
 scale max 2800 width
 skinparam classAttributeIconSize 0
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
 skinparam shadowing false
 
 title Class Diagram 3.6 - B2C Subscription, Gamification & PayOS Payment Fulfillment

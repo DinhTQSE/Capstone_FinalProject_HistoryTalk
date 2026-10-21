@@ -1,11 +1,11 @@
 @startuml
 scale max 2800 width
 skinparam linetype ortho
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
 skinparam shadowing false
 hide circle
 
-title HistoryTalk - Complete Logical Entity-Relationship Diagram (32 Tables across 6 Bounded Domains)
+title HistoryTalk - Complete Logical Entity-Relationship Diagram 
 
 package "1. Multi-Tenant SaaS & User Identity" #EBF5FB {
     entity "school" as school {

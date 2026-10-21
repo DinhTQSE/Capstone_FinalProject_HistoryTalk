@@ -1,77 +1,52 @@
 @startuml
-scale max 2800 width
+scale max 2000 width
+top to bottom direction
 skinparam componentStyle rectangle
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
 skinparam shadowing false
-skinparam linetype ortho
 
-title HistoryTalk - System Architecture Overview (Microservices & External Integrations)
+title HistoryTalk - System Architecture Overview
 
-actor "Customer / Learner" as Customer
-actor "School Student" as Student
-actor "Teacher" as Teacher
-actor "School Admin" as SchoolAdmin
-actor "Content Admin" as ContentAdmin
-actor "System Admin" as SysAdmin
-
-package "Client Tier (Web & Mobile Ready)" #EEF4FF {
-    [Next.js / React Web Application\n(SSR, TailwindCSS, Mapbox/Leaflet, 3D Model Viewer)] as WebApp
+package "Client Tier" #EEF4FF {
+    [Next.js / React Web Application\n(Web UI, Interactive Historical Map, 3D Model Viewer, Streaming Chat)] as WebApp
 }
 
-package "Core Business Microservice (Java 21 / Spring Boot 3.2.5)" #E8F8F5 {
-    [Security & Guard Layer\n(JwtAuthenticationFilter, SchoolSubscriptionGuardInterceptor,\nOAuth2AuthenticationSuccessHandler)] as SecLayer
-    [REST API Controllers (27 Controllers)\n(Auth, School, Classroom, Assignment, Content, Character,\nChat, Quiz, Map, Gamification, Payment, Dashboard, Trash)] as JavaControllers
-    [Domain Application Services & Schedulers\n(AuthService, SchoolManagementService, AcademicLifecycleService,\nDailyTokenAllowanceService, LocalContentService, QuizService,\nPdfExtractionService / Tess4J OCR, PaymentFulfillmentService)] as JavaServices
-    [Spring Data JPA Repositories (29 Repositories)\n& Flyway Migration Engine (V1 - V38)] as JavaRepos
+package "Core Backend Application (Java 21 / Spring Boot)" #E8F8F5 {
+    [Security & Access Control Layer\n(JwtAuthenticationFilter, SchoolSubscriptionGuardInterceptor,\nOAuth2AuthenticationSuccessHandler)] as SecLayer
+    [REST API Controllers\n(Auth, School, Classroom, Assignment, Content, Character,\nChat, Quiz, Map, Gamification, Payment, Dashboard)] as JavaControllers
+    [Application Services & Schedulers\n(AuthService, SchoolManagementService, AcademicLifecycleService,\nDailyTokenAllowanceService, LocalContentService, QuizService,\nPdfExtractionService / Tess4J OCR, PaymentFulfillmentService)] as JavaServices
+    [Data Access Layer\n(Spring Data JPA Repositories & Flyway Schema Migration)] as JavaRepos
 }
 
-package "AI & Hybrid RAG Microservice (Python 3.11 / FastAPI / Uvicorn)" #FEF9E7 {
-    [FastAPI Presentation Layer\n(chat_router: /v1/chat/generate-reply, /generate-reply-stream,\n/process-document, /generate-title)] as AiRouter
-    [RAG & Roleplay Application Service\n(_semantic_chunking, retrieve_history_context,\ngenerate_reply_stream, prompt_builder)] as AiService
-    [Java Backend Async Client\n(JavaBackendClient - httpx)] as AiDataClient
+package "AI & RAG Engine (Python / FastAPI)" #FEF9E7 {
+    [FastAPI Presentation Layer\n(/v1/chat/generate-reply, /generate-reply-stream,\n/process-document, /generate-title)] as AiRouter
+    [RAG & Roleplay Service\n(Semantic Chunking, Vector Context Retrieval,\nStreaming Persona Generation, Prompt Builder)] as AiService
+    [Backend HTTP Client\n(JavaBackendClient - httpx)] as AiDataClient
 }
 
 package "Data Persistence & Vector Storage Tier" #F5EEF8 {
-    database "PostgreSQL 16 Relational DB\n(historical_schema - 31 Relational Tables)" as PostgresDB
-    database "Supabase PgVector DB\n(vector_chunk Table, 768-D HNSW Index,\nmatch_history_chunks RPC)" as VectorDB
+    database "PostgreSQL Relational Database\n(historical_schema)" as PostgresDB
+    database "Supabase PgVector Store\n(vector_chunk Table & HNSW Cosine Index)" as VectorDB
 }
 
 package "External Third-Party Services & Infrastructure" #FDEDEC {
-    [Google OAuth 2.0 Identity Provider] as GoogleOAuth
-    [Cloudflare R2 / Supabase S3 Storage\n(PDFs, 2D Images, 3D GLB Models, Map Rasters)] as CloudStorage
-    [PayOS Payment Gateway\n(QR Checkout & HMAC-SHA256 Webhook)] as PayOS
-    [SMTP Mail Server\n(Password Reset & OAuth Credentials)] as SmtpServer
-    [Ollama / External LLM & Embedding Host\n(Gemma-2-9B-IT / OpenAI API + BAAI/bge-m3)] as LlmHost
-    [Kaggle Cross-Encoder Reranker API\n(/api/rerank)] as KaggleRerank
-    [Observability Stack\n(Spring Actuator, Prometheus, Grafana)] as Monitoring
+    [Google OAuth 2.0\nCloudflare R2 / Supabase Storage\nPayOS Payment Gateway\nSMTP Mail Server] as ExtCore
+    [Ollama / External LLM & Embedding Host\n(Gemma-2-9B-IT + BAAI/bge-m3)\nKaggle Cross-Encoder Reranker API\nPrometheus & Grafana Monitoring] as ExtAi
 }
 
-Customer --> WebApp : HTTPS
-Student --> WebApp : HTTPS
-Teacher --> WebApp : HTTPS
-SchoolAdmin --> WebApp : HTTPS
-ContentAdmin --> WebApp : HTTPS
-SysAdmin --> WebApp : HTTPS
+WebApp -down-> SecLayer : HTTPS REST API & SSE Stream (Bearer JWT)
+SecLayer -down-> JavaControllers
+JavaControllers -down-> JavaServices
+JavaServices -down-> JavaRepos
+JavaRepos -down-> PostgresDB : JDBC / HikariCP
 
-WebApp --> SecLayer : REST API / JSON + SSE Stream\n(Bearer JWT)
-SecLayer --> JavaControllers
-JavaControllers --> JavaServices
-JavaServices --> JavaRepos
-JavaRepos --> PostgresDB : JDBC / HikariCP
+JavaServices -right-> AiRouter : Internal HTTP / SSE
+AiRouter -down-> AiService
+AiService -down-> AiDataClient
+AiDataClient .left.> JavaControllers : Fetch Character & Context
 
-JavaServices --> AiRouter : Async HTTP / SSE\n(X-Internal-Api-Key)
-AiRouter --> AiService
-AiService --> AiDataClient
-AiDataClient --> JavaControllers : Fetch Character & Context Metadata
-
-AiService --> VectorDB : Supabase RPC\n(match_history_chunks / Upsert Chunks)
-AiService --> LlmHost : Embeddings (bge-m3)\n& Roleplay Chat Stream
-AiService --> KaggleRerank : Cross-Encoder Rerank\nTop-10 Chunks
-
-SecLayer --> GoogleOAuth : OAuth2 Code Exchange
-JavaServices --> CloudStorage : Presigned URL / Binary Upload
-JavaServices --> PayOS : Create Payment Link\n& Verify Webhook
-PayOS --> JavaControllers : POST /api/v1/payments/payos/webhook
-JavaServices --> SmtpServer : Send Transactional Emails
-Monitoring ..> JavaControllers : Scrape /actuator/prometheus
+AiService -down-> VectorDB : Vector Similarity Search & Upsert
+AiService -down-> ExtAi : Embeddings, Rerank & LLM Stream
+JavaServices -down-> ExtCore : OAuth2, Storage, PayOS & SMTP
 @enduml

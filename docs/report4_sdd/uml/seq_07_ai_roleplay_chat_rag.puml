@@ -1,6 +1,6 @@
 @startuml
 scale max 2800 width
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
 skinparam shadowing false
 autonumber
 
@@ -24,7 +24,7 @@ MsgSvc -> FastAPI : POST /v1/chat/generate-reply-stream (character, context, mes
 
 FastAPI -> Rerank : get_embedding_from_ollama(userMessage, model="bge-m3")
 Rerank --> FastAPI : 768-D query_embedding
-FastAPI -> VecDB : RPC match_history_chunks(query_embedding, match_limit=10, filter_entity_ids)
+FastAPI -> VecDB : match_history_chunks similarity search(query_embedding, match_limit=10, filter_entity_ids)
 VecDB --> FastAPI : Top-10 candidate chunks
 FastAPI -> Rerank : POST /api/rerank (query, Top-10 chunks)
 alt Kaggle Reranker Available

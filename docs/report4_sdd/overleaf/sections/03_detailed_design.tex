@@ -3,14 +3,14 @@
 % ============================================================================
 \section{Detailed Design}
 
-\subsection{Authentication, Account Lifecycle \& Multi-Tenant RBAC}
+\subsection{Authentication, Account Lifecycle and User Access Control}
 
-\subsubsection{Class Diagram: Authentication, Account Lifecycle \& Multi-Tenant RBAC}
+\subsubsection{Class Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.45\textheight,keepaspectratio]{figures/cls_01_auth_rbac.png}
-    \caption[Class Diagram -- Authentication, Account Lifecycle \& Multi-Tenant RBAC]{Class Diagram -- Authentication, Account Lifecycle \& Multi-Tenant RBAC}
+    \caption{Class Diagram -- Authentication, Account Lifecycle and User Access Control}
     \label{fig:cls_01_auth_rbac}
 \end{figure}
 
@@ -20,55 +20,55 @@
 \textbf{Class} & \textbf{Description} \\
 \hline
 \endhead
-\texttt{AuthController} & REST API controller (\texttt{/api/v1/auth}) handling customer registration, staff registration, credential login, JWT refresh token rotation, logout, and forgot/reset password endpoints. \\
+AuthController & REST API controller (/api/v1/auth) handling customer registration, staff registration, credential login, JWT refresh token rotation, logout, and forgot/reset password endpoints. \\
 \hline
-\texttt{AdminUser\ab Controller} & REST API controller (\texttt{/api/v1/admin/users}) enabling \texttt{SYSTEM\_ADMIN} and \texttt{SCHOOL\_ADMIN} to query paginated user lists, update user roles, deactivate accounts, and bulk-restore soft-deleted users. \\
+AdminUser\ab Controller & REST API controller (/api/v1/admin/users) enabling SYSTEM\_ADMIN and SCHOOL\_ADMIN to query paginated user lists, update user roles, deactivate accounts, and bulk-restore soft-deleted users. \\
 \hline
-\texttt{UserController} & REST API controller (\texttt{/api/v1/users}) managing authenticated user profile retrieval, profile updates, and first-login mandatory password changes (\texttt{mustChange\ab Password}). \\
+UserController & REST API controller (/api/v1/users) managing authenticated user profile retrieval, profile updates, and first-login mandatory password changes (mustChange\ab Password). \\
 \hline
-\texttt{JwtAuthentication\ab Filter} & Spring Security \texttt{OncePerRequest\ab Filter} that extracts Bearer JWT tokens, validates signatures and \texttt{lastToken\ab ResetAt} revocation timestamps, and populates \texttt{SecurityContext\ab Holder}. \\
+JwtAuthentication\ab Filter & Spring Security OncePerRequest\ab Filter that extracts Bearer JWT tokens, validates signatures and lastToken\ab ResetAt revocation timestamps, and populates SecurityContext\ab Holder. \\
 \hline
-\texttt{SchoolSubscription\ab GuardInterceptor} & Spring MVC \texttt{Handler\ab Interceptor} enforcing B2B tenant guards: blocks institutional requests when the user's \texttt{School} is \texttt{SUSPENDED}, \texttt{INACTIVE}, or outside its \texttt{01/09}--\texttt{31/05} subscription window. \\
+SchoolSubscription\ab GuardInterceptor & Spring MVC Handler\ab Interceptor enforcing B2B tenant guards: blocks institutional requests when the user's School is SUSPENDED, INACTIVE, or outside its 01/09--31/05 subscription window. \\
 \hline
-\texttt{AuthService} / \texttt{AuthServiceImpl} & Core authentication service interface and implementation managing BCrypt password verification, dual-token issuance, token revocation via \texttt{lastToken\ab ResetAt}, and SHA-256 hashed password reset tokens. \\
+AuthService / AuthServiceImpl & Core authentication service interface and implementation managing BCrypt password verification, dual-token issuance, token revocation via lastToken\ab ResetAt, and SHA-256 hashed password reset tokens. \\
 \hline
-\texttt{GoogleOAuth\ab ServiceImpl} & Processes Google OAuth 2.0 SSO callbacks, auto-provisions first-time \texttt{CUSTOMER} accounts with random BCrypt passwords, and dispatches credentials via \texttt{GoogleOAuth\ab PasswordEmail\ab Service}. \\
+GoogleOAuth\ab ServiceImpl & Processes Google OAuth 2.0 SSO callbacks, auto-provisions first-time CUSTOMER accounts with random BCrypt passwords, and dispatches credentials via GoogleOAuth\ab PasswordEmail\ab Service. \\
 \hline
-\texttt{JwtTokenProvider} & Cryptographic utility built on \texttt{jjwt 0.12.5} for signing and parsing access and refresh JWTs containing \texttt{uid}, \texttt{role}, and \texttt{schoolId} claims. \\
+JwtTokenProvider & Cryptographic utility for signing and parsing access and refresh JWTs containing uid, role, and schoolId claims. \\
 \hline
-\texttt{UserRepository} & Spring Data JPA repository providing query methods for active/deleted users by email, username, school tenant, and password reset token hash. \\
+UserRepository & Spring Data JPA repository providing query methods for active and deleted users by email, username, school tenant, and password reset token hash. \\
 \hline
-\texttt{User} & Core JPA domain entity mapped to \texttt{"user"}, encapsulating identity, 6-role RBAC (\texttt{UserRole}), \texttt{AccountStatus}, B2C/B2B token counters, and audit timestamps. \\
+User & Core JPA domain entity mapped to "user", encapsulating user identity, role authorization (UserRole), AccountStatus, B2C/B2B token counters, and audit timestamps. \\
 \hline
-\caption{Class Descriptions -- Authentication, Account Lifecycle \& Multi-Tenant RBAC}
+\caption{Class Descriptions -- Authentication, Account Lifecycle and User Access Control}
 \label{tab:cls_01_auth_rbac}
 \end{longtable}
 
-\subsubsection{Sequence Diagrams: Authentication \& Account Lifecycle}
+\subsubsection{Sequence Diagrams}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_01_login_oauth_jwt.png}
-    \caption[Sequence Diagram -- User Login, Google OAuth2 \& Dual-Token JWT Rotation]{Sequence Diagram -- User Login, Google OAuth2 \& Dual-Token JWT Rotation}
+    \caption{Sequence Diagram -- User Login, Google OAuth2 and Dual-Token JWT Rotation}
     \label{fig:seq_01_login_oauth_jwt}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_02_password_reset_and_lifecycle.png}
-    \caption[Sequence Diagram -- Password Reset \& Admin Account Lifecycle]{Sequence Diagram -- Self-Service Password Reset \& Admin Account Lifecycle Management}
+    \caption{Sequence Diagram -- Self-Service Password Reset and Admin Account Lifecycle Management}
     \label{fig:seq_02_password_reset_and_lifecycle}
 \end{figure}
 
 \newpage
-\subsection{B2B SaaS School, Classroom \& Token Quota Allocation}
+\subsection{B2B SaaS School, Classroom and Token Quota Allocation}
 
-\subsubsection{Class Diagram: B2B SaaS School, Classroom \& Token Quota Allocation}
+\subsubsection{Class Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.45\textheight,keepaspectratio]{figures/cls_02_school_classroom_token.png}
-    \caption[Class Diagram -- B2B SaaS School, Classroom \& Token Quota Allocation]{Class Diagram -- B2B SaaS School, Classroom \& Token Quota Allocation}
+    \caption{Class Diagram -- B2B SaaS School, Classroom and Token Quota Allocation}
     \label{fig:cls_02_school_classroom_token}
 \end{figure}
 
@@ -78,53 +78,53 @@
 \textbf{Class} & \textbf{Description} \\
 \hline
 \endhead
-\texttt{AdminSchool\ab Controller} & REST API controller (\texttt{/api/v1/admin/\ab schools}) for \texttt{SYSTEM\_ADMIN} to provision B2B school tenants, assign \texttt{Enterprise\ab Package} tiers, and manage school subscription statuses. \\
+AdminSchool\ab Controller & REST API controller (/api/v1/admin/\ab schools) for SYSTEM\_ADMIN to provision B2B school tenants, assign Enterprise\ab Package tiers, and manage school subscription statuses. \\
 \hline
-\texttt{Classroom\ab Controller} / \texttt{ClassroomStudent\ab Controller} & REST API controllers managing school classrooms, teacher assignments, student roster listings, classroom transfers, and smart class join codes (\texttt{SmartClassCode\ab Generator}). \\
+Classroom\ab Controller / ClassroomStudent\ab Controller & REST API controllers managing school classrooms, teacher assignments, student roster listings, classroom transfers, and smart class join codes (SmartClassCode\ab Generator). \\
 \hline
-\texttt{SchoolLifecycle\ab AndTokenController} & REST API controller (\texttt{/api/v1/schools}) handling bulk CSV student imports, daily token boost requests/approvals, and end-of-academic-year student lifecycle rollovers. \\
+SchoolLifecycle\ab AndTokenController & REST API controller (/api/v1/schools) handling bulk CSV student imports, daily token boost requests and approvals, and end-of-academic-year student lifecycle rollovers. \\
 \hline
-\texttt{SchoolManagement\ab ServiceImpl} & Manages school creation, initial \texttt{SCHOOL\_ADMIN} provisioning, enterprise token pool initialization, and scheduled subscription expiration checks. \\
+SchoolManagement\ab ServiceImpl & Manages school creation, initial SCHOOL\_ADMIN provisioning, enterprise token pool initialization, and scheduled subscription expiration checks. \\
 \hline
-\texttt{AcademicLifecycle\ab ServiceImpl} & Executes end-of-year academic promotions: promotes Grade 6--11 classrooms, archives completed cohorts, and transitions graduating Grade 12 student accounts to \texttt{DEACTIVATED}. \\
+AcademicLifecycle\ab ServiceImpl & Executes end-of-year academic promotions: promotes Grade 6--11 classrooms, archives completed cohorts, and transitions graduating Grade 12 student accounts to DEACTIVATED. \\
 \hline
-\texttt{StudentImport\ab ServiceImpl} & Coordinates \texttt{SchoolWide\ab ImportProcessor} and \texttt{ClassroomImport\ab Processor} using \texttt{Apache Commons CSV} to batch-create student accounts and auto-exempt past-deadline classroom assignments. \\
+StudentImport\ab ServiceImpl & Coordinates SchoolWide\ab ImportProcessor and ClassroomImport\ab Processor using Apache Commons CSV to batch-create student accounts and auto-exempt past-deadline classroom assignments. \\
 \hline
-\texttt{DailyToken\ab AllowanceServiceImpl} & Enforces B2B student daily token limits with lazy midnight resets, resolving effective limits from classroom overrides or school defaults plus approved daily bonus tokens. \\
+DailyToken\ab AllowanceServiceImpl & Enforces B2B student daily token limits with lazy midnight resets, resolving effective limits from classroom overrides or school defaults plus approved daily bonus tokens. \\
 \hline
-\texttt{TokenBoostRequest\ab ServiceImpl} & Manages the student daily token boost lifecycle (\texttt{PENDING} $\rightarrow$ \texttt{APPROVED}/\texttt{REJECTED}), deducting approved tokens from the school's shared \texttt{unallocated\ab TokenQuota}. \\
+TokenBoostRequest\ab ServiceImpl & Manages the student daily token boost lifecycle (PENDING $\rightarrow$ APPROVED/REJECTED), deducting approved tokens from the school's shared unallocated\ab TokenQuota. \\
 \hline
-\texttt{School}, \texttt{Classroom}, \texttt{ClassStudent}, \texttt{TokenBoost\ab Request} & Persistent JPA domain entities modeling the multi-tenant school hierarchy, classroom rosters, and daily token boost requests. \\
+School, Classroom, ClassStudent, TokenBoost\ab Request & Persistent JPA domain entities modeling the multi-tenant school hierarchy, classroom rosters, and daily token boost requests. \\
 \hline
-\caption{Class Descriptions -- B2B SaaS School, Classroom \& Token Quota Allocation}
+\caption{Class Descriptions -- B2B SaaS School, Classroom and Token Quota Allocation}
 \label{tab:cls_02_school_classroom_token}
 \end{longtable}
 
-\subsubsection{Sequence Diagrams: School Provisioning, CSV Import \& Token Boost}
+\subsubsection{Sequence Diagrams}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_03_school_provisioning_and_import.png}
-    \caption[Sequence Diagram -- B2B School Onboarding \& Bulk CSV Enrollment]{Sequence Diagram -- B2B School Onboarding \& Bulk CSV Student Enrollment}
+    \caption{Sequence Diagram -- B2B School Onboarding and Bulk CSV Student Enrollment}
     \label{fig:seq_03_school_provisioning_and_import}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_04_token_boost_and_allowance.png}
-    \caption[Sequence Diagram -- Daily Token Quota Check \& Token Boost Approval]{Sequence Diagram -- Daily Student Token Quota Check \& Token Boost Request Approval}
+    \caption{Sequence Diagram -- Daily Student Token Quota Check and Token Boost Request Approval}
     \label{fig:seq_04_token_boost_and_allowance}
 \end{figure}
 
 \newpage
-\subsection{Historical Content, Character, Document OCR \& Interactive Map}
+\subsection{Historical Content, Character, Document OCR and Interactive Map}
 
-\subsubsection{Class Diagram: Historical Content, Character, Document OCR \& Interactive Map}
+\subsubsection{Class Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.42\textheight,keepaspectratio]{figures/cls_03_content_character_map.png}
-    \caption[Class Diagram -- Historical Content, Character, OCR \& Interactive Map]{Class Diagram -- Historical Content, Character, Document OCR \& Interactive Map}
+    \caption{Class Diagram -- Historical Content, Character, Document OCR and Interactive Map}
     \label{fig:cls_03_content_character_map}
 \end{figure}
 
@@ -134,51 +134,51 @@
 \textbf{Class} & \textbf{Description} \\
 \hline
 \endhead
-\texttt{HistoricalContext\ab Controller} & REST API controller (\texttt{/api/v1/\ab historical-contexts}) providing CRUD, publication toggling, and filtered timeline pagination by \texttt{EventEra} and \texttt{EventCategory}. \\
+HistoricalContext\ab Controller & REST API controller (/api/v1/\ab historical-contexts) providing CRUD, publication toggling, and filtered timeline pagination by EventEra and EventCategory. \\
 \hline
-\texttt{Character\ab Controller} & REST API controller (\texttt{/api/v1/characters}) managing historical character biographies, persona prompts, 3D model URLs, and context associations. \\
+Character\ab Controller & REST API controller (/api/v1/characters) managing historical character biographies, persona prompts, 3D model URLs, and context associations. \\
 \hline
-\texttt{PdfExtraction\ab Controller} / \texttt{DocumentFile\ab Controller} & REST API controllers handling PDF upload, automatic text/OCR extraction, document persistence, and asynchronous RAG vector indexing triggers. \\
+PdfExtraction\ab Controller / DocumentFile\ab Controller & REST API controllers handling PDF upload, automatic text/OCR extraction, document persistence, and asynchronous RAG vector indexing triggers. \\
 \hline
-\texttt{MapPinController} / \texttt{MapFocusController} & REST API controllers managing GeoJSON battle-map pins (\texttt{ADMIN} and \texttt{USER} pins), troop movement \texttt{LineString} paths, and camera viewpoint focuses. \\
+MapPinController / MapFocusController & REST API controllers managing GeoJSON battle-map pins (ADMIN and USER pins), troop movement LineString paths, and camera viewpoint focuses. \\
 \hline
-\texttt{TeacherLocal\ab ContentController} / \texttt{SchoolAdminLocal\ab ContentController} & REST API controllers enabling teachers to author local history contexts/characters and school admins to review and approve/reject them (\texttt{PENDING\_REVIEW} $\rightarrow$ \texttt{ACTIVE}/\texttt{DRAFT}). \\
+TeacherLocal\ab ContentController / SchoolAdminLocal\ab ContentController & REST API controllers enabling teachers to author local history contexts and characters and school admins to review and approve or reject them (PENDING\_REVIEW $\rightarrow$ ACTIVE/DRAFT). \\
 \hline
-\texttt{PdfExtraction\ab ServiceImpl} / \texttt{OcrServiceImpl} & Classifies uploaded PDFs via \texttt{PdfType\ab Classifier}; extracts digital text via \texttt{Apache PDFBox 3.0.1} or falls back to \texttt{Tess4J 5.10.0} Vietnamese OCR (\texttt{vie.traineddata}) for scanned historical archives. \\
+PdfExtraction\ab ServiceImpl / OcrServiceImpl & Classifies uploaded PDFs via PdfType\ab Classifier; extracts digital text via Apache PDFBox or falls back to Tess4J Vietnamese OCR (vie.traineddata) for scanned historical archives. \\
 \hline
-\texttt{LocalContent\ab ServiceImpl} & Enforces multi-tenant isolation and policy checks (\texttt{localHistory\ab PolicyAccepted}) for school-owned local historical content and classroom assignments (\texttt{ClassLocal\ab Content}). \\
+LocalContent\ab ServiceImpl & Enforces multi-tenant isolation and policy checks (localHistory\ab PolicyAccepted) for school-owned local historical content and classroom assignments (ClassLocal\ab Content). \\
 \hline
-\texttt{HistoricalContext}, \texttt{Character}, \texttt{Document}, \texttt{MapPin}, \texttt{MapFocus} & Domain entities representing historical events, roleplay personas, RAG source documents, and interactive GeoJSON map elements. \\
+HistoricalContext, Character, Document, MapPin, MapFocus & Domain entities representing historical events, roleplay personas, RAG source documents, and interactive GeoJSON map elements. \\
 \hline
-\caption{Class Descriptions -- Historical Content, Character, Document OCR \& Interactive Map}
+\caption{Class Descriptions -- Historical Content, Character, Document OCR and Interactive Map}
 \label{tab:cls_03_content_character_map}
 \end{longtable}
 
-\subsubsection{Sequence Diagrams: PDF OCR Ingestion \& Local Content Approval}
+\subsubsection{Sequence Diagrams}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_05_document_ocr_and_rag_sync.png}
-    \caption[Sequence Diagram -- PDF Upload, Hybrid OCR \& Async RAG Indexing]{Sequence Diagram -- PDF Upload, Hybrid PDFBox/Tess4J OCR \& Async RAG Vector Indexing}
+    \caption{Sequence Diagram -- PDF Upload, Hybrid PDFBox/Tess4J OCR and Async RAG Vector Indexing}
     \label{fig:seq_05_document_ocr_and_rag_sync}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_06_local_content_approval.png}
-    \caption[Sequence Diagram -- Local History Content Review \& Classroom Assignment]{Sequence Diagram -- School Local History Content Creation, Review \& Classroom Assignment}
+    \caption{Sequence Diagram -- School Local History Content Creation, Review and Classroom Assignment}
     \label{fig:seq_06_local_content_approval}
 \end{figure}
 
 \newpage
-\subsection{Conversational AI Roleplay \& Hybrid RAG Microservice}
+\subsection{Conversational AI Roleplay and Hybrid RAG Engine}
 
-\subsubsection{Class Diagram: Conversational AI Roleplay \& Hybrid RAG Microservice}
+\subsubsection{Class Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.45\textheight,keepaspectratio]{figures/cls_04_chat_and_ai_rag.png}
-    \caption[Class Diagram -- Conversational AI Roleplay \& Hybrid RAG Microservice]{Class Diagram -- Conversational AI Roleplay \& Hybrid RAG Microservice}
+    \caption{Class Diagram -- Conversational AI Roleplay and Hybrid RAG Engine}
     \label{fig:cls_04_chat_and_ai_rag}
 \end{figure}
 
@@ -188,44 +188,44 @@
 \textbf{Class} & \textbf{Description} \\
 \hline
 \endhead
-\texttt{ChatController} (Java) & Exposes endpoints (\texttt{/api/v1/chat}) for creating chat sessions, retrieving grouped conversation history, and streaming AI character responses over SSE. \\
+ChatController & Exposes endpoints (/api/v1/chat) for creating chat sessions, retrieving grouped conversation history, and streaming AI character responses over SSE. \\
 \hline
-\texttt{ChatSession\ab ServiceImpl} (Java) & Manages chat session lifecycles, initial character greeting generation, and automatic short session title updates after the first dialogue exchange. \\
+ChatSession\ab ServiceImpl & Manages chat session lifecycles, initial character greeting generation, and automatic short session title updates after the first dialogue exchange. \\
 \hline
-\texttt{MessageService\ab Impl} (Java) & Coordinates token quota verification, user message persistence, AI microservice invocation, AI message persistence, and automatic \texttt{AI\_CHAT\_ROLEPLAY} assignment progress tracking. \\
+MessageService\ab Impl & Coordinates token quota verification, user message persistence, AI service invocation, AI message persistence, and automatic AI\_CHAT\_ROLEPLAY assignment progress tracking. \\
 \hline
-\texttt{AiServiceClient} (Java) & HTTP/SSE integration client communicating with the Python FastAPI microservice using \texttt{X-Internal-\ab Api-Key} authentication and Micrometer latency metrics (\texttt{AiMetrics\ab Service}). \\
+AiServiceClient & HTTP/SSE integration client communicating with the Python FastAPI AI service using X-Internal-\ab Api-Key authentication and latency metrics (AiMetrics\ab Service). \\
 \hline
-\texttt{ChatRouter} (Python FastAPI) & Presentation router (\texttt{presentation/\ab chat/router.py}) exposing \texttt{/v1/chat/\ab generate-reply}, \texttt{/generate-\ab reply-stream}, \texttt{/generate-title}, and \texttt{/process-document}. \\
+ChatRouter & FastAPI presentation router (presentation/\ab chat/router.py) exposing /v1/chat/\ab generate-reply, /generate-\ab reply-stream, /generate-title, and /process-document. \\
 \hline
-\texttt{RagChatService} (Python FastAPI) & Core RAG module (\texttt{application/\ab chat/service.py}) implementing dynamic 80th-percentile semantic chunking, \texttt{bge-m3} embedding generation, Supabase \texttt{match\_history\_\ab chunks} RPC retrieval, Kaggle cross-encoder reranking, and streaming LLM roleplay. \\
+RagChatService & Core RAG module (application/\ab chat/service.py) implementing dynamic 80th-percentile semantic chunking, bge-m3 embedding generation, Supabase PgVector similarity retrieval, Kaggle cross-encoder reranking, and streaming LLM roleplay. \\
 \hline
-\texttt{PromptBuilder} (Python FastAPI) & Constructs 1st-person historical persona system prompts (\texttt{prompt\_\ab builder.py}), enforcing anti-hallucination guardrails and a 30\% probability Socratic reverse-questioning directive. \\
+PromptBuilder & Constructs first-person historical persona system prompts (prompt\_\ab builder.py), enforcing anti-hallucination guardrails and a 30\% probability Socratic reverse-questioning directive. \\
 \hline
-\texttt{JavaBackendClient} (Python FastAPI) & Asynchronous \texttt{httpx} data access client (\texttt{dataaccess/\ab java\_backend/\ab client.py}) fetching character profiles and context metadata from the Java backend. \\
+JavaBackendClient & Asynchronous httpx data access client (dataaccess/\ab java\_backend/\ab client.py) fetching character profiles and context metadata from the Java backend. \\
 \hline
-\caption{Class Descriptions -- Conversational AI Roleplay \& Hybrid RAG Microservice}
+\caption{Class Descriptions -- Conversational AI Roleplay and Hybrid RAG Engine}
 \label{tab:cls_04_chat_and_ai_rag}
 \end{longtable}
 
-\subsubsection{Sequence Diagram: Streaming Conversational AI Roleplay with Hybrid RAG}
+\subsubsection{Sequence Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.45\textheight,keepaspectratio]{figures/seq_07_ai_roleplay_chat_rag.png}
-    \caption[Sequence Diagram -- Streaming AI Roleplay with Hybrid RAG \& Reranker]{Sequence Diagram -- Streaming Conversational AI Roleplay with Hybrid RAG \& Kaggle Reranker}
+    \caption{Sequence Diagram -- Streaming Conversational AI Roleplay with Hybrid RAG and Kaggle Reranker}
     \label{fig:seq_07_ai_roleplay_chat_rag}
 \end{figure}
 
 \newpage
-\subsection{Quiz Engine, Question Bank \& Classroom Assignments}
+\subsection{Quiz Engine, Question Bank and Classroom Assignments}
 
-\subsubsection{Class Diagram: Quiz Engine, Question Bank \& Classroom Assignments}
+\subsubsection{Class Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.42\textheight,keepaspectratio]{figures/cls_05_quiz_and_assignment.png}
-    \caption[Class Diagram -- Quiz Engine, Question Bank \& Classroom Assignments]{Class Diagram -- Quiz Engine, Question Bank \& Classroom Assignments}
+    \caption{Class Diagram -- Quiz Engine, Question Bank and Classroom Assignments}
     \label{fig:cls_05_quiz_and_assignment}
 \end{figure}
 
@@ -235,49 +235,49 @@
 \textbf{Class} & \textbf{Description} \\
 \hline
 \endhead
-\texttt{QuizController} / \texttt{StaffQuiz\ab Controller} & REST API controllers managing learner quiz attempts, submissions, ratings, question issue reports, and staff quiz creation/publication. \\
+QuizController / StaffQuiz\ab Controller & REST API controllers managing learner quiz attempts, submissions, ratings, question issue reports, and staff quiz creation and publication. \\
 \hline
-\texttt{StaffQuestionBank\ab Controller} & REST API controller (\texttt{/api/v1/staff/\ab question-bank}) supporting polymorphic question creation (\texttt{MULTIPLE\_CHOICE}, \texttt{FILL\_IN\_BLANK}, \texttt{MATCHING}), bulk CSV import, and many-to-many quiz linking. \\
+StaffQuestionBank\ab Controller & REST API controller (/api/v1/staff/\ab question-bank) supporting polymorphic question creation (MULTIPLE\_CHOICE, FILL\_IN\_BLANK, MATCHING), bulk CSV import, and many-to-many quiz linking. \\
 \hline
-\texttt{TeacherAssignment\ab Controller} & REST API controller (\texttt{/api/v1/teacher/\ab assignments}) enabling teachers to create, update, cancel, or archive classroom assignments and view class gradebooks. \\
+TeacherAssignment\ab Controller & REST API controller (/api/v1/teacher/\ab assignments) enabling teachers to create, update, cancel, or archive classroom assignments and view class gradebooks. \\
 \hline
-\texttt{StudentAssignment\ab Controller} & REST API controller (\texttt{/api/v1/student/\ab assignments}) allowing students to view assigned tasks, start work, log reading duration, and submit completed assignments. \\
+StudentAssignment\ab Controller & REST API controller (/api/v1/student/\ab assignments) allowing students to view assigned tasks, start work, log reading duration, and submit completed assignments. \\
 \hline
-\texttt{QuizServiceImpl} & Evaluates polymorphic JSON question payloads (\texttt{question\_data} vs. \texttt{answer\_data}), computes weighted scores on a 10-point scale, persists \texttt{QuizAnswer\ab Detail} records, and triggers assignment/quest hooks. \\
+QuizServiceImpl & Evaluates polymorphic JSON question payloads (question\_data vs. answer\_data), computes weighted scores on a 10-point scale, persists QuizAnswer\ab Detail records, and triggers assignment and quest hooks. \\
 \hline
-\texttt{TeacherAssignment\ab ServiceImpl} / \texttt{StudentAssignment\ab ServiceImpl} & Orchestrates classroom assignment lifecycles, auto-initializes student submission rows, synchronizes AI chat and quiz scores, and classifies on-time (\texttt{SUBMITTED}) vs. late (\texttt{LATE\_SUBMITTED}) completions. \\
+TeacherAssignment\ab ServiceImpl / StudentAssignment\ab ServiceImpl & Manages classroom assignment lifecycles, auto-initializes student submission rows, synchronizes AI chat and quiz scores, and classifies on-time (SUBMITTED) vs. late (LATE\_SUBMITTED) completions. \\
 \hline
-\texttt{Quiz}, \texttt{Question}, \texttt{QuizQuestion}, \texttt{QuizSession}, \texttt{Assignment}, \texttt{Assignment\ab Submission} & Domain entities modeling the polymorphic question bank, quiz attempts, classroom assignments, and student gradebook submissions. \\
+Quiz, Question, QuizQuestion, QuizSession, Assignment, Assignment\ab Submission & Domain entities modeling the polymorphic question bank, quiz attempts, classroom assignments, and student gradebook submissions. \\
 \hline
-\caption{Class Descriptions -- Quiz Engine, Question Bank \& Classroom Assignments}
+\caption{Class Descriptions -- Quiz Engine, Question Bank and Classroom Assignments}
 \label{tab:cls_05_quiz_and_assignment}
 \end{longtable}
 
-\subsubsection{Sequence Diagrams: Multi-Type Quiz Grading \& Classroom Assignments}
+\subsubsection{Sequence Diagrams}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_08_quiz_attempt_and_grading.png}
-    \caption[Sequence Diagram -- Multi-Type Quiz Execution \& Automated Grading]{Sequence Diagram -- Multi-Type Quiz Execution, Automated Grading \& Assignment Sync}
+    \caption{Sequence Diagram -- Multi-Type Quiz Execution, Automated Grading and Assignment Sync}
     \label{fig:seq_08_quiz_attempt_and_grading}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{figures/seq_09_classroom_assignment_submission.png}
-    \caption[Sequence Diagram -- Classroom Assignment Tracking \& Gradebook]{Sequence Diagram -- Classroom Assignment Creation, Auto-Tracking \& Gradebook Analytics}
+    \caption{Sequence Diagram -- Classroom Assignment Creation, Auto-Tracking and Gradebook Analytics}
     \label{fig:seq_09_classroom_assignment_submission}
 \end{figure}
 
 \newpage
-\subsection{B2C Subscription, Gamification \& PayOS Payment Fulfillment}
+\subsection{B2C Subscription, Gamification and PayOS Payment Fulfillment}
 
-\subsubsection{Class Diagram: B2C Subscription, Gamification \& PayOS Payment Fulfillment}
+\subsubsection{Class Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.42\textheight,keepaspectratio]{figures/cls_06_payment_and_gamification.png}
-    \caption[Class Diagram -- B2C Subscription, Gamification \& PayOS Fulfillment]{Class Diagram -- B2C Subscription, Gamification \& PayOS Payment Fulfillment}
+    \caption{Class Diagram -- B2C Subscription, Gamification and PayOS Payment Fulfillment}
     \label{fig:cls_06_payment_and_gamification}
 \end{figure}
 
@@ -287,29 +287,29 @@
 \textbf{Class} & \textbf{Description} \\
 \hline
 \endhead
-\texttt{PaymentController} & REST API controller (\texttt{/api/v1/payments}) for B2C customers to initiate subscription tier checkouts, poll order status, and cancel pending orders. \\
+PaymentController & REST API controller (/api/v1/payments) for B2C customers to initiate subscription tier checkouts, poll order status, and cancel pending orders. \\
 \hline
-\texttt{PayOSWebhook\ab Controller} & Public webhook endpoint (\texttt{/api/v1/payments/\ab payos/webhook}) receiving asynchronous payment notifications from PayOS. \\
+PayOSWebhook\ab Controller & Public webhook endpoint (/api/v1/payments/\ab payos/webhook) receiving asynchronous payment notifications from PayOS. \\
 \hline
-\texttt{Gamification\ab Controller} / \texttt{StaffQuest\ab Controller} & REST API controllers managing daily streak check-ins, daily quest progress queries, token reward claims, and staff quest configurations. \\
+Gamification\ab Controller / StaffQuest\ab Controller & REST API controllers managing daily streak check-ins, daily quest progress queries, token reward claims, and staff quest configurations. \\
 \hline
-\texttt{PaymentService} / \texttt{PaymentWebhook\ab Service} & Generates unique numeric order codes, creates PayOS checkout links, verifies HMAC-SHA256 webhook signatures, and logs immutable \texttt{Payment\ab Transaction} records. \\
+PaymentService / PaymentWebhook\ab Service & Generates unique numeric order codes, creates PayOS checkout links, verifies HMAC-SHA256 webhook signatures, and logs immutable Payment\ab Transaction records. \\
 \hline
-\texttt{PaymentFulfillment\ab Service} & Executes idempotent, pessimistic-locked order fulfillment (\texttt{PENDING} $\rightarrow$ \texttt{PROCESSING} $\rightarrow$ \texttt{FULFILLED}), activating \texttt{UserTier} and crediting \texttt{Tier.limitedToken} to the user. \\
+PaymentFulfillment\ab Service & Executes idempotent, pessimistic-locked order fulfillment (PENDING $\rightarrow$ PROCESSING $\rightarrow$ FULFILLED), activating UserTier and crediting Tier.limitedToken to the user. \\
 \hline
-\texttt{PaymentFulfillment\ab Reconciliation\ab Scheduler} / \texttt{PaymentExpiry\ab Scheduler} & Background Spring \texttt{@Scheduled} jobs that retry unfulfilled \texttt{PAID} orders (up to 5 attempts) and transition stale \texttt{PENDING} orders to \texttt{EXPIRED}. \\
+PaymentFulfillment\ab Reconciliation\ab Scheduler / PaymentExpiry\ab Scheduler & Background scheduled jobs that retry unfulfilled PAID orders and transition stale PENDING orders to EXPIRED. \\
 \hline
-\texttt{Gamification\ab ServiceImpl} & Tracks consecutive daily login streaks (\texttt{DailyCheckIn}) and quest progress (\texttt{UserQuest\ab Progress}) across \texttt{CHAT}, \texttt{QUIZ}, and \texttt{READ\_CONTEXT} activities. \\
+Gamification\ab ServiceImpl & Tracks consecutive daily login streaks (DailyCheckIn) and quest progress (UserQuest\ab Progress) across CHAT, QUIZ, and READ\_CONTEXT activities. \\
 \hline
-\caption{Class Descriptions -- B2C Subscription, Gamification \& PayOS Payment Fulfillment}
+\caption{Class Descriptions -- B2C Subscription, Gamification and PayOS Payment Fulfillment}
 \label{tab:cls_06_payment_and_gamification}
 \end{longtable}
 
-\subsubsection{Sequence Diagram: PayOS Checkout \& Resilient Tier Fulfillment}
+\subsubsection{Sequence Diagram}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.98\textwidth,height=0.45\textheight,keepaspectratio]{figures/seq_10_payos_checkout_and_fulfillment.png}
-    \caption[Sequence Diagram -- PayOS Checkout \& Resilient Tier Fulfillment]{Sequence Diagram -- PayOS Checkout, Webhook Verification \& Resilient Tier Fulfillment}
+    \caption{Sequence Diagram -- PayOS Checkout, Webhook Verification and Resilient Tier Fulfillment}
     \label{fig:seq_10_payos_checkout_and_fulfillment}
 \end{figure}

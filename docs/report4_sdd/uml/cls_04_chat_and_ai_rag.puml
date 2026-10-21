@@ -1,10 +1,10 @@
 @startuml
 scale max 2800 width
 skinparam classAttributeIconSize 0
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
 skinparam shadowing false
 
-title Class Diagram 3.4 - Conversational AI Roleplay & Hybrid RAG Microservice
+title Class Diagram 3.4 - Conversational AI Roleplay & Hybrid RAG Engine
 
 package "Java Core Backend (com.historytalk)" #E8F8F5 {
     class ChatController <<Controller>> {
@@ -51,7 +51,7 @@ package "Java Core Backend (com.historytalk)" #E8F8F5 {
     }
 }
 
-package "Python FastAPI AI Microservice (history_talk_ai)" #FEF9E7 {
+package "Python FastAPI AI Service (history_talk_ai)" #FEF9E7 {
     class ChatRouter <<FastAPI Router>> {
         + post_generate_reply(request: GenerateReplyRequest): GenerateReplyResponse
         + post_generate_reply_stream(request: GenerateReplyRequest): StreamingResponse

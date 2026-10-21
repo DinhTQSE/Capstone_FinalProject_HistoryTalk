@@ -1,6 +1,6 @@
 @startuml
 scale max 2800 width
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
 skinparam shadowing false
 
 title Activity Diagram WF-02 - Historical Document OCR Ingestion, RAG Indexing & Local Content Approval

@@ -1,16 +1,15 @@
 \documentclass[11pt,a4paper]{article}
 
 % ============================================================================
-% PACKAGES & PAGE SETUP (EXACT FPT UNIVERSITY REPORT 3 TEMPLATE FORMAT)
+% PACKAGES & PAGE SETUP (TIMES NEW ROMAN UNIFIED TYPOGRAPHY & REPORT 3 COLORS)
 % ============================================================================
 \usepackage[utf8]{inputenc}
 \usepackage[T5,T1]{fontenc}
-\usepackage{lmodern}
-% Sans-serif font matching Calibri / Arial in Report 3
-\usepackage[scaled=0.95]{helvet}
-\renewcommand{\familydefault}{\sfdefault}
+% Standardize entire document to Times New Roman (including monospace so there is no mixed courier font)
+\usepackage{newtxtext,newtxmath}
+\renewcommand{\ttdefault}{\rmdefault}
 
-% 1-inch (2.54cm) margins matching Report 3 Word template
+% 1-inch (2.54cm) margins matching FPT Word template
 \usepackage[margin=2.54cm, top=2.54cm, bottom=2.54cm, footskip=1.2cm]{geometry}
 \usepackage{graphicx}
 \usepackage{float}
@@ -26,26 +25,25 @@
 \usepackage{titlesec}
 \usepackage{tocloft}
 \usepackage{caption}
-\usepackage[htt]{hyphenat}
 \usepackage{hyperref}
 
-% Robust line-break helper for long monospace identifiers/paths
+% Robust line-break helper for long identifiers/paths
 \DeclareRobustCommand{\ab}{\allowbreak}
 
 % Helper command for Vietnamese diacritics in T5 encoding
 \newcommand{\vn}[1]{{\fontencoding{T5}\selectfont #1}}
 
-% Prevent right-margin overflows on long inline code identifiers
+% Prevent right-margin overflows
 \sloppy
 \emergencystretch=3em
 
 % ============================================================================
-% EXACT COLOR PALETTE FROM REPORT 3
+% COLOR PALETTE (MATCHING REPORT 3)
 % ============================================================================
 \definecolor{fptred}{HTML}{C00000}         % Cover title & Part I / II headings (#C00000)
 \definecolor{fptblue}{HTML}{2E75B5}        % TOC title & Level 2 headings (#2E75B5)
-\definecolor{fptdarkblue}{HTML}{1F4E79}    % Hyperlinks & dark accents (#1F4E79)
-\definecolor{tableheader}{HTML}{FBE4D5}    % Exact Light Peach / Tan table header (#FBE4D5)
+\definecolor{fptdarkblue}{HTML}{1F4E79}    % Dark blue accents (#1F4E79)
+\definecolor{tableheader}{HTML}{FBE4D5}    % Light Peach / Tan table header (#FBE4D5)
 \definecolor{rocbrown}{HTML}{6E2500}       % Record of Changes header text (#6E2500)
 \definecolor{lightgray}{HTML}{F2F2F2}      % Sub-banner row fill in Data Dictionary
 \definecolor{footergray}{HTML}{7F7F7F}     % Footer "Page" text (#7F7F7F)
@@ -56,16 +54,12 @@
     linkcolor=black,
     urlcolor=fptblue,
     citecolor=fptblue,
-    pdftitle={SWP490 - Report 4: Software Design Document (SDD) - HistoryTalk},
+    pdftitle={SWP490 - Report 4: Software Design Document - HistoryTalk},
     pdfauthor={HistoryTalk Capstone Team}
 }
 
 % ============================================================================
 % HEADING STYLES (MATCHING REPORT 3 HIERARCHY)
-% - Major Roman Part (I., II.): 16pt Bold Dark Red (#C00000)
-% - Section (1., 2., ...):      13pt Bold Black (#000000)
-% - Subsection (1.1, 1.2, ...): 11.5pt Bold Blue (#2E75B5)
-% - Subsubsection (1.2.1, ...): 11pt Bold Italic Black (#000000)
 % ============================================================================
 \newcommand{\romansecheading}[1]{%
     \vspace{6pt}%
@@ -89,7 +83,7 @@
   {\thesubsubsection}{0.6em}{}
 \titlespacing*{\subsubsection}{0pt}{8pt}{3pt}
 
-% Table of Contents styling matching Report 3
+% Table of Contents styling
 \renewcommand{\contentsname}{\textcolor{fptblue}{\fontsize{16pt}{20pt}\selectfont\bfseries Table of Contents}}
 \setlength{\cftbeforepartskip}{8pt}
 \renewcommand{\cftpartfont}{\bfseries\color{black}}
@@ -100,9 +94,9 @@
 \setlength{\cftsubsecindent}{2.8em}
 \setlength{\cftsubsubsecindent}{4.6em}
 
-% Caption styling
+% Caption styling (Times New Roman)
 \captionsetup{
-    font={small,sf},
+    font={small},
     labelfont={bf},
     labelsep=colon
 }
@@ -113,7 +107,7 @@
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 
 % ============================================================================
-% HEADER & FOOTER (EXACT REPORT 3 STYLE: NO TOP HEADER, GRAY LINE + "X | Page")
+% HEADER & FOOTER (NO TOP HEADER, GRAY LINE + "X | Page")
 % ============================================================================
 \pagestyle{fancy}
 \fancyhf{}
@@ -129,7 +123,7 @@
 \begin{document}
 
 % ============================================================================
-% PAGE 1: COVER PAGE (EXACT REPORT 3 LAYOUT)
+% PAGE 1: COVER PAGE
 % ============================================================================
 \thispagestyle{fancy}
 \begin{center}
@@ -157,7 +151,7 @@
 \newpage
 
 % ============================================================================
-% PART I: RECORD OF CHANGES (EXACT REPORT 3 STYLE)
+% PART I: RECORD OF CHANGES
 % ============================================================================
 \romansecheading{I. Record of Changes}
 
@@ -169,16 +163,16 @@
 \textbf{\textcolor{rocbrown}{Date}} & \textbf{\textcolor{rocbrown}{A* M, D}} & \textbf{\textcolor{rocbrown}{In charge}} & \textbf{\textcolor{rocbrown}{Change Description}} \\
 \hline
 \endhead
-30/06/2026 & A & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải} & Initial Software Design Document (SDD v1.0) baseline: System Architecture, Database ERD, and Detailed Design for B2C core modules. \\
+30/06/2026 & A & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải} & Initial Software Design Document baseline: System Architecture, Database ERD, and Detailed Design for core learning modules. \\
 \hline
-14/09/2026 & M & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải} & Review 1 SDD Update (v1.5): Added decoupled Java Spring Boot + Python FastAPI microservices architecture, PostgreSQL 16 + Supabase PgVector schema, PayOS payment integration, and Gamification design. \\
+14/09/2026 & M & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải} & Review 1 SDD Update: Added Java Spring Boot Backend and Python FastAPI AI Engine architecture, PostgreSQL and Supabase PgVector schema, PayOS payment integration, and Gamification design. \\
 \hline
-20/10/2026 & M & \textbf{\vn{Trần Quốc Dinh}},\newline\textbf{\vn{Võ Đồng Đức Khải}}\newline\textit{(Main In-Charge)}\newline\& All Team Members & \textbf{Review 2 SDD Release (v2.0 -- Tag \texttt{review-2}):}\newline
-$\bullet$ \textbf{\vn{Trần Quốc Dinh} (SE196495):} Full 32-table Database ERD \& Data Dictionary (\texttt{V1}--\texttt{V38}), 9 Entity State Machines, B2C PayOS Billing \& Gamification design (\textbf{WF-05}).\newline
-$\bullet$ \textbf{\vn{Võ Đồng Đức Khải} (SE196405):} Multi-Type Quiz Question Bank (\texttt{MULTIPLE\_CHOICE}, \texttt{FILL\_IN\_BLANK}, \texttt{MATCHING}), Classroom Assignments \& Gradebook Analytics design (\textbf{WF-04}).\newline
-$\bullet$ \textbf{\vn{Nguyễn Minh Trí} (SE192645):} System Architecture, Multi-Tenant SaaS School Lifecycle, Daily Token Allowance \& Boost design (\textbf{WF-01}).\newline
-$\bullet$ \textbf{\vn{Nguyễn Công Thành} (SE196309):} Conversational AI Roleplay, Hybrid RAG Pipeline (\texttt{bge-m3} + Kaggle Reranker), PDFBox/Tess4J OCR \& AI/RAG 5-Item Specification (\textbf{WF-03}).\newline
-$\bullet$ \textbf{\vn{Đỗ Quốc Bảo} (SE193803):} Historical Context, Character, Interactive GeoJSON Battle Map \& Local Content Approval design (\textbf{WF-02}). \\
+20/10/2026 & M & \vn{Trần Quốc Dinh},\newline\vn{Võ Đồng Đức Khải}\newline\textit{(Main In-Charge)}\newline\& All Team Members & Review 2 SDD Update:\newline
+$\bullet$ \vn{Trần Quốc Dinh} (SE196495): SaaS B2B School/Classroom \& User Management APIs, Progress \& System Tracking Analytics, Database ERD \& Data Dictionary, Entity State Machines, and DevOps CI/CD Deployment design (WF-01).\newline
+$\bullet$ \vn{Võ Đồng Đức Khải} (SE196405): Authentication, Google OAuth2, Multi-Tenant Database Isolation, Global Content Management \& PDF/OCR Document Processing Pipeline design (WF-02).\newline
+$\bullet$ \vn{Nguyễn Minh Trí} (SE192645): System Architecture, Conversational AI Roleplay, Hybrid RAG Pipeline, Semantic Chunking, Vector Retrieval \& Prompt Engineering design (WF-03).\newline
+$\bullet$ \vn{Đỗ Quốc Bảo} (SE193803): Timed Quiz Assessment Engine, Question Bank, Interactive Historical Map APIs \& PayOS Online Payment Gateway design (WF-04).\newline
+$\bullet$ \vn{Nguyễn Công Thành} (SE196309): Frontend Web Application Architecture, Interactive Map/Chat/Quiz Client Workflows \& Learner Experience design (WF-05). \\
 \hline
  &  &  &  \\
 \hline
@@ -186,7 +180,7 @@ $\bullet$ \textbf{\vn{Đỗ Quốc Bảo} (SE193803):} Historical Context, Chara
 \hline
 \end{longtable}
 \vspace{-0.2cm}
-\footnotesize{\textbf{*A} - Added \quad \textbf{M} - Modified \quad \textbf{D} - Deleted}
+\footnotesize{*A - Added \quad M - Modified \quad D - Deleted}
 \normalsize
 
 \vspace{0.6cm}
@@ -198,15 +192,15 @@ $\bullet$ \textbf{\vn{Đỗ Quốc Bảo} (SE193803):} Historical Context, Chara
 \textbf{Student ID} & \textbf{Member Name} & \textbf{Role} & \textbf{Owned SDD Modules \& Main Workflows} \\
 \hline
 \endhead
-SE196495 & \textbf{\vn{Trần Quốc Dinh}} & Backend Developer \& DevOps \textit{(SDD Lead)} & Database ERD \& 32-Table Data Dictionary, State Machines, B2C PayOS Billing \& Gamification (\textbf{WF-05}) \\
+SE196495 & \vn{Trần Quốc Dinh} & Backend Developer \& DevOps (SDD Lead) & SaaS B2B School/Classroom \& User Management, Progress \& System Tracking Analytics, Database ERD \& Data Dictionary, State Machines, DevOps CI/CD (WF-01) \\
 \hline
-SE196405 & \textbf{\vn{Võ Đồng Đức Khải}} & Backend Developer \& Tester \textit{(SDD Co-Lead)} & Multi-Type Quiz Question Bank, Classroom Assignments \& Gradebook Analytics (\textbf{WF-04}) \\
+SE196405 & \vn{Võ Đồng Đức Khải} & Backend Developer \& Tester (SDD Co-Lead) & Authentication, Google OAuth2, Multi-Tenant DB, Global Content CRUD \& PDFBox/Tess4J OCR Document Pipeline (WF-02) \\
 \hline
-SE192645 & \vn{Nguyễn Minh Trí} & Leader \& AI Engineer \& Backend Dev & System Architecture, Multi-Tenant SaaS School Lifecycle, Daily Token Allowance \& Boost (\textbf{WF-01}) \\
+SE192645 & \vn{Nguyễn Minh Trí} & Leader \& AI Engineer \& Backend Dev & System Architecture, Conversational AI Roleplay, Hybrid RAG Pipeline, Vector Search, Reranking \& Prompting (WF-03) \\
 \hline
-SE196309 & \vn{Nguyễn Công Thành} & Frontend Developer \& Tester & Conversational AI Roleplay, Hybrid RAG Pipeline (BGE-M3 + Kaggle Reranker), PDFBox/Tess4J OCR (\textbf{WF-03}) \\
+SE193803 & \vn{Đỗ Quốc Bảo} & Backend Developer \& Tester & Timed Quiz Engine, Question Bank, Interactive Historical Map APIs \& PayOS Online Payment Gateway (WF-04) \\
 \hline
-SE193803 & \vn{Đỗ Quốc Bảo} & Backend Developer \& Tester & Historical Context, Character, Interactive GeoJSON Battle Map \& Local Content Approval (\textbf{WF-02}) \\
+SE196309 & \vn{Nguyễn Công Thành} & Frontend Developer \& Tester & Frontend Web & App UI (Next.js/React), Client State Management, Interactive Map/Chat/Quiz UI & Gamification Flows (WF-05) \\
 \hline
 \end{longtable}
 }

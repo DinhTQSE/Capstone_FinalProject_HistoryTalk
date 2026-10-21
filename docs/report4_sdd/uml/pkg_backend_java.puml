@@ -1,81 +1,66 @@
 @startuml
-scale max 2800 width
+scale max 2000 width
+top to bottom direction
 skinparam packageStyle folder
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 15
 skinparam shadowing false
 
-title Package Diagram - Core Backend Service (com.historytalk - Java Spring Boot)
+title Package Diagram - Core Backend Service (com.historytalk)
 
 package "com.historytalk" {
-    package "Presentation Layer" #EBF5FB {
+    package "Presentation & API Layer" #EBF5FB {
         package "controller" {
-            [authentication\n(AuthController)] as CAuth
-            [school\n(AdminSchool, SchoolLifecycleAndToken,\nSchoolAdminQuota/Teacher/Student)] as CSchool
-            [classroom & assignment\n(Classroom, ClassroomStudent,\nTeacherAssignment, StudentAssignment)] as CClass
-            [historicalContext, character & localcontent\n(Context, Character, Media, Document,\nTeacher/SchoolAdmin/Student LocalContent)] as CContent
-            [document & map\n(DocumentFile, PdfExtraction, MapPin, MapFocus)] as CMap
-            [chat & quiz\n(Chat, Quiz, StaffQuiz, StaffQuestionBank)] as CChatQuiz
-            [payment, gamification, dashboard & trash\n(Payment, PayOSWebhook, Gamification, Tier,\nAnalyticsDashboard, SystemDashboard, SystemTrash)] as CPay
+            [authentication, user & school\nclassroom, assignment & dashboard\nhistoricalContext, character & localcontent\ndocument, media, map, chat, quiz & payment] as CAll
         }
         package "dto" {
-            [Request / Response DTOs\n(14 Domain Subpackages + ApiResponse / PaginatedResponse)] as DTOs
+            [Domain Request / Response DTOs\n& Standardized API Envelopes] as DTOs
         }
         package "exception" {
-            [GlobalExceptionHandler\nBaseException, ResourceNotFoundException,\nInvalidRequestException, DataConflictException] as ExHandler
+            [GlobalExceptionHandler\n& Domain Exception Hierarchy] as ExHandler
         }
+        CAll -[hidden]right-> DTOs
+        DTOs -[hidden]right-> ExHandler
     }
 
     package "Security & Configuration Layer" #FEF9E7 {
         package "security" {
-            [JwtAuthenticationFilter & JwtTokenProvider] as SecJwt
-            [SchoolSubscriptionGuardInterceptor] as SecGuard
-            [OAuth2AuthenticationSuccess/FailureHandler] as SecOAuth
+            [JwtAuthenticationFilter & JwtTokenProvider\nSchoolSubscriptionGuardInterceptor\nOAuth2AuthenticationHandlers] as SecAll
         }
         package "config" {
-            [SecurityConfig, OpenApiConfig, PayOSConfig,\nOAuth2Properties, SchoolLifecycleWebMvcConfig] as Cfg
+            [SecurityConfig, OpenApiConfig,\nPayOSConfig, WebMvcConfig] as Cfg
         }
+        SecAll -[hidden]right-> Cfg
     }
 
-    package "Application / Business Logic Layer" #E8F8F5 {
+    package "Application Business Logic Layer" #E8F8F5 {
         package "service" {
-            [authentication & user\n(AuthServiceImpl, GoogleOAuthServiceImpl, UserServiceImpl)] as SAuth
-            [school & classroom\n(SchoolManagement, AcademicLifecycle, StudentImport,\nDailyTokenAllowance, TokenBoostRequest, Classroom)] as SSchool
-            [assignment & quiz\n(TeacherAssignmentServiceImpl, StudentAssignmentServiceImpl,\nQuizServiceImpl)] as SQuiz
-            [historicalContext, character & localcontent\n(HistoricalContextServiceImpl, CharacterServiceImpl,\nLocalContentServiceImpl, DocumentProcessorStrategy)] as SContent
-            [document, media & map\n(DocumentFileServiceImpl, PdfExtractionServiceImpl,\nOcrServiceImpl, SupabaseDocumentStorageService, MapPinServiceImpl)] as SDoc
-            [chat\n(ChatSessionServiceImpl, MessageServiceImpl,\nAiServiceClient, AiMetricsService)] as SChat
-            [payment, gamification & dashboard\n(PaymentService, PaymentFulfillmentService,\nPaymentFulfillmentReconciliationScheduler, GamificationServiceImpl)] as SPay
+            [authentication, user & school services\nclassroom, token quota & assignment services\ncontext, character, local content & map services\ndocument PDFBox/Tess4J OCR & chat AI services\npayment fulfillment & gamification services] as SAll
         }
         package "mapper" {
-            [CharacterMapper, UserMapper, PaymentMapper, TierMapper] as MapPkg
+            [Entity-to-DTO\nDomain Mappers] as MapPkg
         }
         package "utils" {
-            [SecurityUtils, UuidUtils] as UtilPkg
+            [SecurityUtils\n& UuidUtils] as UtilPkg
         }
+        SAll -[hidden]right-> MapPkg
+        MapPkg -[hidden]right-> UtilPkg
     }
 
-    package "Data Access & Domain Layer" #F5EEF8 {
+    package "Data Access & Domain Persistence Layer" #F5EEF8 {
         package "repository" {
-            [Spring Data JPA Repositories (29 Interfaces)\n+ Dashboard Analytics Projections (16 Interfaces)] as RepoPkg
+            [Spring Data JPA Repositories\n& Analytical Query Projections] as RepoPkg
         }
         package "entity" {
-            [JPA Domain Entities (30 Classes across 12 Subpackages)] as EntPkg
-            [enums (23 Domain Enumerations)] as EnumPkg
+            [JPA Persistent Domain Entities\n& Domain Enumerations] as EntPkg
         }
+        RepoPkg -[hidden]right-> EntPkg
     }
 }
 
-CAuth --> DTOs
-CSchool --> SSchool
-CClass --> SQuiz
-CContent --> SContent
-CMap --> SDoc
-CChatQuiz --> SChat
-CPay --> SPay
-SecJwt --> SAuth
-SContent --> MapPkg
-SChat --> RepoPkg
-SPay --> RepoPkg
-RepoPkg --> EntPkg
-EntPkg --> EnumPkg
+CAll -down-> SecAll
+CAll -down-> SAll
+SecAll -down-> SAll
+SAll -down-> RepoPkg
+RepoPkg -right-> EntPkg
 @enduml

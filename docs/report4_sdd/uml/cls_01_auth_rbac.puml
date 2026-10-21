@@ -1,10 +1,10 @@
 @startuml
 scale max 2800 width
 skinparam classAttributeIconSize 0
-skinparam defaultFontName Arial
+skinparam defaultFontName "Times New Roman"
 skinparam shadowing false
 
-title Class Diagram 3.1 - Authentication, Account Lifecycle & Multi-Tenant RBAC
+title Class Diagram 3.1 - Authentication, Account Lifecycle & User Access Control
 
 class AuthController <<Controller>> {
     + register(request: RegisterRequest): ResponseEntity<ApiResponse<RegisterResponse>>
