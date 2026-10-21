@@ -1355,6 +1355,21 @@ Giáo viên (`TEACHER`) và `SCHOOL_ADMIN` được cấp quyền quản lý b�
 
 ---
 
+### 57. Cơ chế Phân quyền Hiển thị Tư liệu cho Học sinh (`GET /api/v1/student/local-contents/...`)
+
+- **Bối cảnh & Nhân vật hiển thị cho Học sinh:**
+  - Thuộc đúng trường học sinh đang theo học (`schoolId`).
+  - Đã được xuất bản (`isPublished = true`, `contentStatus = ACTIVE`, `deletedAt IS NULL`).
+  - Thỏa mãn một trong hai điều kiện phạm vi (`contentScope`):
+    1. **`SCHOOL_WIDE`**: Hiển thị cho toàn bộ học sinh trong trường.
+    2. **`CLASS_ONLY`**: **CHỈ hiển thị cho học sinh thuộc các lớp được gán** (kiểm tra liên kết qua bảng `class_student` của học sinh với `class_local_content` của bối cảnh/nhân vật).
+- **Bộ lọc theo lớp (`?classId=...`):**
+  - Khi học sinh hoặc giao diện lớp lọc theo `classId`, backend trả về nội dung `CLASS_ONLY` được gán cho chính lớp đó hoặc nội dung `SCHOOL_WIDE` toàn trường.
+- **Truy cập chi tiết theo ID (`/api/v1/student/local-contents/contexts/{id}`):**
+  - Nếu nội dung là `CLASS_ONLY`, học sinh truy cập bắt buộc phải đang theo học tại một trong những lớp được giáo viên gán. Nếu không thuộc lớp được gán, hệ thống chặn với mã `403 FORBIDDEN` (`You do not have access to this class-only local content`).
+
+---
+
 ## ❌ Error Responses
 
 | HTTP | Code | Trường hợp |

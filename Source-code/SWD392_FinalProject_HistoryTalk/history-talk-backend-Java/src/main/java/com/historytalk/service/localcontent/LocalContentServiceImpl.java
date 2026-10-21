@@ -78,6 +78,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final com.historytalk.repository.QuizRepository quizRepository;
     private final com.historytalk.repository.QuestionRepository questionRepository;
     private final com.historytalk.service.quiz.QuizService quizService;
+    private final com.historytalk.repository.classroom.ClassStudentRepository classStudentRepository;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.historytalk.service.document.PdfExtractionService pdfExtractionService;
@@ -499,13 +500,84 @@ public class LocalContentServiceImpl implements LocalContentService {
 
     @Override
     @Transactional(readOnly = true)
+    public PaginatedResponse<LocalContentResponse> getStudentPublishedLocalContexts(
+            String search, String classId, int page, int size, UserPrincipal principal) {
+        School school = resolveSchool(principal);
+        UUID studentId = resolveUserId(principal);
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        List<UUID> targetClassIds;
+        if (StringUtils.hasText(classId)) {
+            targetClassIds = List.of(UUID.fromString(classId));
+        } else {
+            targetClassIds = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
+                    .stream()
+                    .map(com.historytalk.entity.classroom.Classroom::getId)
+                    .toList();
+        }
+
+        boolean hasClasses = !targetClassIds.isEmpty();
+        List<UUID> safeClassIds = hasClasses ? targetClassIds : List.of(UUID.randomUUID());
+
+        Page<HistoricalContext> pageResult = localContextRepo.findVisibleToStudent(
+                school.getId(), hasClasses, safeClassIds, normalize(search), pageable);
+
+        return buildPage(pageResult.map(this::mapContextToResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<LocalContentResponse> getStudentPublishedLocalCharacters(
+            String search, String classId, int page, int size, UserPrincipal principal) {
+        School school = resolveSchool(principal);
+        UUID studentId = resolveUserId(principal);
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.ASC, "name"));
+
+        List<UUID> targetClassIds;
+        if (StringUtils.hasText(classId)) {
+            targetClassIds = List.of(UUID.fromString(classId));
+        } else {
+            targetClassIds = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
+                    .stream()
+                    .map(com.historytalk.entity.classroom.Classroom::getId)
+                    .toList();
+        }
+
+        boolean hasClasses = !targetClassIds.isEmpty();
+        List<UUID> safeClassIds = hasClasses ? targetClassIds : List.of(UUID.randomUUID());
+
+        Page<Character> pageResult = localCharacterRepo.findVisibleToStudent(
+                school.getId(), hasClasses, safeClassIds, normalize(search), pageable);
+
+        return buildPage(pageResult.map(this::mapCharacterToResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public LocalContentResponse getPublishedLocalContextById(String contextId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
+        UUID studentId = resolveUserId(principal);
+
         HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local context not found"));
         if (!Boolean.TRUE.equals(ctx.getIsPublished()) || ctx.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Content is not published");
         }
+
+        // If CLASS_ONLY, student must be enrolled in one of the assigned classes
+        if (ctx.getContentScope() == ContentScope.CLASS_ONLY) {
+            List<UUID> assignedClasses = classLocalContentRepo
+                    .findClassIdsByEntityIdAndEntityType(ctx.getContextId(), EntityType.CONTEXT);
+            List<UUID> studentClasses = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
+                    .stream()
+                    .map(com.historytalk.entity.classroom.Classroom::getId)
+                    .toList();
+            boolean hasAccess = assignedClasses.stream().anyMatch(studentClasses::contains);
+            if (!hasAccess) {
+                throw new UnauthorizedException("You do not have access to this class-only local content");
+            }
+        }
+
         return mapContextToResponse(ctx);
     }
 
@@ -513,11 +585,28 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public LocalContentResponse getPublishedLocalCharacterById(String characterId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
+        UUID studentId = resolveUserId(principal);
+
         Character c = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Local character not found"));
         if (!Boolean.TRUE.equals(c.getIsPublished()) || c.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Content is not published");
         }
+
+        // If CLASS_ONLY, student must be enrolled in one of the assigned classes
+        if (c.getContentScope() == ContentScope.CLASS_ONLY) {
+            List<UUID> assignedClasses = classLocalContentRepo
+                    .findClassIdsByEntityIdAndEntityType(c.getCharacterId(), EntityType.CHARACTER);
+            List<UUID> studentClasses = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
+                    .stream()
+                    .map(com.historytalk.entity.classroom.Classroom::getId)
+                    .toList();
+            boolean hasAccess = assignedClasses.stream().anyMatch(studentClasses::contains);
+            if (!hasAccess) {
+                throw new UnauthorizedException("You do not have access to this class-only local content");
+            }
+        }
+
         return mapCharacterToResponse(c);
     }
 

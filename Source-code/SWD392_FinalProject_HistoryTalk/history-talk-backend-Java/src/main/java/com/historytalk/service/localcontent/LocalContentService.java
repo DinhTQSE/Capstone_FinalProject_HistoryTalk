@@ -65,6 +65,10 @@ public interface LocalContentService {
 
     // ── Student: Published content ───────────────────────────────────────────
 
+    PaginatedResponse<LocalContentResponse> getStudentPublishedLocalContexts(String search, String classId, int page, int size, UserPrincipal principal);
+
+    PaginatedResponse<LocalContentResponse> getStudentPublishedLocalCharacters(String search, String classId, int page, int size, UserPrincipal principal);
+
     LocalContentResponse getPublishedLocalContextById(String contextId, UserPrincipal principal);
 
     LocalContentResponse getPublishedLocalCharacterById(String characterId, UserPrincipal principal);

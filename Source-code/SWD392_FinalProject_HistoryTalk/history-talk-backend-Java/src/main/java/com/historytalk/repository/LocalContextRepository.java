@@ -69,11 +69,39 @@ public interface LocalContextRepository extends JpaRepository<HistoricalContext,
     // ── Student query ─────────────────────────────────────────────────────────
 
     /**
-     * Published SCHOOL_WIDE contexts visible to students in a school,
-     * OR CLASS_ONLY contexts whose teacher is the student's class teacher.
-     * Simple version: return all PUBLISHED contexts in the school for now.
-     * (Refined class-level filtering happens at assignment level.)
+     * Published contexts visible to a student in a school:
+     *   - SCHOOL_WIDE published contexts, OR
+     *   - CLASS_ONLY published contexts assigned to one of the student's enrolled classrooms (or given classroom).
      */
+    @Query("""
+            SELECT hc FROM HistoricalContext hc
+            WHERE hc.school.id = :schoolId
+              AND hc.isPublished = true
+              AND hc.contentStatus = com.historytalk.entity.enums.ContentStatus.ACTIVE
+              AND hc.deletedAt IS NULL
+              AND (
+                hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE
+                OR (
+                    hc.contentScope = com.historytalk.entity.enums.ContentScope.CLASS_ONLY
+                    AND (:hasClasses = true AND hc.contextId IN (
+                        SELECT clc.entityId FROM ClassLocalContent clc
+                        WHERE clc.entityType = com.historytalk.entity.enums.EntityType.CONTEXT
+                          AND clc.classId IN :classIds
+                    ))
+                )
+              )
+              AND (:search IS NULL OR :search = ''
+                   OR hc.name ILIKE CONCAT('%', :search, '%')
+                   OR hc.description ILIKE CONCAT('%', :search, '%'))
+            ORDER BY hc.createdAt DESC
+            """)
+    Page<HistoricalContext> findVisibleToStudent(
+            @Param("schoolId") UUID schoolId,
+            @Param("hasClasses") boolean hasClasses,
+            @Param("classIds") List<UUID> classIds,
+            @Param("search") String search,
+            Pageable pageable);
+
     @Query("""
             SELECT hc FROM HistoricalContext hc
             WHERE hc.school.id = :schoolId

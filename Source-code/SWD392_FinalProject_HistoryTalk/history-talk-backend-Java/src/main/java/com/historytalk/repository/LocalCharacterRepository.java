@@ -62,6 +62,40 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
             Pageable pageable);
 
     /**
+     * Published characters visible to a student in a school:
+     *   - SCHOOL_WIDE published characters, OR
+     *   - CLASS_ONLY published characters assigned to one of the student's enrolled classrooms (or given classroom).
+     */
+    @Query("""
+            SELECT c FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.isPublished = true
+              AND c.contentStatus = com.historytalk.entity.enums.ContentStatus.ACTIVE
+              AND c.deletedAt IS NULL
+              AND (
+                c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE
+                OR (
+                    c.contentScope = com.historytalk.entity.enums.ContentScope.CLASS_ONLY
+                    AND (:hasClasses = true AND c.characterId IN (
+                        SELECT clc.entityId FROM ClassLocalContent clc
+                        WHERE clc.entityType = com.historytalk.entity.enums.EntityType.CHARACTER
+                          AND clc.classId IN :classIds
+                    ))
+                )
+              )
+              AND (:search IS NULL OR :search = ''
+                   OR c.name ILIKE CONCAT('%', :search, '%')
+                   OR c.background ILIKE CONCAT('%', :search, '%'))
+            ORDER BY c.name ASC
+            """)
+    Page<Character> findVisibleToStudent(
+            @Param("schoolId") UUID schoolId,
+            @Param("hasClasses") boolean hasClasses,
+            @Param("classIds") List<UUID> classIds,
+            @Param("search") String search,
+            Pageable pageable);
+
+    /**
      * Published SCHOOL_WIDE characters in a school (for student view via assignments).
      */
     @Query("""

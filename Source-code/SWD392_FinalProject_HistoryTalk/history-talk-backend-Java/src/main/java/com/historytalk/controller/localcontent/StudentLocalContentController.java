@@ -47,22 +47,7 @@ public class StudentLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> result =
-                localContentService.getLocalContexts(search, "ACTIVE", page, size, principal);
-        // classId filter: if provided, only return content assigned to that class
-        if (classId != null && !classId.isBlank()) {
-            var filtered = result.getContent().stream()
-                    .filter(r -> r.getClassIds() != null && r.getClassIds().contains(classId))
-                    .toList();
-            result = PaginatedResponse.<LocalContentResponse>builder()
-                    .content(filtered)
-                    .currentPage(result.getCurrentPage())
-                    .pageSize(result.getPageSize())
-                    .totalElements((long) filtered.size())
-                    .totalPages(1)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
-        }
+                localContentService.getStudentPublishedLocalContexts(search, classId, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(result,
                 "Published local contexts retrieved — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " found"));
     }
@@ -94,21 +79,7 @@ public class StudentLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         PaginatedResponse<LocalContentResponse> result =
-                localContentService.getLocalCharacters(search, "ACTIVE", page, size, principal);
-        if (classId != null && !classId.isBlank()) {
-            var filtered = result.getContent().stream()
-                    .filter(r -> r.getClassIds() != null && r.getClassIds().contains(classId))
-                    .toList();
-            result = PaginatedResponse.<LocalContentResponse>builder()
-                    .content(filtered)
-                    .currentPage(result.getCurrentPage())
-                    .pageSize(result.getPageSize())
-                    .totalElements((long) filtered.size())
-                    .totalPages(1)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
-        }
+                localContentService.getStudentPublishedLocalCharacters(search, classId, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(result,
                 "Published local characters retrieved — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " found"));
     }
