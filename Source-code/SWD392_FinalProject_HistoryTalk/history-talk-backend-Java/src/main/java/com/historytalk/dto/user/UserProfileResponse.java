@@ -29,4 +29,7 @@ public class UserProfileResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
+    private String schoolId;
+    private String schoolName;
+    private String schoolCode;
 }

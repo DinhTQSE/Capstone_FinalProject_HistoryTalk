@@ -12,6 +12,12 @@ import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.HistoricalContextRepository;
+import com.historytalk.entity.quiz.Quiz;
+import com.historytalk.exception.InvalidRequestException;
+import com.historytalk.repository.CharacterRepository;
+import com.historytalk.repository.QuizRepository;
+import org.springframework.security.access.AccessDeniedException;
+
 import com.historytalk.repository.assignment.AssignmentRepository;
 import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
 import com.historytalk.repository.classroom.ClassStudentRepository;
@@ -51,6 +57,11 @@ class TeacherAssignmentServiceImplTest {
     private HistoricalContextRepository historicalContextRepository;
     @Mock
     private com.historytalk.repository.UserRepository userRepository;
+    @Mock
+    private QuizRepository quizRepository;
+    @Mock
+    private CharacterRepository characterRepository;
+
 
     @InjectMocks
     private TeacherAssignmentServiceImpl teacherAssignmentService;
@@ -254,5 +265,106 @@ class TeacherAssignmentServiceImplTest {
         assertEquals(AssignmentStatus.CANCELLED, assignment.getStatus());
         verify(assignmentRepository, times(1)).save(assignment);
     }
-}
 
+    @Test
+    @DisplayName("Tạo bài tập Quiz thành công khi Quiz đã công bố và cùng trường")
+    void testCreateAssignment_QuizTest_Success() {
+        UUID quizId = UUID.randomUUID();
+        Quiz quiz = Quiz.builder()
+                .quizId(quizId)
+                .title("Trắc nghiệm Chiến dịch Điện Biên Phủ")
+                .isPublished(true)
+                .createdBy(teacher)
+                .build();
+
+        CreateAssignmentRequest req = CreateAssignmentRequest.builder()
+                .classId(classroomId)
+                .title("Kiểm tra 15 phút Điện Biên Phủ")
+                .assignmentType(AssignmentType.QUIZ_TEST)
+                .targetId(quizId)
+                .deadline(LocalDateTime.now().plusDays(2))
+                .build();
+
+        Assignment savedAssignment = Assignment.builder()
+                .id(UUID.randomUUID())
+                .classroom(classroom)
+                .teacher(teacher)
+                .title(req.getTitle())
+                .assignmentType(req.getAssignmentType())
+                .targetId(quizId)
+                .minRequirement(1)
+                .deadline(req.getDeadline())
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(userRepository.findById(teacherUid)).thenReturn(Optional.of(teacher));
+        when(quizRepository.findById(quizId)).thenReturn(Optional.of(quiz));
+        when(assignmentRepository.save(any(Assignment.class))).thenReturn(savedAssignment);
+        when(classStudentRepository.findEnrolledStudentUids(classroomId)).thenReturn(List.of());
+
+        TeacherAssignmentResponse response = teacherAssignmentService.createAssignment(req, teacherPrincipal);
+
+        assertNotNull(response);
+        assertEquals("Kiểm tra 15 phút Điện Biên Phủ", response.getTitle());
+        assertEquals("Trắc nghiệm Chiến dịch Điện Biên Phủ", response.getTargetTitle());
+    }
+
+    @Test
+    @DisplayName("Tạo bài tập Quiz thất bại khi Quiz chưa công bố (isPublished = false)")
+    void testCreateAssignment_QuizTest_ThrowsWhenUnpublished() {
+        UUID quizId = UUID.randomUUID();
+        Quiz quiz = Quiz.builder()
+                .quizId(quizId)
+                .title("Trắc nghiệm Nháp")
+                .isPublished(false)
+                .createdBy(teacher)
+                .build();
+
+        CreateAssignmentRequest req = CreateAssignmentRequest.builder()
+                .classId(classroomId)
+                .title("Kiểm tra nháp")
+                .assignmentType(AssignmentType.QUIZ_TEST)
+                .targetId(quizId)
+                .deadline(LocalDateTime.now().plusDays(2))
+                .build();
+
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(quizRepository.findById(quizId)).thenReturn(Optional.of(quiz));
+
+        InvalidRequestException ex = assertThrows(InvalidRequestException.class, () ->
+                teacherAssignmentService.createAssignment(req, teacherPrincipal));
+        assertTrue(ex.getMessage().contains("chưa được công bố/phê duyệt"));
+    }
+
+    @Test
+    @DisplayName("Tạo bài tập Quiz thất bại khi Quiz thuộc trường khác")
+    void testCreateAssignment_QuizTest_ThrowsWhenDifferentSchool() {
+        UUID otherSchoolId = UUID.randomUUID();
+        School otherSchool = School.builder().id(otherSchoolId).name("Trường Khác").build();
+        User otherTeacher = User.builder().uid(UUID.randomUUID()).school(otherSchool).build();
+
+        UUID quizId = UUID.randomUUID();
+        Quiz quiz = Quiz.builder()
+                .quizId(quizId)
+                .title("Quiz trường khác")
+                .isPublished(true)
+                .createdBy(otherTeacher)
+                .build();
+
+        CreateAssignmentRequest req = CreateAssignmentRequest.builder()
+                .classId(classroomId)
+                .title("Giao bài quiz trường khác")
+                .assignmentType(AssignmentType.QUIZ_TEST)
+                .targetId(quizId)
+                .deadline(LocalDateTime.now().plusDays(2))
+                .build();
+
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(quizRepository.findById(quizId)).thenReturn(Optional.of(quiz));
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () ->
+                teacherAssignmentService.createAssignment(req, teacherPrincipal));
+        assertTrue(ex.getMessage().contains("không thuộc trường của bạn"));
+    }
+}

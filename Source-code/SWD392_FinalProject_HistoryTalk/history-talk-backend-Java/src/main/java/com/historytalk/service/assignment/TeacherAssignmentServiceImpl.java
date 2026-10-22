@@ -329,6 +329,21 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
             case QUIZ_TEST -> {
                 Quiz quiz = quizRepository.findById(targetId)
                         .orElseThrow(() -> new ResourceNotFoundException("Bộ câu hỏi Quiz không tồn tại với ID: " + targetId));
+                if (quiz.getDeletedAt() != null) {
+                    throw new ResourceNotFoundException("Bộ câu hỏi Quiz đã bị xóa với ID: " + targetId);
+                }
+                if (!Boolean.TRUE.equals(quiz.getIsPublished())) {
+                    throw new InvalidRequestException("Bộ câu hỏi Quiz chưa được công bố/phê duyệt");
+                }
+                if (quiz.getHistoricalContext() != null && quiz.getHistoricalContext().getSchool() != null) {
+                    if (!quiz.getHistoricalContext().getSchool().getId().equals(schoolId)) {
+                        throw new AccessDeniedException("Bộ câu hỏi Quiz này thuộc bối cảnh địa phương của trường khác");
+                    }
+                } else if (quiz.getCreatedBy() != null && quiz.getCreatedBy().getSchool() != null) {
+                    if (!quiz.getCreatedBy().getSchool().getId().equals(schoolId)) {
+                        throw new AccessDeniedException("Bộ câu hỏi Quiz này không thuộc trường của bạn");
+                    }
+                }
                 return quiz.getTitle();
             }
             default -> throw new InvalidRequestException("Loại bài tập không hợp lệ: " + type);
