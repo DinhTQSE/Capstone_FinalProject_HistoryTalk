@@ -1,6 +1,7 @@
 package com.historytalk.controller.school;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.school.SchoolResponse;
 import com.historytalk.dto.school.SchoolTokenQuotaResponse;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
@@ -29,6 +30,16 @@ public class SchoolAdminQuotaController {
 
     private final SchoolManagementService schoolManagementService;
     private final UserRepository userRepository;
+
+    @GetMapping({"/my-school", "/profile"})
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "Get school profile and information for current School Admin")
+    public ResponseEntity<ApiResponse<SchoolResponse>> getMySchool(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        SchoolResponse response = schoolManagementService.getSchoolById(schoolId);
+        return ResponseEntity.ok(ApiResponse.success(response, "School profile retrieved successfully"));
+    }
 
     @GetMapping("/token-quota")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")

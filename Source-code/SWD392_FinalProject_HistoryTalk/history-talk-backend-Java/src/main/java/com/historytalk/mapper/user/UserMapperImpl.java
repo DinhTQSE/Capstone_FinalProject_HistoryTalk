@@ -32,6 +32,10 @@ public class UserMapperImpl implements UserMapper {
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .deletedAt(user.getDeletedAt())
+                .schoolId(user.getSchool() != null && user.getSchool().getId() != null
+                        ? user.getSchool().getId().toString() : null)
+                .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
+                .schoolCode(user.getSchool() != null ? user.getSchool().getSchoolCode() : null)
                 .build();
     }
 }
