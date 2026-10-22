@@ -1,0 +1,48 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.6.1 - PayOS Checkout, Webhook Verification & Resilient Tier Fulfillment
+
+actor "Customer" as User
+participant "PaymentController" as PayCtrl
+participant "PayOSWebhookController" as WebCtrl
+participant "PaymentService /\nPaymentWebhookService" as PaySvc
+participant "PaymentFulfillmentService" as FulfillSvc
+participant "PaymentFulfillmentReconciliationScheduler" as Sched
+participant "PayOS Gateway API" as PayOS
+database "PostgreSQL\n(payment_order, payment_transaction, user_tier, user)" as DB
+
+User -> PayCtrl : POST /api/v1/payments/create (tierId)
+PayCtrl -> PaySvc : createPaymentLink(uid, tierId)
+PaySvc -> DB : Generate unique orderCode & INSERT payment_order (status=PENDING, fulfillment_status=PENDING)
+PaySvc -> PayOS : createPaymentLink(PaymentData)
+PayOS --> PaySvc : CheckoutResponseData (checkoutUrl, qrCode, paymentLinkId)
+PaySvc -> DB : UPDATE payment_order SET checkout_url, qr_code, payment_link_id
+PaySvc --> User : 200 OK (checkoutUrl, qrCode)
+
+User -> PayOS : Complete VietQR Bank Transfer
+PayOS -> WebCtrl : POST /api/v1/payments/payos/webhook (WebhookPayload + Signature)
+WebCtrl -> PaySvc : verifyAndProcessWebhook(payload)
+PaySvc -> PayOS : verifyPaymentWebhookData(payload) (HMAC-SHA256 verification)
+PaySvc -> DB : INSERT INTO payment_transaction (status=SUCCESS, rawPayload)
+PaySvc -> DB : UPDATE payment_order SET status=PAID, paid_at=NOW()
+PaySvc -> FulfillSvc : fulfillPaidOrder(orderId)
+
+group Idempotent Pessimistic-Locked Tier Fulfillment
+    FulfillSvc -> DB : Lock payment_order (fulfillment_status = PROCESSING)
+    FulfillSvc -> DB : Deactivate previous UserTier & INSERT new active UserTier (startTime, endTime)
+    FulfillSvc -> DB : UPDATE "user" SET token = token + tier.limitedToken
+    FulfillSvc -> DB : UPDATE payment_order SET fulfillment_status = FULFILLED, fulfilled_at = NOW()
+end
+WebCtrl --> PayOS : 200 OK
+
+group Background Self-Healing Reconciliation (Every 60s)
+    Sched -> DB : Find orders where status=PAID AND fulfillment_status IN (PENDING, FAILED) AND attempts < 5
+    loop For each unfulfilled paid order
+        Sched -> FulfillSvc : fulfillPaidOrder(orderId)
+    end
+end
+@enduml

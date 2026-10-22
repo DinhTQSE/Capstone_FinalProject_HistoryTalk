@@ -1,0 +1,39 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Activity Diagram WF-05 - B2C Subscription Upgrade via PayOS & Daily Gamification Rewards
+
+|Customer|
+start
+:Select Subscription Tier (Plus / Pro) & click Upgrade;
+
+|Core Backend|
+:Create PaymentOrder (status = PENDING, fulfillmentStatus = PENDING);
+:Request payment link & VietQR from PayOS Gateway;
+
+|Customer|
+:Scan VietQR code & complete bank transfer;
+
+|PayOS Gateway|
+:Dispatch signed webhook to POST /api/v1/payments/payos/webhook;
+
+|Core Backend|
+:Verify HMAC-SHA256 webhook signature;
+if (Signature valid & code == '00'?) then (Yes)
+    :Record PaymentTransaction (status = SUCCESS);
+    :Update PaymentOrder (status = PAID);
+    :Lock order (fulfillmentStatus = PROCESSING);
+    :Activate new UserTier & credit Tier tokens to User;
+    :Mark PaymentOrder (fulfillmentStatus = FULFILLED);
+else (Webhook delayed / transient error)
+    :PaymentFulfillmentReconciliationScheduler retries\nunfulfilled PAID orders every 60 seconds;
+endif
+
+|Customer|
+:Perform Daily Check-In & complete Daily Quests\n(CHAT, QUIZ, READ_CONTEXT);
+:Claim quest reward tokens;
+:System updates UserQuestProgress (claimed = true)\nand increments User token balance;
+stop
+@enduml

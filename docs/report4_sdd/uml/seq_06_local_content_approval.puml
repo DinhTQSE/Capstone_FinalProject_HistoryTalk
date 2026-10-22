@@ -1,0 +1,36 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.3.2 - School Local History Content Creation, Review & Classroom Assignment
+
+actor "Teacher" as Teacher
+actor "School Admin" as SchoolAdmin
+participant "TeacherLocalContentController" as TCtrl
+participant "SchoolAdminLocalContentController" as ACtrl
+participant "LocalContentServiceImpl" as LocalSvc
+database "PostgreSQL\n(historical_context, character, class_local_content)" as DB
+
+Teacher -> TCtrl : POST /api/v1/teacher/local-content/contexts (CreateLocalContextRequest)
+TCtrl -> LocalSvc : createLocalContext(teacherUid, request)
+LocalSvc -> DB : Verify school.localHistoryPolicyAccepted == true
+LocalSvc -> DB : INSERT INTO historical_context (school_id, content_scope, content_status=DRAFT, is_published=false)
+LocalSvc -> DB : INSERT INTO class_local_content (class_id, entity_id, entity_type='CONTEXT')
+LocalSvc --> Teacher : 201 Created (status = DRAFT)
+
+Teacher -> TCtrl : PUT /api/v1/teacher/local-content/{id}/submit-review
+TCtrl -> LocalSvc : submitForReview(entityId, CONTEXT)
+LocalSvc -> DB : UPDATE historical_context SET content_status = 'PENDING_REVIEW'
+LocalSvc --> Teacher : 200 OK (Awaiting School Admin Approval)
+
+SchoolAdmin -> ACtrl : PUT /api/v1/school-admin/local-content/{id}/status (ACTIVE / DRAFT, reviewNote)
+ACtrl -> LocalSvc : reviewLocalContent(adminUid, entityId, status, reviewNote)
+alt Approved (status == ACTIVE)
+    LocalSvc -> DB : UPDATE SET content_status='ACTIVE', is_published=true, approved_by=adminUid, review_note=note
+else Rejected back to Draft (status == DRAFT)
+    LocalSvc -> DB : UPDATE SET content_status='DRAFT', is_published=false, review_note=note
+end
+LocalSvc --> SchoolAdmin : 200 OK (LocalContentResponse)
+@enduml

@@ -1,0 +1,46 @@
+@startuml
+scale max 2000 width
+top to bottom direction
+skinparam packageStyle folder
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 15
+skinparam shadowing false
+
+title Package Diagram - Frontend Web Application
+
+package "HistoryTalk-Frontend" {
+    package "Presentation Layer" #EBF5FB {
+        [Presentation.Pages\n(Role-Tailored App Router Views)] as Pages
+        [Presentation.Components\n(Historical Map, 3D Character Viewer,\nStreaming Chat, Quiz Player, Gradebook)] as Comps
+        [Presentation.UI Elements\n(Buttons, Modals, DataTables, Badges)] as UIElem
+        Pages -[hidden]right-> Comps
+        Comps -[hidden]right-> UIElem
+    }
+
+    package "Feature Modules Layer" #E8F8F5 {
+        [Features.Authentication\n& School / Classroom Management] as FAuthSchool
+        [Features.Historical Exploration, Map\n& Conversational AI Chat] as FMapChat
+        [Features.Quiz, Assignments,\nBilling & Gamification] as FQuizBill
+        FAuthSchool -[hidden]right-> FMapChat
+        FMapChat -[hidden]right-> FQuizBill
+    }
+
+    package "Infrastructure Layer" #FEF9E7 {
+        [Infrastructure.API Client\n(HTTP Client & JWT Refresh Interceptor)] as ApiClient
+        [Infrastructure.SSE Streaming Client\n(Stream Reader for AI Dialogue)] as SseClient
+        [Infrastructure.Media Upload Client\n(Cloud Storage Upload Handler)] as MediaClient
+        ApiClient -[hidden]right-> SseClient
+        SseClient -[hidden]right-> MediaClient
+    }
+
+    package "Core & State Layer" #F5EEF8 {
+        [Core.Context & State Stores] as State
+        [Core.Custom Hooks & TypeScript Contracts] as Hooks
+        State -[hidden]right-> Hooks
+    }
+}
+
+Comps -down-> FMapChat
+FMapChat -down-> SseClient
+SseClient -down-> State
+@enduml

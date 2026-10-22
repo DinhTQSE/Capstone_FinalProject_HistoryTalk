@@ -1,0 +1,103 @@
+@startuml
+scale max 2800 width
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Class Diagram 3.2 - B2B SaaS School, Classroom & Token Quota Allocation
+
+class AdminSchoolController <<Controller>> {
+    + createSchool(request: CreateSchoolRequest): ResponseEntity<ApiResponse<SchoolResponse>>
+    + updateSchoolStatus(id: UUID, request: UpdateSchoolStatusRequest): ResponseEntity<ApiResponse<SchoolResponse>>
+    + renewSchoolSubscription(id: UUID, pkg: EnterprisePackage): ResponseEntity<ApiResponse<SchoolResponse>>
+}
+
+class ClassroomController <<Controller>> {
+    + createClassroom(request: CreateClassroomRequest): ResponseEntity<ApiResponse<ClassroomResponse>>
+    + updateClassroom(id: UUID, request: UpdateClassroomRequest): ResponseEntity<ApiResponse<ClassroomResponse>>
+    + getClassroomsBySchool(schoolId: UUID): ResponseEntity<ApiResponse<List<ClassroomResponse>>>
+}
+
+class SchoolLifecycleAndTokenController <<Controller>> {
+    + importStudentsCsv(file: MultipartFile, scope: ImportScope): ResponseEntity<ApiResponse<BatchEnrollResultResponse>>
+    + requestTokenBoost(request: CreateTokenBoostRequest): ResponseEntity<ApiResponse<TokenBoostResponse>>
+    + reviewTokenBoost(id: UUID, request: ReviewTokenBoostRequest): ResponseEntity<ApiResponse<TokenBoostResponse>>
+    + runEndOfYearRollover(schoolId: UUID): ResponseEntity<ApiResponse<RolloverSummaryResponse>>
+}
+
+class SchoolManagementServiceImpl <<Service>> {
+    - schoolRepository: SchoolRepository
+    - userRepository: UserRepository
+    + createSchoolWithAdmin(request): SchoolResponse
+    + checkAndExpireSubscriptions(): void
+}
+
+class DailyTokenAllowanceServiceImpl <<Service>> {
+    - userRepository: UserRepository
+    - schoolRepository: SchoolRepository
+    - classroomRepository: ClassroomRepository
+    + checkAndConsumeStudentTokens(studentUid: UUID, tokensRequired: int): boolean
+    + getEffectiveDailyLimit(student: User): int
+}
+
+class TokenBoostRequestServiceImpl <<Service>> {
+    - tokenBoostRequestRepository: TokenBoostRequestRepository
+    - userRepository: UserRepository
+    - schoolRepository: SchoolRepository
+    + submitBoostRequest(studentUid: UUID, requestedTokens: int, reason: String): TokenBoostRequest
+    + approveOrRejectRequest(requestId: UUID, reviewerUid: UUID, approved: boolean): TokenBoostRequest
+}
+
+class StudentImportServiceImpl <<Service>> {
+    - schoolWideImportProcessor: SchoolWideImportProcessor
+    - classroomImportProcessor: ClassroomImportProcessor
+    + processStudentCsv(file: MultipartFile, scope: ImportScope, schoolId: UUID, classroomId: UUID): BatchEnrollResultResponse
+}
+
+class School <<Entity>> {
+    - id: UUID
+    - schoolCode: String
+    - packageType: EnterprisePackage
+    - totalSchoolTokenQuota: Integer
+    - unallocatedTokenQuota: Integer
+    - defaultDailyStudentQuota: Integer
+    - subscriptionStartDate: LocalDate
+    - subscriptionEndDate: LocalDate
+    - status: SchoolStatus
+}
+
+class Classroom <<Entity>> {
+    - id: UUID
+    - classCode: String
+    - gradeLevel: Integer
+    - academicYear: Integer
+    - dailyTokenQuota: Integer
+    - status: String
+}
+
+class ClassStudent <<Entity>> {
+    - id: UUID
+    - joinedAt: LocalDateTime
+    - status: String
+}
+
+class TokenBoostRequest <<Entity>> {
+    - id: UUID
+    - requestedTokens: Integer
+    - approvedTokens: Integer
+    - status: TokenBoostRequestStatus
+    - requestDate: LocalDate
+}
+
+AdminSchoolController --> SchoolManagementServiceImpl
+ClassroomController --> Classroom
+SchoolLifecycleAndTokenController --> DailyTokenAllowanceServiceImpl
+SchoolLifecycleAndTokenController --> TokenBoostRequestServiceImpl
+SchoolLifecycleAndTokenController --> StudentImportServiceImpl
+SchoolManagementServiceImpl --> School
+DailyTokenAllowanceServiceImpl --> School
+DailyTokenAllowanceServiceImpl --> Classroom
+TokenBoostRequestServiceImpl --> TokenBoostRequest
+Classroom "1" *-- "many" ClassStudent
+School "1" *-- "many" Classroom
+@enduml

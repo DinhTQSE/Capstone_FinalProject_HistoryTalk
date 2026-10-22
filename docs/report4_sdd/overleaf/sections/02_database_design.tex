@@ -1,0 +1,531 @@
+% ============================================================================
+% SECTION 2: DATABASE DESIGN
+% ============================================================================
+\section{Database Design}
+
+\subsection{Entity-Relationship Diagram}
+
+The HistoryTalk persistence layer is built on PostgreSQL (relational schema historical\_\ab schema) integrated with Supabase PgVector (vector extension vector(768) with HNSW indexing). Schema evolution is version-controlled through Flyway database migrations. Across the system's bounded domains, the database comprises the relational domain tables and the vector\_\ab chunk vector store table.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.99\textwidth,height=0.70\textheight,keepaspectratio]{figures/erd_full_overview.png}
+    \caption{Logical Entity-Relationship Diagram}
+    \label{fig:erd_full_overview}
+\end{figure}
+
+\newpage
+\subsection{Table Descriptions}
+
+Table~\ref{tab:db_table_descriptions} summarizes the database tables in HistoryTalk, specifying the business purpose, Primary Keys (PK), and Foreign Keys (FK) of each table in alignment with the database schema and JPA entity models.
+
+\begin{longtable}{|C{0.9cm}|L{4.2cm}|L{9.2cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{No} & \textbf{Table} & \textbf{Description} \\
+\hline
+\endhead
+01 & school & Stores B2B multi-tenant school organizations, enterprise subscription packages (ENTERPRISE\_\ab SMALL, ENTERPRISE\_\ab MEDIUM, ENTERPRISE\_\ab LARGE), shared token pools, academic subscription dates (01/09--31/05), and default daily student token quotas.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} None \\
+\hline
+02 & "user" & Stores all platform user accounts across platform roles (CUSTOMER, CONTENT\_\ab ADMIN, SYSTEM\_\ab ADMIN, SCHOOL\_\ab ADMIN, TEACHER, SCHOOL\_\ab STUDENT), credentials, account status, B2C token balance, and B2B daily token consumption.\newline
+$\bullet$ \textbf{Primary keys:} uid\newline
+$\bullet$ \textbf{Foreign keys:} school\_\ab id $\rightarrow$ school(id) \\
+\hline
+03 & classroom & Represents school classrooms managed by teachers for a specific grade level (6--12) and academic year, with optional per-classroom daily token quota overrides.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} school\_\ab id $\rightarrow$ school(id), teacher\_\ab id $\rightarrow$ "user"(uid) \\
+\hline
+04 & class\_\ab student & Junction table mapping enrolled school students to classrooms with enrollment timestamps and active status.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} classroom\_\ab id $\rightarrow$ classroom(id), student\_\ab id $\rightarrow$ "user"(uid) \\
+\hline
+05 & token\_\ab boost\_\ab request & Tracks daily token boost requests submitted by school students when reaching their daily quota, and approval/rejection records by teachers or school admins.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} school\_\ab id $\rightarrow$ school(id), classroom\_\ab id $\rightarrow$ classroom(id), student\_\ab uid $\rightarrow$ "user"(uid), reviewed\_\ab by\_\ab uid $\rightarrow$ "user"(uid) \\
+\hline
+06 & historical\_\ab context & Stores historical events, eras (ANCIENT, MEDIEVAL, MODERN, CONTEMPORARY), categories, GeoJSON battle-map overlays, and multi-tenant local content approval states.\newline
+$\bullet$ \textbf{Primary keys:} context\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} created\_\ab by $\rightarrow$ "user"(uid), school\_\ab id $\rightarrow$ school(id), approved\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+07 & "character" & Stores historical figure personas, biographical backgrounds, speaking styles/personalities, 2D avatars, 3D model URLs (.glb), lifespan dates, and local content approval states.\newline
+$\bullet$ \textbf{Primary keys:} character\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} created\_\ab by $\rightarrow$ "user"(uid), school\_\ab id $\rightarrow$ school(id), approved\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+08 & context\_\ab character\_\ab mapping & Many-to-many bridge table associating historical characters with one or more historical contexts/campaigns.\newline
+$\bullet$ \textbf{Primary keys:} mapping\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} context\_\ab id $\rightarrow$ historical\_\ab context(context\_\ab id), character\_\ab id $\rightarrow$ "character"(character\_\ab id) \\
+\hline
+09 & class\_\ab local\_\ab content & Assigns school-owned local historical contexts or characters (CLASS\_\ab ONLY or SCHOOL\_\ab WIDE) to specific classrooms.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} class\_\ab id $\rightarrow$ classroom(id), assigned\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+10 & document & Stores reference historical documents (TEXT, MARKDOWN, PDF, IMAGE\_\ab 2D, IMAGE\_\ab 3D) attached polymorphically to contexts or characters for RAG grounding.\newline
+$\bullet$ \textbf{Primary keys:} doc\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} uploaded\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+11 & document\_\ab media\_\ab metadata & Polymorphic media metadata table storing Cloudflare R2 / Supabase Storage paths, dimensions, file sizes, and formats for characters, contexts, documents, and avatars.\newline
+$\bullet$ \textbf{Primary keys:} metadata\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} document\_\ab id $\rightarrow$ document(doc\_\ab id) \\
+\hline
+12 & vector\_\ab chunk & Supabase PgVector table storing semantically chunked document passages and 768-dimensional BAAI/bge-m3 embeddings indexed with HNSW cosine similarity.\newline
+$\bullet$ \textbf{Primary keys:} chunk\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} doc\_\ab id $\rightarrow$ document(doc\_\ab id) \\
+\hline
+13 & map\_\ab pin & Stores interactive map markers (ADMIN or USER owned), coordinates, historical years, and GeoJSON LineString troop movement paths for a historical context.\newline
+$\bullet$ \textbf{Primary keys:} pin\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} context\_\ab id $\rightarrow$ historical\_\ab context(context\_\ab id), created\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+14 & map\_\ab focus & Stores predefined camera viewpoints (latitude, longitude, zoom level, display order) to guide learners through key geographical stages of a campaign.\newline
+$\bullet$ \textbf{Primary keys:} focus\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} context\_\ab id $\rightarrow$ historical\_\ab context(context\_\ab id), created\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+15 & chat\_\ab session & Tracks conversational AI roleplay sessions between a user and a historical character within a specific historical context.\newline
+$\bullet$ \textbf{Primary keys:} session\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} uid $\rightarrow$ "user"(uid), context\_\ab id $\rightarrow$ historical\_\ab context(context\_\ab id), character\_\ab id $\rightarrow$ "character"(character\_\ab id) \\
+\hline
+16 & message & Stores individual user and AI dialogue turns within a chat session, including token usage, 3 AI-suggested follow-up questions, and cited RAG historical quotes.\newline
+$\bullet$ \textbf{Primary keys:} message\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} session\_\ab id $\rightarrow$ chat\_\ab session(session\_\ab id) \\
+\hline
+17 & quiz & Stores assessment quizzes linked to historical contexts, categorized by difficulty level (EASY, MEDIUM, HARD) and publication status.\newline
+$\bullet$ \textbf{Primary keys:} quiz\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} context\_\ab id $\rightarrow$ historical\_\ab context(context\_\ab id), created\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+18 & question & Central question bank supporting three polymorphic question types (MULTIPLE\_\ab CHOICE, FILL\_\ab IN\_\ab BLANK, MATCHING) with JSON payload question\_\ab data and explanations.\newline
+$\bullet$ \textbf{Primary keys:} question\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} quiz\_\ab id $\rightarrow$ quiz(quiz\_\ab id) (nullable for bank questions) \\
+\hline
+19 & quiz\_\ab question & Many-to-many link table binding reusable Question Bank items to Quizzes with explicit order\_\ab index and point weights (points).\newline
+$\bullet$ \textbf{Primary keys:} (quiz\_\ab id, question\_\ab id)\newline
+$\bullet$ \textbf{Foreign keys:} quiz\_\ab id $\rightarrow$ quiz(quiz\_\ab id), question\_\ab id $\rightarrow$ question(question\_\ab id) \\
+\hline
+20 & quiz\_\ab session & Records a learner's timed quiz attempt, start/end timestamps, time limit, and final calculated score on a 10-point scale.\newline
+$\bullet$ \textbf{Primary keys:} session\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} quiz\_\ab id $\rightarrow$ quiz(quiz\_\ab id), uid $\rightarrow$ "user"(uid) \\
+\hline
+21 & quiz\_\ab answer\_\ab detail & Stores per-question submitted answer JSON (answer\_\ab data), correctness flag, and points earned within a quiz attempt session.\newline
+$\bullet$ \textbf{Primary keys:} answer\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} session\_\ab id $\rightarrow$ quiz\_\ab session(session\_\ab id), question\_\ab id $\rightarrow$ question(question\_\ab id) \\
+\hline
+22 & quiz\_\ab rating & Stores 1--5 star ratings submitted by learners after completing a quiz (enforcing one rating per user per quiz).\newline
+$\bullet$ \textbf{Primary keys:} rating\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} quiz\_\ab id $\rightarrow$ quiz(quiz\_\ab id), user\_\ab id $\rightarrow$ "user"(uid) \\
+\hline
+23 & question\_\ab report & Stores learner/teacher error reports flagging factual or formatting issues on specific quiz questions for Content Admin review.\newline
+$\bullet$ \textbf{Primary keys:} report\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} question\_\ab id $\rightarrow$ question(question\_\ab id), quiz\_\ab id $\rightarrow$ quiz(quiz\_\ab id), reported\_\ab by $\rightarrow$ "user"(uid) \\
+\hline
+24 & assignment & Stores classroom homework assignments created by teachers across three learning modes (CONTEXT\_\ab READING, AI\_\ab CHAT\_\ab ROLEPLAY, QUIZ\_\ab TEST) with deadlines and minimum completion thresholds.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} classroom\_\ab id $\rightarrow$ classroom(id), teacher\_\ab id $\rightarrow$ "user"(uid) \\
+\hline
+25 & assignment\_\ab submission & Tracks individual student progress, submission status (NOT\_\ab STARTED, IN\_\ab PROGRESS, SUBMITTED, LATE\_\ab SUBMITTED, MISSED, EXEMPTED), score, AI chat message count, and reading duration.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} assignment\_\ab id $\rightarrow$ assignment(id), student\_\ab id $\rightarrow$ "user"(uid), quiz\_\ab session\_\ab id $\rightarrow$ quiz\_\ab session(session\_\ab id), chat\_\ab session\_\ab id $\rightarrow$ chat\_\ab session(session\_\ab id) \\
+\hline
+26 & tier & Defines B2C subscription plans (e.g., Free, Plus, Pro), pricing in VND, billing duration in months, and token allowances.\newline
+$\bullet$ \textbf{Primary keys:} tier\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} None \\
+\hline
+27 & user\_\ab tier & Records active and historical B2C tier subscriptions for users, linking to the originating payment\_\ab order.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} uid $\rightarrow$ "user"(uid), tier\_\ab id $\rightarrow$ tier(tier\_\ab id), order\_\ab id $\rightarrow$ payment\_\ab order(order\_\ab id) \\
+\hline
+28 & payment\_\ab order & Tracks PayOS checkout orders, unique numeric order\_\ab code, QR checkout URLs, payment status (PENDING, PAID, CANCELLED, EXPIRED, FAILED), and resilient fulfillment state (PENDING, PROCESSING, FULFILLED, FAILED).\newline
+$\bullet$ \textbf{Primary keys:} order\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} uid $\rightarrow$ "user"(uid), tier\_\ab id $\rightarrow$ tier(tier\_\ab id) \\
+\hline
+29 & payment\_\ab transaction & Immutable audit log of incoming PayOS webhook payloads, bank reference numbers, and verification statuses.\newline
+$\bullet$ \textbf{Primary keys:} transaction\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} order\_\ab id $\rightarrow$ payment\_\ab order(order\_\ab id) \\
+\hline
+30 & daily\_\ab quest & Master catalog of daily gamification quests (CHAT, QUIZ, READ\_\ab CONTEXT), completion targets, and token rewards.\newline
+$\bullet$ \textbf{Primary keys:} quest\_\ab id\newline
+$\bullet$ \textbf{Foreign keys:} None \\
+\hline
+31 & user\_\ab quest\_\ab progress & Tracks daily per-user progress toward active quests and reward claim status.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} user\_\ab uid $\rightarrow$ "user"(uid), quest\_\ab id $\rightarrow$ daily\_\ab quest(quest\_\ab id) \\
+\hline
+32 & daily\_\ab check\_\ab in & Records daily user login check-ins and consecutive day streak counts.\newline
+$\bullet$ \textbf{Primary keys:} id\newline
+$\bullet$ \textbf{Foreign keys:} user\_\ab uid $\rightarrow$ "user"(uid) \\
+\hline
+\caption{Database Table Descriptions}
+\label{tab:db_table_descriptions}
+\end{longtable}
+
+\newpage
+\subsection{Detailed Data Dictionary}
+
+Table~\ref{tab:data_dictionary} provides the column-level specification for the database tables, synchronized with the Java JPA entity models and database schema.
+
+\footnotesize
+\begin{longtable}{|L{3.8cm}|L{2.5cm}|L{2.1cm}|L{5.9cm}|}
+\hline
+\rowcolor{tableheader}
+\textbf{Column Name} & \textbf{Data Type} & \textbf{Constraints} & \textbf{Description} \\
+\hline
+\endhead
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 01: school -- B2B Multi-Tenant Partner Schools}} \\
+\hline
+id & UUID & PK, NOT NULL & Unique school tenant identifier. \\
+\hline
+name & VARCHAR(255) & NOT NULL & Official school name. \\
+\hline
+school\_\ab code & VARCHAR(50) & UQ, NOT NULL & Unique institutional code (e.g., THPT-LHP-HCM). \\
+\hline
+address & VARCHAR(500) & NULLABLE & Physical address of the school. \\
+\hline
+contact\_\ab email & VARCHAR(100) & NOT NULL & Primary administrative contact email. \\
+\hline
+contact\_\ab phone & VARCHAR(20) & NULLABLE & Contact phone number. \\
+\hline
+package\_\ab type & VARCHAR(50) & NOT NULL & Enum EnterprisePackage: ENTERPRISE\_\ab SMALL (5M), ENTERPRISE\_\ab MEDIUM (20M), ENTERPRISE\_\ab LARGE (50M). \\
+\hline
+total\_\ab school\_\ab token\_\ab quota & INTEGER & NOT NULL & Total contracted AI tokens for the academic year. \\
+\hline
+unallocated\_\ab token\_\ab quota & INTEGER & NOT NULL & Remaining shared token pool available for daily student consumption and boosts. \\
+\hline
+subscription\_\ab start\_\ab date & DATE & NULLABLE & Academic year start date (standard 01/09). \\
+\hline
+subscription\_\ab end\_\ab date & DATE & NULLABLE & Academic year end date (standard 31/05). \\
+\hline
+renewed\_\ab for\_\ab next\_\ab year & BOOLEAN & DEFAULT FALSE & Flag indicating pre-renewal for the next academic year. \\
+\hline
+next\_\ab package\_\ab type & VARCHAR(50) & NULLABLE & Next year's EnterprisePackage tier if pre-renewed. \\
+\hline
+default\_\ab daily\_\ab student\_\ab quota & INTEGER & DEFAULT 1000 & Default daily AI token allowance per student. \\
+\hline
+local\_\ab history\_\ab policy\_\ab accepted & BOOLEAN & DEFAULT FALSE & Whether the School Admin accepted the Local History Content Policy. \\
+\hline
+status & VARCHAR(20) & NOT NULL & Enum SchoolStatus: ACTIVE, INACTIVE, SUSPENDED, EXPIRED. \\
+\hline
+created\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMP & AUDIT & Creation, modification, and soft-delete timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 02: "user" -- Platform User Accounts \& Access Control}} \\
+\hline
+uid & UUID & PK, NOT NULL & Unique user UUID. \\
+\hline
+user\_\ab name & VARCHAR(100) & UQ, NOT NULL & Unique login username. \\
+\hline
+email & VARCHAR(100) & UQ, NOT NULL & Unique login and notification email address. \\
+\hline
+password & VARCHAR(100) & NOT NULL & BCrypt-hashed password string. \\
+\hline
+full\_\ab name & VARCHAR(150) & NULLABLE & Full display name of the user. \\
+\hline
+dob / gender / phone\_\ab number & DATE / VARCHAR & NULLABLE & Date of birth, Gender (MALE, FEMALE, OTHER), and phone. \\
+\hline
+address / avatar\_\ab url & VARCHAR(500) & NULLABLE & Residential address and profile avatar URL. \\
+\hline
+role & VARCHAR(50) & NOT NULL & Enum UserRole: CUSTOMER, CONTENT\_\ab ADMIN, SYSTEM\_\ab ADMIN, SCHOOL\_\ab ADMIN, TEACHER, SCHOOL\_\ab STUDENT. \\
+\hline
+school\_\ab id & UUID & FK, NULLABLE & References school(id) for B2B institutional users. \\
+\hline
+student\_\ab code & VARCHAR(50) & NULLABLE & Institutional student code within the school. \\
+\hline
+must\_\ab change\_\ab password & BOOLEAN & DEFAULT FALSE & Forces password update on first login for CSV-imported accounts. \\
+\hline
+subject\_\ab department & VARCHAR(100) & NULLABLE & Academic department for TEACHER accounts. \\
+\hline
+account\_\ab status & VARCHAR(30) & NOT NULL & Enum AccountStatus: ACTIVE, DEACTIVATED. \\
+\hline
+deactivated\_\ab reason & VARCHAR(255) & NULLABLE & Audit reason for account deactivation (e.g., Grade 12 graduation). \\
+\hline
+token & INTEGER & DEFAULT 0 & B2C customer token balance. \\
+\hline
+daily\_\ab tokens\_\ab used & INTEGER & DEFAULT 0 & Tokens consumed today by a SCHOOL\_\ab STUDENT. \\
+\hline
+daily\_\ab bonus\_\ab tokens & INTEGER & DEFAULT 0 & Approved boost tokens granted for the current day. \\
+\hline
+last\_\ab active\_\ab date / last\_\ab token\_\ab reset\_\ab at & TIMESTAMP & NULLABLE & Last activity and lazy daily token reset / JWT revocation timestamp. \\
+\hline
+password\_\ab reset\_\ab token\_\ab hash / expires\_\ab at & VARCHAR(64) / TS & NULLABLE & SHA-256 hash and expiry of active password reset token. \\
+\hline
+created\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMP & AUDIT & Standard lifecycle timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 03: classroom -- School Classrooms}} \\
+\hline
+id & UUID & PK, NOT NULL & Unique classroom identifier. \\
+\hline
+school\_\ab id & UUID & FK, NOT NULL & References school(id). \\
+\hline
+teacher\_\ab id & UUID & FK, NULLABLE & References homeroom/history teacher "user"(uid). \\
+\hline
+class\_\ab name & VARCHAR(100) & NOT NULL & Display name (e.g., 10A1, 12C3). \\
+\hline
+class\_\ab code & VARCHAR(50) & UQ, NOT NULL & Globally unique smart join code generated by SmartClassCodeGenerator. \\
+\hline
+grade\_\ab level & INTEGER & NULLABLE & Grade level (6 to 12). \\
+\hline
+academic\_\ab year & INTEGER & NOT NULL & Academic start year (e.g., 2026). \\
+\hline
+description & VARCHAR(500) & NULLABLE & Classroom curriculum description. \\
+\hline
+daily\_\ab token\_\ab quota & INTEGER & NULLABLE & Optional classroom-specific daily student token limit override. \\
+\hline
+status & VARCHAR(20) & DEFAULT 'ACTIVE' & Classroom lifecycle state (ACTIVE, ARCHIVED). \\
+\hline
+created\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMP & AUDIT & Standard lifecycle timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 04: class\_\ab student -- Classroom Student Roster Association}} \\
+\hline
+id & UUID & PK, NOT NULL & Unique enrollment record ID. \\
+\hline
+classroom\_\ab id & UUID & FK, NOT NULL & References classroom(id). \\
+\hline
+student\_\ab id & UUID & FK, NOT NULL & References "user"(uid) (Unique together with classroom\_\ab id). \\
+\hline
+joined\_\ab at & TIMESTAMP & NOT NULL & Enrollment timestamp. \\
+\hline
+status & VARCHAR(20) & DEFAULT 'ACTIVE' & Enrollment status (ACTIVE, TRANSFERRED, REMOVED). \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 05: token\_\ab boost\_\ab request -- Student Daily Token Boost Workflow}} \\
+\hline
+id & UUID & PK, NOT NULL & Unique boost request ID. \\
+\hline
+school\_\ab id / classroom\_\ab id & UUID & FK, NOT NULL & References school(id) and classroom(id). \\
+\hline
+student\_\ab uid & UUID & FK, NOT NULL & Requesting student "user"(uid). \\
+\hline
+requested\_\ab tokens / approved\_\ab tokens & INTEGER & NOT NULL / NULL & Requested vs. approved bonus token count. \\
+\hline
+reason / review\_\ab note & VARCHAR(500) & NOT NULL / NULL & Student justification and teacher/admin review note. \\
+\hline
+status & VARCHAR(20) & NOT NULL & Enum TokenBoostRequestStatus: PENDING, APPROVED, REJECTED. \\
+\hline
+reviewed\_\ab by\_\ab uid & UUID & FK, NULLABLE & Teacher or School Admin "user"(uid) who reviewed the request. \\
+\hline
+request\_\ab date / created\_\ab at / updated\_\ab at & DATE / TS & NOT NULL & Request date and audit timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 06: historical\_\ab context -- Historical Events, Battles \& Local Content}} \\
+\hline
+context\_\ab id & UUID & PK, NOT NULL & Unique historical context UUID. \\
+\hline
+name & VARCHAR(100) & UQ, NOT NULL & Event/campaign title. \\
+\hline
+description & TEXT & NOT NULL & Detailed historical narrative and background. \\
+\hline
+era & VARCHAR(30) & NULLABLE & Enum EventEra: ANCIENT, MEDIEVAL, MODERN, CONTEMPORARY. \\
+\hline
+category & VARCHAR(30) & NULLABLE & Enum EventCategory: WAR, POLITICS, CULTURE, SCIENCE, RELIGION, OTHER. \\
+\hline
+year / start\_\ab year / end\_\ab year / is\_\ab bc & INT / BOOLEAN & NULLABLE & Chronological timeline indicators and Before Christ (is\_\ab bc) flag. \\
+\hline
+location / latitude / longitude & VARCHAR / FLOAT8 & NULLABLE & Geographical location name and coordinates. \\
+\hline
+image\_\ab url / video\_\ab url & VARCHAR(500) & NULLABLE & Cover illustration and video media URLs. \\
+\hline
+battle\_\ab map & JSONB & NULLABLE & Interactive battle-map configuration JSON (factions, symbols, overlay). \\
+\hline
+created\_\ab by / approved\_\ab by & UUID & FK & Author "user"(uid) and approving School Admin "user"(uid). \\
+\hline
+school\_\ab id & UUID & FK, NULLABLE & NULL for global content; school(id) for school-owned local content. \\
+\hline
+content\_\ab scope & VARCHAR(20) & NULLABLE & Enum ContentScope: CLASS\_\ab ONLY, SCHOOL\_\ab WIDE. \\
+\hline
+content\_\ab status & VARCHAR(20) & NULLABLE & Enum ContentStatus: DRAFT, PENDING\_\ab REVIEW, ACTIVE, INACTIVE. \\
+\hline
+review\_\ab note / is\_\ab published & TEXT / BOOLEAN & NULL / DEFAULT F & Admin review feedback note and public visibility flag. \\
+\hline
+created\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMP & AUDIT & Standard lifecycle timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 07: "character" -- Historical Character Personas}} \\
+\hline
+character\_\ab id & UUID & PK, NOT NULL & Unique character UUID. \\
+\hline
+name / title & VARCHAR(100/150) & NOT NULL / NULL & Character name and historical title/honorific. \\
+\hline
+background & TEXT & NOT NULL & Comprehensive biographical grounding text. \\
+\hline
+personality & VARCHAR(500) & NULLABLE & Persona tone, temperament, and speaking style prompt traits. \\
+\hline
+image\_\ab url / character\_\ab model\_\ab url & VARCHAR(255/500) & NULLABLE & 2D avatar URL and 3D .glb model URL. \\
+\hline
+born\_\ab year/month/day / is\_\ab born\_\ab bc & INT / BOOLEAN & NULLABLE & Structured birth date fields supporting BCE/CE eras. \\
+\hline
+death\_\ab year/month/day / is\_\ab death\_\ab bc & INT / BOOLEAN & NULLABLE & Structured death date fields supporting BCE/CE eras. \\
+\hline
+created\_\ab by / school\_\ab id / approved\_\ab by & UUID & FK & Creator, owning school (for local characters), and approver. \\
+\hline
+content\_\ab scope / content\_\ab status & VARCHAR(20) & NULLABLE & ContentScope and ContentStatus (DRAFT, PENDING\_\ab REVIEW, ACTIVE, INACTIVE). \\
+\hline
+review\_\ab note / is\_\ab published & TEXT / BOOLEAN & NULL / DEFAULT F & School Admin review note and publication status. \\
+\hline
+created\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMP & AUDIT & Standard lifecycle timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 08: context\_\ab character\_\ab mapping -- Context-Character M:N Join Table}} \\
+\hline
+mapping\_\ab id & UUID & PK, NOT NULL & Surrogate primary key. \\
+\hline
+context\_\ab id / character\_\ab id & UUID & FK, UQ PAIR & References historical\_\ab context(context\_\ab id) and "character"(character\_\ab id). \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 09: class\_\ab local\_\ab content -- Classroom Local Content Assignment}} \\
+\hline
+id & UUID & PK, NOT NULL & Unique assignment row ID. \\
+\hline
+class\_\ab id & UUID & FK, NOT NULL & Target classroom(id). \\
+\hline
+entity\_\ab id / entity\_\ab type & UUID / VARCHAR(20) & NOT NULL & Polymorphic reference (CONTEXT or CHARACTER). \\
+\hline
+assigned\_\ab by / assigned\_\ab at & UUID / TIMESTAMP & NULL / NOT NULL & Teacher who assigned the content and timestamp. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 10: document -- RAG Historical Source Documents}} \\
+\hline
+doc\_\ab id & UUID & PK, NOT NULL & Unique document UUID. \\
+\hline
+uploaded\_\ab by & UUID & FK, NOT NULL & References uploader "user"(uid). \\
+\hline
+entity\_\ab id / entity\_\ab type & UUID / VARCHAR(20) & NOT NULL & Polymorphic owner (CONTEXT, CHARACTER, DOCUMENT, USER). \\
+\hline
+title / file\_\ab url & VARCHAR(255/500) & NOT NULL / NULL & Document title and cloud storage file URL. \\
+\hline
+content & TEXT & NULLABLE & Extracted UTF-8 text (via PDFBox, Tess4J OCR, or Markdown). \\
+\hline
+document\_\ab type & VARCHAR(20) & NOT NULL & Enum DocumentType: TEXT, MARKDOWN, PDF, IMAGE\_\ab 2D, IMAGE\_\ab 3D. \\
+\hline
+status & VARCHAR(20) & NOT NULL & Enum ContentStatus: DRAFT, PENDING\_\ab REVIEW, ACTIVE, INACTIVE. \\
+\hline
+uploaded\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMP & AUDIT & Upload, modification, and soft-delete timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 11: document\_\ab media\_\ab metadata -- Polymorphic Cloud Media Metadata}} \\
+\hline
+metadata\_\ab id & UUID & PK, NOT NULL & Unique media metadata ID. \\
+\hline
+document\_\ab id & UUID & FK, NULLABLE & Optional reference to document(doc\_\ab id). \\
+\hline
+entity\_\ab type / entity\_\ab id & VARCHAR(20) / UUID & NOT NULL & Polymorphic target (CHARACTER, CONTEXT, DOCUMENT, USER). \\
+\hline
+media\_\ab type / file\_\ab format & VARCHAR(20) & NOT NULL / NULL & Enum MediaType (IMAGE\_\ab 2D, MODEL\_\ab 3D) and extension. \\
+\hline
+file\_\ab size\_\ab bytes / width / height & BIGINT / INT & NULLABLE & Binary size and pixel dimensions. \\
+\hline
+storage\_\ab path / thumbnail\_\ab path & VARCHAR(500) & NOT NULL / NULL & Object key in Cloudflare R2 / Supabase Storage. \\
+\hline
+extended\_\ab metadata & JSONB & NULLABLE & Additional rendering metadata JSON. \\
+\hline
+created\_\ab at / updated\_\ab at & TIMESTAMP & AUDIT & Creation and update timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 12: vector\_\ab chunk -- Supabase PgVector RAG Embeddings}} \\
+\hline
+chunk\_\ab id & UUID & PK, NOT NULL & Unique chunk UUID. \\
+\hline
+doc\_\ab id / entity\_\ab id & UUID & FK, NOT NULL & Source document(doc\_\ab id) and parent entity\_\ab id for filtered retrieval. \\
+\hline
+content & TEXT & NOT NULL & Semantically chunked text passage ($\le 1200$ chars). \\
+\hline
+embedding & vector(768) & NOT NULL & 768-D dense vector generated by BAAI/bge-m3 (HNSW cosine index). \\
+\hline
+sequence\_\ab number / is\_\ab active & INT / BOOLEAN & NOT NULL & Chunk order within document and active flag. \\
+\hline
+created\_\ab at / updated\_\ab at / deleted\_\ab at & TIMESTAMPTZ & AUDIT & Standard lifecycle timestamps. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 13 \& 14: map\_\ab pin \& map\_\ab focus -- Interactive GeoJSON Battle Maps}} \\
+\hline
+pin\_\ab id (map\_\ab pin) & UUID & PK, NOT NULL & Unique map pin identifier. \\
+\hline
+context\_\ab id / created\_\ab by & UUID & FK, NOT NULL & Parent historical\_\ab context and creator "user". \\
+\hline
+pin\_\ab owner\_\ab type / pin\_\ab type & VARCHAR(10/50) & NOT NULL / NULL & Discriminator (ADMIN or USER) and tactical marker type. \\
+\hline
+label / description / pin\_\ab year & VARCHAR / TEXT / INT & NOT NULL & Pin title, narrative, and chronological year. \\
+\hline
+latitude / longitude & FLOAT8 & NOT NULL & Geographic coordinates. \\
+\hline
+path\_\ab geojson (map\_\ab pin) & JSONB & NOT NULL & GeoJSON LineString coordinates modeling troop movement paths. \\
+\hline
+focus\_\ab id (map\_\ab focus) & UUID & PK, NOT NULL & Unique camera viewpoint focus ID (with zoom\_\ab level, order\_\ab index, is\_\ab default). \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 15 \& 16: chat\_\ab session \& message -- Conversational AI Roleplay}} \\
+\hline
+session\_\ab id (chat\_\ab session) & UUID & PK, NOT NULL & Unique chat session ID linking uid, character\_\ab id, and context\_\ab id. \\
+\hline
+title / last\_\ab message\_\ab at & VARCHAR(255) / TS & NULLABLE & LLM-generated short session title and latest message timestamp. \\
+\hline
+message\_\ab id (message) & UUID & PK, NOT NULL & Unique message UUID belonging to session\_\ab id. \\
+\hline
+content / is\_\ab from\_\ab ai / message\_\ab type & TEXT / BOOL / VARCHAR & NOT NULL & Message text, sender flag, and type (CHAT, SYSTEM\_\ab GREETING). \\
+\hline
+token & INTEGER & DEFAULT 0 & Prompt + completion LLM tokens consumed by the turn. \\
+\hline
+suggested\_\ab questions / quotes & TEXT (JSON) & NULLABLE & JSON arrays of 3 follow-up questions and cited RAG historical passages. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 17--23: quiz, question, quiz\_\ab question, quiz\_\ab session, quiz\_\ab answer\_\ab detail, quiz\_\ab rating, question\_\ab report}} \\
+\hline
+quiz\_\ab id (quiz) & UUID & PK, NOT NULL & Quiz ID linked to context\_\ab id, created\_\ab by, title, level (EASY, MEDIUM, HARD), is\_\ab published. \\
+\hline
+question\_\ab id (question) & UUID & PK, NOT NULL & Question ID with content, question\_\ab type (MULTIPLE\_\ab CHOICE, FILL\_\ab IN\_\ab BLANK, MATCHING), question\_\ab data (JSON), explanation. \\
+\hline
+(quiz\_\ab id, question\_\ab id) (quiz\_\ab question) & UUID PAIR & PK, FK & Composite link key with order\_\ab index (INT) and points (NUMERIC(8,2)). \\
+\hline
+session\_\ab id (quiz\_\ab session) & UUID & PK, NOT NULL & Attempt ID with quiz\_\ab id, uid, limited\_\ab time, start\_\ab time, end\_\ab time, score. \\
+\hline
+answer\_\ab id (quiz\_\ab answer\_\ab detail) & UUID & PK, NOT NULL & Per-question answer record with answer\_\ab data (JSON), score\_\ab earned, is\_\ab correct. \\
+\hline
+rating\_\ab id (quiz\_\ab rating) & UUID & PK, NOT NULL & User quiz rating (rating\_\ab value 1--5, unique per quiz\_\ab id + user\_\ab id). \\
+\hline
+report\_\ab id (question\_\ab report) & UUID & PK, NOT NULL & Question issue report (question\_\ab id, quiz\_\ab id, reported\_\ab by, reason, status). \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 24 \& 25: assignment \& assignment\_\ab submission -- Classroom Assignments}} \\
+\hline
+id (assignment) & UUID & PK, NOT NULL & Assignment ID linked to classroom\_\ab id and teacher\_\ab id. \\
+\hline
+assignment\_\ab type / target\_\ab id & VARCHAR(30) / UUID & NOT NULL & Enum AssignmentType (CONTEXT\_\ab READING, AI\_\ab CHAT\_\ab ROLEPLAY, QUIZ\_\ab TEST) and target entity UUID. \\
+\hline
+deadline / min\_\ab requirement / status & TIMESTAMPTZ / INT / VARCHAR & NOT NULL & Due date, minimum messages/seconds threshold, and AssignmentStatus (ACTIVE, CANCELLED, ARCHIVED). \\
+\hline
+id (assignment\_\ab submission) & UUID & PK, NOT NULL & Submission ID (unique per assignment\_\ab id + student\_\ab id). \\
+\hline
+status & VARCHAR(20) & NOT NULL & Enum SubmissionStatus: NOT\_\ab STARTED, IN\_\ab PROGRESS, SUBMITTED, LATE\_\ab SUBMITTED, MISSED, EXEMPTED. \\
+\hline
+score / message\_\ab count / reading\_\ab duration & NUMERIC(4,2) / INT & NULL / DEFAULT 0 & Graded score (0--10), AI roleplay turn count, and reading duration in seconds. \\
+\hline
+quiz\_\ab session\_\ab id / chat\_\ab session\_\ab id & UUID & FK, NULLABLE & Linked evidence quiz\_\ab session or chat\_\ab session. \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 26--29: tier, user\_\ab tier, payment\_\ab order, payment\_\ab transaction -- B2C PayOS Billing}} \\
+\hline
+tier\_\ab id (tier) & UUID & PK, NOT NULL & Subscription plan ID with title, amount (VND), no\_\ab month, limited\_\ab token. \\
+\hline
+id (user\_\ab tier) & UUID & PK, NOT NULL & Active user subscription record (uid, tier\_\ab id, order\_\ab id, start\_\ab time, end\_\ab time, is\_\ab active). \\
+\hline
+order\_\ab id (payment\_\ab order) & UUID & PK, NOT NULL & Checkout order UUID with unique order\_\ab code (BIGINT), amount, checkout\_\ab url, qr\_\ab code. \\
+\hline
+status / fulfillment\_\ab status & VARCHAR(50/30) & NOT NULL & PaymentOrderStatus (PENDING, PAID, CANCELLED, EXPIRED, FAILED) and PaymentFulfillmentStatus (PENDING, PROCESSING, FULFILLED, FAILED). \\
+\hline
+fulfillment\_\ab attempts / error / locked\_\ab at & INT / TEXT / TS & NULLABLE & Retry counter, failure diagnostic, and pessimistic lock timestamp for reconciliation. \\
+\hline
+transaction\_\ab id (payment\_\ab transaction) & UUID & PK, NOT NULL & Webhook transaction log (order\_\ab id, amount, payload, status PENDING/SUCCESS/FAILED, reference). \\
+\hline
+
+\multicolumn{4}{|l|}{\cellcolor{lightgray}\textbf{Table 30--32: daily\_\ab quest, user\_\ab quest\_\ab progress, daily\_\ab check\_\ab in -- Gamification}} \\
+\hline
+quest\_\ab id (daily\_\ab quest) & VARCHAR(50) & PK, NOT NULL & Quest identifier with type (CHAT, QUIZ, READ\_\ab CONTEXT), target, reward\_\ab tokens. \\
+\hline
+id (user\_\ab quest\_\ab progress) & UUID & PK, NOT NULL & Daily quest progress (user\_\ab uid, quest\_\ab id, date, progress, completed, claimed). \\
+\hline
+id (daily\_\ab check\_\ab in) & UUID & PK, NOT NULL & Daily attendance check-in (user\_\ab uid, date, streak\_\ab count). \\
+\hline
+\caption{Detailed Data Dictionary}
+\label{tab:data_dictionary}
+\end{longtable}
+\normalsize

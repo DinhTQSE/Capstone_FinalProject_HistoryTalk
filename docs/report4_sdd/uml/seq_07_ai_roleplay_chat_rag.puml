@@ -1,0 +1,51 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.4.1 - Streaming Conversational AI Roleplay with Hybrid RAG & Kaggle Reranker
+
+actor "Learner / Student" as User
+participant "ChatController" as Ctrl
+participant "MessageServiceImpl" as MsgSvc
+participant "DailyTokenAllowanceService" as QuotaSvc
+participant "Python FastAPI AI\n(/v1/chat/generate-reply-stream)" as FastAPI
+database "Supabase PgVector\n(match_history_chunks)" as VecDB
+participant "Ollama BGE-M3 &\nKaggle Reranker" as Rerank
+participant "LLM Engine\n(Gemma-2-9B-IT / OpenAI)" as LLM
+database "PostgreSQL\n(message, assignment_submission)" as DB
+
+User -> Ctrl : POST /api/v1/chat/sessions/{sessionId}/stream (userMessage)
+Ctrl -> MsgSvc : streamMessage(sessionId, userMessage)
+MsgSvc -> QuotaSvc : Verify & reserve user/school token allowance
+MsgSvc -> DB : INSERT user Message (is_from_ai = false)
+MsgSvc -> FastAPI : POST /v1/chat/generate-reply-stream (character, context, message, history)
+
+FastAPI -> Rerank : get_embedding_from_ollama(userMessage, model="bge-m3")
+Rerank --> FastAPI : 768-D query_embedding
+FastAPI -> VecDB : match_history_chunks similarity search(query_embedding, match_limit=10, filter_entity_ids)
+VecDB --> FastAPI : Top-10 candidate chunks
+FastAPI -> Rerank : POST /api/rerank (query, Top-10 chunks)
+alt Kaggle Reranker Available
+    Rerank --> FastAPI : Top reranked passages
+else Reranker Timeout / Error
+    FastAPI -> FastAPI : Fallback to Top-2 Cosine Similarity chunks
+end
+
+FastAPI -> FastAPI : build_chat_system_prompt() + Inject RAG Guardrails + 30% Socratic Question Rule
+FastAPI -> LLM : Stream chat completion chunks
+loop SSE Token Streaming
+    LLM --> FastAPI : Text delta chunk
+    FastAPI --> MsgSvc : SSE chunk
+    MsgSvc --> User : SSE event: token chunk
+end
+FastAPI -> LLM : Generate 3 follow-up suggestedQuestions (1st/2nd person Vietnamese)
+LLM --> FastAPI : 3 suggested questions
+FastAPI --> MsgSvc : Final metadata (suggestedQuestions, promptTokens, completionTokens, quotes_used)
+
+MsgSvc -> DB : INSERT AI Message (is_from_ai=true, token, suggested_questions, quotes)
+MsgSvc -> QuotaSvc : Deduct actual tokens consumed
+MsgSvc -> DB : Update active AI_CHAT_ROLEPLAY AssignmentSubmission (increment messageCount & auto-score)
+MsgSvc --> User : SSE [DONE] with message metadata
+@enduml

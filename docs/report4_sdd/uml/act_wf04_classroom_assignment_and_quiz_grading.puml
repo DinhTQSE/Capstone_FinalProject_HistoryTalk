@@ -1,0 +1,39 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Activity Diagram WF-04 - Classroom Assignment Dispatch, Multi-Type Quiz & Automated Grading
+
+|Teacher|
+start
+:Select Classroom & create Assignment\n(CONTEXT_READING | AI_CHAT_ROLEPLAY | QUIZ_TEST);
+:Configure target entity, deadline & minRequirement;
+:System creates Assignment (status = ACTIVE) and\ninitializes NOT_STARTED submissions for all students;
+
+|School Student|
+:Open "My Assignments" portal & start Assignment;
+:System transitions AssignmentSubmission to IN_PROGRESS;
+if (Assignment Type?) then (QUIZ_TEST)
+    :Start timed QuizSession;
+    :Answer MULTIPLE_CHOICE, FILL_IN_BLANK, and MATCHING questions;
+    :Submit QuizSession;
+    :System grades answers, saves QuizAnswerDetails,\nand syncs score to AssignmentSubmission;
+elseif (AI_CHAT_ROLEPLAY) then
+    :Converse with target Historical Character;
+    :System increments messageCount on each valid exchange\nand computes score against minRequirement;
+else (CONTEXT_READING)
+    :Read HistoricalContext & explore BattleMap;
+    :System tracks readingDurationSeconds & submits completion;
+endif
+
+if (Submitted before deadline?) then (Yes)
+    :Set AssignmentSubmission status = SUBMITTED;
+else (No - After deadline)
+    :Set AssignmentSubmission status = LATE_SUBMITTED;
+endif
+
+|Teacher|
+:View real-time Classroom Gradebook & Analytics Dashboard;
+stop
+@enduml

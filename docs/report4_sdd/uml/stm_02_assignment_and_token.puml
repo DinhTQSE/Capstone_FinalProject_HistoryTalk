@@ -1,0 +1,35 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title State Machine Diagrams 4.1.2 - Assignment, Submission & TokenBoostRequest Lifecycles
+
+state "1. AssignmentStatus Lifecycle (Assignment Entity)" as AssignSM #EBF5FB {
+    [*] --> Assign_ACTIVE : Teacher creates assignment\nfor Classroom
+    state "ACTIVE" as Assign_ACTIVE
+    state "ARCHIVED" as Assign_ARCHIVED
+    state "CANCELLED" as Assign_CANCELLED
+    Assign_ACTIVE --> Assign_ARCHIVED : Academic term ends /\nTeacher archives assignment
+    Assign_ACTIVE --> Assign_CANCELLED : Teacher cancels / soft-deletes\nassignment
+}
+
+state "2. SubmissionStatus Lifecycle (AssignmentSubmission Entity)" as SubSM #E8F8F5 {
+    [*] --> NOT_STARTED : Auto-created when Teacher\npublishes Assignment
+    [*] --> EXEMPTED : Student enrolled in classroom\nAFTER assignment deadline
+    NOT_STARTED --> IN_PROGRESS : Student opens Context /\nstarts AI Chat / starts Quiz
+    IN_PROGRESS --> SUBMITTED : Student completes requirement\n(submitted_at <= deadline)
+    IN_PROGRESS --> LATE_SUBMITTED : Student completes requirement\n(submitted_at > deadline)
+    NOT_STARTED --> MISSED : Deadline passed without\nsubmission
+    IN_PROGRESS --> MISSED : Deadline passed without\nsubmission
+    MISSED --> LATE_SUBMITTED : Student submits late after\ndeadline (if permitted)
+}
+
+state "3. TokenBoostRequestStatus Lifecycle (TokenBoostRequest Entity)" as BoostSM #FEF9E7 {
+    [*] --> PENDING : Student submits daily\ntoken boost request
+    PENDING --> APPROVED : Teacher / School Admin approves\n(credits daily_bonus_tokens)
+    PENDING --> REJECTED : Teacher / School Admin rejects\nwith review_note
+    APPROVED --> [*]
+    REJECTED --> [*]
+}
+@enduml

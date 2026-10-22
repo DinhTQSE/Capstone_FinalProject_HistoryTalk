@@ -75,6 +75,9 @@ class AnalyticsDashboardServiceImplTest {
     @Mock
     private com.historytalk.repository.school.TokenBoostRequestRepository tokenBoostRequestRepository;
 
+    @Mock
+    private com.historytalk.repository.assignment.AssignmentSubmissionRepository assignmentSubmissionRepository;
+
     @InjectMocks
     private AnalyticsDashboardServiceImpl dashboardService;
 
@@ -153,6 +156,14 @@ class AnalyticsDashboardServiceImplTest {
         when(tokenBoostRequestRepository.countBySchool_IdAndStatus(
                 schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)).thenReturn(3L);
 
+        com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection stats =
+                mock(com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection.class);
+        when(stats.getTotalSubmissions()).thenReturn(120L);
+        when(stats.getSubmittedCount()).thenReturn(90L);
+        when(stats.getLateSubmittedCount()).thenReturn(18L);
+        when(stats.getNotStartedCount()).thenReturn(12L);
+        when(assignmentSubmissionRepository.getSubmissionStatsBySchoolId(schoolId)).thenReturn(stats);
+
         SchoolAdminDashboardResponse response = dashboardService.getSchoolAdminDashboard(schoolId);
 
         assertNotNull(response);
@@ -178,6 +189,11 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(25.0, response.getTeacherTokenUsagePercentage());
         assertEquals(1000, response.getDefaultDailyStudentQuota());
         assertEquals(3L, response.getPendingTokenBoostRequests());
+        assertNotNull(response.getAssignmentStats());
+        assertEquals(120L, response.getAssignmentStats().getTotalSubmissions());
+        assertEquals(75.0, response.getAssignmentStats().getCompletedRate());
+        assertEquals(15.0, response.getAssignmentStats().getLateSubmittedRate());
+        assertEquals(10.0, response.getAssignmentStats().getNotStartedRate());
     }
 
     @Test
@@ -215,6 +231,35 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals("10A1", response.getContent().get(0).getClassName());
         assertEquals(10000L, response.getContent().get(0).getTokensUsedTotal());
         assertEquals(50.0, response.getContent().get(0).getPercentageOfSchoolUsage());
+
+        org.mockito.ArgumentCaptor<Pageable> classPageableCaptor = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(classroomRepository).findClassroomTokenUsageList(
+                eq(schoolId), any(LocalDateTime.class), eq(2026), eq(10), eq("ACTIVE"), any(), classPageableCaptor.capture());
+        assertFalse(classPageableCaptor.getValue().getSort().isSorted());
+    }
+
+    @Test
+    @DisplayName("getClassroomsTokenUsage: When schoolId is null, resolves from security context and succeeds without throwing null id")
+    void getClassroomsTokenUsage_NullSchoolId_ResolvesFromSecurityContext() {
+        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
+        com.historytalk.security.AuthenticatedPrincipal ap = new com.historytalk.security.AuthenticatedPrincipal("admin@school.com", teacherUser.getUid().toString(), "SCHOOL_ADMIN");
+        when(auth.getPrincipal()).thenReturn(ap);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        when(userRepository.findById(teacherUser.getUid())).thenReturn(Optional.of(teacherUser));
+        when(schoolRepository.existsById(schoolId)).thenReturn(true);
+        when(messageRepository.sumTokensUsedBySchoolStudents(schoolId)).thenReturn(1000L);
+        when(messageRepository.sumTokensUsedBySchoolTeachers(schoolId)).thenReturn(500L);
+
+        when(classroomRepository.findClassroomTokenUsageList(eq(schoolId), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(Collections.emptyList()));
+
+        com.historytalk.dto.PaginatedResponse<ClassroomTokenUsageSummaryDto> res =
+                dashboardService.getClassroomsTokenUsage(null, null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertNotNull(res);
+        verify(schoolRepository).existsById(schoolId);
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -247,7 +292,9 @@ class AnalyticsDashboardServiceImplTest {
                 .thenReturn(page);
 
         com.historytalk.dto.PaginatedResponse<StudentTokenUsageDetailDto> response =
-                dashboardService.getClassroomStudentsTokenUsage(classroom.getId(), null, org.springframework.data.domain.PageRequest.of(0, 20), teacherPrincipal);
+                dashboardService.getClassroomStudentsTokenUsage(classroom.getId(), null,
+                        org.springframework.data.domain.PageRequest.of(0, 20, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "tokensUsedTotal")),
+                        teacherPrincipal);
 
         assertNotNull(response);
         assertEquals(1L, response.getTotalElements());
@@ -259,6 +306,10 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(200L, dto.getDailyBonusTokens());
         // Remaining = min((2000 + 200 - 300), unallocated 40000) = 1900
         assertEquals(1900L, dto.getEffectiveRemainingToday());
+
+        org.mockito.ArgumentCaptor<Pageable> studentPageableCaptor = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(classStudentRepository).findStudentTokenUsageInClassroom(eq(classroom.getId()), any(LocalDateTime.class), any(), studentPageableCaptor.capture());
+        assertFalse(studentPageableCaptor.getValue().getSort().isSorted());
     }
 
     @Test

@@ -1,0 +1,41 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.3.1 - PDF Upload, Hybrid PDFBox/Tess4J OCR & Async RAG Vector Indexing
+
+actor "Content Admin / Teacher" as Admin
+participant "PdfExtractionController /\nDocumentFileController" as Ctrl
+participant "PdfExtractionServiceImpl" as PdfSvc
+participant "OcrServiceImpl\n(Tess4J Vietnamese)" as OcrSvc
+participant "DocumentContentServiceImpl" as DocSvc
+participant "AiServiceClient" as AiClient
+participant "Python FastAPI AI\n(/v1/chat/process-document)" as FastAPI
+database "Supabase PgVector\n(vector_chunk)" as VecDB
+
+Admin -> Ctrl : POST /api/v1/documents/pdf/extract (MultipartFile PDF)
+Ctrl -> PdfSvc : extractTextFromPdf(file)
+PdfSvc -> PdfSvc : Classify PDF via PdfTypeClassifier (Apache PDFBox 3.0.1)
+alt Digital Text PDF (Selectable Text >= Threshold)
+    PdfSvc -> PdfSvc : Extract text directly via PDFTextStripper
+else Scanned Image PDF
+    PdfSvc -> OcrSvc : extractTextViaOcr(renderedPageImages, lang="vie")
+    OcrSvc --> PdfSvc : OCR Extracted Vietnamese Text
+end
+PdfSvc --> Ctrl : PdfExtractionResponse (extractedText, pageCount, pdfType)
+
+Admin -> Ctrl : POST /api/v1/documents (title, entityId, entityType, content)
+Ctrl -> DocSvc : saveDocumentAndTriggerRag(request)
+DocSvc -> DocSvc : Save Document entity (status = ACTIVE) in PostgreSQL
+DocSvc -> AiClient : processDocument(docId, entityId, content)
+AiClient -> FastAPI : POST /v1/chat/process-document (X-Internal-Api-Key)
+FastAPI -> FastAPI : Delete existing chunks for docId
+FastAPI -> FastAPI : _semantic_chunking(content) via BGE-M3 sentence cosine distances
+FastAPI -> FastAPI : Generate 768-D embeddings concurrently (Semaphore=15) via Ollama bge-m3
+FastAPI -> VecDB : Batch INSERT INTO vector_chunk (100 records/batch)
+FastAPI --> AiClient : 200 OK (Indexed chunks count)
+AiClient --> Ctrl : Completed
+Ctrl --> Admin : 201 Created (DocumentFileResponse)
+@enduml

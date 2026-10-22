@@ -1,0 +1,91 @@
+@startuml
+scale max 2800 width
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Class Diagram 3.4 - Conversational AI Roleplay & Hybrid RAG Engine
+
+package "Java Core Backend (com.historytalk)" #E8F8F5 {
+    class ChatController <<Controller>> {
+        + createSession(request: CreateChatSessionRequest): ResponseEntity<ApiResponse<ChatSessionResponse>>
+        + sendMessage(sessionId: UUID, request: SendMessageRequest): ResponseEntity<ApiResponse<SendMessageResponse>>
+        + streamMessage(sessionId: UUID, request: SendMessageRequest): SseEmitter
+        + getSessionHistory(uid: UUID): ResponseEntity<ApiResponse<List<ChatHistoryGroupResponse>>>
+    }
+
+    class ChatSessionServiceImpl <<Service>> {
+        - chatSessionRepository: ChatSessionRepository
+        - characterRepository: CharacterRepository
+        - historicalContextRepository: HistoricalContextRepository
+        + createOrGetSession(uid: UUID, characterId: UUID, contextId: UUID): ChatSessionResponse
+    }
+
+    class MessageServiceImpl <<Service>> {
+        - messageRepository: MessageRepository
+        - aiServiceClient: AiServiceClient
+        - dailyTokenAllowanceService: DailyTokenAllowanceService
+        - studentAssignmentService: StudentAssignmentService
+        + sendAndPersistMessage(sessionId: UUID, content: String): SendMessageResponse
+    }
+
+    class AiServiceClient <<Component>> {
+        + generateReply(characterId, contextId, message, history): AiReplyPayload
+        + generateReplyStream(characterId, contextId, message, history): Flux<String>
+        + processDocument(docId, entityId, content): void
+    }
+
+    class ChatSession <<Entity>> {
+        - sessionId: UUID
+        - title: String
+        - lastMessageAt: LocalDateTime
+    }
+
+    class Message <<Entity>> {
+        - messageId: UUID
+        - content: String
+        - isFromAi: Boolean
+        - token: Integer
+        - suggestedQuestions: String
+        - quotes: String
+    }
+}
+
+package "Python FastAPI AI Service (history_talk_ai)" #FEF9E7 {
+    class ChatRouter <<FastAPI Router>> {
+        + post_generate_reply(request: GenerateReplyRequest): GenerateReplyResponse
+        + post_generate_reply_stream(request: GenerateReplyRequest): StreamingResponse
+        + post_process_document(request: ProcessDocumentRequest): StatusResponse
+        + post_generate_title(request: GenerateTitleRequest): GenerateTitleResponse
+    }
+
+    class RagChatService <<Application Service>> {
+        + retrieve_history_context(question: str, entity_ids: List[str]): Tuple[str, List[str]]
+        + generate_reply(character, context, user_message, history): Tuple
+        + generate_reply_stream(character, context, user_message, history): AsyncGenerator
+        + _semantic_chunking(content: str, max_chunk_chars: int): List[str]
+        + process_document(request: ProcessDocumentRequest): void
+    }
+
+    class PromptBuilder <<Utility>> {
+        + build_chat_system_prompt(character: CharacterData, context: HistoricalContextData): str
+        + build_title_system_prompt(character: CharacterData): str
+    }
+
+    class JavaBackendClient <<DataAccess>> {
+        + fetch_character(character_id: str): CharacterData
+        + fetch_historical_context(context_id: str): HistoricalContextData
+    }
+}
+
+ChatController --> ChatSessionServiceImpl
+ChatController --> MessageServiceImpl
+ChatSessionServiceImpl --> ChatSession
+MessageServiceImpl --> Message
+MessageServiceImpl --> AiServiceClient
+ChatSession "1" *-- "many" Message
+AiServiceClient ..> ChatRouter : HTTP / SSE (Port 8001)
+ChatRouter --> RagChatService
+RagChatService --> PromptBuilder
+RagChatService --> JavaBackendClient
+@enduml

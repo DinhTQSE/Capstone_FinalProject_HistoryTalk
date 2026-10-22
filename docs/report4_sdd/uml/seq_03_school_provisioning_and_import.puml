@@ -1,0 +1,40 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.2.1 - B2B School Onboarding & Bulk CSV Student Enrollment
+
+actor "System Admin /\nSchool Admin" as Admin
+participant "Next.js Admin UI" as UI
+participant "AdminSchoolController /\nSchoolLifecycleController" as Ctrl
+participant "SchoolManagementServiceImpl" as SchoolSvc
+participant "StudentImportServiceImpl" as ImportSvc
+database "PostgreSQL\n(school, classroom, user, class_student)" as DB
+
+group Step 1: System Admin Provisions B2B School Tenant
+    Admin -> UI : Submit Create School Form (Package: ENTERPRISE_SMALL/MEDIUM/LARGE)
+    UI -> Ctrl : POST /api/v1/admin/schools
+    Ctrl -> SchoolSvc : createSchoolWithAdmin(request)
+    SchoolSvc -> DB : INSERT INTO school (quota, 01/09-31/05 subscription dates, status=ACTIVE)
+    SchoolSvc -> DB : INSERT INTO "user" (role=SCHOOL_ADMIN, school_id)
+    SchoolSvc --> UI : 201 Created (SchoolResponse)
+end
+
+group Step 2: School Admin / Teacher Bulk Imports Students via CSV
+    Admin -> UI : Upload Student Roster CSV (ImportScope: SCHOOL_WIDE or CLASSROOM)
+    UI -> Ctrl : POST /api/v1/schools/students/import-csv
+    Ctrl -> ImportSvc : processStudentCsv(file, scope, schoolId, classroomId)
+    ImportSvc -> ImportSvc : Parse CSV rows (Apache Commons CSV) & validate email/studentCode
+    loop For each valid student row
+        ImportSvc -> DB : Upsert User (role=SCHOOL_STUDENT, school_id, must_change_password=true)
+        opt Scope == CLASSROOM
+            ImportSvc -> DB : INSERT INTO class_student (classroom_id, student_id, status=ACTIVE)
+            ImportSvc -> DB : Backfill EXEMPTED submissions for past-deadline classroom assignments
+        end
+    end
+    ImportSvc --> Ctrl : BatchEnrollResultResponse (createdCount, enrolledCount, errors)
+    Ctrl --> UI : 200 OK
+end
+@enduml

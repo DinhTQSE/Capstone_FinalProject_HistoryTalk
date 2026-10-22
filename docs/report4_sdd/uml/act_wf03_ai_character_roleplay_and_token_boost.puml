@@ -1,0 +1,43 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Activity Diagram WF-03 - Grounded AI Historical Roleplay Chat & Daily Token Boost Workflow
+
+|Student / Customer|
+start
+:Select HistoricalContext & Character on Timeline/Map;
+:Initialize or resume ChatSession;
+:Send historical question to Character;
+
+|Core Backend & AI Service|
+:Perform lazy daily token reset if new day;
+if (Available Daily / Tier Tokens >= Required?) then (Yes)
+    :Embed query via BGE-M3 & retrieve Top-10 chunks\nfrom Supabase PgVector;
+    :Rerank chunks via Kaggle Cross-Encoder\n(or fallback to Top-2 cosine chunks);
+    :Stream 1st-person grounded response +\n3 suggested follow-up questions;
+    :Persist User & AI Messages, deduct tokens,\nand update active AI_CHAT_ROLEPLAY assignment;
+    |Student / Customer|
+    :Read streamed response & continue dialogue;
+    stop
+else (No - Daily Quota Reached)
+    |Student / Customer|
+    :Receive Quota Exceeded alert;
+    :Submit TokenBoostRequest (requestedTokens, reason);
+endif
+
+|Teacher / School Admin|
+:Review pending TokenBoostRequest in Classroom/School console;
+if (Approve Boost Request?) then (Approve)
+    :Verify school unallocatedTokenQuota >= approvedTokens;
+    :Update TokenBoostRequest (status = APPROVED);
+    :Credit approvedTokens to student dailyBonusTokens;
+    |Student / Customer|
+    :Resume AI Character Roleplay conversation immediately;
+else (Reject)
+    |Teacher / School Admin|
+    :Update TokenBoostRequest (status = REJECTED, reviewNote);
+endif
+stop
+@enduml

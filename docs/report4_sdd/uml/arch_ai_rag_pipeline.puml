@@ -1,0 +1,39 @@
+@startuml
+scale max 2000 width
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 13
+skinparam shadowing false
+
+title HistoryTalk - Hybrid RAG Ingestion & Conversational AI Pipeline
+
+package "Phase 1: Document Ingestion & Semantic Indexing Pipeline" #EBF5FB {
+    [1. Document Upload\n(PDF / Markdown / Text)] as Step1
+    [2. PDF Type Classifier & Extractor\n(Apache PDFBox + Tess4J Vietnamese OCR)] as Step2
+    [3. Dynamic Semantic Chunking\n(Sentence Splitting + 80th Percentile Cosine Distance)] as Step3
+    [4. Dense Vector Embedding\n(Ollama BAAI/bge-m3 - 768 Dimensions)] as Step4
+    database "5. Supabase PgVector Store\n(vector_chunk Table - HNSW Cosine Index)" as VecStore
+}
+
+package "Phase 2: Retrieval, Reranking & Grounded Persona Generation" #FEF9E7 {
+    [A. User Question & Session Context\n(characterId, contextId, message_history)] as QueryIn
+    [B. Query Embedding Generation\n(BAAI/bge-m3 768-D Vector)] as QueryEmbed
+    [C. Vector Similarity Search\n(PgVector Cosine Similarity Query\nfiltered by entity_ids)] as VecSearch
+    [D. Cross-Encoder Reranking\n(Kaggle Rerank API /api/rerank\nFallback: Top Cosine Chunks)] as Rerank
+    [E. Grounded Persona Prompt Builder\n(First-Person Roleplay Rules + Anti-Hallucination Guardrail\n+ Socratic Reverse-Questioning)] as PromptBuild
+    [F. Streaming LLM Inference\n(Gemma-2-9B-IT / External OpenAI API\nSSE Token Stream + Suggested Follow-up Questions)] as LlmStream
+}
+
+Step1 -down-> Step2 : Raw File Stream
+Step2 -down-> Step3 : Normalized UTF-8 Text
+Step3 -down-> Step4 : Semantic Text Chunks
+Step4 -down-> VecStore : Batch Upsert
+
+QueryIn -down-> QueryEmbed : User Prompt
+QueryEmbed -down-> VecSearch : 768-D Query Vector
+VecStore .right.> VecSearch : Cosine Similarity Search
+VecSearch -down-> Rerank : Candidate Chunks
+Rerank -down-> PromptBuild : Top Reranked Historical Passages
+PromptBuild -down-> LlmStream : Assembled Messages Payload
+@enduml

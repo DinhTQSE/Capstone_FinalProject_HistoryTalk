@@ -1,0 +1,42 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Activity Diagram WF-02 - Historical Document OCR Ingestion, RAG Indexing & Local Content Approval
+
+|Teacher / Content Admin|
+start
+:Create HistoricalContext or Character profile\n(status = DRAFT);
+:Upload reference PDF / Markdown document\nand attach GeoJSON MapPins / 3D Model;
+
+|Core Backend & AI Service|
+:Classify uploaded PDF (Digital vs. Scanned);
+if (Scanned PDF?) then (Yes)
+    :Run Tess4J Vietnamese OCR extraction;
+else (No)
+    :Extract text via Apache PDFBox;
+endif
+:Save Document (status = ACTIVE) in PostgreSQL;
+:Send extracted content to FastAPI AI Service;
+:Execute dynamic 80th-percentile Semantic Chunking\nand generate 768-D BGE-M3 embeddings;
+:Batch insert vectors into Supabase PgVector (vector_chunk);
+
+|Teacher / Content Admin|
+if (Global or School Local Content?) then (Global Content - Content Admin)
+    :Publish directly (contentStatus = ACTIVE, isPublished = true);
+    stop
+else (School Local Content - Teacher)
+    :Assign Local Content to Classroom(s)\nand submit for review (contentStatus = PENDING_REVIEW);
+endif
+
+|School Admin|
+:Review pending Local Content & historical sources;
+if (Approve Local Content?) then (Approved)
+    :Set contentStatus = ACTIVE, isPublished = true;
+    :Content becomes visible to enrolled School Students;
+else (Rejected)
+    :Set contentStatus = DRAFT with reviewNote feedback;
+endif
+stop
+@enduml

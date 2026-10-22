@@ -1,0 +1,49 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.5.2 - Classroom Assignment Creation, Auto-Tracking & Gradebook Analytics
+
+actor "Teacher" as Teacher
+actor "School Student" as Student
+participant "TeacherAssignmentController" as TCtrl
+participant "StudentAssignmentController" as SCtrl
+participant "TeacherAssignmentServiceImpl" as TSvc
+participant "StudentAssignmentServiceImpl" as SSvc
+database "PostgreSQL\n(assignment, assignment_submission, class_student)" as DB
+
+group Step 1: Teacher Dispatches Assignment to Classroom
+    Teacher -> TCtrl : POST /api/v1/teacher/assignments (classroomId, type, targetId, deadline, minRequirement)
+    TCtrl -> TSvc : createAssignment(teacherUid, request)
+    TSvc -> DB : INSERT INTO assignment (status = ACTIVE)
+    TSvc -> DB : Query active ClassStudents in classroomId
+    TSvc -> DB : Batch INSERT INTO assignment_submission (status = NOT_STARTED) for all enrolled students
+    TSvc --> Teacher : 201 Created (TeacherAssignmentResponse)
+end
+
+group Step 2: Student Completes Assignment (Reading / AI Roleplay / Quiz)
+    Student -> SCtrl : POST /api/v1/student/assignments/{id}/start
+    SCtrl -> SSvc : startAssignment(studentUid, assignmentId)
+    SSvc -> DB : UPDATE assignment_submission SET status = IN_PROGRESS, started_at = NOW()
+    SSvc --> Student : 200 OK
+
+    Student -> SCtrl : POST /api/v1/student/assignments/{id}/submit (readingDurationSeconds / sessionId)
+    SCtrl -> SSvc : submitAssignment(studentUid, assignmentId, request)
+    SSvc -> SSvc : Calculate score = min(10.0, (actualProgress / minRequirement) * 10.0)
+    alt NOW() <= assignment.deadline
+        SSvc -> DB : UPDATE assignment_submission SET status = SUBMITTED, score, submitted_at = NOW()
+    else NOW() > assignment.deadline
+        SSvc -> DB : UPDATE assignment_submission SET status = LATE_SUBMITTED, score, submitted_at = NOW()
+    end
+    SSvc --> Student : 200 OK (StudentSubmissionResponse)
+end
+
+group Step 3: Teacher Reviews Gradebook
+    Teacher -> TCtrl : GET /api/v1/teacher/assignments/{id}/gradebook
+    TCtrl -> TSvc : getAssignmentGradebook(teacherUid, assignmentId)
+    TSvc -> DB : Aggregate submissions (SUBMITTED, LATE_SUBMITTED, IN_PROGRESS, MISSED, EXEMPTED)
+    TSvc --> Teacher : 200 OK (AssignmentGradebookResponse)
+end
+@enduml

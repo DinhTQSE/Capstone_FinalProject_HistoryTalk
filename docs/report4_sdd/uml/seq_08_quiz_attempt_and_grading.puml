@@ -1,0 +1,36 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+autonumber
+
+title Sequence Diagram 3.5.1 - Multi-Type Quiz Execution, Automated Grading & Assignment Sync
+
+actor "Learner / Student" as User
+participant "QuizController" as Ctrl
+participant "QuizServiceImpl" as QuizSvc
+participant "StudentAssignmentServiceImpl" as AssignSvc
+participant "GamificationServiceImpl" as GameSvc
+database "PostgreSQL\n(quiz, quiz_question, question, quiz_session, quiz_answer_detail)" as DB
+
+User -> Ctrl : POST /api/v1/quizzes/{quizId}/sessions (Start Quiz)
+Ctrl -> QuizSvc : startQuizSession(uid, quizId)
+QuizSvc -> DB : Load Quiz & ordered Questions via quiz_question link table
+QuizSvc -> DB : INSERT INTO quiz_session (quiz_id, uid, start_time=NOW())
+QuizSvc --> User : 201 Created (QuizSessionResponse with sanitized questions)
+
+User -> Ctrl : POST /api/v1/quizzes/sessions/{sessionId}/submit (SubmitQuizRequest)
+Ctrl -> QuizSvc : submitAndGradeQuiz(sessionId, answers)
+QuizSvc -> DB : Verify session ownership & time limit
+loop For each Question in Quiz
+    QuizSvc -> QuizSvc : Parse question_data & answer_data JSON by QuestionType\n(MULTIPLE_CHOICE | FILL_IN_BLANK | MATCHING)
+    QuizSvc -> QuizSvc : Compute isCorrect & partial/full scoreEarned (weighted by quiz_question.points)
+    QuizSvc -> DB : INSERT INTO quiz_answer_detail (session_id, question_id, answer_data, score_earned, is_correct)
+end
+QuizSvc -> DB : UPDATE quiz_session SET end_time=NOW(), score=normalizedScore10
+QuizSvc -> AssignSvc : syncQuizSubmissionScore(uid, quizId, quizSession)
+AssignSvc -> DB : If active QUIZ_TEST assignment exists, update AssignmentSubmission (score, SUBMITTED/LATE_SUBMITTED)
+QuizSvc -> GameSvc : incrementQuestProgress(uid, QuestType.QUIZ)
+QuizSvc --> Ctrl : QuizResultResponse (score, correctCount, explanations)
+Ctrl --> User : 200 OK
+@enduml

@@ -1,0 +1,66 @@
+@startuml
+scale max 2000 width
+top to bottom direction
+skinparam packageStyle folder
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 15
+skinparam shadowing false
+
+title Package Diagram - Core Backend Service (com.historytalk)
+
+package "com.historytalk" {
+    package "Presentation & API Layer" #EBF5FB {
+        package "controller" {
+            [authentication, user & school\nclassroom, assignment & dashboard\nhistoricalContext, character & localcontent\ndocument, media, map, chat, quiz & payment] as CAll
+        }
+        package "dto" {
+            [Domain Request / Response DTOs\n& Standardized API Envelopes] as DTOs
+        }
+        package "exception" {
+            [GlobalExceptionHandler\n& Domain Exception Hierarchy] as ExHandler
+        }
+        CAll -[hidden]right-> DTOs
+        DTOs -[hidden]right-> ExHandler
+    }
+
+    package "Security & Configuration Layer" #FEF9E7 {
+        package "security" {
+            [JwtAuthenticationFilter & JwtTokenProvider\nSchoolSubscriptionGuardInterceptor\nOAuth2AuthenticationHandlers] as SecAll
+        }
+        package "config" {
+            [SecurityConfig, OpenApiConfig,\nPayOSConfig, WebMvcConfig] as Cfg
+        }
+        SecAll -[hidden]right-> Cfg
+    }
+
+    package "Application Business Logic Layer" #E8F8F5 {
+        package "service" {
+            [authentication, user & school services\nclassroom, token quota & assignment services\ncontext, character, local content & map services\ndocument PDFBox/Tess4J OCR & chat AI services\npayment fulfillment & gamification services] as SAll
+        }
+        package "mapper" {
+            [Entity-to-DTO\nDomain Mappers] as MapPkg
+        }
+        package "utils" {
+            [SecurityUtils\n& UuidUtils] as UtilPkg
+        }
+        SAll -[hidden]right-> MapPkg
+        MapPkg -[hidden]right-> UtilPkg
+    }
+
+    package "Data Access & Domain Persistence Layer" #F5EEF8 {
+        package "repository" {
+            [Spring Data JPA Repositories\n& Analytical Query Projections] as RepoPkg
+        }
+        package "entity" {
+            [JPA Persistent Domain Entities\n& Domain Enumerations] as EntPkg
+        }
+        RepoPkg -[hidden]right-> EntPkg
+    }
+}
+
+CAll -down-> SecAll
+CAll -down-> SAll
+SecAll -down-> SAll
+SAll -down-> RepoPkg
+RepoPkg -right-> EntPkg
+@enduml

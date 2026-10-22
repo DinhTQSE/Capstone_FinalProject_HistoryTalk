@@ -1,0 +1,52 @@
+@startuml
+scale max 2000 width
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam shadowing false
+
+title HistoryTalk - System Architecture Overview
+
+package "Client Tier" #EEF4FF {
+    [Next.js / React Web Application\n(Web UI, Interactive Historical Map, 3D Model Viewer, Streaming Chat)] as WebApp
+}
+
+package "Core Backend Application (Java 21 / Spring Boot)" #E8F8F5 {
+    [Security & Access Control Layer\n(JwtAuthenticationFilter, SchoolSubscriptionGuardInterceptor,\nOAuth2AuthenticationSuccessHandler)] as SecLayer
+    [REST API Controllers\n(Auth, School, Classroom, Assignment, Content, Character,\nChat, Quiz, Map, Gamification, Payment, Dashboard)] as JavaControllers
+    [Application Services & Schedulers\n(AuthService, SchoolManagementService, AcademicLifecycleService,\nDailyTokenAllowanceService, LocalContentService, QuizService,\nPdfExtractionService / Tess4J OCR, PaymentFulfillmentService)] as JavaServices
+    [Data Access Layer\n(Spring Data JPA Repositories & Flyway Schema Migration)] as JavaRepos
+}
+
+package "AI & RAG Engine (Python / FastAPI)" #FEF9E7 {
+    [FastAPI Presentation Layer\n(/v1/chat/generate-reply, /generate-reply-stream,\n/process-document, /generate-title)] as AiRouter
+    [RAG & Roleplay Service\n(Semantic Chunking, Vector Context Retrieval,\nStreaming Persona Generation, Prompt Builder)] as AiService
+    [Backend HTTP Client\n(JavaBackendClient - httpx)] as AiDataClient
+}
+
+package "Data Persistence & Vector Storage Tier" #F5EEF8 {
+    database "PostgreSQL Relational Database\n(historical_schema)" as PostgresDB
+    database "Supabase PgVector Store\n(vector_chunk Table & HNSW Cosine Index)" as VectorDB
+}
+
+package "External Third-Party Services & Infrastructure" #FDEDEC {
+    [Google OAuth 2.0\nCloudflare R2 / Supabase Storage\nPayOS Payment Gateway\nSMTP Mail Server] as ExtCore
+    [Ollama / External LLM & Embedding Host\n(Gemma-2-9B-IT + BAAI/bge-m3)\nKaggle Cross-Encoder Reranker API\nPrometheus & Grafana Monitoring] as ExtAi
+}
+
+WebApp -down-> SecLayer : HTTPS REST API & SSE Stream (Bearer JWT)
+SecLayer -down-> JavaControllers
+JavaControllers -down-> JavaServices
+JavaServices -down-> JavaRepos
+JavaRepos -down-> PostgresDB : JDBC / HikariCP
+
+JavaServices -right-> AiRouter : Internal HTTP / SSE
+AiRouter -down-> AiService
+AiService -down-> AiDataClient
+AiDataClient .left.> JavaControllers : Fetch Character & Context
+
+AiService -down-> VectorDB : Vector Similarity Search & Upsert
+AiService -down-> ExtAi : Embeddings, Rerank & LLM Stream
+JavaServices -down-> ExtCore : OAuth2, Storage, PayOS & SMTP
+@enduml

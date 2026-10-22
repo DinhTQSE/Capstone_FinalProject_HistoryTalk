@@ -1,0 +1,53 @@
+@startuml
+scale max 1800 width
+top to bottom direction
+skinparam packageStyle folder
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 14
+skinparam shadowing false
+
+title Package Diagram - AI & RAG Service (history_talk_ai)
+
+package "src.history_talk_ai" {
+    package "presentation" #EBF5FB {
+        package "chat" as PChat {
+            [router.py\n(FastAPI Endpoints: /v1/chat)] as RouterPy
+            [schemas.py\n(Pydantic Request & Response Schemas)] as SchemasPy
+        }
+    }
+
+    package "application" #E8F8F5 {
+        package "chat" as AChat {
+            [service.py\n(Semantic Chunking, Vector Retrieval,\nReranking & Streaming Roleplay)] as ServicePy
+        }
+        package "prompting" {
+            [prompt_builder.py\n(System Persona & Title Prompt Builders)] as PromptPy
+        }
+    }
+
+    package "dataaccess" #F5EEF8 {
+        package "java_backend" {
+            [client.py\n(Async HTTP Client for Character & Context)] as ClientPy
+            [character_schema.py & historical_context_schema.py] as CharSchema
+        }
+        [Supabase PgVector Client\n(vector_chunk Similarity Search & Upsert)] as SupaClient
+    }
+
+    package "common" #FEF9E7 {
+        package "config" {
+            [settings.py\n(Environment & Model Configuration)] as SettingsPy
+        }
+        package "errors" {
+            [Global Exception Handlers] as ErrorsPy
+        }
+    }
+}
+
+RouterPy -right-> SchemasPy
+RouterPy -down-> ServicePy
+ServicePy -right-> PromptPy
+ServicePy -down-> ClientPy
+ServicePy -down-> SupaClient
+ServicePy -down-> SettingsPy
+ClientPy -right-> CharSchema
+@enduml

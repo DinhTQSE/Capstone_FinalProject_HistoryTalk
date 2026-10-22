@@ -1,0 +1,44 @@
+@startuml
+scale max 2800 width
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title State Machine Diagrams 4.1.3 - PaymentOrder, PaymentFulfillment & PaymentTransaction Lifecycles
+
+state "1. PaymentOrderStatus Lifecycle (PaymentOrder Entity)" as OrderSM #FDEDEC {
+    [*] --> Order_PENDING : Customer initiates Tier Checkout\n(PayOS link generated)
+    state "PENDING" as Order_PENDING
+    state "PAID" as Order_PAID
+    state "CANCELLED" as Order_CANCELLED
+    state "EXPIRED" as Order_EXPIRED
+    state "FAILED" as Order_FAILED
+
+    Order_PENDING --> Order_PAID : Valid PayOS Webhook received\n(code == '00')
+    Order_PENDING --> Order_CANCELLED : Customer cancels order
+    Order_PENDING --> Order_EXPIRED : PaymentExpiryScheduler marks\norder expired after timeout
+    Order_PENDING --> Order_FAILED : Payment gateway error /\ninvalid transaction
+}
+
+state "2. PaymentFulfillmentStatus Lifecycle (PaymentOrder Entity)" as FulfillSM #E8F8F5 {
+    [*] --> Fulfill_PENDING : Order created
+    state "PENDING" as Fulfill_PENDING
+    state "PROCESSING" as Fulfill_PROCESSING
+    state "FULFILLED" as Fulfill_FULFILLED
+    state "FAILED" as Fulfill_FAILED
+
+    Fulfill_PENDING --> Fulfill_PROCESSING : Order becomes PAID\n(Acquire fulfillment lock)
+    Fulfill_PROCESSING --> Fulfill_FULFILLED : UserTier activated &\ntokens credited to User
+    Fulfill_PROCESSING --> Fulfill_FAILED : Database / runtime exception\n(increment fulfillmentAttempts)
+    Fulfill_FAILED --> Fulfill_PROCESSING : ReconciliationScheduler retries\n(attempts < 5)
+}
+
+state "3. PaymentTransactionStatus Lifecycle (PaymentTransaction Entity)" as TxSM #FEF9E7 {
+    [*] --> Tx_PENDING : Webhook event received
+    state "PENDING" as Tx_PENDING
+    state "SUCCESS" as Tx_SUCCESS
+    state "FAILED" as Tx_FAILED
+
+    Tx_PENDING --> Tx_SUCCESS : Signature verified & payment succeeded
+    Tx_PENDING --> Tx_FAILED : Signature invalid or bank failure
+}
+@enduml

@@ -1,0 +1,87 @@
+@startuml
+scale max 2800 width
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "Times New Roman"
+skinparam shadowing false
+
+title Class Diagram 3.1 - Authentication, Account Lifecycle & User Access Control
+
+class AuthController <<Controller>> {
+    + register(request: RegisterRequest): ResponseEntity<ApiResponse<RegisterResponse>>
+    + registerStaff(request: RegisterStaffRequest): ResponseEntity<ApiResponse<RegisterStaffResponse>>
+    + login(request: LoginRequest): ResponseEntity<ApiResponse<LoginResponse>>
+    + refreshToken(request: RefreshTokenRequest): ResponseEntity<ApiResponse<RefreshTokenResponse>>
+    + logout(): ResponseEntity<ApiResponse<LogoutResponse>>
+    + forgotPassword(request: ForgotPasswordRequest): ResponseEntity<ApiResponse<Void>>
+    + resetPassword(request: ResetPasswordRequest): ResponseEntity<ApiResponse<Void>>
+}
+
+class AdminUserController <<Controller>> {
+    + getAllUsers(role, status, pageable): ResponseEntity<PaginatedApiResponse<UserProfileResponse>>
+    + updateUserRole(uid: UUID, request: UpdateUserRoleRequest): ResponseEntity<ApiResponse<UserProfileResponse>>
+    + deactivateUser(uid: UUID, reason: String): ResponseEntity<ApiResponse<Void>>
+    + bulkRestoreUsers(request: BulkRestoreUsersRequest): ResponseEntity<ApiResponse<BulkRestoreUsersResponse>>
+}
+
+class JwtAuthenticationFilter <<SecurityFilter>> {
+    - jwtTokenProvider: JwtTokenProvider
+    - customUserDetailsService: CustomUserDetailsService
+    + doFilterInternal(request, response, filterChain): void
+}
+
+class SchoolSubscriptionGuardInterceptor <<HandlerInterceptor>> {
+    - schoolRepository: SchoolRepository
+    + preHandle(request, response, handler): boolean
+}
+
+interface AuthService <<Interface>> {
+    + register(request: RegisterRequest): RegisterResponse
+    + login(request: LoginRequest): LoginResponse
+    + refreshToken(request: RefreshTokenRequest): RefreshTokenResponse
+    + logout(uid: UUID): LogoutResponse
+    + forgotPassword(request: ForgotPasswordRequest): void
+    + resetPassword(request: ResetPasswordRequest): void
+}
+
+class AuthServiceImpl <<Service>> {
+    - userRepository: UserRepository
+    - jwtTokenProvider: JwtTokenProvider
+    - passwordEncoder: PasswordEncoder
+    - passwordResetEmailService: PasswordResetEmailService
+}
+
+class GoogleOAuthServiceImpl <<Service>> {
+    - userRepository: UserRepository
+    - jwtTokenProvider: JwtTokenProvider
+    - googleOAuthPasswordEmailService: GoogleOAuthPasswordEmailService
+    + processOAuthPostLogin(email: String, name: String, avatar: String): LoginResponse
+}
+
+interface UserRepository <<Repository>> {
+    + findByEmailAndDeletedAtIsNull(email: String): Optional<User>
+    + findByUserNameAndDeletedAtIsNull(userName: String): Optional<User>
+    + findByPasswordResetTokenHash(hash: String): Optional<User>
+}
+
+class User <<Entity>> {
+    - uid: UUID
+    - userName: String
+    - email: String
+    - password: String
+    - role: UserRole
+    - accountStatus: AccountStatus
+    - school: School
+    - mustChangePassword: Boolean
+    - lastTokenResetAt: LocalDateTime
+    - passwordResetTokenHash: String
+}
+
+AuthController --> AuthService
+AdminUserController --> UserRepository
+JwtAuthenticationFilter --> UserRepository
+SchoolSubscriptionGuardInterceptor --> User
+AuthService <|.. AuthServiceImpl
+AuthServiceImpl --> UserRepository
+GoogleOAuthServiceImpl --> UserRepository
+UserRepository --> User
+@enduml
