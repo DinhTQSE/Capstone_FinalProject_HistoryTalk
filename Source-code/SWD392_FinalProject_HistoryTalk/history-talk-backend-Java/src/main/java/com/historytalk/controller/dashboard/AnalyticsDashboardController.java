@@ -95,7 +95,7 @@ public class AnalyticsDashboardController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             @ParameterObject
-            @PageableDefault(size = 10, sort = "tokensUsedTotal", direction = Sort.Direction.DESC)
+            @PageableDefault(size = 10)
             Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/school-admin/analytics/classrooms by school admin: {}", principal != null ? principal.getUsername() : "security-context");
@@ -111,7 +111,7 @@ public class AnalyticsDashboardController {
             @PathVariable UUID classroomId,
             @RequestParam(required = false) String search,
             @ParameterObject
-            @PageableDefault(size = 20, sort = "tokensUsedTotal", direction = Sort.Direction.DESC)
+            @PageableDefault(size = 20)
             Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/school-admin/analytics/classrooms/{}/students by user: {}", classroomId, principal != null ? principal.getUsername() : "security-context");

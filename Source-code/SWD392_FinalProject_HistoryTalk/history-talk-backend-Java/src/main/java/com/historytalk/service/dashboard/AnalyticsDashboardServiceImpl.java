@@ -4,6 +4,8 @@ import com.historytalk.dto.dashboard.*;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.repository.dashboard.ClassroomTokenUsageProjection;
 import com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection;
+import com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection;
+import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.historytalk.entity.classroom.Classroom;
@@ -56,6 +58,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     private final PaymentOrderRepository paymentOrderRepository;
     private final UserTierRepository userTierRepository;
     private final com.historytalk.repository.school.TokenBoostRequestRepository tokenBoostRequestRepository;
+    private final com.historytalk.repository.assignment.AssignmentSubmissionRepository assignmentSubmissionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,11 +121,27 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         }
 
         // Assignment progress distribution
+        com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection stats =
+                assignmentSubmissionRepository.getSubmissionStatsBySchoolId(finalSchoolId);
+        long totalSubmissions = (stats != null && stats.getTotalSubmissions() != null) ? stats.getTotalSubmissions() : 0L;
+        long submittedCount = (stats != null && stats.getSubmittedCount() != null) ? stats.getSubmittedCount() : 0L;
+        long lateCount = (stats != null && stats.getLateSubmittedCount() != null) ? stats.getLateSubmittedCount() : 0L;
+        long notStartedCount = (stats != null && stats.getNotStartedCount() != null) ? stats.getNotStartedCount() : 0L;
+
+        double completedRate = totalSubmissions > 0
+                ? Math.round((submittedCount * 100.0 / totalSubmissions) * 10.0) / 10.0
+                : 0.0;
+        double lateSubmittedRate = totalSubmissions > 0
+                ? Math.round((lateCount * 100.0 / totalSubmissions) * 10.0) / 10.0
+                : 0.0;
+        double notStartedRate = totalSubmissions > 0
+                ? Math.round((notStartedCount * 100.0 / totalSubmissions) * 10.0) / 10.0
+                : 0.0;
         SchoolAdminDashboardResponse.AssignmentStats assignmentStats = SchoolAdminDashboardResponse.AssignmentStats.builder()
-                .totalSubmissions(0L)
-                .completedRate(0.0)
-                .lateSubmittedRate(0.0)
-                .notStartedRate(0.0)
+                .totalSubmissions(totalSubmissions)
+                .completedRate(completedRate)
+                .lateSubmittedRate(lateSubmittedRate)
+                .notStartedRate(notStartedRate)
                 .build();
 
         return SchoolAdminDashboardResponse.builder()
@@ -225,6 +244,20 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         long totalAiMessages = studentUids.isEmpty() ? 0L : messageRepository.countMessagesByStudentUids(studentUids);
         double avgAiMessages = studentCount > 0 ? (double) totalAiMessages / studentCount : 0.0;
 
+        com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection classStats =
+                assignmentSubmissionRepository.getSubmissionStatsByClassroomId(classId);
+        long classTotal = (classStats != null && classStats.getTotalSubmissions() != null) ? classStats.getTotalSubmissions() : 0L;
+        long classSubmitted = (classStats != null && classStats.getSubmittedCount() != null) ? classStats.getSubmittedCount() : 0L;
+        long classLate = (classStats != null && classStats.getLateSubmittedCount() != null) ? classStats.getLateSubmittedCount() : 0L;
+        long classPending = (classStats != null)
+                ? (classStats.getNotStartedCount() != null ? classStats.getNotStartedCount() : 0L)
+                  + (classStats.getInProgressCount() != null ? classStats.getInProgressCount() : 0L)
+                : 0L;
+
+        double onTimeRate = classTotal > 0 ? Math.round((classSubmitted * 100.0 / classTotal) * 10.0) / 10.0 : 0.0;
+        double lateRate = classTotal > 0 ? Math.round((classLate * 100.0 / classTotal) * 10.0) / 10.0 : 0.0;
+        double pendingRate = classTotal > 0 ? Math.round((classPending * 100.0 / classTotal) * 10.0) / 10.0 : 0.0;
+
         return TeacherClassroomDashboardResponse.builder()
                 .classId(classroom.getId())
                 .className(classroom.getClassName())
@@ -238,9 +271,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .totalAiMessages(totalAiMessages)
                 .avgAiMessagesPerStudent(Math.round(avgAiMessages * 10.0) / 10.0)
                 .assignmentRates(TeacherClassroomDashboardResponse.AssignmentRates.builder()
-                        .onTimeRate(0.0)
-                        .lateRate(0.0)
-                        .pendingRate(0.0)
+                        .onTimeRate(onTimeRate)
+                        .lateRate(lateRate)
+                        .pendingRate(pendingRate)
                         .build())
                 .students(studentItems)
                 .build();
@@ -526,18 +559,29 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Transactional(readOnly = true)
     public PaginatedResponse<ClassroomTokenUsageSummaryDto> getClassroomsTokenUsage(
             UUID schoolId, Integer academicYear, Integer gradeLevel, String status, String search, Pageable pageable) {
-        if (!schoolRepository.existsById(schoolId)) {
-            throw new ResourceNotFoundException("School not found with id: " + schoolId);
+        UUID resolvedSchoolId = schoolId;
+        if (resolvedSchoolId == null) {
+            UserPrincipal resolvedPrincipal = resolvePrincipal(null);
+            resolvedSchoolId = resolvedPrincipal.getSchoolId();
+        }
+        if (resolvedSchoolId == null) {
+            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
+        }
+        if (!schoolRepository.existsById(resolvedSchoolId)) {
+            throw new ResourceNotFoundException("School not found with id: " + resolvedSchoolId);
         }
 
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
-        long schoolTotal = messageRepository.sumTokensUsedBySchoolStudents(schoolId)
-                + messageRepository.sumTokensUsedBySchoolTeachers(schoolId);
+        long schoolTotal = messageRepository.sumTokensUsedBySchoolStudents(resolvedSchoolId)
+                + messageRepository.sumTokensUsedBySchoolTeachers(resolvedSchoolId);
 
+        Pageable safePageable = (pageable != null)
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+                : PageRequest.of(0, 10);
         Page<ClassroomTokenUsageProjection> page = classroomRepository.findClassroomTokenUsageList(
-                schoolId, todayStart, academicYear, gradeLevel, status, trimmedSearch, pageable);
+                resolvedSchoolId, todayStart, academicYear, gradeLevel, status, trimmedSearch, safePageable);
 
         List<ClassroomTokenUsageSummaryDto> content = page.getContent().stream()
                 .map(p -> ClassroomTokenUsageSummaryDto.builder()
@@ -599,8 +643,11 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
+        Pageable safePageable = (pageable != null)
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+                : PageRequest.of(0, 20);
         Page<StudentTokenUsageDetailProjection> page = classStudentRepository.findStudentTokenUsageInClassroom(
-                classroomId, todayStart, trimmedSearch, pageable);
+                classroomId, todayStart, trimmedSearch, safePageable);
 
         List<StudentTokenUsageDetailDto> content = page.getContent().stream()
                 .map(p -> {
