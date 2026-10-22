@@ -31,7 +31,7 @@ public class SchoolAdminQuotaController {
     private final SchoolManagementService schoolManagementService;
     private final UserRepository userRepository;
 
-    @GetMapping({"/my-school", "/profile"})
+    @GetMapping("/my-school")
     @PreAuthorize("hasRole('SCHOOL_ADMIN')")
     @Operation(summary = "Get school profile and information for current School Admin")
     public ResponseEntity<ApiResponse<SchoolResponse>> getMySchool(
