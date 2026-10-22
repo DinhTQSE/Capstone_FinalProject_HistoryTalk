@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection;
+import java.time.LocalDateTime;
 
 @Repository
 public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID> {
@@ -58,4 +60,52 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
             @Param("schoolId") UUID schoolId,
             @Param("keyword") String keyword,
             org.springframework.data.domain.Pageable pageable);
+
+    @Query(value = """
+            SELECT u.uid AS "studentId",
+                   u.student_code AS "studentCode",
+                   u.full_name AS "fullName",
+                   u.user_name AS "userName",
+                   u.email AS "email",
+                   COALESCE(SUM(CASE WHEN m.deleted_at IS NULL THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "tokensUsedTotal",
+                   COALESCE(SUM(CASE WHEN m.deleted_at IS NULL AND m.created_at >= :todayStart THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "tokensUsedToday",
+                   COALESCE(u.daily_tokens_used, 0) AS "dailyTokensUsed",
+                   COALESCE(u.daily_bonus_tokens, 0) AS "dailyBonusTokens",
+                   COUNT(DISTINCT m.message_id) AS "messageCount",
+                   MAX(m.created_at) AS "lastActiveAt"
+            FROM class_student cs
+            JOIN "user" u ON u.uid = cs.student_id
+            LEFT JOIN chat_session sess ON sess.uid = u.uid AND sess.deleted_at IS NULL
+            LEFT JOIN message m ON m.session_id = sess.session_id
+            WHERE cs.classroom_id = :classroomId
+              AND cs.status = 'ACTIVE'
+              AND u.deleted_at IS NULL
+              AND (CAST(:search AS text) IS NULL OR :search = ''
+                   OR u.full_name ILIKE CONCAT('%', CAST(:search AS text), '%')
+                   OR (u.student_code IS NOT NULL AND u.student_code ILIKE CONCAT('%', CAST(:search AS text), '%'))
+                   OR u.user_name ILIKE CONCAT('%', CAST(:search AS text), '%')
+                   OR u.email ILIKE CONCAT('%', CAST(:search AS text), '%'))
+            GROUP BY u.uid, u.student_code, u.full_name, u.user_name, u.email, u.daily_tokens_used, u.daily_bonus_tokens
+            ORDER BY "tokensUsedTotal" DESC
+            """,
+            countQuery = """
+            SELECT COUNT(DISTINCT u.uid)
+            FROM class_student cs
+            JOIN "user" u ON u.uid = cs.student_id
+            WHERE cs.classroom_id = :classroomId
+              AND cs.status = 'ACTIVE'
+              AND u.deleted_at IS NULL
+              AND (CAST(:search AS text) IS NULL OR :search = ''
+                   OR u.full_name ILIKE CONCAT('%', CAST(:search AS text), '%')
+                   OR (u.student_code IS NOT NULL AND u.student_code ILIKE CONCAT('%', CAST(:search AS text), '%'))
+                   OR u.user_name ILIKE CONCAT('%', CAST(:search AS text), '%')
+                   OR u.email ILIKE CONCAT('%', CAST(:search AS text), '%'))
+            """,
+            nativeQuery = true)
+    org.springframework.data.domain.Page<StudentTokenUsageDetailProjection> findStudentTokenUsageInClassroom(
+            @Param("classroomId") UUID classroomId,
+            @Param("todayStart") LocalDateTime todayStart,
+            @Param("search") String search,
+            org.springframework.data.domain.Pageable pageable);
 }
+

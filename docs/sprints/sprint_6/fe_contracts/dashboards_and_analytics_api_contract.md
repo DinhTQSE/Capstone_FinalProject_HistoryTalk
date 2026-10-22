@@ -45,6 +45,21 @@ export interface AssignmentStats {
   notStartedRate: number;
 }
 
+export interface ClassroomTokenUsageSummaryDto {
+  classroomId: string;
+  className: string;
+  classCode: string;
+  gradeLevel: number;
+  academicYear: number;
+  status: 'ACTIVE' | 'ARCHIVED' | 'DELETED';
+  teacherName: string;
+  teacherUid: string;
+  studentCount: number;
+  tokensUsedTotal: number;
+  tokensUsedToday: number;
+  percentageOfSchoolUsage: number;
+}
+
 export interface SchoolAdminDashboardResponse {
   schoolId: string;
   schoolName: string;
@@ -62,9 +77,14 @@ export interface SchoolAdminDashboardResponse {
   totalSchoolTokenQuota: number;
   unallocatedTokenQuota: number; // Remaining School Shared Pool
   allocatedTokens: number;       // Total tokens deducted from Shared Pool
-  tokensUsedByStudents: number;
+  tokensUsedByStudents: number; // Token tiêu thụ bởi khối Học sinh
+  tokensUsedByTeachers: number; // Token tiêu thụ bởi khối Giáo viên
+  tokensUsedTotal: number;      // Tổng token toàn trường đã sử dụng
+  studentTokenUsagePercentage: number;
+  teacherTokenUsagePercentage: number;
   defaultDailyStudentQuota: number;
   pendingTokenBoostRequests: number;
+  topClassroomsByTokenUsage: ClassroomTokenUsageSummaryDto[];
   assignmentStats: AssignmentStats;
 }
 ```
@@ -91,9 +111,29 @@ export interface SchoolAdminDashboardResponse {
     "totalSchoolTokenQuota": 5000000,
     "unallocatedTokenQuota": 3175500,
     "allocatedTokens": 1824500,
-    "tokensUsedByStudents": 1824500,
+    "tokensUsedByStudents": 1500000,
+    "tokensUsedByTeachers": 324500,
+    "tokensUsedTotal": 1824500,
+    "studentTokenUsagePercentage": 82.2,
+    "teacherTokenUsagePercentage": 17.8,
     "defaultDailyStudentQuota": 1000,
     "pendingTokenBoostRequests": 4,
+    "topClassroomsByTokenUsage": [
+      {
+        "classroomId": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "className": "10A1",
+        "classCode": "CVA-10A1-2026",
+        "gradeLevel": 10,
+        "academicYear": 2026,
+        "status": "ACTIVE",
+        "teacherName": "Thầy Nguyễn Văn A",
+        "teacherUid": "t1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "studentCount": 35,
+        "tokensUsedTotal": 450000,
+        "tokensUsedToday": 15200,
+        "percentageOfSchoolUsage": 24.7
+      }
+    ],
     "assignmentStats": {
       "totalSubmissions": 0,
       "completedRate": 0.0,
@@ -411,6 +451,174 @@ export interface SystemAdminComprehensiveDashboardResponse {
 ```
 
 ---
+
+
+---
+
+### 2.6. School Admin: Classroom Token Analytics (Phân tích Tiêu thụ theo Lớp)
+- **Endpoint:** `GET /api/v1/school-admin/analytics/classrooms`
+- **Authorized Role:** `ROLE_SCHOOL_ADMIN`, `ROLE_ADMIN`, `ROLE_SYSTEM_ADMIN`
+- **Query Parameters:**
+  - `academicYear` (number, optional): Năm học (VD: `2026`)
+  - `gradeLevel` (number, optional): Khối lớp (`10`, `11`, `12`)
+  - `status` (string, optional): Trạng thái lớp (`ACTIVE`, `ARCHIVED`)
+  - `search` (string, optional): Tìm theo tên lớp, mã lớp hoặc tên giáo viên phụ trách
+  - `page` (number, default: 0), `size` (number, default: 10), `sort` (string, default: `tokensUsedTotal,desc`)
+
+#### Sample Response (`200 OK`)
+```json
+{
+  "code": 200,
+  "message": "Classroom token analytics retrieved successfully",
+  "data": [
+    {
+      "classroomId": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "className": "10A1",
+      "classCode": "CVA-10A1-2026",
+      "gradeLevel": 10,
+      "academicYear": 2026,
+      "status": "ACTIVE",
+      "teacherName": "Thầy Nguyễn Văn A",
+      "teacherUid": "t1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "studentCount": 35,
+      "tokensUsedTotal": 450000,
+      "tokensUsedToday": 15200,
+      "percentageOfSchoolUsage": 24.7
+    }
+  ],
+  "pagination": {
+    "page": 0,
+    "size": 10,
+    "totalElements": 20,
+    "totalPages": 2,
+    "hasNext": true,
+    "hasPrevious": false
+  }
+}
+```
+
+---
+
+### 2.7. Classroom Students Token Usage Drill-Down (Chi tiết Tiêu thụ từng Học sinh trong Lớp)
+- **Endpoint:** `GET /api/v1/school-admin/analytics/classrooms/{classroomId}/students`
+- **Authorized Role:** `ROLE_SCHOOL_ADMIN`, `ROLE_TEACHER` (phụ trách lớp), `ROLE_ADMIN`, `ROLE_SYSTEM_ADMIN`
+- **Query Parameters:**
+  - `search` (string, optional): Tìm theo họ tên, mã HS hoặc username
+  - `page` (number, default: 0), `size` (number, default: 20), `sort` (string, default: `tokensUsedTotal,desc`)
+
+#### TypeScript Interface
+```typescript
+export interface StudentTokenUsageDetailDto {
+  studentId: string;
+  studentCode: string;
+  fullName: string;
+  userName: string;
+  email: string;
+  tokensUsedTotal: number;
+  tokensUsedToday: number;
+  dailyTokenLimit: number;
+  dailyBonusTokens: number;
+  effectiveRemainingToday: number;
+  messageCount: number;
+  lastActiveAt: string | null;
+}
+```
+
+#### Sample Response (`200 OK`)
+```json
+{
+  "code": 200,
+  "message": "Classroom students token usage retrieved successfully",
+  "data": [
+    {
+      "studentId": "s1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "studentCode": "HS001",
+      "fullName": "Nguyễn Văn An",
+      "userName": "cva_hs_hs001",
+      "email": "an.nguyen@cva.edu.vn",
+      "tokensUsedTotal": 28500,
+      "tokensUsedToday": 850,
+      "dailyTokenLimit": 1000,
+      "dailyBonusTokens": 200,
+      "effectiveRemainingToday": 350,
+      "messageCount": 42,
+      "lastActiveAt": "2026-10-22T09:45:10"
+    }
+  ],
+  "pagination": {
+    "page": 0,
+    "size": 20,
+    "totalElements": 35,
+    "totalPages": 2,
+    "hasNext": true,
+    "hasPrevious": false
+  }
+}
+```
+
+---
+
+### 2.8. Teacher: Classes Overview Analytics (Tổng quan Các lớp GV Phụ trách)
+- **Endpoint:** `GET /api/v1/teacher/dashboard/classes-overview`
+- **Authorized Role:** `ROLE_TEACHER`
+- **Description:** Trả về bảng tổng hợp token của tất cả các lớp mà giáo viên hiện tại đang phụ trách, giúp giáo viên dạy 2, 3 lớp nắm bắt trực quan lớp nào tiêu thụ nhiều token nhất.
+
+#### TypeScript Interface
+```typescript
+export interface TeacherClassesOverviewResponse {
+  teacherUid: string;
+  teacherName: string;
+  totalClassroomsManaged: number;
+  totalStudentsManaged: number;
+  totalTokensUsedByAllClasses: number;
+  classrooms: ClassroomTokenUsageSummaryDto[];
+}
+```
+
+#### Sample Response (`200 OK`)
+```json
+{
+  "code": 200,
+  "message": "Teacher classes overview retrieved successfully",
+  "data": {
+    "teacherUid": "t1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "teacherName": "Thầy Nguyễn Văn A",
+    "totalClassroomsManaged": 2,
+    "totalStudentsManaged": 70,
+    "totalTokensUsedByAllClasses": 720000,
+    "classrooms": [
+      {
+        "classroomId": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "className": "10A1",
+        "classCode": "CVA-10A1-2026",
+        "gradeLevel": 10,
+        "academicYear": 2026,
+        "status": "ACTIVE",
+        "teacherName": "Thầy Nguyễn Văn A",
+        "teacherUid": "t1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "studentCount": 35,
+        "tokensUsedTotal": 450000,
+        "tokensUsedToday": 15200,
+        "percentageOfSchoolUsage": 62.5
+      },
+      {
+        "classroomId": "b2b2c3d4-e5f6-7890-abcd-ef1234567891",
+        "className": "10A2",
+        "classCode": "CVA-10A2-2026",
+        "gradeLevel": 10,
+        "academicYear": 2026,
+        "status": "ACTIVE",
+        "teacherName": "Thầy Nguyễn Văn A",
+        "teacherUid": "t1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "studentCount": 35,
+        "tokensUsedTotal": 270000,
+        "tokensUsedToday": 8400,
+        "percentageOfSchoolUsage": 37.5
+      }
+    ]
+  }
+}
+```
 
 ## 3. Error Codes & Handling Guide
 

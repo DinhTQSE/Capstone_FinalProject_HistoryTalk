@@ -147,6 +147,9 @@ class AnalyticsDashboardServiceImplTest {
         when(userRepository.countBySchoolIdAndRole(schoolId, UserRole.TEACHER)).thenReturn(25L);
         when(userRepository.countBySchoolIdAndRole(schoolId, UserRole.SCHOOL_STUDENT)).thenReturn(450L);
         when(messageRepository.sumTokensUsedBySchoolStudents(schoolId)).thenReturn(15000L);
+        when(messageRepository.sumTokensUsedBySchoolTeachers(schoolId)).thenReturn(5000L);
+        when(classroomRepository.findTopClassroomsByTokenUsage(eq(schoolId), any(LocalDateTime.class), eq(5)))
+                .thenReturn(Collections.emptyList());
         when(tokenBoostRequestRepository.countBySchool_IdAndStatus(
                 schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)).thenReturn(3L);
 
@@ -169,8 +172,117 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(40000, response.getUnallocatedTokenQuota());
         assertEquals(60000, response.getAllocatedTokens());
         assertEquals(15000L, response.getTokensUsedByStudents());
+        assertEquals(5000L, response.getTokensUsedByTeachers());
+        assertEquals(20000L, response.getTokensUsedTotal());
+        assertEquals(75.0, response.getStudentTokenUsagePercentage());
+        assertEquals(25.0, response.getTeacherTokenUsagePercentage());
         assertEquals(1000, response.getDefaultDailyStudentQuota());
         assertEquals(3L, response.getPendingTokenBoostRequests());
+    }
+
+    @Test
+    @DisplayName("getClassroomsTokenUsage: Lấy danh sách thống kê token theo lớp thành công")
+    void getClassroomsTokenUsage_Success() {
+        when(schoolRepository.existsById(schoolId)).thenReturn(true);
+        when(messageRepository.sumTokensUsedBySchoolStudents(schoolId)).thenReturn(15000L);
+        when(messageRepository.sumTokensUsedBySchoolTeachers(schoolId)).thenReturn(5000L);
+
+        com.historytalk.repository.dashboard.ClassroomTokenUsageProjection proj = mock(com.historytalk.repository.dashboard.ClassroomTokenUsageProjection.class);
+        UUID cId = UUID.randomUUID();
+        when(proj.getClassroomId()).thenReturn(cId);
+        when(proj.getClassName()).thenReturn("10A1");
+        when(proj.getClassCode()).thenReturn("CVA-10A1-2026");
+        when(proj.getGradeLevel()).thenReturn(10);
+        when(proj.getAcademicYear()).thenReturn(2026);
+        when(proj.getStatus()).thenReturn("ACTIVE");
+        when(proj.getTeacherName()).thenReturn("Thầy A");
+        when(proj.getStudentCount()).thenReturn(35L);
+        when(proj.getTokensUsedTotal()).thenReturn(10000L);
+        when(proj.getTokensUsedToday()).thenReturn(500L);
+
+        org.springframework.data.domain.Page<com.historytalk.repository.dashboard.ClassroomTokenUsageProjection> page =
+                new org.springframework.data.domain.PageImpl<>(List.of(proj), org.springframework.data.domain.PageRequest.of(0, 10), 1);
+
+        when(classroomRepository.findClassroomTokenUsageList(
+                eq(schoolId), any(LocalDateTime.class), any(), any(), any(), any(), any()))
+                .thenReturn(page);
+
+        com.historytalk.dto.PaginatedResponse<ClassroomTokenUsageSummaryDto> response =
+                dashboardService.getClassroomsTokenUsage(schoolId, 2026, 10, "ACTIVE", null, org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertNotNull(response);
+        assertEquals(1L, response.getTotalElements());
+        assertEquals("10A1", response.getContent().get(0).getClassName());
+        assertEquals(10000L, response.getContent().get(0).getTokensUsedTotal());
+        assertEquals(50.0, response.getContent().get(0).getPercentageOfSchoolUsage());
+    }
+
+    @Test
+    @DisplayName("getClassroomStudentsTokenUsage: Lấy chi tiết token học sinh trong lớp thành công")
+    void getClassroomStudentsTokenUsage_Success() {
+        Classroom classroom = Classroom.builder()
+                .id(UUID.randomUUID())
+                .school(school)
+                .teacher(teacherUser)
+                .dailyTokenQuota(2000)
+                .build();
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroom.getId(), schoolId))
+                .thenReturn(Optional.of(classroom));
+
+        com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection sproj = mock(com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection.class);
+        UUID sId = UUID.randomUUID();
+        when(sproj.getStudentId()).thenReturn(sId);
+        when(sproj.getStudentCode()).thenReturn("HS001");
+        when(sproj.getFullName()).thenReturn("Nguyễn Văn An");
+        when(sproj.getTokensUsedTotal()).thenReturn(5000L);
+        when(sproj.getTokensUsedToday()).thenReturn(300L);
+        when(sproj.getDailyBonusTokens()).thenReturn(200);
+        when(sproj.getMessageCount()).thenReturn(12L);
+
+        org.springframework.data.domain.Page<com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection> page =
+                new org.springframework.data.domain.PageImpl<>(List.of(sproj), org.springframework.data.domain.PageRequest.of(0, 20), 1);
+
+        when(classStudentRepository.findStudentTokenUsageInClassroom(
+                eq(classroom.getId()), any(LocalDateTime.class), any(), any()))
+                .thenReturn(page);
+
+        com.historytalk.dto.PaginatedResponse<StudentTokenUsageDetailDto> response =
+                dashboardService.getClassroomStudentsTokenUsage(classroom.getId(), null, org.springframework.data.domain.PageRequest.of(0, 20), teacherPrincipal);
+
+        assertNotNull(response);
+        assertEquals(1L, response.getTotalElements());
+        StudentTokenUsageDetailDto dto = response.getContent().get(0);
+        assertEquals("HS001", dto.getStudentCode());
+        assertEquals(5000L, dto.getTokensUsedTotal());
+        assertEquals(300L, dto.getTokensUsedToday());
+        assertEquals(2000L, dto.getDailyTokenLimit());
+        assertEquals(200L, dto.getDailyBonusTokens());
+        // Remaining = min((2000 + 200 - 300), unallocated 40000) = 1900
+        assertEquals(1900L, dto.getEffectiveRemainingToday());
+    }
+
+    @Test
+    @DisplayName("getTeacherClassesOverview: Lấy tổng quan các lớp của giáo viên thành công")
+    void getTeacherClassesOverview_Success() {
+        when(userRepository.findById(teacherUser.getUid())).thenReturn(Optional.of(teacherUser));
+
+        com.historytalk.repository.dashboard.ClassroomTokenUsageProjection proj = mock(com.historytalk.repository.dashboard.ClassroomTokenUsageProjection.class);
+        when(proj.getClassroomId()).thenReturn(UUID.randomUUID());
+        when(proj.getClassName()).thenReturn("10A1");
+        when(proj.getStudentCount()).thenReturn(30L);
+        when(proj.getTokensUsedTotal()).thenReturn(8000L);
+
+        when(classroomRepository.findClassroomsTokenUsageForTeacher(eq(schoolId), eq(teacherUser.getUid()), any(LocalDateTime.class)))
+                .thenReturn(List.of(proj));
+
+        TeacherClassesOverviewResponse response = dashboardService.getTeacherClassesOverview(teacherPrincipal);
+
+        assertNotNull(response);
+        assertEquals(teacherUser.getUid(), response.getTeacherUid());
+        assertEquals(1, response.getTotalClassroomsManaged());
+        assertEquals(30L, response.getTotalStudentsManaged());
+        assertEquals(8000L, response.getTotalTokensUsedByAllClasses());
+        assertEquals("10A1", response.getClassrooms().get(0).getClassName());
     }
 
     @Test
