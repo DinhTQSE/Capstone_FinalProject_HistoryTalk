@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -37,9 +39,17 @@ public class SchoolAdminDashboardResponse {
     private int totalSchoolTokenQuota;
     private int unallocatedTokenQuota; // Quỹ chung còn lại của trường
     private int allocatedTokens;       // Tổng token đã tiêu thụ khỏi Quỹ chung
-    private long tokensUsedByStudents;
+    private long tokensUsedByStudents; // Token tiêu thụ bởi học sinh
+    private long tokensUsedByTeachers; // Token tiêu thụ bởi giáo viên
+    private long tokensUsedTotal;      // Tổng token toàn trường đã sử dụng
+    private double studentTokenUsagePercentage;
+    private double teacherTokenUsagePercentage;
     private int defaultDailyStudentQuota;
     private long pendingTokenBoostRequests;
+
+    // Top các lớp học tiêu thụ nhiều token nhất trong trường
+    @Builder.Default
+    private List<ClassroomTokenUsageSummaryDto> topClassroomsByTokenUsage = new ArrayList<>();
 
     // Tỷ lệ hoàn thành bài tập toàn trường
     private AssignmentStats assignmentStats;

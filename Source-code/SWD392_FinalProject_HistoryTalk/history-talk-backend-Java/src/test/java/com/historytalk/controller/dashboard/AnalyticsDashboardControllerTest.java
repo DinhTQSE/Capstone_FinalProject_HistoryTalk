@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -84,7 +85,7 @@ class AnalyticsDashboardControllerTest {
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
-                .setCustomArgumentResolvers(principalResolver)
+                .setCustomArgumentResolvers(principalResolver, new PageableHandlerMethodArgumentResolver())
                 .build();
     }
 
@@ -232,5 +233,124 @@ class AnalyticsDashboardControllerTest {
                 .andExpect(jsonPath("$.data.tokenSummary.totalTokensB2bAllocated").value(500000))
                 .andExpect(jsonPath("$.data.platformOverview.totalSchools").value(10))
                 .andExpect(jsonPath("$.data.platformOverview.totalRevenue").value(30000000));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/analytics/classrooms - Success returns 200 OK")
+    void getClassroomsTokenUsage_Success() throws Exception {
+        ClassroomTokenUsageSummaryDto dto = ClassroomTokenUsageSummaryDto.builder()
+                .classroomId(classId)
+                .className("10A1")
+                .classCode("CVA-10A1-2026")
+                .gradeLevel(10)
+                .academicYear(2026)
+                .status("ACTIVE")
+                .teacherName("Thầy A")
+                .studentCount(35L)
+                .tokensUsedTotal(12000L)
+                .tokensUsedToday(800L)
+                .percentageOfSchoolUsage(45.5)
+                .build();
+
+        com.historytalk.dto.PaginatedResponse<ClassroomTokenUsageSummaryDto> paginated =
+                com.historytalk.dto.PaginatedResponse.<ClassroomTokenUsageSummaryDto>builder()
+                        .content(java.util.List.of(dto))
+                        .totalElements(1L)
+                        .totalPages(1)
+                        .currentPage(0)
+                        .pageSize(10)
+                        .hasNext(false)
+                        .hasPrevious(false)
+                        .build();
+
+        when(analyticsDashboardService.getClassroomsTokenUsage(any(), any(), any(), any(), any(), any()))
+                .thenReturn(paginated);
+
+        mockMvc.perform(get("/api/v1/school-admin/analytics/classrooms")
+                        .param("academicYear", "2026")
+                        .param("gradeLevel", "10")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].className").value("10A1"))
+                .andExpect(jsonPath("$.data[0].tokensUsedTotal").value(12000))
+                .andExpect(jsonPath("$.data[0].percentageOfSchoolUsage").value(45.5));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/analytics/classrooms/{classroomId}/students - Success returns 200 OK")
+    void getClassroomStudentsTokenUsage_Success() throws Exception {
+        StudentTokenUsageDetailDto dto = StudentTokenUsageDetailDto.builder()
+                .studentId(UUID.randomUUID())
+                .studentCode("HS001")
+                .fullName("Nguyễn Văn An")
+                .userName("cva_hs001")
+                .tokensUsedTotal(4500L)
+                .tokensUsedToday(250L)
+                .dailyTokenLimit(1000L)
+                .dailyBonusTokens(100L)
+                .effectiveRemainingToday(850L)
+                .messageCount(15L)
+                .build();
+
+        com.historytalk.dto.PaginatedResponse<StudentTokenUsageDetailDto> paginated =
+                com.historytalk.dto.PaginatedResponse.<StudentTokenUsageDetailDto>builder()
+                        .content(java.util.List.of(dto))
+                        .totalElements(1L)
+                        .totalPages(1)
+                        .currentPage(0)
+                        .pageSize(20)
+                        .hasNext(false)
+                        .hasPrevious(false)
+                        .build();
+
+        when(analyticsDashboardService.getClassroomStudentsTokenUsage(eq(classId), any(), any(), any()))
+                .thenReturn(paginated);
+
+        mockMvc.perform(get("/api/v1/school-admin/analytics/classrooms/" + classId + "/students")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].studentCode").value("HS001"))
+                .andExpect(jsonPath("$.data[0].tokensUsedTotal").value(4500))
+                .andExpect(jsonPath("$.data[0].effectiveRemainingToday").value(850));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/teacher/dashboard/classes-overview - Success returns 200 OK")
+    void getTeacherClassesOverview_Success() throws Exception {
+        TeacherClassesOverviewResponse response = TeacherClassesOverviewResponse.builder()
+                .teacherUid(UUID.randomUUID())
+                .teacherName("Thầy Nguyễn Văn B")
+                .totalClassroomsManaged(2)
+                .totalStudentsManaged(70)
+                .totalTokensUsedByAllClasses(25000)
+                .classrooms(java.util.List.of(
+                        ClassroomTokenUsageSummaryDto.builder()
+                                .classroomId(classId)
+                                .className("10A1")
+                                .studentCount(35)
+                                .tokensUsedTotal(15000)
+                                .build(),
+                        ClassroomTokenUsageSummaryDto.builder()
+                                .classroomId(UUID.randomUUID())
+                                .className("10A2")
+                                .studentCount(35)
+                                .tokensUsedTotal(10000)
+                                .build()
+                ))
+                .build();
+
+        when(analyticsDashboardService.getTeacherClassesOverview(any()))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/teacher/dashboard/classes-overview")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.teacherName").value("Thầy Nguyễn Văn B"))
+                .andExpect(jsonPath("$.data.totalClassroomsManaged").value(2))
+                .andExpect(jsonPath("$.data.totalTokensUsedByAllClasses").value(25000))
+                .andExpect(jsonPath("$.data.classrooms[0].className").value("10A1"));
     }
 }

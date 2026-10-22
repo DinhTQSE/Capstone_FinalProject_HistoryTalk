@@ -1,6 +1,13 @@
 package com.historytalk.controller.dashboard;
 
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.dto.PaginatedApiResponse;
+import com.historytalk.dto.PaginatedResponse;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.historytalk.dto.dashboard.*;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.dashboard.AnalyticsDashboardService;
@@ -78,4 +85,49 @@ public class AnalyticsDashboardController {
         SystemAdminComprehensiveDashboardResponse response = analyticsDashboardService.getSystemAdminDashboard();
         return ResponseEntity.ok(ApiResponse.success(response, "System Admin dashboard retrieved successfully"));
     }
+
+    @GetMapping("/school-admin/analytics/classrooms")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin Classroom Token Analytics", description = "Returns token consumption breakdown by classroom in the school with filters and pagination")
+    public ResponseEntity<PaginatedApiResponse<ClassroomTokenUsageSummaryDto>> getClassroomsTokenUsage(
+            @RequestParam(required = false) Integer academicYear,
+            @RequestParam(required = false) Integer gradeLevel,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @ParameterObject
+            @PageableDefault(size = 10, sort = "tokensUsedTotal", direction = Sort.Direction.DESC)
+            Pageable pageable,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/analytics/classrooms by school admin: {}", principal != null ? principal.getUsername() : "security-context");
+        PaginatedResponse<ClassroomTokenUsageSummaryDto> response = analyticsDashboardService.getClassroomsTokenUsage(
+                principal != null ? principal.getSchoolId() : null, academicYear, gradeLevel, status, search, pageable);
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Classroom token analytics retrieved successfully"));
+    }
+
+    @GetMapping("/school-admin/analytics/classrooms/{classroomId}/students")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'TEACHER')")
+    @Operation(summary = "Classroom Students Token Usage Drill-Down", description = "Returns individual student token usage details for the specified classroom")
+    public ResponseEntity<PaginatedApiResponse<StudentTokenUsageDetailDto>> getClassroomStudentsTokenUsage(
+            @PathVariable UUID classroomId,
+            @RequestParam(required = false) String search,
+            @ParameterObject
+            @PageableDefault(size = 20, sort = "tokensUsedTotal", direction = Sort.Direction.DESC)
+            Pageable pageable,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/analytics/classrooms/{}/students by user: {}", classroomId, principal != null ? principal.getUsername() : "security-context");
+        PaginatedResponse<StudentTokenUsageDetailDto> response = analyticsDashboardService.getClassroomStudentsTokenUsage(
+                classroomId, search, pageable, principal);
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Classroom students token usage retrieved successfully"));
+    }
+
+    @GetMapping("/teacher/dashboard/classes-overview")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(summary = "Teacher Classes Overview Analytics", description = "Returns summary of token usage across all classrooms managed by the teacher")
+    public ResponseEntity<ApiResponse<TeacherClassesOverviewResponse>> getTeacherClassesOverview(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/teacher/dashboard/classes-overview by teacher: {}", principal != null ? principal.getUsername() : "security-context");
+        TeacherClassesOverviewResponse response = analyticsDashboardService.getTeacherClassesOverview(principal);
+        return ResponseEntity.ok(ApiResponse.success(response, "Teacher classes overview retrieved successfully"));
+    }
+
 }

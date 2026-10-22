@@ -191,9 +191,45 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             JOIN chat_session cs ON cs.session_id = m.session_id
             JOIN "user" u ON u.uid = cs.uid
             WHERE u.school_id = :schoolId
+              AND u.role = 'SCHOOL_STUDENT'
               AND m.deleted_at IS NULL
             """, nativeQuery = true)
     long sumTokensUsedBySchoolStudents(@Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE u.school_id = :schoolId
+              AND u.role = 'TEACHER'
+              AND m.deleted_at IS NULL
+            """, nativeQuery = true)
+    long sumTokensUsedBySchoolTeachers(@Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE u.school_id = :schoolId
+              AND u.role = 'SCHOOL_STUDENT'
+              AND m.deleted_at IS NULL
+              AND m.created_at >= :since
+            """, nativeQuery = true)
+    long sumTokensUsedBySchoolStudentsSince(@Param("schoolId") UUID schoolId, @Param("since") LocalDateTime since);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE u.school_id = :schoolId
+              AND u.role = 'TEACHER'
+              AND m.deleted_at IS NULL
+              AND m.created_at >= :since
+            """, nativeQuery = true)
+    long sumTokensUsedBySchoolTeachersSince(@Param("schoolId") UUID schoolId, @Param("since") LocalDateTime since);
 
     @Query(value = """
             SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)

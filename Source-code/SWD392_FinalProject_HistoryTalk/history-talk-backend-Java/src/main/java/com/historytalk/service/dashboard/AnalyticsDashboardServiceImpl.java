@@ -1,6 +1,11 @@
 package com.historytalk.service.dashboard;
 
 import com.historytalk.dto.dashboard.*;
+import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.repository.dashboard.ClassroomTokenUsageProjection;
+import com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.historytalk.entity.classroom.Classroom;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.enums.UserRole;
@@ -77,6 +82,32 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         int unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
         int allocated = Math.max(0, totalQuota - unallocated);
         long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(finalSchoolId);
+        long tokensUsedByTeachers = messageRepository.sumTokensUsedBySchoolTeachers(finalSchoolId);
+        long tokensUsedTotal = tokensUsedByStudents + tokensUsedByTeachers;
+        double studentPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByStudents * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
+        double teacherPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByTeachers * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
+
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        List<ClassroomTokenUsageProjection> topClassProjections = classroomRepository.findTopClassroomsByTokenUsage(finalSchoolId, todayStart, 5);
+        List<ClassroomTokenUsageSummaryDto> topClassrooms = (topClassProjections != null) ? topClassProjections.stream()
+                .map(p -> ClassroomTokenUsageSummaryDto.builder()
+                        .classroomId(p.getClassroomId())
+                        .className(p.getClassName())
+                        .classCode(p.getClassCode())
+                        .gradeLevel(p.getGradeLevel())
+                        .academicYear(p.getAcademicYear())
+                        .status(p.getStatus())
+                        .teacherName(p.getTeacherName())
+                        .teacherUid(p.getTeacherUid())
+                        .studentCount(p.getStudentCount() != null ? p.getStudentCount() : 0L)
+                        .tokensUsedTotal(p.getTokensUsedTotal() != null ? p.getTokensUsedTotal() : 0L)
+                        .tokensUsedToday(p.getTokensUsedToday() != null ? p.getTokensUsedToday() : 0L)
+                        .percentageOfSchoolUsage(tokensUsedTotal > 0 && p.getTokensUsedTotal() != null
+                                ? Math.round((p.getTokensUsedTotal() * 100.0 / tokensUsedTotal) * 10.0) / 10.0
+                                : 0.0)
+                        .build())
+                .toList() : new ArrayList<>();
+
         int defaultDailyQuota = school.getDefaultDailyStudentQuota() != null ? school.getDefaultDailyStudentQuota() : 1000;
         long pendingBoostRequests = 0L;
         if (tokenBoostRequestRepository != null) {
@@ -112,6 +143,11 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .unallocatedTokenQuota(unallocated)
                 .allocatedTokens(allocated)
                 .tokensUsedByStudents(tokensUsedByStudents)
+                .tokensUsedByTeachers(tokensUsedByTeachers)
+                .tokensUsedTotal(tokensUsedTotal)
+                .studentTokenUsagePercentage(studentPercent)
+                .teacherTokenUsagePercentage(teacherPercent)
+                .topClassroomsByTokenUsage(topClassrooms)
                 .defaultDailyStudentQuota(defaultDailyQuota)
                 .pendingTokenBoostRequests(pendingBoostRequests)
                 .assignmentStats(assignmentStats)
@@ -485,4 +521,172 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         if (questionCount == 0) return 0.0;
         return Math.round((session.getScore() * 100.0 / questionCount) * 10.0) / 10.0;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<ClassroomTokenUsageSummaryDto> getClassroomsTokenUsage(
+            UUID schoolId, Integer academicYear, Integer gradeLevel, String status, String search, Pageable pageable) {
+        if (!schoolRepository.existsById(schoolId)) {
+            throw new ResourceNotFoundException("School not found with id: " + schoolId);
+        }
+
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
+        long schoolTotal = messageRepository.sumTokensUsedBySchoolStudents(schoolId)
+                + messageRepository.sumTokensUsedBySchoolTeachers(schoolId);
+
+        Page<ClassroomTokenUsageProjection> page = classroomRepository.findClassroomTokenUsageList(
+                schoolId, todayStart, academicYear, gradeLevel, status, trimmedSearch, pageable);
+
+        List<ClassroomTokenUsageSummaryDto> content = page.getContent().stream()
+                .map(p -> ClassroomTokenUsageSummaryDto.builder()
+                        .classroomId(p.getClassroomId())
+                        .className(p.getClassName())
+                        .classCode(p.getClassCode())
+                        .gradeLevel(p.getGradeLevel())
+                        .academicYear(p.getAcademicYear())
+                        .status(p.getStatus())
+                        .teacherName(p.getTeacherName())
+                        .teacherUid(p.getTeacherUid())
+                        .studentCount(p.getStudentCount() != null ? p.getStudentCount() : 0L)
+                        .tokensUsedTotal(p.getTokensUsedTotal() != null ? p.getTokensUsedTotal() : 0L)
+                        .tokensUsedToday(p.getTokensUsedToday() != null ? p.getTokensUsedToday() : 0L)
+                        .percentageOfSchoolUsage(schoolTotal > 0 && p.getTokensUsedTotal() != null
+                                ? Math.round((p.getTokensUsedTotal() * 100.0 / schoolTotal) * 10.0) / 10.0
+                                : 0.0)
+                        .build())
+                .toList();
+
+        return PaginatedResponse.<ClassroomTokenUsageSummaryDto>builder()
+                .content(content)
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .currentPage(page.getNumber())
+                .pageSize(page.getSize())
+                .hasNext(page.hasNext())
+                .hasPrevious(page.hasPrevious())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<StudentTokenUsageDetailDto> getClassroomStudentsTokenUsage(
+            UUID classroomId, String search, Pageable pageable, UserPrincipal principal) {
+        UserPrincipal resolved = resolvePrincipal(principal);
+        UUID schoolId = resolved.getSchoolId();
+
+        Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with id: " + classroomId));
+
+        if (resolved.getRole() == UserRole.TEACHER) {
+            UUID teacherUid = UUID.fromString(resolved.getUid());
+            if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
+                throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
+            }
+        }
+
+        School school = classroom.getSchool();
+        int baseDailyLimit = (classroom.getDailyTokenQuota() != null && classroom.getDailyTokenQuota() > 0)
+                ? classroom.getDailyTokenQuota()
+                : ((school != null && school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
+                    ? school.getDefaultDailyStudentQuota()
+                    : 1000);
+        int schoolPool = (school != null && school.getUnallocatedTokenQuota() != null)
+                ? Math.max(0, school.getUnallocatedTokenQuota())
+                : 0;
+
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
+        Page<StudentTokenUsageDetailProjection> page = classStudentRepository.findStudentTokenUsageInClassroom(
+                classroomId, todayStart, trimmedSearch, pageable);
+
+        List<StudentTokenUsageDetailDto> content = page.getContent().stream()
+                .map(p -> {
+                    long bonus = p.getDailyBonusTokens() != null ? p.getDailyBonusTokens() : 0L;
+                    long usedToday = p.getTokensUsedToday() != null ? p.getTokensUsedToday() : 0L;
+                    long effectiveDailyLimit = baseDailyLimit + bonus;
+                    long remainingDailyLimit = Math.max(0, effectiveDailyLimit - usedToday);
+                    long effectiveRemainingToday = Math.min(remainingDailyLimit, schoolPool);
+
+                    return StudentTokenUsageDetailDto.builder()
+                            .studentId(p.getStudentId())
+                            .studentCode(p.getStudentCode())
+                            .fullName(p.getFullName())
+                            .userName(p.getUserName())
+                            .email(p.getEmail())
+                            .tokensUsedTotal(p.getTokensUsedTotal() != null ? p.getTokensUsedTotal() : 0L)
+                            .tokensUsedToday(usedToday)
+                            .dailyTokenLimit(baseDailyLimit)
+                            .dailyBonusTokens(bonus)
+                            .effectiveRemainingToday(effectiveRemainingToday)
+                            .messageCount(p.getMessageCount() != null ? p.getMessageCount() : 0L)
+                            .lastActiveAt(p.getLastActiveAt())
+                            .build();
+                })
+                .toList();
+
+        return PaginatedResponse.<StudentTokenUsageDetailDto>builder()
+                .content(content)
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .currentPage(page.getNumber())
+                .pageSize(page.getSize())
+                .hasNext(page.hasNext())
+                .hasPrevious(page.hasPrevious())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TeacherClassesOverviewResponse getTeacherClassesOverview(UserPrincipal principal) {
+        UserPrincipal resolved = resolvePrincipal(principal);
+        UUID teacherUid = UUID.fromString(resolved.getUid());
+        UUID schoolId = resolved.getSchoolId();
+
+        User teacher = userRepository.findById(teacherUid)
+                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with id: " + teacherUid));
+
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        List<ClassroomTokenUsageProjection> projections = classroomRepository.findClassroomsTokenUsageForTeacher(
+                schoolId, teacherUid, todayStart);
+
+        long totalTokensUsed = (projections != null) ? projections.stream()
+                .mapToLong(p -> p.getTokensUsedTotal() != null ? p.getTokensUsedTotal() : 0L)
+                .sum() : 0L;
+
+        long totalStudents = (projections != null) ? projections.stream()
+                .mapToLong(p -> p.getStudentCount() != null ? p.getStudentCount() : 0L)
+                .sum() : 0L;
+
+        List<ClassroomTokenUsageSummaryDto> classroomDtos = (projections != null) ? projections.stream()
+                .map(p -> ClassroomTokenUsageSummaryDto.builder()
+                        .classroomId(p.getClassroomId())
+                        .className(p.getClassName())
+                        .classCode(p.getClassCode())
+                        .gradeLevel(p.getGradeLevel())
+                        .academicYear(p.getAcademicYear())
+                        .status(p.getStatus())
+                        .teacherName(teacher.getFullName())
+                        .teacherUid(teacherUid)
+                        .studentCount(p.getStudentCount() != null ? p.getStudentCount() : 0L)
+                        .tokensUsedTotal(p.getTokensUsedTotal() != null ? p.getTokensUsedTotal() : 0L)
+                        .tokensUsedToday(p.getTokensUsedToday() != null ? p.getTokensUsedToday() : 0L)
+                        .percentageOfSchoolUsage(totalTokensUsed > 0 && p.getTokensUsedTotal() != null
+                                ? Math.round((p.getTokensUsedTotal() * 100.0 / totalTokensUsed) * 10.0) / 10.0
+                                : 0.0)
+                        .build())
+                .toList() : new ArrayList<>();
+
+        return TeacherClassesOverviewResponse.builder()
+                .teacherUid(teacherUid)
+                .teacherName(teacher.getFullName())
+                .totalClassroomsManaged(projections != null ? projections.size() : 0)
+                .totalStudentsManaged(totalStudents)
+                .totalTokensUsedByAllClasses(totalTokensUsed)
+                .classrooms(classroomDtos)
+                .build();
+    }
+
 }
