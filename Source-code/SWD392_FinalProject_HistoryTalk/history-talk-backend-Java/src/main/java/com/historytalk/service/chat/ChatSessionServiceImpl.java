@@ -8,16 +8,21 @@ import com.historytalk.entity.character.Character;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 
+import com.historytalk.entity.enums.ContentScope;
+import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventEra;
+import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.CharacterRepository;
+import com.historytalk.repository.ClassLocalContentRepository;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.MessageRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.service.chat.AiServiceClient;
 import com.historytalk.service.chat.AiServiceClient.AiChatResult;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
@@ -49,6 +54,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private final MessageRepository messageRepository;
     private final AiServiceClient aiServiceClient;
     private final ObjectMapper objectMapper;
+    private final ClassLocalContentRepository classLocalContentRepository;
+    private final ClassStudentRepository classStudentRepository;
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> getSessions(String userId, String characterId) {
@@ -88,6 +95,10 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             if (user.getSchool() == null || !user.getSchool().getId().equals(character.getSchool().getId())) {
                 throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
             }
+            if (!canAccessClassOnly(user, userRole, character.getContentScope(), character.getCreatedBy(),
+                    character.getCharacterId(), EntityType.CHARACTER)) {
+                throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
+            }
         }
 
         HistoricalContext context = null;
@@ -101,6 +112,9 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             if (context != null && context.getSchool() != null && !"SYSTEM_ADMIN".equalsIgnoreCase(userRole)) {
                 if (user.getSchool() == null || !user.getSchool().getId().equals(context.getSchool().getId())) {
                     context = null; // Not visible across schools
+                } else if (!canAccessClassOnly(user, userRole, context.getContentScope(), context.getCreatedBy(),
+                        context.getContextId(), EntityType.CONTEXT)) {
+                    context = null; // CLASS_ONLY context of a class the user does not belong to
                 }
             }
             if (context != null) {
@@ -269,6 +283,27 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                 || "STAFF".equalsIgnoreCase(role)
                 || "ADMIN".equalsIgnoreCase(role));
+    }
+
+    /**
+     * CLASS_ONLY local content: SCHOOL_ADMIN and platform roles always pass, a TEACHER only for
+     * content they authored, anyone else (students) only when enrolled in an assigned class.
+     */
+    private boolean canAccessClassOnly(User user, String userRole, ContentScope scope, User createdBy,
+                                       UUID entityId, EntityType entityType) {
+        if (scope != ContentScope.CLASS_ONLY || isStaffOrAdmin(userRole)
+                || "SYSTEM_ADMIN".equalsIgnoreCase(userRole) || user.getRole() == UserRole.SCHOOL_ADMIN) {
+            return true;
+        }
+        if (user.getRole() == UserRole.TEACHER) {
+            return createdBy != null && user.getUid().equals(createdBy.getUid());
+        }
+        List<UUID> assignedClassIds = classLocalContentRepository.findClassIdsByEntityIdAndEntityType(entityId, entityType);
+        if (assignedClassIds.isEmpty()) {
+            return false;
+        }
+        return classStudentRepository.findActiveClassroomsByStudentUid(user.getUid()).stream()
+                .anyMatch(classroom -> assignedClassIds.contains(classroom.getId()));
     }
 
     private boolean isPubliclyVisible(Boolean isPublished, LocalDateTime deletedAt) {

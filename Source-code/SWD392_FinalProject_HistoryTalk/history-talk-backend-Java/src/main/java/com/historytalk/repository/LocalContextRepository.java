@@ -141,6 +141,23 @@ public interface LocalContextRepository extends JpaRepository<HistoricalContext,
             """)
     Page<HistoricalContext> findTrashBySchool(@Param("schoolId") UUID schoolId, Pageable pageable);
 
+    @Query(value = """
+            SELECT hc FROM HistoricalContext hc
+            WHERE hc.school.id = :schoolId
+              AND hc.createdBy.uid = :creatorId
+              AND hc.deletedAt IS NOT NULL
+            ORDER BY hc.deletedAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(hc) FROM HistoricalContext hc
+            WHERE hc.school.id = :schoolId
+              AND hc.createdBy.uid = :creatorId
+              AND hc.deletedAt IS NOT NULL
+            """)
+    Page<HistoricalContext> findTrashBySchoolAndCreator(@Param("schoolId") UUID schoolId,
+                                                        @Param("creatorId") UUID creatorId,
+                                                        Pageable pageable);
+
     @Query("""
             SELECT hc FROM HistoricalContext hc
             WHERE hc.contextId = :id

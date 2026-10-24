@@ -100,11 +100,11 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
               AND (:era IS NULL OR hc.era = :era)
               AND (
                   (:schoolId IS NULL AND c.school IS NULL AND hc.school IS NULL)
-                  OR (:schoolId IS NOT NULL AND (
-                      (c.school IS NULL AND hc.school IS NULL)
-                      OR (c.school.id = :schoolId AND (c.contentScope IS NULL OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
-                      OR (hc.school.id = :schoolId AND (hc.contentScope IS NULL OR hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
-                  ))
+                  OR (:schoolId IS NOT NULL
+                      AND (c.school IS NULL
+                           OR (c.school.id = :schoolId AND (c.contentScope IS NULL OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE)))
+                      AND (hc.school IS NULL
+                           OR (hc.school.id = :schoolId AND (hc.contentScope IS NULL OR hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))))
               )
             ORDER BY hc.createdAt DESC, c.name ASC
             """,
@@ -119,11 +119,11 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
               AND (:era IS NULL OR hc.era = :era)
               AND (
                   (:schoolId IS NULL AND c.school IS NULL AND hc.school IS NULL)
-                  OR (:schoolId IS NOT NULL AND (
-                      (c.school IS NULL AND hc.school IS NULL)
-                      OR (c.school.id = :schoolId AND (c.contentScope IS NULL OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
-                      OR (hc.school.id = :schoolId AND (hc.contentScope IS NULL OR hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))
-                  ))
+                  OR (:schoolId IS NOT NULL
+                      AND (c.school IS NULL
+                           OR (c.school.id = :schoolId AND (c.contentScope IS NULL OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE)))
+                      AND (hc.school IS NULL
+                           OR (hc.school.id = :schoolId AND (hc.contentScope IS NULL OR hc.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE))))
               )
             """)
     Page<Object[]> findScenarios(@Param("search") String search,

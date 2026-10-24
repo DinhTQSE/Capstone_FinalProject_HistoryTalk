@@ -2,6 +2,7 @@ package com.historytalk.repository;
 
 import com.historytalk.entity.document.DocumentMediaMetadata;
 import com.historytalk.entity.enums.EntityType;
+import com.historytalk.entity.enums.MediaType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,5 +19,6 @@ public interface DocumentMediaMetadataRepository extends JpaRepository<DocumentM
     // Polymorphic query methods
     Optional<DocumentMediaMetadata> findByEntityTypeAndEntityId(EntityType entityType, UUID entityId);
     List<DocumentMediaMetadata> findAllByEntityTypeAndEntityId(EntityType entityType, UUID entityId);
+    List<DocumentMediaMetadata> findAllByEntityTypeAndEntityIdAndMediaType(EntityType entityType, UUID entityId, MediaType mediaType);
     void deleteByEntityTypeAndEntityId(EntityType entityType, UUID entityId);
 }

@@ -12,7 +12,7 @@ import java.util.UUID;
 
 /**
  * Strategy for direct binary upload via multipart/form-data.
- * Supports both 2D images (max 10MB) and 3D models (max 100MB).
+ * Supports 2D images (max 10MB), 3D models (max 100MB) and videos (max 50MB).
  * Streams binary data directly to Supabase Storage via MultipartFile.
  */
 @Slf4j
@@ -22,6 +22,7 @@ public class DirectBinaryUploadStrategy implements MediaUploadStrategy {
 
     private static final long MAX_2D_SIZE_BYTES = 10 * 1024 * 1024L; // 10MB
     private static final long MAX_3D_SIZE_BYTES = 100 * 1024 * 1024L; // 100MB
+    private static final long MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024L; // 50MB
 
     private final SupabaseDocumentStorageService supabaseDocumentStorageService;
 
@@ -39,19 +40,24 @@ public class DirectBinaryUploadStrategy implements MediaUploadStrategy {
 
     /**
      * Upload MultipartFile directly to Supabase Storage.
-     * Supports both 2D images (max 10MB) and 3D models (max 100MB).
+     * Supports 2D images (max 10MB), 3D models (max 100MB) and videos (max 50MB).
      *
      * @param storagePath Storage path for the file
      * @param file MultipartFile to upload
      * @param contentType Content type of the file
-     * @param mediaType Media type (IMAGE_2D or MODEL_3D)
+     * @param mediaType Media type (IMAGE_2D, MODEL_3D or VIDEO)
      * @return UploadResult with storage path and upload ID
      * @throws IOException if file reading fails
      */
     public UploadResult uploadMultipartFile(String storagePath, MultipartFile file, String contentType, String mediaType) throws IOException {
-        long maxSize = mediaType != null && mediaType.equalsIgnoreCase("MODEL_3D") 
-                ? MAX_3D_SIZE_BYTES 
-                : MAX_2D_SIZE_BYTES;
+        long maxSize;
+        if (mediaType != null && mediaType.equalsIgnoreCase("MODEL_3D")) {
+            maxSize = MAX_3D_SIZE_BYTES;
+        } else if (mediaType != null && mediaType.equalsIgnoreCase("VIDEO")) {
+            maxSize = MAX_VIDEO_SIZE_BYTES;
+        } else {
+            maxSize = MAX_2D_SIZE_BYTES;
+        }
 
         if (file.getSize() > maxSize) {
             throw new IllegalArgumentException(
