@@ -43,7 +43,7 @@ public class CharacterMediaController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
         summary = "Upload media directly via multipart/form-data",
-        description = "Uploads media directly via multipart/form-data for a Character. Supports both 2D images (max 10MB) and 3D models (max 100MB). Single-step flow for direct binary upload."
+        description = "Uploads media directly via multipart/form-data for a Character. Supports both 2D images (max 10MB) and 3D models (max 100MB). Single-step flow for direct binary upload. Re-uploading the same mediaType replaces the previous file. TEACHER may only upload onto local characters they created; SCHOOL_ADMIN onto local characters of their school."
     )
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadDirectBinary(
             @Parameter(description = "Character ID", required = true)
@@ -75,6 +75,8 @@ public class CharacterMediaController {
     @Operation(summary = "Get signed view URL for character media")
     public ResponseEntity<ApiResponse<SignedViewUrlResponse>> getViewUrl(
             @PathVariable String characterId,
+            @Parameter(description = "Media type to view (optional — defaults to the most recent media)")
+            @RequestParam(required = false) String mediaType,
             @RequestParam(required = false) Integer thumbnailWidth,
             @RequestParam(required = false) Integer thumbnailHeight) {
         
@@ -85,7 +87,7 @@ public class CharacterMediaController {
         log.info("GET /api/v1/characters/{}/media/view-url by user {}", characterId, userId);
         
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
-                characterUuid, EntityType.CHARACTER, thumbnailWidth, thumbnailHeight, userId, userRole);
+                characterUuid, EntityType.CHARACTER, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
         
         return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
     }
@@ -93,9 +95,12 @@ public class CharacterMediaController {
     @DeleteMapping
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Delete media from character")
+    @Operation(summary = "Delete media from character",
+            description = "mediaType=IMAGE_2D|MODEL_3D deletes only that media. Without mediaType every media of the character is deleted.")
     public ResponseEntity<ApiResponse<Void>> deleteMedia(
-            @PathVariable String characterId) {
+            @PathVariable String characterId,
+            @Parameter(description = "Media type to delete (optional)")
+            @RequestParam(required = false) String mediaType) {
         
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
@@ -103,7 +108,7 @@ public class CharacterMediaController {
         
         log.info("DELETE /api/v1/characters/{}/media by user {}", characterId, userId);
         
-        mediaService.deleteMedia(characterUuid, EntityType.CHARACTER, userId, userRole);
+        mediaService.deleteMedia(characterUuid, EntityType.CHARACTER, mediaType, userId, userRole);
         
         return ResponseEntity.noContent().build();
     }

@@ -51,6 +51,7 @@ public class TeacherLocalContentController {
     private final LocalContentService localContentService;
     private final MediaService mediaService;
     private final com.historytalk.service.media.MapImageUploadService mapImageUploadService;
+    private final com.historytalk.service.media.VideoUploadService videoUploadService;
 
     // ══════════════════════════════════════════════════════════════════════════
     // LOCAL CONTEXTS
@@ -150,8 +151,9 @@ public class TeacherLocalContentController {
 
     @PostMapping(value = "/contexts/{contextId}/media/upload-direct", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-            summary = "Upload media/ảnh trực tiếp cho bối cảnh địa phương",
-            description = "Teacher upload file ảnh (2D) hoặc model (3D) cho bối cảnh địa phương (1 bước).")
+            summary = "Upload ảnh/video trực tiếp cho bối cảnh địa phương",
+            description = "Teacher upload ảnh (mediaType=IMAGE_2D, tối đa 10MB) hoặc video (mediaType=VIDEO: MP4/WebM/Ogg/MOV, tối đa 50MB) " +
+                    "cho bối cảnh mình tạo (1 bước). Hệ thống tự cập nhật imageUrl / videoUrl; upload lại cùng mediaType sẽ thay file cũ.")
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadContextMediaDirect(
             @PathVariable String contextId,
             @RequestPart("file") MultipartFile file,
@@ -171,6 +173,7 @@ public class TeacherLocalContentController {
     @Operation(summary = "Lấy signed view URL cho media của bối cảnh")
     public ResponseEntity<ApiResponse<SignedViewUrlResponse>> getContextMediaViewUrl(
             @PathVariable String contextId,
+            @RequestParam(required = false) String mediaType,
             @RequestParam(required = false) Integer thumbnailWidth,
             @RequestParam(required = false) Integer thumbnailHeight) {
 
@@ -178,17 +181,20 @@ public class TeacherLocalContentController {
         String userRole = SecurityUtils.getRoleName();
         UUID contextUuid = UUID.fromString(contextId);
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
-                contextUuid, EntityType.CONTEXT, thumbnailWidth, thumbnailHeight, userId, userRole);
+                contextUuid, EntityType.CONTEXT, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
         return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
     }
 
     @DeleteMapping("/contexts/{contextId}/media")
-    @Operation(summary = "Xóa media khỏi bối cảnh")
-    public ResponseEntity<ApiResponse<Void>> deleteContextMedia(@PathVariable String contextId) {
+    @Operation(summary = "Xóa media khỏi bối cảnh",
+            description = "mediaType=IMAGE_2D|VIDEO chỉ xóa loại đó (kể cả URL nhập tay); bỏ trống để xóa toàn bộ media.")
+    public ResponseEntity<ApiResponse<Void>> deleteContextMedia(
+            @PathVariable String contextId,
+            @RequestParam(required = false) String mediaType) {
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
         UUID contextUuid = UUID.fromString(contextId);
-        mediaService.deleteMedia(contextUuid, EntityType.CONTEXT, userId, userRole);
+        mediaService.deleteMedia(contextUuid, EntityType.CONTEXT, mediaType, userId, userRole);
         return ResponseEntity.noContent().build();
     }
 
@@ -288,7 +294,7 @@ public class TeacherLocalContentController {
     @PostMapping(value = "/characters/{characterId}/media/upload-direct", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Upload media/ảnh trực tiếp cho nhân vật địa phương",
-            description = "Teacher upload file ảnh (2D) hoặc model (3D) cho nhân vật địa phương (1 bước).")
+            description = "Teacher upload file ảnh (IMAGE_2D) hoặc model (MODEL_3D) cho nhân vật mình tạo (1 bước). Upload lại cùng mediaType sẽ thay file cũ.")
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadCharacterMediaDirect(
             @PathVariable String characterId,
             @RequestPart("file") MultipartFile file,
@@ -308,6 +314,7 @@ public class TeacherLocalContentController {
     @Operation(summary = "Lấy signed view URL cho media của nhân vật")
     public ResponseEntity<ApiResponse<SignedViewUrlResponse>> getCharacterMediaViewUrl(
             @PathVariable String characterId,
+            @RequestParam(required = false) String mediaType,
             @RequestParam(required = false) Integer thumbnailWidth,
             @RequestParam(required = false) Integer thumbnailHeight) {
 
@@ -315,17 +322,20 @@ public class TeacherLocalContentController {
         String userRole = SecurityUtils.getRoleName();
         UUID characterUuid = UUID.fromString(characterId);
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
-                characterUuid, EntityType.CHARACTER, thumbnailWidth, thumbnailHeight, userId, userRole);
+                characterUuid, EntityType.CHARACTER, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
         return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
     }
 
     @DeleteMapping("/characters/{characterId}/media")
-    @Operation(summary = "Xóa media khỏi nhân vật")
-    public ResponseEntity<ApiResponse<Void>> deleteCharacterMedia(@PathVariable String characterId) {
+    @Operation(summary = "Xóa media khỏi nhân vật",
+            description = "mediaType=IMAGE_2D|MODEL_3D chỉ xóa loại đó; bỏ trống để xóa toàn bộ media.")
+    public ResponseEntity<ApiResponse<Void>> deleteCharacterMedia(
+            @PathVariable String characterId,
+            @RequestParam(required = false) String mediaType) {
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
         UUID characterUuid = UUID.fromString(characterId);
-        mediaService.deleteMedia(characterUuid, EntityType.CHARACTER, userId, userRole);
+        mediaService.deleteMedia(characterUuid, EntityType.CHARACTER, mediaType, userId, userRole);
         return ResponseEntity.noContent().build();
     }
 
@@ -459,6 +469,18 @@ public class TeacherLocalContentController {
         String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
         String url = mapImageUploadService.uploadMapImage(file, userId, userRole);
         return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Media uploaded successfully"));
+    }
+
+    @PostMapping(value = "/media/upload-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Giáo viên tải video lên kho lưu trữ trường",
+            description = "Tải file video (MP4, WebM, Ogg, MOV tối đa 50MB) và nhận URL công khai để điền vào videoUrl " +
+                    "khi tạo / sửa bối cảnh. Với bối cảnh đã tồn tại có thể dùng POST /contexts/{contextId}/media/upload-direct?mediaType=VIDEO.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadVideo(
+            @RequestPart("file") MultipartFile file) {
+
+        String url = videoUploadService.uploadVideo(file, SecurityUtils.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Video uploaded successfully"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════

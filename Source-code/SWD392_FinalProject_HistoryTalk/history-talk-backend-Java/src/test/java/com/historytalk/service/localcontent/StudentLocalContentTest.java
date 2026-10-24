@@ -9,6 +9,7 @@ import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.ClassLocalContentRepository;
 import com.historytalk.repository.LocalCharacterRepository;
@@ -33,6 +34,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -159,5 +162,46 @@ class StudentLocalContentTest {
 
         assertThatThrownBy(() -> localContentService.getPublishedLocalContextById(contextId.toString(), studentPrincipal))
                 .isInstanceOf(UnauthorizedException.class);
+    }
+
+    @Test
+    void getStudentPublishedLocalContexts_rejectsClassIdStudentIsNotEnrolledIn() {
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(classStudentRepository.findActiveClassroomsByStudentUid(studentUid))
+                .thenReturn(List.of(Classroom.builder().id(classId).build()));
+        String foreignClassId = UUID.randomUUID().toString();
+
+        assertThatThrownBy(() -> localContentService.getStudentPublishedLocalContexts(
+                "", foreignClassId, 1, 10, studentPrincipal))
+                .isInstanceOf(UnauthorizedException.class);
+        assertThatThrownBy(() -> localContentService.getStudentPublishedLocalCharacters(
+                "", foreignClassId, 1, 10, studentPrincipal))
+                .isInstanceOf(UnauthorizedException.class);
+        verify(localContextRepo, never()).findVisibleToStudent(any(), anyBoolean(), anyList(), anyString(), any());
+    }
+
+    @Test
+    void getStudentPublishedLocalContexts_classIdFilterNarrowsToThatEnrolledClass() {
+        UUID secondClassId = UUID.randomUUID();
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(classStudentRepository.findActiveClassroomsByStudentUid(studentUid))
+                .thenReturn(List.of(Classroom.builder().id(classId).build(), Classroom.builder().id(secondClassId).build()));
+        when(localContextRepo.findVisibleToStudent(eq(schoolId), eq(true), eq(List.of(secondClassId)), eq(""), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        PaginatedResponse<LocalContentResponse> res = localContentService.getStudentPublishedLocalContexts(
+                "", secondClassId.toString(), 1, 10, studentPrincipal);
+
+        assertThat(res.getContent()).isEmpty();
+    }
+
+    @Test
+    void getStudentPublishedLocalContexts_invalidClassId_isBadRequest() {
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(classStudentRepository.findActiveClassroomsByStudentUid(studentUid)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> localContentService.getStudentPublishedLocalContexts(
+                "", "not-a-uuid", 1, 10, studentPrincipal))
+                .isInstanceOf(InvalidRequestException.class);
     }
 }

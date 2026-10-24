@@ -133,6 +133,23 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
             """)
     Page<Character> findTrashBySchool(@Param("schoolId") UUID schoolId, Pageable pageable);
 
+    @Query(value = """
+            SELECT c FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.createdBy.uid = :creatorId
+              AND c.deletedAt IS NOT NULL
+            ORDER BY c.deletedAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.createdBy.uid = :creatorId
+              AND c.deletedAt IS NOT NULL
+            """)
+    Page<Character> findTrashBySchoolAndCreator(@Param("schoolId") UUID schoolId,
+                                                @Param("creatorId") UUID creatorId,
+                                                Pageable pageable);
+
     @Query("""
             SELECT c FROM Character c
             WHERE c.characterId = :id

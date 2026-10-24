@@ -79,6 +79,8 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final com.historytalk.repository.QuestionRepository questionRepository;
     private final com.historytalk.service.quiz.QuizService quizService;
     private final com.historytalk.repository.classroom.ClassStudentRepository classStudentRepository;
+    private final com.historytalk.repository.classroom.ClassroomRepository classroomRepository;
+    private final com.historytalk.repository.DocumentMediaMetadataRepository mediaMetadataRepository;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.historytalk.service.document.PdfExtractionService pdfExtractionService;
@@ -122,7 +124,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .build();
 
         ctx = localContextRepo.save(ctx);
-        saveClassAssignments(ctx.getContextId(), EntityType.CONTEXT, req.getClassIds(), teacher.getUid());
+        saveClassAssignments(ctx.getContextId(), EntityType.CONTEXT, req.getClassIds(), teacher.getUid(), school.getId());
         log.info("Teacher {} created local context {} (scope={}, published={}) for school {}",
                 teacher.getUid(), ctx.getContextId(), ctx.getContentScope(), ctx.getIsPublished(), school.getId());
         return mapContextToResponse(ctx);
@@ -159,7 +161,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (req.getContentScope() != null)             ctx.setContentScope(req.getContentScope());
 
         if (req.getClassIds() != null) {
-            saveClassAssignments(ctx.getContextId(), EntityType.CONTEXT, req.getClassIds(), teacher.getUid());
+            saveClassAssignments(ctx.getContextId(), EntityType.CONTEXT, req.getClassIds(), teacher.getUid(), school.getId());
         }
 
         ctx = localContextRepo.save(ctx);
@@ -259,7 +261,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
 
         Character saved = localCharacterRepo.save(character);
-        saveClassAssignments(saved.getCharacterId(), EntityType.CHARACTER, req.getClassIds(), teacher.getUid());
+        saveClassAssignments(saved.getCharacterId(), EntityType.CHARACTER, req.getClassIds(), teacher.getUid(), school.getId());
         log.info("Teacher {} created local character {} (scope={}, published={}) for school {}",
                 teacher.getUid(), saved.getCharacterId(), saved.getContentScope(), saved.getIsPublished(), school.getId());
         return mapCharacterToResponse(saved);
@@ -307,7 +309,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
 
         if (req.getClassIds() != null) {
-            saveClassAssignments(character.getCharacterId(), EntityType.CHARACTER, req.getClassIds(), teacher.getUid());
+            saveClassAssignments(character.getCharacterId(), EntityType.CHARACTER, req.getClassIds(), teacher.getUid(), school.getId());
         }
 
         Character saved = localCharacterRepo.save(character);
@@ -506,15 +508,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID studentId = resolveUserId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        List<UUID> targetClassIds;
-        if (StringUtils.hasText(classId)) {
-            targetClassIds = List.of(UUID.fromString(classId));
-        } else {
-            targetClassIds = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
-                    .stream()
-                    .map(com.historytalk.entity.classroom.Classroom::getId)
-                    .toList();
-        }
+        List<UUID> targetClassIds = resolveStudentClassIds(studentId, classId);
 
         boolean hasClasses = !targetClassIds.isEmpty();
         List<UUID> safeClassIds = hasClasses ? targetClassIds : List.of(UUID.randomUUID());
@@ -533,15 +527,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID studentId = resolveUserId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.ASC, "name"));
 
-        List<UUID> targetClassIds;
-        if (StringUtils.hasText(classId)) {
-            targetClassIds = List.of(UUID.fromString(classId));
-        } else {
-            targetClassIds = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
-                    .stream()
-                    .map(com.historytalk.entity.classroom.Classroom::getId)
-                    .toList();
-        }
+        List<UUID> targetClassIds = resolveStudentClassIds(studentId, classId);
 
         boolean hasClasses = !targetClassIds.isEmpty();
         List<UUID> safeClassIds = hasClasses ? targetClassIds : List.of(UUID.randomUUID());
@@ -660,18 +646,82 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
     }
 
-    /** Helper: replace classroom assignments for a local content item. */
-    private void saveClassAssignments(UUID entityId, EntityType entityType, List<String> classIds, UUID teacherId) {
+    /**
+     * Helper: replace classroom assignments for a local content item.
+     * Every class must be an active classroom of the teacher's school, otherwise CLASS_ONLY
+     * content could be pointed at classes of another institution.
+     */
+    private void saveClassAssignments(UUID entityId, EntityType entityType, List<String> classIds, UUID teacherId, UUID schoolId) {
         if (classIds == null || classIds.isEmpty()) return;
+        List<UUID> classUuids = classIds.stream()
+                .map(this::parseClassId)
+                .distinct()
+                .toList();
+        for (UUID classUuid : classUuids) {
+            if (classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classUuid, schoolId).isEmpty()) {
+                throw new InvalidRequestException("Lớp học không tồn tại hoặc không thuộc trường của bạn: " + classUuid);
+            }
+        }
         classLocalContentRepo.deleteByEntityIdAndEntityType(entityId, entityType);
-        classIds.stream()
-                .map(id -> ClassLocalContent.builder()
+        classUuids.stream()
+                .map(classUuid -> ClassLocalContent.builder()
                         .entityId(entityId)
                         .entityType(entityType)
-                        .classId(UUID.fromString(id))
+                        .classId(classUuid)
                         .assignedBy(teacherId)
                         .build())
                 .forEach(classLocalContentRepo::save);
+    }
+
+    private UUID parseClassId(String classId) {
+        try {
+            return UUID.fromString(classId.trim());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new InvalidRequestException("classId không hợp lệ: " + classId);
+        }
+    }
+
+    /**
+     * Classes a student may filter local content by. A {@code classId} the student is not actively
+     * enrolled in is rejected — otherwise any student could read another class's CLASS_ONLY content.
+     */
+    private List<UUID> resolveStudentClassIds(UUID studentId, String classId) {
+        List<UUID> enrolled = classStudentRepository.findActiveClassroomsByStudentUid(studentId)
+                .stream()
+                .map(com.historytalk.entity.classroom.Classroom::getId)
+                .toList();
+        if (!StringUtils.hasText(classId)) {
+            return enrolled;
+        }
+        UUID requested = parseClassId(classId);
+        if (!enrolled.contains(requested)) {
+            throw new UnauthorizedException("Bạn không thuộc lớp học này");
+        }
+        return List.of(requested);
+    }
+
+    private void assertCreatedBy(User createdBy, UUID teacherId) {
+        if (createdBy == null || !createdBy.getUid().equals(teacherId)) {
+            throw new UnauthorizedException("You can only modify content you created");
+        }
+    }
+
+    /**
+     * Polymorphic rows (class assignments, media metadata) have no FK to the content table,
+     * so they are removed explicitly before a hard delete to avoid orphans.
+     */
+    private void cleanUpLocalContentLinks(UUID entityId, EntityType entityType) {
+        classLocalContentRepo.deleteByEntityIdAndEntityType(entityId, entityType);
+        for (var media : mediaMetadataRepository.findAllByEntityTypeAndEntityId(entityType, entityId)) {
+            if (supabaseDocumentStorageService != null) {
+                try {
+                    supabaseDocumentStorageService.deleteFile(media.getStoragePath());
+                } catch (RuntimeException ex) {
+                    log.warn("Could not delete media file {}: {}", media.getStoragePath(), ex.getMessage());
+                }
+            }
+            mediaMetadataRepository.delete(media);
+        }
     }
 
     private HistoricalContext findLocalContextOwned(String contextId, UUID schoolId, UUID teacherId) {
@@ -1292,7 +1342,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     public PaginatedResponse<LocalContentResponse> getTrashedContexts(int page, int size, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
-        Page<HistoricalContext> p = localContextRepo.findTrashBySchool(schoolId, pageable);
+        Page<HistoricalContext> p = localContextRepo.findTrashBySchoolAndCreator(schoolId, resolveUserId(principal), pageable);
         return buildPage(p.map(this::mapContextToResponse));
     }
 
@@ -1302,6 +1352,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         HistoricalContext ctx = localContextRepo.findTrashedByIdAndSchool(UUID.fromString(contextId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Context not found in trash"));
+        assertCreatedBy(ctx.getCreatedBy(), resolveUserId(principal));
         ctx.setDeletedAt(null);
         ctx.setContentStatus(Boolean.TRUE.equals(ctx.getIsPublished()) ? ContentStatus.ACTIVE : ContentStatus.DRAFT);
         ctx = localContextRepo.save(ctx);
@@ -1315,6 +1366,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         HistoricalContext ctx = localContextRepo.findTrashedByIdAndSchool(UUID.fromString(contextId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Context not found in trash"));
+        assertCreatedBy(ctx.getCreatedBy(), resolveUserId(principal));
+        cleanUpLocalContentLinks(ctx.getContextId(), EntityType.CONTEXT);
         localContextRepo.delete(ctx);
         log.info("Permanently deleted local context {} for school {}", contextId, schoolId);
     }
@@ -1324,7 +1377,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     public PaginatedResponse<LocalContentResponse> getTrashedCharacters(int page, int size, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
-        Page<Character> p = localCharacterRepo.findTrashBySchool(schoolId, pageable);
+        Page<Character> p = localCharacterRepo.findTrashBySchoolAndCreator(schoolId, resolveUserId(principal), pageable);
         return buildPage(p.map(this::mapCharacterToResponse));
     }
 
@@ -1334,6 +1387,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         Character c = localCharacterRepo.findTrashedByIdAndSchool(UUID.fromString(characterId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found in trash"));
+        assertCreatedBy(c.getCreatedBy(), resolveUserId(principal));
         c.setDeletedAt(null);
         c.setContentStatus(Boolean.TRUE.equals(c.getIsPublished()) ? ContentStatus.ACTIVE : ContentStatus.DRAFT);
         c = localCharacterRepo.save(c);
@@ -1347,6 +1401,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         Character c = localCharacterRepo.findTrashedByIdAndSchool(UUID.fromString(characterId), schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found in trash"));
+        assertCreatedBy(c.getCreatedBy(), resolveUserId(principal));
+        cleanUpLocalContentLinks(c.getCharacterId(), EntityType.CHARACTER);
         localCharacterRepo.delete(c);
         log.info("Permanently deleted local character {} for school {}", characterId, schoolId);
     }

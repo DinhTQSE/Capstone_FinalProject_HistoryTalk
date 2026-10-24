@@ -43,14 +43,14 @@ public class HistoricalContextMediaController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
         summary = "Upload media directly via multipart/form-data",
-        description = "Uploads media directly via multipart/form-data for a Historical Context. Supports both 2D images (max 10MB) and 3D models (max 100MB). Single-step flow for direct binary upload."
+        description = "Uploads media directly via multipart/form-data for a Historical Context. Supports 2D images (IMAGE_2D, max 10MB) and videos (VIDEO: MP4/WebM/Ogg/MOV, max 50MB). Re-uploading the same mediaType replaces the previous file. TEACHER may only upload onto local contexts they created; SCHOOL_ADMIN onto local contexts of their school."
     )
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadDirectBinary(
             @Parameter(description = "Context ID", required = true)
             @PathVariable String contextId,
-            @Parameter(description = "Media binary file (2D image or 3D model)", required = true, content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            @Parameter(description = "Media binary file (2D image or video)", required = true, content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE))
             @RequestPart("file") MultipartFile file,
-            @Parameter(description = "Media type (IMAGE_2D or MODEL_3D)", required = true, schema = @Schema(allowableValues = {"IMAGE_2D", "MODEL_3D"}))
+            @Parameter(description = "Media type (IMAGE_2D or VIDEO)", required = true, schema = @Schema(allowableValues = {"IMAGE_2D", "VIDEO"}))
             @RequestParam("mediaType") String mediaType,
             @Parameter(description = "Image width (optional, for 2D images)")
             @RequestParam(value = "width", required = false) Integer width,
@@ -75,6 +75,8 @@ public class HistoricalContextMediaController {
     @Operation(summary = "Get signed view URL for context media")
     public ResponseEntity<ApiResponse<SignedViewUrlResponse>> getViewUrl(
             @PathVariable String contextId,
+            @Parameter(description = "Media type to view (optional — defaults to the most recent media)")
+            @RequestParam(required = false) String mediaType,
             @RequestParam(required = false) Integer thumbnailWidth,
             @RequestParam(required = false) Integer thumbnailHeight) {
         
@@ -85,7 +87,7 @@ public class HistoricalContextMediaController {
         log.info("GET /api/v1/contexts/{}/media/view-url by user {}", contextId, userId);
         
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
-                contextUuid, EntityType.CONTEXT, thumbnailWidth, thumbnailHeight, userId, userRole);
+                contextUuid, EntityType.CONTEXT, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
         
         return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
     }
@@ -93,9 +95,12 @@ public class HistoricalContextMediaController {
     @DeleteMapping
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Delete media from context")
+    @Operation(summary = "Delete media from context",
+            description = "mediaType=IMAGE_2D|VIDEO deletes only that media (and clears imageUrl/videoUrl even if it was entered manually). Without mediaType every media of the context is deleted.")
     public ResponseEntity<ApiResponse<Void>> deleteMedia(
-            @PathVariable String contextId) {
+            @PathVariable String contextId,
+            @Parameter(description = "Media type to delete (optional)")
+            @RequestParam(required = false) String mediaType) {
         
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
@@ -103,7 +108,7 @@ public class HistoricalContextMediaController {
         
         log.info("DELETE /api/v1/contexts/{}/media by user {}", contextId, userId);
         
-        mediaService.deleteMedia(contextUuid, EntityType.CONTEXT, userId, userRole);
+        mediaService.deleteMedia(contextUuid, EntityType.CONTEXT, mediaType, userId, userRole);
         
         return ResponseEntity.noContent().build();
     }

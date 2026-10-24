@@ -3,7 +3,8 @@
 > **Base URL:** `http://localhost:8080/Historical-tell`  
 > **Auth:** Bearer JWT required for all endpoints  
 > **Viết cho:** Frontend (Thành) & Mobile (nếu cần)  
-> **Last updated:** 20/10/2026 — v4 (Full Feature Parity: Giáo viên và Trường học sở hữu 100% tính năng như Content Admin: Battle Map, Sửa tài liệu, Gắn kết Nhân vật - Bối cảnh động, Thùng rác trường học & Khôi phục, Ngân hàng Quiz & Câu hỏi, Map Pins & Focuses, Bảo mật cách ly phòng Chat)
+> **Last updated:** 24/10/2026 — v5 (Upload video cho giáo viên, phân quyền sở hữu media, chặn học sinh lọc `classId` lớp khác, kiểm tra lớp khi gán, chat & kịch bản tôn trọng `CLASS_ONLY` — xem mục 58)  
+> v4 — 20/10/2026 (Full Feature Parity: Battle Map, Sửa tài liệu, Gắn kết Nhân vật - Bối cảnh động, Thùng rác trường học & Khôi phục, Ngân hàng Quiz & Câu hỏi, Map Pins & Focuses, Bảo mật cách ly phòng Chat)
 
 ---
 
@@ -711,6 +712,32 @@ Content-Type: multipart/form-data
 
 ---
 
+### 27b. Tải video nhanh (Standalone Video Upload trước khi tạo / sửa bối cảnh) — 🆕 v5
+```
+POST /api/v1/teacher/local-contents/media/upload-video
+Authorization: Bearer {TEACHER_TOKEN}
+Content-Type: multipart/form-data
+```
+
+**Form Data:**
+- `file`: File video (`MP4`, `WebM`, `Ogg`, `MOV`, tối đa **50 MB**). Nếu trình duyệt gửi `application/octet-stream`, backend nhận diện theo đuôi file.
+
+**Response `200 OK`:**
+```json
+{
+  "success": true,
+  "message": "Video uploaded successfully",
+  "data": {
+    "url": "https://...supabase.co/storage/v1/object/public/documents/videos/{userId}/{uuid}.mp4"
+  }
+}
+```
+> 💡 *Sử dụng:* Thay cho ô nhập URL text — FE upload file, lấy `data.url` gán vào `videoUrl` khi gọi `POST /contexts` hoặc `PUT /contexts/{id}`. Với bối cảnh **đã tồn tại**, nên dùng mục 28 (`mediaType=VIDEO`) để backend tự lưu metadata và thay video cũ.
+
+**Lỗi `400`:** file rỗng, không phải video, hoặc vượt 50 MB (`Kích thước file không được vượt quá 50MB`).
+
+---
+
 ### 28. Tải trực tiếp Media cho bối cảnh địa phương (Context Media Upload)
 ```
 POST /api/v1/historical-contexts/{contextId}/media/upload-direct?mediaType=IMAGE_2D
@@ -720,12 +747,18 @@ Content-Type: multipart/form-data
 ```
 
 **Query Params:**
-- `mediaType`: `IMAGE_2D` (ảnh tối đa 10MB) hoặc `VIDEO` (video tối đa 100MB).
+- `mediaType`: `IMAGE_2D` (ảnh tối đa 10MB) hoặc `VIDEO` (video `MP4`/`WebM`/`Ogg`/`MOV` tối đa **50MB** — giới hạn bởi `spring.servlet.multipart.max-file-size`).
 - `width`: integer (optional).
 - `height`: integer (optional).
 
 **Form Data:**
 - `file`: File nhị phân (`file`).
+
+**Quy tắc (v5):**
+- `TEACHER` chỉ upload được lên bối cảnh **do chính mình tạo**; `SCHOOL_ADMIN` lên mọi bối cảnh của trường mình; nội dung toàn quốc (Platform) chỉ Content/System Admin. Vi phạm → `403`.
+- Mỗi bối cảnh giữ **1 file cho mỗi `mediaType`**: upload lại `VIDEO` sẽ thay video cũ (file cũ bị xóa khỏi storage).
+- `VIDEO` chỉ áp dụng cho bối cảnh; gửi `mediaType=VIDEO` lên nhân vật → `400`.
+- `storagePath` có dạng `CONTEXT/{contextId}/{8 ký tự ngẫu nhiên}_{tên-file-đã-làm-sạch}` (ký tự lạ / `../` bị thay bằng `_`).
 
 **Response `200 OK`:**
 ```json
@@ -751,10 +784,15 @@ Content-Type: multipart/form-data
 
 ### 29. Xóa Media khỏi bối cảnh địa phương
 ```
-DELETE /api/v1/historical-contexts/{contextId}/media
-(Hoặc: DELETE /api/v1/teacher/local-contents/contexts/{contextId}/media)
+DELETE /api/v1/historical-contexts/{contextId}/media?mediaType=VIDEO
+(Hoặc: DELETE /api/v1/teacher/local-contents/contexts/{contextId}/media?mediaType=VIDEO)
 Authorization: Bearer {TEACHER_TOKEN}
 ```
+
+**Query Params (v5):**
+- `mediaType` *(optional)*: `IMAGE_2D` | `VIDEO`. Có truyền → chỉ xóa loại đó và set `imageUrl`/`videoUrl` = `null` (kể cả URL nhập tay, ví dụ link YouTube). Bỏ trống → xóa toàn bộ media (hành vi cũ, trả `404` nếu bối cảnh chưa có media nào).
+
+**Xem signed URL:** `GET .../contexts/{contextId}/media/view-url?mediaType=VIDEO` — `mediaType` optional, bỏ trống sẽ lấy media upload gần nhất. Media của nội dung trường chỉ người cùng trường xem được (người ngoài nhận `404`).
 
 ---
 
@@ -793,10 +831,12 @@ Content-Type: multipart/form-data
 
 ### 31. Xóa Media khỏi nhân vật địa phương
 ```
-DELETE /api/v1/characters/{characterId}/media
-(Hoặc: DELETE /api/v1/teacher/local-contents/characters/{characterId}/media)
+DELETE /api/v1/characters/{characterId}/media?mediaType=MODEL_3D
+(Hoặc: DELETE /api/v1/teacher/local-contents/characters/{characterId}/media?mediaType=MODEL_3D)
 Authorization: Bearer {TEACHER_TOKEN}
 ```
+- `mediaType` *(optional, v5)*: `IMAGE_2D` | `MODEL_3D`. Bỏ trống → xóa toàn bộ media của nhân vật.
+- Quy tắc sở hữu giống mục 28 (TEACHER chỉ nhân vật mình tạo).
 
 ---
 
@@ -1330,14 +1370,8 @@ Giáo viên (`TEACHER`) và `SCHOOL_ADMIN` được cấp quyền quản lý b�
 - **Quyền hạn truy cập chat (`POST /api/v1/chat/sessions`):**
   - **Học sinh trường (`SCHOOL_STUDENT`):** Chỉ được chat với nhân vật/bối cảnh toàn cầu HOẶC nhân vật/bối cảnh của chính trường học mình đang theo học.
   - **Giáo viên trường (`TEACHER`):** Chỉ được chat với nhân vật/bối cảnh toàn cầu HOẶC nhân vật/bối cảnh của trường mình.
-  - **Người dùng khác (`CUSTOMER`, học sinh trường khác, v.v.):** Cố tình tạo phòng chat với nhân vật/bối cảnh địa phương của một trường sẽ nhận lỗi `403 FORBIDDEN` ngay lập tức:
-    ```json
-    {
-      "success": false,
-      "message": "Access denied: Character/Context belongs to another educational institution",
-      "data": null
-    }
-    ```
+  - **Người dùng khác (`CUSTOMER`, học sinh trường khác, v.v.):** Cố tình tạo phòng chat với nhân vật địa phương của trường khác sẽ nhận `404 NOT_FOUND` (`Không tìm thấy nhân vật với ID: ...`) — không lộ sự tồn tại của ID. Nếu chỉ `contextId` thuộc trường khác, backend bỏ qua context đó (phiên chat tạo không kèm bối cảnh).
+  - **Nội dung `CLASS_ONLY` (v5):** chỉ học sinh **đang học trong lớp được gán**, giáo viên **tác giả**, và `SCHOOL_ADMIN` của trường mới chat được. Học sinh lớp khác / giáo viên khác cùng trường → nhân vật trả `404`, bối cảnh bị bỏ qua.
 
 ---
 
@@ -1365,8 +1399,31 @@ Giáo viên (`TEACHER`) và `SCHOOL_ADMIN` được cấp quyền quản lý b�
     2. **`CLASS_ONLY`**: **CHỈ hiển thị cho học sinh thuộc các lớp được gán** (kiểm tra liên kết qua bảng `class_student` của học sinh với `class_local_content` của bối cảnh/nhân vật).
 - **Bộ lọc theo lớp (`?classId=...`):**
   - Khi học sinh hoặc giao diện lớp lọc theo `classId`, backend trả về nội dung `CLASS_ONLY` được gán cho chính lớp đó hoặc nội dung `SCHOOL_WIDE` toàn trường.
+  - **v5:** `classId` bắt buộc là lớp học sinh **đang theo học (ACTIVE)**. Truyền lớp khác → `403` (`Bạn không thuộc lớp học này`); `classId` sai định dạng UUID → `400`.
 - **Truy cập chi tiết theo ID (`/api/v1/student/local-contents/contexts/{id}`):**
   - Nếu nội dung là `CLASS_ONLY`, học sinh truy cập bắt buộc phải đang theo học tại một trong những lớp được giáo viên gán. Nếu không thuộc lớp được gán, hệ thống chặn với mã `403 FORBIDDEN` (`You do not have access to this class-only local content`).
+
+---
+
+### 58. Thay đổi v5 (24/10/2026) — Video & siết phân quyền
+
+| # | Thay đổi | Ảnh hưởng FE |
+|---|----------|--------------|
+| 1 | `mediaType=VIDEO` cho `POST .../contexts/{id}/media/upload-direct` (MP4/WebM/Ogg/MOV ≤ 50MB), tự cập nhật `videoUrl` | Thêm nút chọn file video ở form sửa bối cảnh |
+| 2 | Endpoint mới `POST /api/v1/teacher/local-contents/media/upload-video` trả `{ url }` | Dùng ở form tạo mới (chưa có `contextId`) |
+| 3 | `view-url` & `DELETE .../media` nhận `mediaType` optional; xóa có `mediaType` thì chỉ xóa loại đó | Nút "Xóa video" gọi `DELETE ...?mediaType=VIDEO` để không mất ảnh bìa |
+| 4 | Upload/xóa media kiểm tra quyền sở hữu: TEACHER chỉ nội dung mình tạo, SCHOOL_ADMIN nội dung trường mình, nội dung Platform chỉ admin Platform | Xử lý `403` |
+| 5 | Upload lại cùng `mediaType` thay file cũ (trước đây tạo thêm bản ghi → `view-url`/`DELETE` lỗi 500 khi có ≥ 2 media) | Không cần thay đổi |
+| 6 | Học sinh lọc `?classId=` của lớp không học → `403` | Chỉ hiển thị dropdown lớp của học sinh |
+| 7 | `classIds` khi tạo/sửa nội dung phải là lớp (chưa xóa) của trường giáo viên; `classIds` trùng được gộp; sai UUID → `400` | Xử lý `400` |
+| 8 | Chat: nội dung `CLASS_ONLY` chỉ lớp được gán / tác giả / School Admin | Xử lý `404` khi mở chat |
+| 9 | `/api/v1/chat/scenarios`: cả nhân vật **và** bối cảnh đều phải là Platform hoặc `SCHOOL_WIDE` của trường mình (trước đây nhân vật `SCHOOL_WIDE` + bối cảnh `CLASS_ONLY` vẫn lọt vào danh sách) | Không cần thay đổi |
+| 10 | Thùng rác giáo viên (`/trash/contexts`, `/trash/characters`): chỉ liệt kê nội dung **mình tạo**; `restore` / `permanent` nội dung của GV khác → `403` (trước đây mọi GV cùng trường đều khôi phục/xóa vĩnh viễn được) | Xử lý `403` |
+| 11 | Xóa vĩnh viễn dọn luôn gán lớp (`class_local_content`) và media (metadata + file storage) của nội dung | Không cần thay đổi |
+
+**Ghi chú hành vi giữ nguyên:**
+- `classIds` = `null` hoặc `[]` khi `PUT` → **giữ nguyên** danh sách lớp cũ (kể cả khi đổi `SCHOOL_WIDE` → `CLASS_ONLY`). Muốn đổi lớp phải gửi danh sách mới khác rỗng.
+- Nội dung đã xóa mềm không hiển thị với học sinh (lọc `deletedAt IS NULL`); liên kết `class_local_content` được giữ để khôi phục từ thùng rác vẫn còn lớp cũ. Chỉ khi xóa vĩnh viễn liên kết mới bị xóa.
 
 ---
 
