@@ -20,6 +20,8 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.historytalk.repository.assignment.AssignmentRepository;
 import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
+import com.historytalk.repository.assignment.AssignmentSubmissionBatchStatsProjection;
+import com.historytalk.entity.character.Character;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
 import com.historytalk.security.UserPrincipal;
@@ -167,6 +169,76 @@ class TeacherAssignmentServiceImplTest {
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
         assertEquals("Bài tập 1", result.getContent().get(0).getTitle());
+    }
+
+    @Test
+    @DisplayName("Lấy danh sách bài tập của lớp với batch submission stats và target titles")
+    void testGetAssignmentsByClassroom_WithBatchStatsAndTargetTitles() {
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId))
+                .thenReturn(Optional.of(classroom));
+
+        UUID quizId = UUID.randomUUID();
+        UUID charId = UUID.randomUUID();
+        UUID assign1 = UUID.randomUUID();
+        UUID assign2 = UUID.randomUUID();
+
+        Assignment a1 = Assignment.builder()
+                .id(assign1)
+                .classroom(classroom)
+                .title("Bài tập Quiz")
+                .assignmentType(AssignmentType.QUIZ_TEST)
+                .targetId(quizId)
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        Assignment a2 = Assignment.builder()
+                .id(assign2)
+                .classroom(classroom)
+                .title("Bài tập AI Roleplay")
+                .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
+                .targetId(charId)
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        when(assignmentRepository.findAssignmentsByClassroomAndOptionalStatus(eq(classroomId), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(a1, a2)));
+
+        AssignmentSubmissionBatchStatsProjection stats1 = org.mockito.Mockito.mock(AssignmentSubmissionBatchStatsProjection.class);
+        when(stats1.getAssignmentId()).thenReturn(assign1);
+        when(stats1.getTotalSubmissions()).thenReturn(30L);
+        when(stats1.getSubmittedCount()).thenReturn(20L);
+        when(stats1.getLateSubmittedCount()).thenReturn(5L);
+        when(stats1.getInProgressCount()).thenReturn(2L);
+        when(stats1.getNotStartedCount()).thenReturn(3L);
+
+        when(assignmentSubmissionRepository.getSubmissionStatsByAssignmentIds(any()))
+                .thenReturn(List.of(stats1));
+
+        Quiz quiz = Quiz.builder().quizId(quizId).title("Kiểm tra Sử 10").build();
+        when(quizRepository.findAllById(any())).thenReturn(List.of(quiz));
+
+        Character character = Character.builder().characterId(charId).name("Trần Hưng Đạo").build();
+        when(characterRepository.findAllById(any())).thenReturn(List.of(character));
+
+        PaginatedResponse<TeacherAssignmentResponse> result = teacherAssignmentService.getAssignmentsByClassroom(
+                classroomId, null, PageRequest.of(0, 10), teacherPrincipal);
+
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+
+        TeacherAssignmentResponse resp1 = result.getContent().get(0);
+        assertEquals("Bài tập Quiz", resp1.getTitle());
+        assertEquals("Kiểm tra Sử 10", resp1.getTargetTitle());
+        assertEquals(30L, resp1.getTotalStudents());
+        assertEquals(20L, resp1.getSubmittedCount());
+        assertEquals(5L, resp1.getLateSubmittedCount());
+        assertEquals(2L, resp1.getInProgressCount());
+        assertEquals(3L, resp1.getNotStartedCount());
+
+        TeacherAssignmentResponse resp2 = result.getContent().get(1);
+        assertEquals("Bài tập AI Roleplay", resp2.getTitle());
+        assertEquals("Trần Hưng Đạo", resp2.getTargetTitle());
+        assertEquals(0L, resp2.getTotalStudents());
     }
 
     @Test

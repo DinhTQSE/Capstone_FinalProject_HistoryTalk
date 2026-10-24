@@ -5,12 +5,14 @@ import com.historytalk.repository.dashboard.DashboardPeriodCountProjection;
 import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
 import com.historytalk.repository.dashboard.DashboardTokenTrendProjection;
 import com.historytalk.repository.dashboard.DashboardTopTokenUserProjection;
+import com.historytalk.repository.dashboard.StudentMessageCountProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -258,6 +260,16 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
               AND m.deleted_at IS NULL
             """, nativeQuery = true)
     long countMessagesByStudentUids(@Param("studentUids") List<UUID> studentUids);
+
+    @Query(value = """
+            SELECT cs.uid AS "studentUid", COUNT(m.message_id) AS "messageCount"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE cs.uid IN (:studentUids)
+              AND m.deleted_at IS NULL
+            GROUP BY cs.uid
+            """, nativeQuery = true)
+    List<StudentMessageCountProjection> countMessagesGroupByStudentUids(@Param("studentUids") Collection<UUID> studentUids);
 
     @Query(value = """
             SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)

@@ -17,6 +17,8 @@ import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
 import com.historytalk.repository.dashboard.DashboardTopWrongQuestionProjection;
 import com.historytalk.repository.dashboard.DashboardUserTopCharacterProjection;
+import com.historytalk.repository.dashboard.StudentQuizSummaryProjection;
+import com.historytalk.repository.dashboard.StudentMessageCountProjection;
 import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.repository.school.SchoolRepository;
@@ -370,14 +372,25 @@ class AnalyticsDashboardServiceImplTest {
                 .thenReturn(List.of(studentUser.getUid()));
         when(userRepository.findAllById(List.of(studentUser.getUid())))
                 .thenReturn(List.of(studentUser));
-        when(quizSessionRepository.countByUser_UidAndEndTimeIsNotNullAndDeletedAtIsNull(studentUser.getUid()))
-                .thenReturn(5L);
-        when(quizSessionRepository.averageScorePercentageByUser(studentUser.getUid()))
-                .thenReturn(85.5);
-        when(messageRepository.countMessagesByUser(studentUser.getUid()))
-                .thenReturn(42L);
-        when(messageRepository.countMessagesByStudentUids(List.of(studentUser.getUid())))
-                .thenReturn(42L);
+        StudentQuizSummaryProjection quizSummary = org.mockito.Mockito.mock(StudentQuizSummaryProjection.class);
+        when(quizSummary.getStudentUid()).thenReturn(studentUser.getUid());
+        when(quizSummary.getQuizzesAttempted()).thenReturn(5L);
+        when(quizSummary.getAverageScorePercentage()).thenReturn(85.5);
+        when(quizSessionRepository.findQuizSummariesByStudentUids(List.of(studentUser.getUid())))
+                .thenReturn(List.of(quizSummary));
+
+        StudentMessageCountProjection msgCount = org.mockito.Mockito.mock(StudentMessageCountProjection.class);
+        when(msgCount.getStudentUid()).thenReturn(studentUser.getUid());
+        when(msgCount.getMessageCount()).thenReturn(42L);
+        when(messageRepository.countMessagesGroupByStudentUids(List.of(studentUser.getUid())))
+                .thenReturn(List.of(msgCount));
+
+
+
+
+
+
+
 
         TeacherClassroomDashboardResponse response = dashboardService.getTeacherClassroomDashboard(classId, teacherPrincipal);
 

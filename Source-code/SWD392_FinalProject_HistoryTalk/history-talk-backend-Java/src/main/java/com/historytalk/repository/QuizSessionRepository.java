@@ -2,6 +2,7 @@ package com.historytalk.repository;
 
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.repository.dashboard.DashboardQuizTrendProjection;
+import com.historytalk.repository.dashboard.StudentQuizSummaryProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -145,6 +147,30 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
               AND qs.uid = :uid
             """, nativeQuery = true)
     Double averageScorePercentageByUser(@Param("uid") UUID uid);
+
+    @Query(value = """
+            SELECT 
+                qs.uid AS "studentUid",
+                COUNT(qs.session_id) AS "quizzesAttempted",
+                COALESCE(AVG(
+                    CASE
+                        WHEN qs.score IS NOT NULL AND qc.question_count > 0
+                        THEN qs.score * 100.0 / qc.question_count
+                    END
+                ), 0.0) AS "averageScorePercentage"
+            FROM quiz_session qs
+            LEFT JOIN (
+                SELECT quiz_id, COUNT(*) AS question_count
+                FROM question
+                WHERE deleted_at IS NULL
+                GROUP BY quiz_id
+            ) qc ON qc.quiz_id = qs.quiz_id
+            WHERE qs.deleted_at IS NULL
+              AND qs.end_time IS NOT NULL
+              AND qs.uid IN (:studentUids)
+            GROUP BY qs.uid
+            """, nativeQuery = true)
+    List<StudentQuizSummaryProjection> findQuizSummariesByStudentUids(@Param("studentUids") Collection<UUID> studentUids);
 
     @Query("""
             SELECT s FROM QuizSession s
