@@ -5,6 +5,8 @@ import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.repository.dashboard.ClassroomTokenUsageProjection;
 import com.historytalk.repository.dashboard.StudentTokenUsageDetailProjection;
 import com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection;
+import com.historytalk.repository.dashboard.StudentQuizSummaryProjection;
+import com.historytalk.repository.dashboard.StudentMessageCountProjection;
 import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +42,7 @@ import java.lang.management.ManagementFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -208,12 +211,23 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
 
         LocalDate today = LocalDate.now();
         List<TeacherClassroomDashboardResponse.StudentAnalyticsItem> studentItems = new ArrayList<>();
+        long totalAiMessages = 0L;
         if (!studentUids.isEmpty()) {
             List<User> students = userRepository.findAllById(studentUids);
+
+            Map<UUID, StudentQuizSummaryProjection> quizStatsMap = quizSessionRepository
+                    .findQuizSummariesByStudentUids(studentUids).stream()
+                    .collect(Collectors.toMap(StudentQuizSummaryProjection::getStudentUid, Function.identity(), (k1, k2) -> k1));
+
+            Map<UUID, Long> messageCountMap = messageRepository
+                    .countMessagesGroupByStudentUids(studentUids).stream()
+                    .collect(Collectors.toMap(StudentMessageCountProjection::getStudentUid, StudentMessageCountProjection::getMessageCount, (k1, k2) -> k1));
             for (User student : students) {
-                long quizzes = quizSessionRepository.countByUser_UidAndEndTimeIsNotNullAndDeletedAtIsNull(student.getUid());
-                Double avgScore = quizSessionRepository.averageScorePercentageByUser(student.getUid());
-                long aiMessages = messageRepository.countMessagesByUser(student.getUid());
+                StudentQuizSummaryProjection quizStat = quizStatsMap.get(student.getUid());
+                long quizzes = quizStat != null && quizStat.getQuizzesAttempted() != null ? quizStat.getQuizzesAttempted() : 0L;
+                Double avgScore = quizStat != null ? quizStat.getAverageScorePercentage() : 0.0;
+                long aiMessages = messageCountMap.getOrDefault(student.getUid(), 0L);
+                totalAiMessages += aiMessages;
 
                 boolean isSameDay = student.getLastTokenResetAt() != null
                         && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
@@ -241,7 +255,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             }
         }
 
-        long totalAiMessages = studentUids.isEmpty() ? 0L : messageRepository.countMessagesByStudentUids(studentUids);
+
         double avgAiMessages = studentCount > 0 ? (double) totalAiMessages / studentCount : 0.0;
 
         com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection classStats =

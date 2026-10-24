@@ -86,4 +86,19 @@ public interface AssignmentSubmissionRepository extends JpaRepository<Assignment
               AND a.deleted_at IS NULL
             """, nativeQuery = true)
     AssignmentSubmissionStatsProjection getSubmissionStatsByClassroomId(@Param("classroomId") UUID classroomId);
+
+    @Query(value = """
+            SELECT
+                s.assignment_id AS "assignmentId",
+                COUNT(s.id) AS "totalSubmissions",
+                COUNT(CASE WHEN s.status = 'SUBMITTED' THEN 1 END) AS "submittedCount",
+                COUNT(CASE WHEN s.status = 'LATE_SUBMITTED' THEN 1 END) AS "lateSubmittedCount",
+                COUNT(CASE WHEN s.status = 'NOT_STARTED' THEN 1 END) AS "notStartedCount",
+                COUNT(CASE WHEN s.status = 'IN_PROGRESS' THEN 1 END) AS "inProgressCount",
+                COUNT(CASE WHEN s.status = 'MISSED' THEN 1 END) AS "missedCount"
+            FROM assignment_submission s
+            WHERE s.assignment_id IN (:assignmentIds)
+            GROUP BY s.assignment_id
+            """, nativeQuery = true)
+    List<AssignmentSubmissionBatchStatsProjection> getSubmissionStatsByAssignmentIds(@Param("assignmentIds") Collection<UUID> assignmentIds);
 }

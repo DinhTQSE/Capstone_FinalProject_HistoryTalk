@@ -20,6 +20,7 @@ import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.assignment.AssignmentRepository;
 import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
+import com.historytalk.repository.assignment.AssignmentSubmissionBatchStatsProjection;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
 import com.historytalk.security.UserPrincipal;
@@ -34,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -150,9 +153,82 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         Page<Assignment> page = assignmentRepository.findAssignmentsByClassroomAndOptionalStatus(
                 classroomId, status, pageable);
 
-        List<TeacherAssignmentResponse> content = page.getContent().stream()
-                .map(a -> mapToTeacherAssignmentResponse(a, classroom.getClassName()))
-                .toList();
+        List<Assignment> assignments = page.getContent();
+        List<TeacherAssignmentResponse> content;
+
+        if (assignments.isEmpty()) {
+            content = Collections.emptyList();
+        } else {
+            List<UUID> assignmentIds = assignments.stream().map(Assignment::getId).toList();
+
+            Map<UUID, AssignmentSubmissionBatchStatsProjection> statsMap = assignmentSubmissionRepository
+                    .getSubmissionStatsByAssignmentIds(assignmentIds).stream()
+                    .collect(Collectors.toMap(AssignmentSubmissionBatchStatsProjection::getAssignmentId, Function.identity(), (k1, k2) -> k1));
+
+            Set<UUID> contextIds = assignments.stream()
+                    .filter(a -> a.getAssignmentType() == AssignmentType.CONTEXT_READING && a.getTargetId() != null)
+                    .map(Assignment::getTargetId)
+                    .collect(Collectors.toSet());
+            Map<UUID, String> contextMap = contextIds.isEmpty() ? Collections.emptyMap() :
+                    historicalContextRepository.findAllById(contextIds).stream()
+                            .collect(Collectors.toMap(HistoricalContext::getContextId, HistoricalContext::getName, (k1, k2) -> k1));
+
+            Set<UUID> charIds = assignments.stream()
+                    .filter(a -> a.getAssignmentType() == AssignmentType.AI_CHAT_ROLEPLAY && a.getTargetId() != null)
+                    .map(Assignment::getTargetId)
+                    .collect(Collectors.toSet());
+            Map<UUID, String> charMap = charIds.isEmpty() ? Collections.emptyMap() :
+                    characterRepository.findAllById(charIds).stream()
+                            .collect(Collectors.toMap(Character::getCharacterId, Character::getName, (k1, k2) -> k1));
+
+            Set<UUID> quizIds = assignments.stream()
+                    .filter(a -> a.getAssignmentType() == AssignmentType.QUIZ_TEST && a.getTargetId() != null)
+                    .map(Assignment::getTargetId)
+                    .collect(Collectors.toSet());
+            Map<UUID, String> quizMap = quizIds.isEmpty() ? Collections.emptyMap() :
+                    quizRepository.findAllById(quizIds).stream()
+                            .collect(Collectors.toMap(Quiz::getQuizId, Quiz::getTitle, (k1, k2) -> k1));
+
+            content = assignments.stream().map(a -> {
+                AssignmentSubmissionBatchStatsProjection stats = statsMap.get(a.getId());
+                long total = stats != null && stats.getTotalSubmissions() != null ? stats.getTotalSubmissions() : 0L;
+                long submitted = stats != null && stats.getSubmittedCount() != null ? stats.getSubmittedCount() : 0L;
+                long late = stats != null && stats.getLateSubmittedCount() != null ? stats.getLateSubmittedCount() : 0L;
+                long inProgress = stats != null && stats.getInProgressCount() != null ? stats.getInProgressCount() : 0L;
+                long notStarted = stats != null && stats.getNotStartedCount() != null ? stats.getNotStartedCount() : 0L;
+
+                String targetTitle = "Nội dung bài tập";
+                if (a.getAssignmentType() != null && a.getTargetId() != null) {
+                    switch (a.getAssignmentType()) {
+                        case CONTEXT_READING -> targetTitle = contextMap.getOrDefault(a.getTargetId(), "Unknown Context");
+                        case AI_CHAT_ROLEPLAY -> targetTitle = charMap.getOrDefault(a.getTargetId(), "Unknown Character");
+                        case QUIZ_TEST -> targetTitle = quizMap.getOrDefault(a.getTargetId(), "Unknown Quiz");
+                    }
+                }
+
+                return TeacherAssignmentResponse.builder()
+                        .assignmentId(a.getId())
+                        .classroomId(a.getClassroom().getId())
+                        .className(classroom.getClassName())
+                        .title(a.getTitle())
+                        .description(a.getDescription())
+                        .assignmentType(a.getAssignmentType())
+                        .targetId(a.getTargetId())
+                        .targetTitle(targetTitle)
+                        .deadline(a.getDeadline())
+                        .minRequirement(a.getMinRequirement())
+                        .status(a.getStatus())
+                        .totalStudents(total)
+                        .submittedCount(submitted)
+                        .lateSubmittedCount(late)
+                        .inProgressCount(inProgress)
+                        .notStartedCount(notStarted)
+                        .createdAt(a.getCreatedAt())
+                        .build();
+            }).toList();
+        }
+
+
 
         return PaginatedResponse.<TeacherAssignmentResponse>builder()
                 .content(content)
@@ -195,6 +271,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                         .submittedAt(sub.getSubmittedAt())
                         .build())
                 .toList();
+
 
         int submittedCount = (int) submissions.stream()
                 .filter(s -> s.getStatus() == SubmissionStatus.SUBMITTED || s.getStatus() == SubmissionStatus.LATE_SUBMITTED)
