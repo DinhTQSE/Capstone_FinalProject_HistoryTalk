@@ -10,13 +10,14 @@ _ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(dotenv_path=_ENV_PATH)
 
 logging.getLogger("uvicorn.access").addFilter(
-    lambda record: "/health" not in record.getMessage()
+    lambda record: "/health" not in record.getMessage() and "/metrics" not in record.getMessage()
 )
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from history_talk_ai.common.config.settings import settings
+from history_talk_ai.common.metrics import PrometheusMetricsMiddleware, metrics_endpoint
 from history_talk_ai.presentation.chat import router as chat_router
 
 app = FastAPI(
@@ -32,6 +33,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(PrometheusMetricsMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -46,3 +48,8 @@ app.include_router(chat_router.router)
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok", "llm_model": settings.LLM_MODEL}
+
+
+@app.get("/metrics", tags=["Monitoring"], include_in_schema=True)
+async def metrics():
+    return metrics_endpoint()

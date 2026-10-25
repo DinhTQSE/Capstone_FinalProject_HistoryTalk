@@ -326,6 +326,7 @@ public class MessageServiceImpl implements MessageService {
                         messageRepository.save(assistantMsg);
 
                         int totalToken = promptToken.get() + completionToken.get();
+                        aiServiceClient.recordStreamTokens(promptToken.get(), completionToken.get());
                         int remainingTokens = session.getUser().getToken() != null ? session.getUser().getToken() : 0;
                         if (totalToken > 0) {
                             if (session.getUser().getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER) {

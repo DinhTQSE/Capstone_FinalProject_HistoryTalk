@@ -45,6 +45,7 @@
 
 ### 3. 📂 Implemented Plans (Kế hoạch Triển khai Chi tiết):
 * 📋 **[school_subscription_daily_token_and_lifecycle_plan.md](implemented_plan/school_subscription_daily_token_and_lifecycle_plan.md):** Kế hoạch chi tiết triển khai Flyway Migrations (`V38`, `V39`, `V40`), Pure Shared Pool Pay-As-You-Go, Hạn mức Giáo viên & Cấp Token trực tiếp / Ticket Admin, Upload PDF cho Teacher, và Sửa lỗi Dashboard/Classrooms (`US-SP7-14` ~ `US-SP7-20`).
+* 📋 **[prometheus_grafana_full_system_monitoring_plan.md](implemented_plan/prometheus_grafana_full_system_monitoring_plan.md):** Kế hoạch chi tiết triển khai giám sát toàn hệ thống (Full-System Observability) với Prometheus, Grafana (10 Panels), Spring Boot Actuator Micrometer (bao gồm SSE Streaming & RAG Document Metrics), và FastAPI Prometheus Exporter.
 
 ### 4. 📦 FE Contracts (API Contract cho Frontend):
 * 📑 **[school_subscription_daily_token_and_lifecycle_api_contract.md](fe_contracts/school_subscription_daily_token_and_lifecycle_api_contract.md):** Đặc tả chi tiết các REST API endpoints cho Chu kỳ Gói Trường học, Cấu hình Hạn mức Ngày (Học sinh & Giáo viên), Luồng Cấp Token & Ticket cho cả 3 Role, API Upload PDF của Giáo viên, và Chuyển giao Năm học.

@@ -58,7 +58,7 @@ public class SecurityConfig {
     private final OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler;
 
-    @Value("${monitoring.allowed-ips:127.0.0.1,0:0:0:0:0:0:0:1}")
+    @Value("${monitoring.allowed-ips:127.0.0.1,0:0:0:0:0:0:0:1,172.16.0.0/12,172.17.0.0/16,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16}")
     private String monitoringAllowedIps;
 
     @Bean
@@ -82,12 +82,12 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher("/actuator/**")
+                .securityMatcher("/actuator/**", "/Historical-tell/actuator/**")
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers("/actuator/prometheus")
+                        .requestMatchers("/actuator/health", "/Historical-tell/actuator/health", "/actuator/info", "/Historical-tell/actuator/info").permitAll()
+                        .requestMatchers("/actuator/prometheus", "/Historical-tell/actuator/prometheus")
                         .access((authentication, context) ->
                                 new AuthorizationDecision(isMonitoringIpAllowed(context.getRequest())))
                         .anyRequest().denyAll()
