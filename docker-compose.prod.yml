@@ -88,6 +88,63 @@ services:
       timeout: 10s
       retries: 3
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: historytalk-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./Source-code/SWD392_FinalProject_HistoryTalk/monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - historytalk-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: historytalk-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "https://historytalk.app/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./Source-code/SWD392_FinalProject_HistoryTalk/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./Source-code/SWD392_FinalProject_HistoryTalk/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - historytalk-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
   caddy:
     image: caddy:2-alpine
     container_name: historytalk-caddy
@@ -114,3 +171,5 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  prometheus_data:
+  grafana_data:
