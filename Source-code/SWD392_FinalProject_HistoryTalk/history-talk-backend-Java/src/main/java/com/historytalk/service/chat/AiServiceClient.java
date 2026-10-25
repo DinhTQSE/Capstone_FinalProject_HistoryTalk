@@ -244,6 +244,7 @@ public class AiServiceClient {
                             try (Stream<String> lines = response.body()) {
                                 errorBody = lines.collect(java.util.stream.Collectors.joining("\n"));
                             } catch (Exception ignored) {}
+                            aiMetricsService.recordRequest("chat_stream", "failure");
                             onError.accept(new SystemException("AI streaming failed with status " + response.statusCode() + ". Body: " + errorBody));
                             return;
                         }
@@ -257,9 +258,11 @@ public class AiServiceClient {
                             onError.accept(e);
                             return;
                         }
+                        aiMetricsService.recordRequest("chat_stream", "success");
                         onComplete.run();
                     })
                     .exceptionally(ex -> {
+                        aiMetricsService.recordRequest("chat_stream", "failure");
                         onError.accept(ex);
                         return null;
                     });
@@ -326,8 +329,10 @@ public class AiServiceClient {
                                         .body(request)
                                         .retrieve()
                                         .toBodilessEntity();
+                        aiMetricsService.recordRequest("process_document", "success");
                         log.info("Successfully sent document {} for AI processing", docId);
                 } catch (RestClientException e) {
+                        aiMetricsService.recordRequest("process_document", "failure");
                         log.error("AI service /documents/process call failed for doc {}: {}", docId, e.getMessage());
                 }
         }
@@ -344,8 +349,10 @@ public class AiServiceClient {
                                         .uri("/v1/ai/documents/" + docId)
                                         .retrieve()
                                         .toBodilessEntity();
+                        aiMetricsService.recordRequest("delete_document", "success");
                         log.info("Successfully requested AI deletion for document {}", docId);
                 } catch (RestClientException e) {
+                        aiMetricsService.recordRequest("delete_document", "failure");
                         log.error("AI service DELETE /documents call failed for doc {}: {}", docId, e.getMessage());
                 }
         }
@@ -353,6 +360,13 @@ public class AiServiceClient {
         /**
          * Build CharacterPayload from a Character entity.
          */
+        public void recordStreamTokens(int promptTokens, int completionTokens) {
+                if (promptTokens > 0 || completionTokens > 0) {
+                        aiMetricsService.recordTokens(new AiMetricsService.TokenUsage(
+                                        "ollama", "gemma2", promptTokens, completionTokens, promptTokens + completionTokens));
+                }
+        }
+
         public static CharacterPayload buildCharacterPayload(com.historytalk.entity.character.Character c) {
                 String born = "";
                 if (c.getBornYear() != null) {

@@ -148,3 +148,13 @@ springdoc.api-docs.path=/api/v1/api-docs
 springdoc.swagger-ui.path=/api/v1/swagger-ui
 springdoc.swagger-ui.enabled=true
 springdoc.enable-kotlin=false
+
+# =============================================================================
+# Observability / Actuator & Prometheus
+# =============================================================================
+management.endpoints.web.exposure.include=health,info,prometheus
+management.endpoint.health.show-details=never
+management.prometheus.metrics.export.enabled=true
+management.metrics.tags.application=${spring.application.name}
+management.metrics.distribution.percentiles-histogram.http.server.requests=true
+monitoring.allowed-ips=${MONITORING_ALLOWED_IPS:127.0.0.1,0:0:0:0:0:0:0:1,172.16.0.0/12,172.17.0.0/16,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16}
