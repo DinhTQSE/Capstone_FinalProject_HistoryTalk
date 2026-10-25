@@ -43,6 +43,7 @@ services:
       - historytalk-net
     environment:
       - AI_SERVICE_URL=http://historytalk-ai:8001
+      - MONITORING_ALLOWED_IPS=127.0.0.1,0:0:0:0:0:0:0:1,172.16.0.0/12,172.17.0.0/16,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16
     logging:
       driver: "json-file"
       options:
@@ -159,10 +160,9 @@ services:
     networks:
       - historytalk-net
     depends_on:
-      historytalk-java:
-        condition: service_healthy
-      historytalk-ai:
-        condition: service_healthy
+      - historytalk-java
+      - historytalk-ai
+      - grafana
 
 networks:
   historytalk-net:

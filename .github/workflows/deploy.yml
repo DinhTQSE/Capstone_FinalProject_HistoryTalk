@@ -57,14 +57,17 @@ jobs:
           script: |
             # Đăng nhập GHCR trên server
             echo "$MY_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-            # CẬP NHẬT CẤU HÌNH MỚI NHẤT TỪ GITHUB
+            # CẬP NHẬT CẤU HÌNH MỚI NHẤT TỪ GITHUB (đồng bộ sạch Caddyfile & docker-compose.prod.yml, giữ nguyên .env.*)
             cd /home/ec2-user/SWD392_FinalProject_HistoryTalk/
-            git pull origin main
+            git remote set-url origin "https://${GHCR_USERNAME}:${MY_PAT}@github.com/DinhTQSE/Capstone_FinalProject_HistoryTalk.git"
+            git fetch origin main
+            git reset --hard origin/main
            
             docker compose -f docker-compose.prod.yml pull
             
             # 2. Ép buộc tạo lại container ngay cả khi cấu hình không đổi
             docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            docker exec historytalk-caddy caddy reload --config /etc/caddy/Caddyfile || true
             
             # 3. Dọn rác
             docker image prune -f
