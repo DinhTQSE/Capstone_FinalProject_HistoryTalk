@@ -182,13 +182,14 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     List<QuizSession> findRecentCompletedByUser(@Param("uid") UUID uid, Pageable pageable);
 
     @Query(value = """
-            SELECT CAST(q.era AS text) AS era, COUNT(*) AS count
+            SELECT CAST(hc.era AS text) AS era, COUNT(*) AS count
             FROM quiz_session qs
             JOIN quiz q ON q.quiz_id = qs.quiz_id
+            JOIN historical_context hc ON hc.context_id = q.context_id
             WHERE qs.uid = :uid
               AND qs.end_time IS NOT NULL
               AND qs.deleted_at IS NULL
-            GROUP BY q.era
+            GROUP BY hc.era
             """, nativeQuery = true)
     List<Object[]> countEraDistributionByUser(@Param("uid") UUID uid);
 }

@@ -1,6 +1,7 @@
 package com.historytalk.utils;
 
 import com.historytalk.security.AuthenticatedPrincipal;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -19,7 +20,8 @@ public class SecurityUtils {
      */
     public static String getUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) return null;
+        // Endpoint permitAll: khach co AnonymousAuthenticationToken (principal "anonymousUser"), khong phai uid.
+        if (auth == null || auth instanceof AnonymousAuthenticationToken) return null;
         Object principal = auth.getPrincipal();
         if (principal instanceof AuthenticatedPrincipal ap) {
             return ap.getUid();
