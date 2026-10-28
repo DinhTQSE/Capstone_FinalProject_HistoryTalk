@@ -4,6 +4,7 @@ import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.*;
 import com.historytalk.service.quiz.QuizService;
+import com.historytalk.service.quiz.csv.QuizCsvTemplateBuilder;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -13,12 +14,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
@@ -31,6 +34,7 @@ import java.util.UUID;
 public class StaffQuizController {
 
     private final QuizService quizService;
+    private final QuizCsvTemplateBuilder quizCsvTemplateBuilder;
 
     /**
      * GET /staff/quizzes
@@ -183,8 +187,11 @@ public class StaffQuizController {
                     "Rows with the same 'title' are grouped into one quiz; each row is one question. " +
                     "Duplicate titles and invalid rows are skipped and reported in the response. " +
                     "All imported quizzes are created as drafts (isPublished = false). " +
-                    "Required columns: title, contextId, level, questionContent, " +
-                    "option1, option2, option3, option4, correctAnswer, explanation."
+                    "Required columns: title, contextId, level, questionContent. " +
+                    "Optional: questionType (MULTIPLE_CHOICE | FILL_IN_BLANK | MATCHING, default MULTIPLE_CHOICE), " +
+                    "option1..option6, correctAnswer, explanation, caseSensitive, trimWhitespace. " +
+                    "File must be UTF-8 comma-separated; download GET /import/template. " +
+                    "All rows of one title must share contextId and level."
     )
     public ResponseEntity<ApiResponse<QuizImportResponse>> importQuizzes(
             @RequestPart("file") MultipartFile file) {
@@ -194,6 +201,25 @@ public class StaffQuizController {
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizImportResponse data = quizService.importQuizzesFromCsv(file, userId);
         return ResponseEntity.ok(ApiResponse.success(data, "CSV import completed"));
+    }
+
+    /**
+     * GET /staff/quizzes/import/template
+     * Downloads a sample CSV (UTF-8 with BOM so Excel shows Vietnamese correctly)
+     * containing one example row per question type.
+     */
+    @GetMapping("/import/template")
+    @Operation(
+            summary = "Download quiz CSV import template",
+            description = "Returns a UTF-8 (BOM) CSV with the full header and one example row for " +
+                    "MULTIPLE_CHOICE, FILL_IN_BLANK and MATCHING. Replace contextId before importing."
+    )
+    public ResponseEntity<byte[]> downloadImportTemplate() {
+        log.info("GET /api/v1/staff/quizzes/import/template");
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"quiz-import-template.csv\"")
+                .body(quizCsvTemplateBuilder.build());
     }
 
     // ==================== Session History (SYSTEM_ADMIN only) ====================
