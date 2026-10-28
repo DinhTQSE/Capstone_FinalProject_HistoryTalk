@@ -2,11 +2,15 @@ package com.historytalk.service.quiz;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.quiz.QuestionRequest;
 import com.historytalk.dto.quiz.QuizStaffResponse;
+import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
+import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizRepository;
@@ -23,11 +27,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +59,9 @@ class QuizServiceImplTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private QuestionDataValidator questionDataValidator;
 
     @InjectMocks
     private QuizServiceImpl quizService;
@@ -83,6 +94,57 @@ class QuizServiceImplTest {
         String json = new ObjectMapper().writeValueAsString(response);
 
         assertThat(json).doesNotContain("deletedAt");
+    }
+
+    @Test
+    void updateQuestionTypeOnlyRevalidatesExistingData() throws Exception {
+        Quiz quiz = activeQuiz();
+        Question question = Question.builder()
+                .questionId(UUID.randomUUID())
+                .quiz(quiz)
+                .content("Ai chỉ huy?")
+                .questionType(QuestionType.MULTIPLE_CHOICE)
+                .questionData("{\"options\":[],\"correctOptionIds\":[]}")
+                .build();
+        QuestionRequest request = QuestionRequest.builder()
+                .questionType(QuestionType.MATCHING)
+                .build();
+
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(objectMapper.readTree(question.getQuestionData())).thenReturn(new ObjectMapper().createObjectNode());
+        doThrow(new InvalidRequestException("invalid")).when(questionDataValidator)
+                .validate(eq(QuestionType.MATCHING), any());
+
+        assertThatThrownBy(() -> quizService.updateQuestion(
+                quiz.getQuizId().toString(), question.getQuestionId().toString(), request))
+                .isInstanceOf(InvalidRequestException.class);
+
+        verify(questionDataValidator).validate(eq(QuestionType.MATCHING), any());
+        verify(questionRepository, never()).save(any());
+    }
+
+    @Test
+    void updateBankQuestionTypeOnlyRevalidatesExistingData() throws Exception {
+        Question question = Question.builder()
+                .questionId(UUID.randomUUID())
+                .content("Ai chỉ huy?")
+                .questionType(QuestionType.MULTIPLE_CHOICE)
+                .questionData("{\"options\":[],\"correctOptionIds\":[]}")
+                .build();
+        QuestionRequest request = QuestionRequest.builder()
+                .questionType(QuestionType.FILL_IN_BLANK)
+                .build();
+
+        when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(objectMapper.readTree(question.getQuestionData())).thenReturn(new ObjectMapper().createObjectNode());
+        doThrow(new InvalidRequestException("invalid")).when(questionDataValidator)
+                .validate(eq(QuestionType.FILL_IN_BLANK), any());
+
+        assertThatThrownBy(() -> quizService.updateBankQuestion(question.getQuestionId().toString(), request))
+                .isInstanceOf(InvalidRequestException.class);
+
+        verify(questionRepository, never()).save(any());
     }
 
     private Quiz activeQuiz() {

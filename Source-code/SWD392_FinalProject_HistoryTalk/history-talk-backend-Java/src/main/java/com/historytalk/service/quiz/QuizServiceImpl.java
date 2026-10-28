@@ -77,6 +77,7 @@ public class QuizServiceImpl implements QuizService {
     private final ObjectMapper objectMapper;
     private final GamificationService gamificationService;
     private final QuizQuestionRepository quizQuestionRepository;
+    private final QuestionDataValidator questionDataValidator;
 
     // ==================== Customer ====================
 
@@ -478,6 +479,7 @@ public class QuizServiceImpl implements QuizService {
         if (request.getContent() != null && !request.getContent().isBlank()) {
             question.setContent(request.getContent());
         }
+        validateEffectiveQuestionData(question, request);
         if (request.getExplanation() != null) {
             question.setExplanation(request.getExplanation());
         }
@@ -734,12 +736,27 @@ public class QuizServiceImpl implements QuizService {
 
     // ==================== Private Helpers ====================
 
+    /**
+     * Re-validates the (type, data) pair a partial update would leave on the question,
+     * so a type-only change cannot keep data shaped for the previous type.
+     */
+    private void validateEffectiveQuestionData(Question question, QuestionRequest request) {
+        if (request.getQuestionType() == null && request.getQuestionData() == null) {
+            return;
+        }
+        QuestionType effectiveType = request.getQuestionType() != null
+                ? request.getQuestionType()
+                : (question.getQuestionType() != null ? question.getQuestionType() : QuestionType.MULTIPLE_CHOICE);
+        JsonNode effectiveData = request.getQuestionData() != null
+                ? request.getQuestionData()
+                : deserializeJsonNode(question.getQuestionData());
+        questionDataValidator.validate(effectiveType, effectiveData);
+    }
+
     private Question buildQuestion(QuestionRequest request, Quiz quiz) {
         QuestionType type = request.getQuestionType() != null
                 ? request.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
-        if (request.getQuestionData() == null) {
-            throw new InvalidRequestException("Yêu cầu questionData cho câu hỏi loại " + type.name());
-        }
+        questionDataValidator.validate(type, request.getQuestionData());
         return Question.builder()
                 .quiz(quiz)
                 .content(request.getContent())
@@ -1038,6 +1055,7 @@ public class QuizServiceImpl implements QuizService {
         if (request.getContent() != null && !request.getContent().isBlank()) {
             question.setContent(request.getContent());
         }
+        validateEffectiveQuestionData(question, request);
         if (request.getExplanation() != null) {
             question.setExplanation(request.getExplanation());
         }
