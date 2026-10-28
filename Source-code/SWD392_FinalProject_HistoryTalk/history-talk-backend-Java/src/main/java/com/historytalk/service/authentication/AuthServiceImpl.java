@@ -8,6 +8,7 @@ import com.historytalk.dto.authentication.RegisterResponse;
 import com.historytalk.dto.authentication.RegisterStaffRequest;
 import com.historytalk.dto.authentication.RegisterStaffResponse;
 import com.historytalk.entity.enums.UserRole;
+import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
@@ -16,7 +17,6 @@ import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.payment.TierRepository;
 import com.historytalk.repository.payment.UserTierRepository;
-import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.notification.PasswordResetEmailService;
@@ -41,22 +41,15 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
-
-    /** In-memory blacklist for logged-out tokens. Replace with Redis in production. */
-    public static final Set<String> BLACKLISTED_TOKENS =
-            Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -67,9 +60,10 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
     private final PasswordResetEmailService passwordResetEmailService;
 
-    @Value("${app.password-reset.token-expiration-minutes}")
+    @Value("${app.password-reset.token-expiration-minutes:30}")
     private long passwordResetTokenExpirationMinutes;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -111,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
                     .user(saved)
                     .tier(freeTier)
                     .startTime(LocalDateTime.now())
-                    .endTime(LocalDateTime.now().plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120)) // 10 years for free tier if no_month is 0
+                    .endTime(LocalDateTime.now().plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120))
                     .isActive(true)
                     .build();
             userTierRepository.save(userTier);
@@ -130,6 +124,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
+        return login(request, null, null);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponse login(LoginRequest request, String ipAddress, String deviceInfo) {
         log.info("Login attempt for email: {}", request.getEmail());
 
         try {
@@ -146,7 +146,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new UnauthorizedException("Email hoặc mật khẩu không hợp lệ"));
 
-        // Reject soft-deleted or deactivated (graduated/transferred) users
+        // Reject soft-deleted or deactivated users
         if (user.getDeletedAt() != null
                 || user.getAccountStatus() == com.historytalk.entity.enums.AccountStatus.DEACTIVATED) {
             throw new UnauthorizedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa");
@@ -155,8 +155,8 @@ public class AuthServiceImpl implements AuthService {
         UserPrincipal principal = new UserPrincipal(user);
         Map<String, Object> claims = buildClaims(principal);
 
-        String accessToken  = jwtService.generateAccessToken(user.getEmail(), claims);
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), claims);
+        String refreshToken = refreshTokenService.createRefreshToken(user, ipAddress, deviceInfo);
 
         log.info("Login successful for uid: {}", user.getUid());
 
@@ -186,7 +186,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = userOptional.get();
-            String rawToken = generatePasswordResetToken();
+        String rawToken = generatePasswordResetToken();
         user.setPasswordResetTokenHash(sha256Hex(rawToken));
         user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(passwordResetTokenExpirationMinutes));
         userRepository.save(user);
@@ -219,46 +219,48 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setPasswordResetTokenHash(null);
         user.setPasswordResetExpiresAt(null);
+        user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
+
+        // Hủy toàn bộ refresh token cũ của user trên mọi thiết bị
+        refreshTokenService.revokeAllUserTokens(user.getUid());
+        log.info("Password reset successfully and all tokens revoked for user {}", user.getUid());
     }
 
     @Override
     public RefreshTokenResponse refreshToken(String refreshToken) {
-        log.info("Refreshing token");
+        return refreshToken(refreshToken, null, null);
+    }
 
-        if (!StringUtils.hasText(refreshToken) || !jwtService.isTokenValid(refreshToken)) {
-            throw new UnauthorizedException("Refresh token không hợp lệ hoặc đã hết hạn");
-        }
-
-        if (BLACKLISTED_TOKENS.contains(refreshToken)) {
-            throw new UnauthorizedException("Refresh token đã bị thu hồi");
-        }
-
-        String email = jwtService.extractEmail(refreshToken);
-        User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new UnauthorizedException("User not found"));
-
-        UserPrincipal principal = new UserPrincipal(user);
-        Map<String, Object> claims = buildClaims(principal);
-
-        String newAccessToken = jwtService.generateAccessToken(email, claims);
-
-        return RefreshTokenResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .expiresIn(jwtService.getAccessTokenExpirationMs())
-                .build();
+    @Override
+    public RefreshTokenResponse refreshToken(String refreshToken, String ipAddress, String deviceInfo) {
+        log.info("Refreshing token with RTR");
+        return refreshTokenService.rotateRefreshToken(refreshToken, ipAddress, deviceInfo);
     }
 
     @Override
     public void logout(String authorizationHeader) {
-        if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
-            throw new UnauthorizedException("Định dạng header Authorization không hợp lệ. Mong đợi: Bearer <token>");
+        logout(authorizationHeader, null);
+    }
+
+    @Override
+    public void logout(String authorizationHeader, String refreshToken) {
+        if (StringUtils.hasText(refreshToken)) {
+            refreshTokenService.revokeToken(refreshToken);
         }
-        String token = authorizationHeader.substring(7);
-        BLACKLISTED_TOKENS.add(token);
-        log.info("Token blacklisted on logout");
+        log.info("Logout processed. Refresh token revoked in DB if present.");
+    }
+
+    @Override
+    @Transactional
+    public void logoutAll(String userId) {
+        UUID uid = UUID.fromString(userId);
+        User user = userRepository.findById(uid)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setPasswordChangedAt(LocalDateTime.now());
+        userRepository.save(user);
+        refreshTokenService.revokeAllUserTokens(uid);
+        log.info("User {} logged out from all devices", userId);
     }
 
     @Override
@@ -276,8 +278,7 @@ public class AuthServiceImpl implements AuthService {
             throw new DataConflictException("Tên đăng nhập đã tồn tại");
         }
 
-        UserRole role;
-        role = parsePrivilegedRole(request.getRole());
+        UserRole role = parsePrivilegedRole(request.getRole());
         if (role == UserRole.CUSTOMER) {
             throw new InvalidRequestException("Không thể đăng ký tài khoản đặc quyền với vai trò CUSTOMER. Vui lòng sử dụng endpoint đăng ký công khai.");
         }
@@ -349,24 +350,28 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void softDeleteUser(String targetUserId, String staffId) {
         log.info("Soft deleting user {} requested by user {}", targetUserId, staffId);
-        
+
         User requestUser = userRepository.findById(UUID.fromString(staffId))
                 .orElseThrow(() -> new ResourceNotFoundException("Requesting user not found"));
-                
+
         if (!targetUserId.equals(staffId) && requestUser.getRole() != UserRole.SYSTEM_ADMIN) {
             throw new InvalidRequestException("Chỉ SYSTEM_ADMIN mới có thể vô hiệu hóa tài khoản của người dùng khác.");
         }
-        
+
         User targetUser = userRepository.findById(UUID.fromString(targetUserId))
                 .orElseThrow(() -> new ResourceNotFoundException("Target user not found"));
-                
+
         targetUser.setDeletedAt(LocalDateTime.now());
+        targetUser.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(targetUser);
+
+        // Hủy toàn bộ refresh token khi bị khóa tài khoản
+        refreshTokenService.revokeAllUserTokens(targetUser.getUid());
 
         // Cascade soft delete all user content
         cascadeSoftDeleteContent(targetUser.getUid());
-        
-        log.info("User {} successfully deactivated and content cascading initiated.", targetUserId);
+
+        log.info("User {} successfully deactivated, tokens revoked, and content cascading initiated.", targetUserId);
     }
 
     private void cascadeSoftDeleteContent(UUID userId) {
@@ -389,7 +394,6 @@ public class AuthServiceImpl implements AuthService {
         // QuizSession
         entityManager.createQuery("UPDATE QuizSession qs SET qs.deletedAt = CURRENT_TIMESTAMP WHERE qs.user.uid = :userId AND qs.deletedAt IS NULL")
                 .setParameter("userId", userId).executeUpdate();
-
     }
 
     private UserRole parsePrivilegedRole(String roleValue) {

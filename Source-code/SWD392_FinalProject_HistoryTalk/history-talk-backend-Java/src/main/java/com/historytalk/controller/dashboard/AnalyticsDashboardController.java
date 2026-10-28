@@ -68,7 +68,7 @@ public class AnalyticsDashboardController {
     }
 
     @GetMapping("/customer/dashboard")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'USER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Customer B2C Personal Dashboard", description = "Returns subscription tier, token balance, quiz learning history, top AI characters, and PayOS transaction history (US-SP6-09)")
     public ResponseEntity<ApiResponse<CustomerPersonalDashboardResponse>> getCustomerDashboard(
             @AuthenticationPrincipal UserPrincipal principal) {

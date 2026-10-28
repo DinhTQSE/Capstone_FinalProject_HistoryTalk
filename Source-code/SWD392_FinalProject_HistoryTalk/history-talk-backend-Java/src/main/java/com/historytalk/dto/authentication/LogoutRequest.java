@@ -1,4 +1,4 @@
-package com.historytalk.dto.quiz;
+package com.historytalk.dto.authentication;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MyRatingResponse {
+public class LogoutRequest {
 
-    private Integer myRating;
+    private String refreshToken;
 }

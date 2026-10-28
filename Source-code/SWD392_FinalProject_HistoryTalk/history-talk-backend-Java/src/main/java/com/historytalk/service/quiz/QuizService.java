@@ -49,17 +49,6 @@ public interface QuizService {
 
     void deleteQuestion(String quizId, String questionId);
 
-    // ==================== Rating & Reports ====================
-
-    QuizRatingResponse rateQuiz(String quizId, int value, UUID userId);
-
-    MyRatingResponse getMyRating(String quizId, UUID userId);
-
-    void reportQuestion(String questionId, String reason, UUID userId);
-
-    PaginatedResponse<QuestionReportResponse> getQuestionReports(String status, Pageable pageable);
-
-    void resolveQuestionReport(String reportId);
 
     // ==================== Import ====================
 

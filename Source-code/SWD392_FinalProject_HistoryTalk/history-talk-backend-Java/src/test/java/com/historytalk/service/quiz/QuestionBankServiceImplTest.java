@@ -53,8 +53,6 @@ class QuestionBankServiceImplTest {
     @Mock private QuizAnswerDetailRepository quizAnswerDetailRepository;
     @Mock private UserRepository userRepository;
     @Mock private HistoricalContextRepository historicalContextRepository;
-    @Mock private QuizRatingRepository quizRatingRepository;
-    @Mock private QuestionReportRepository questionReportRepository;
     @Mock private GamificationService gamificationService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -65,7 +63,6 @@ class QuestionBankServiceImplTest {
         quizService = new QuizServiceImpl(
                 quizRepository, questionRepository, quizSessionRepository,
                 quizAnswerDetailRepository, userRepository, historicalContextRepository,
-                quizRatingRepository, questionReportRepository,
                 objectMapper, gamificationService,
                 quizQuestionRepository
         );

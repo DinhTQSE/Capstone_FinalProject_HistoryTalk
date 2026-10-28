@@ -31,11 +31,16 @@ public class JwtTokenProvider {
 
     /**
      * Generate access token with extra claims (uid, role).
+     * In JJWT 0.12.x, .claims(map) overrides previously set claims, so extra claims
+     * must be populated before setting the subject, issuedAt, and expiration.
      */
     public String generateAccessToken(String email, Map<String, Object> extraClaims) {
-        return Jwts.builder()
+        var builder = Jwts.builder();
+        if (extraClaims != null && !extraClaims.isEmpty()) {
+            builder.claims(extraClaims);
+        }
+        return builder
                 .subject(email)
-                .claims(extraClaims)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
                 .signWith(signingKey(), SignatureAlgorithm.HS512)
@@ -59,6 +64,13 @@ public class JwtTokenProvider {
      */
     public String getUsernameFromToken(String token) {
         return getAllClaims(token).getSubject();
+    }
+
+    /**
+     * Extract issuedAt Date from token.
+     */
+    public Date getIssuedAtFromToken(String token) {
+        return getAllClaims(token).getIssuedAt();
     }
 
     /**

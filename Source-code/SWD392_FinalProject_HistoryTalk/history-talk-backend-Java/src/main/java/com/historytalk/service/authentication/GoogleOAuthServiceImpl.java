@@ -41,6 +41,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
     private final UserTierRepository userTierRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
     private final GoogleOAuthPasswordEmailService passwordEmailService;
 
     @Override
@@ -59,7 +60,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
         UserPrincipal principal = new UserPrincipal(user);
         Map<String, Object> claims = buildClaims(principal);
         String accessToken = jwtService.generateAccessToken(user.getEmail(), claims);
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        String refreshToken = refreshTokenService.createRefreshToken(user, null, "Google OAuth2");
 
         log.info("Google OAuth login successful for uid: {}", user.getUid());
 
@@ -105,7 +106,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
             UserPrincipal principal = new UserPrincipal(user);
             Map<String, Object> claims = buildClaims(principal);
             String accessToken = jwtService.generateAccessToken(user.getEmail(), claims);
-            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+            String refreshToken = refreshTokenService.createRefreshToken(user, null, "Google OAuth2");
             
             log.info("Google ID Token login successful for uid: {}", user.getUid());
             
