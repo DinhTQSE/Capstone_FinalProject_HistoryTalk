@@ -94,6 +94,15 @@ class QuizCsvFileReaderTest {
     }
 
     @Test
+    void trailingEmptyHeaderColumnsFromExcelAreAllowed() {
+        List<CSVRecord> records = reader.read(file(utf8(
+                "title,contextId,level,questionContent,,\nA,ctx,EASY,Q,,\n")));
+
+        assertThat(records).hasSize(1);
+        assertThat(records.get(0).get("questionContent")).isEqualTo("Q");
+    }
+
+    @Test
     void headerOnlyFileFails() {
         assertThatThrownBy(() -> reader.read(file(utf8(HEADER))))
                 .isInstanceOf(InvalidRequestException.class)

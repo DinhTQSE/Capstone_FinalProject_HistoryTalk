@@ -194,6 +194,17 @@ class QuizServiceImplImportTest {
     }
 
     @Test
+    void titleLongerThanColumnLimitIsRejectedBeforeSaving() {
+        String longTitle = "Q".repeat(256);
+
+        QuizImportResponse response = importCsv(HEADER + row(longTitle, "EASY", "", "Câu 1", "A,B,C,D", "0", ""));
+
+        assertThat(response.getSkippedCount()).isEqualTo(1);
+        assertThat(response.getErrors().get(0)).contains("255");
+        verify(quizRepository, never()).save(any());
+    }
+
+    @Test
     void oneBadQuizDoesNotBlockOthers() {
         QuizImportResponse response = importCsv(HEADER
                 + row("A", "EASY", "", "Câu 1", "A,B,C,D", "9", "")

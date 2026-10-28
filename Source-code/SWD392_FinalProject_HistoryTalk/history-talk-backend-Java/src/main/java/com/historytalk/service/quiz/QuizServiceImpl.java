@@ -62,6 +62,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class QuizServiceImpl implements QuizService {
 
+    /** Matches {@code quiz.title} column length. */
+    private static final int QUIZ_TITLE_MAX_LENGTH = 255;
+
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
     private final QuizSessionRepository quizSessionRepository;
@@ -599,6 +602,12 @@ public class QuizServiceImpl implements QuizService {
      */
     private QuizStaffResponse saveQuizGroup(String title, List<CSVRecord> rows, User user) {
         CSVRecord first = rows.get(0);
+
+        // Checked up front: a DB length violation would mark the shared transaction rollback-only
+        if (title.length() > QUIZ_TITLE_MAX_LENGTH) {
+            throw new InvalidRequestException("title dài " + title.length() + " ký tự, tối đa "
+                    + QUIZ_TITLE_MAX_LENGTH + " ký tự");
+        }
 
         // Difficulty belongs to the quiz, so every row must declare the same level
         QuizLevel level = parseRowLevel(first);

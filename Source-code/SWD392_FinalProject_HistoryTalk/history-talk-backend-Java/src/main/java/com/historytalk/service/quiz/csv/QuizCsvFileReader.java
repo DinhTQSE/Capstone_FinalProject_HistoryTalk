@@ -40,6 +40,8 @@ public class QuizCsvFileReader {
     private static final CSVFormat FORMAT = CSVFormat.DEFAULT.builder()
             .setHeader()
             .setSkipHeaderRecord(true)
+            // Excel keeps cleared cells in the used range, leaving trailing ",," in the header
+            .setAllowMissingColumnNames(true)
             .setIgnoreEmptyLines(true)
             .setTrim(true)
             .build();
