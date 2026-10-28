@@ -57,6 +57,9 @@ class AuthServiceImplTest {
     private JwtService jwtService;
 
     @Mock
+    private RefreshTokenService refreshTokenService;
+
+    @Mock
     private PasswordResetEmailService passwordResetEmailService;
 
     private AuthServiceImpl authService;
@@ -70,6 +73,7 @@ class AuthServiceImplTest {
                 passwordEncoder,
                 authenticationManager,
                 jwtService,
+                refreshTokenService,
                 passwordResetEmailService
         );
         ReflectionTestUtils.setField(authService, "passwordResetTokenExpirationMinutes", 30L);
@@ -151,6 +155,8 @@ class AuthServiceImplTest {
         assertThat(user.getPassword()).isEqualTo("encoded-new-password");
         assertThat(user.getPasswordResetTokenHash()).isNull();
         assertThat(user.getPasswordResetExpiresAt()).isNull();
+        assertThat(user.getPasswordChangedAt()).isNotNull();
+        verify(refreshTokenService).revokeAllUserTokens(user.getUid());
         verify(userRepository).save(user);
     }
 
@@ -158,10 +164,10 @@ class AuthServiceImplTest {
     void resetPasswordRejectsMissingOrBlankToken() {
         assertThatThrownBy(() -> authService.resetPassword(null, "new-password", "new-password"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Invalid or expired password reset token");
+                .hasMessage("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
         assertThatThrownBy(() -> authService.resetPassword("  ", "new-password", "new-password"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Invalid or expired password reset token");
+                .hasMessage("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
 
         verify(userRepository, never()).findByPasswordResetTokenHash(any());
         verify(passwordEncoder, never()).encode(any());
@@ -174,7 +180,7 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> authService.resetPassword(rawToken, "new-password", "new-password"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Invalid or expired password reset token");
+                .hasMessage("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any(User.class));
@@ -191,7 +197,7 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> authService.resetPassword(rawToken, "new-password", "new-password"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Invalid or expired password reset token");
+                .hasMessage("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any(User.class));
@@ -207,7 +213,7 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> authService.resetPassword(rawToken, "new-password", "new-password"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Invalid or expired password reset token");
+                .hasMessage("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any(User.class));
@@ -223,7 +229,7 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> authService.resetPassword(rawToken, "new-password", "new-password"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Invalid or expired password reset token");
+                .hasMessage("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any(User.class));
@@ -233,7 +239,7 @@ class AuthServiceImplTest {
     void resetPasswordRejectsPasswordMismatch() {
         assertThatThrownBy(() -> authService.resetPassword("reset-token", "new-password", "different-password"))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessage("Password and confirmation password do not match");
+                .hasMessage("Mật khẩu và mật khẩu xác nhận không khớp");
 
         verify(userRepository, never()).findByPasswordResetTokenHash(any());
         verify(passwordEncoder, never()).encode(any());

@@ -36,7 +36,7 @@ public class PdfExtractionController {
     private final DocumentContentService documentContentService;
 
     @PostMapping(value = "/extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Extract raw text from PDF file for frontend drafting (STATELESS - no DB persistence)")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> extractText(
@@ -48,7 +48,7 @@ public class PdfExtractionController {
     }
 
     @PostMapping(value = "/upload-and-extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF and extract raw text for document drafting")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> uploadAndExtract(
@@ -65,7 +65,7 @@ public class PdfExtractionController {
     }
 
     @PostMapping(value = "/upload-and-extract/stream", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'STAFF', 'ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF and stream extraction progress via SSE")
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter uploadAndExtractStream(

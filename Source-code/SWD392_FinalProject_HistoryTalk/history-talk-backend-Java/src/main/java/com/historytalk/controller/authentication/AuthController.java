@@ -5,6 +5,8 @@ import com.historytalk.dto.authentication.ForgotPasswordRequest;
 import com.historytalk.dto.authentication.LoginRequest;
 import com.historytalk.dto.authentication.LoginResponse;
 import com.historytalk.dto.authentication.LogoutResponse;
+import com.historytalk.dto.authentication.LogoutRequest;
+import com.historytalk.utils.HttpRequestUtils;
 import com.historytalk.dto.authentication.RefreshTokenRequest;
 import com.historytalk.dto.authentication.RefreshTokenResponse;
 import com.historytalk.dto.authentication.RegisterRequest;
@@ -74,10 +76,13 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate with email and password, returns JWT tokens.")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
-            @Valid @RequestBody LoginRequest request) {
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest servletRequest) {
 
         log.info("POST /api/v1/auth/login - email: {}", request.getEmail());
-        LoginResponse data = authService.login(request);
+        String ip = HttpRequestUtils.getClientIpAddress(servletRequest);
+        String device = HttpRequestUtils.getDeviceInfo(servletRequest);
+        LoginResponse data = authService.login(request, ip, device);
         return ResponseEntity.ok(ApiResponse.success(data, "Login successful"));
     }
 
@@ -148,20 +153,38 @@ public class AuthController {
     @PostMapping("/refresh-token")
     @Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token.")
     public ResponseEntity<ApiResponse<RefreshTokenResponse>> refreshToken(
-            @Valid @RequestBody RefreshTokenRequest request) {
+            @Valid @RequestBody RefreshTokenRequest request,
+            HttpServletRequest servletRequest) {
 
         log.info("POST /api/v1/auth/refresh-token");
-        RefreshTokenResponse data = authService.refreshToken(request.getRefreshToken());
+        String ip = HttpRequestUtils.getClientIpAddress(servletRequest);
+        String device = HttpRequestUtils.getDeviceInfo(servletRequest);
+        RefreshTokenResponse data = authService.refreshToken(request.getRefreshToken(), ip, device);
         return ResponseEntity.ok(ApiResponse.success(data, "Token refreshed successfully"));
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout", description = "Invalidate the current bearer token.")
-    public ResponseEntity<ApiResponse<LogoutResponse>> logout(HttpServletRequest request) {
+    @Operation(summary = "Logout", description = "Invalidate the current session and revoke refresh token.")
+    public ResponseEntity<ApiResponse<LogoutResponse>> logout(
+            HttpServletRequest request,
+            @RequestBody(required = false) LogoutRequest body) {
         log.info("POST /api/v1/auth/logout");
-        authService.logout(request.getHeader("Authorization"));
+        String refreshToken = body != null ? body.getRefreshToken() : null;
+        authService.logout(request.getHeader("Authorization"), refreshToken);
         LogoutResponse data = LogoutResponse.builder().message("Logout successful").build();
         return ResponseEntity.ok(ApiResponse.success(data, "Logout successful"));
+    }
+
+    @PostMapping("/logout-all")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Logout from all devices", description = "Revoke all refresh tokens and active sessions for the current user.")
+    public ResponseEntity<ApiResponse<LogoutResponse>> logoutAll() {
+        String userId = SecurityUtils.getUserId();
+        log.info("POST /api/v1/auth/logout-all - user: {}", userId);
+        authService.logoutAll(userId);
+        LogoutResponse data = LogoutResponse.builder().message("All sessions revoked successfully").build();
+        return ResponseEntity.ok(ApiResponse.success(data, "All sessions revoked successfully"));
     }
 
     @PatchMapping("/users/{userId}/deactivate")

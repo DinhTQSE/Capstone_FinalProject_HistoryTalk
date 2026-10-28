@@ -58,6 +58,9 @@ class GoogleOAuthServiceImplTest {
     @Mock
     private GoogleOAuthPasswordEmailService passwordEmailService;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @InjectMocks
     private GoogleOAuthServiceImpl googleOAuthService;
 
@@ -72,7 +75,7 @@ class GoogleOAuthServiceImplTest {
         when(passwordEncoder.encode(any(String.class))).thenReturn("encoded-placeholder");
         when(userRepository.save(any(User.class))).thenReturn(saved);
         when(jwtService.generateAccessToken(eq("new.user@gmail.com"), anyMap())).thenReturn("access-token");
-        when(jwtService.generateRefreshToken("new.user@gmail.com")).thenReturn("refresh-token");
+        when(refreshTokenService.createRefreshToken(any(), any(), any())).thenReturn("refresh-token");
         when(jwtService.getAccessTokenExpirationMs()).thenReturn(3600000L);
 
         LoginResponse response = googleOAuthService.authenticateGoogleUser(oauth2User);
@@ -105,7 +108,7 @@ class GoogleOAuthServiceImplTest {
 
         when(userRepository.findByEmailIgnoreCase("existing@gmail.com")).thenReturn(Optional.of(existing));
         when(jwtService.generateAccessToken(eq("existing@gmail.com"), anyMap())).thenReturn("access-token");
-        when(jwtService.generateRefreshToken("existing@gmail.com")).thenReturn("refresh-token");
+        when(refreshTokenService.createRefreshToken(any(), any(), any())).thenReturn("refresh-token");
         when(jwtService.getAccessTokenExpirationMs()).thenReturn(3600000L);
 
         LoginResponse response = googleOAuthService.authenticateGoogleUser(oauth2User);
@@ -130,7 +133,7 @@ class GoogleOAuthServiceImplTest {
                 .when(passwordEmailService)
                 .sendTemporaryPasswordEmail(eq("new.user@gmail.com"), eq("new.user"), any(String.class));
         when(jwtService.generateAccessToken(eq("new.user@gmail.com"), anyMap())).thenReturn("access-token");
-        when(jwtService.generateRefreshToken("new.user@gmail.com")).thenReturn("refresh-token");
+        when(refreshTokenService.createRefreshToken(any(), any(), any())).thenReturn("refresh-token");
         when(jwtService.getAccessTokenExpirationMs()).thenReturn(3600000L);
 
         LoginResponse response = googleOAuthService.authenticateGoogleUser(oauth2User);
@@ -148,7 +151,7 @@ class GoogleOAuthServiceImplTest {
 
         assertThatThrownBy(() -> googleOAuthService.authenticateGoogleUser(oauth2User("deleted@gmail.com", "Deleted User")))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Account has been deactivated");
+                .hasMessage("Tài khoản đã bị vô hiệu hóa");
     }
 
     @Test
@@ -161,7 +164,7 @@ class GoogleOAuthServiceImplTest {
 
         assertThatThrownBy(() -> googleOAuthService.authenticateGoogleUser(oauth2User))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Google account email is required");
+                .hasMessage("Yêu cầu email tài khoản Google");
     }
 
     private OAuth2User oauth2User(String email, String name) {

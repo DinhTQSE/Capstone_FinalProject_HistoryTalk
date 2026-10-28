@@ -133,45 +133,7 @@ public class QuizController {
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
     }
 
-    @PostMapping("/{quizId}/rating")
-    @PreAuthorize("isAuthenticated()")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Rate a quiz", description = "Submit a star rating (1-5) for a quiz.")
-    public ResponseEntity<ApiResponse<QuizRatingResponse>> rateQuiz(
-            @PathVariable String quizId,
-            @RequestBody Map<String, Integer> payload) {
-        log.info("POST /api/v1/quizzes/{}/rating", quizId);
-        UUID userId = UUID.fromString(SecurityUtils.getUserId());
-        int value = payload.getOrDefault("value", 5);
-        QuizRatingResponse data = quizService.rateQuiz(quizId, value, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz rated successfully"));
-    }
 
-    @GetMapping("/{quizId}/rating/me")
-    @PreAuthorize("isAuthenticated()")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Get user's rating for a quiz", description = "Get current user's star rating for a quiz.")
-    public ResponseEntity<ApiResponse<MyRatingResponse>> getMyRating(
-            @PathVariable String quizId) {
-        log.info("GET /api/v1/quizzes/{}/rating/me", quizId);
-        UUID userId = resolveUserId();
-        MyRatingResponse data = quizService.getMyRating(quizId, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Rating retrieved successfully"));
-    }
-
-    @PostMapping("/questions/{questionId}/report")
-    @PreAuthorize("isAuthenticated()")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Report question issue", description = "Report an issue or error with a quiz question.")
-    public ResponseEntity<ApiResponse<Void>> reportQuestion(
-            @PathVariable String questionId,
-            @RequestBody(required = false) Map<String, String> payload) {
-        log.info("POST /api/v1/quizzes/questions/{}/report", questionId);
-        UUID userId = UUID.fromString(SecurityUtils.getUserId());
-        String reason = payload != null ? payload.get("reason") : null;
-        quizService.reportQuestion(questionId, reason, userId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Question reported successfully"));
-    }
 
     /**
      * Safely extract userId from SecurityContext.

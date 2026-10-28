@@ -43,7 +43,7 @@ spring.flyway.out-of-order=true
 # =============================================================================
 # Secret Key must be at least 256 bits (32 chars / base64 string)
 JWT_SECRET=your_super_secret_jwt_key_must_be_at_least_32_characters_long
-JWT_EXPIRATION_MS=86400000
+JWT_EXPIRATION_MS=900000
 JWT_REFRESH_EXPIRATION_MS=604800000
 
 jwt.secret=${JWT_SECRET}
