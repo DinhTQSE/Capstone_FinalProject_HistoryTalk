@@ -64,7 +64,7 @@ class QuestionBankServiceImplTest {
                 quizRepository, questionRepository, quizSessionRepository,
                 quizAnswerDetailRepository, userRepository, historicalContextRepository,
                 objectMapper, gamificationService,
-                quizQuestionRepository
+                quizQuestionRepository, new QuestionDataValidator(objectMapper)
         );
     }
 
