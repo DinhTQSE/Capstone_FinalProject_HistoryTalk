@@ -27,6 +27,8 @@ import com.historytalk.repository.*;
 import com.historytalk.service.gamification.GamificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.historytalk.service.quiz.csv.QuizCsvFileReader;
+import com.historytalk.service.quiz.csv.QuizCsvRowParser;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -64,7 +66,8 @@ class QuestionBankServiceImplTest {
                 quizRepository, questionRepository, quizSessionRepository,
                 quizAnswerDetailRepository, userRepository, historicalContextRepository,
                 objectMapper, gamificationService,
-                quizQuestionRepository, new QuestionDataValidator(objectMapper)
+                quizQuestionRepository, new QuestionDataValidator(objectMapper),
+                new QuizCsvFileReader(), new QuizCsvRowParser(List.of())
         );
     }
 

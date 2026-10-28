@@ -12,7 +12,6 @@ import com.historytalk.dto.quiz.quizdata.MatchingPair;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
-import com.historytalk.dto.quiz.quizdata.QuestionOption;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuestType;
@@ -30,7 +29,6 @@ import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.historytalk.exception.ResourceNotFoundException;
-import com.historytalk.exception.SystemException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizAnswerDetailRepository;
@@ -39,10 +37,10 @@ import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.service.gamification.GamificationService;
+import com.historytalk.service.quiz.csv.QuizCsvFileReader;
+import com.historytalk.service.quiz.csv.QuizCsvRowParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -50,12 +48,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +72,8 @@ public class QuizServiceImpl implements QuizService {
     private final GamificationService gamificationService;
     private final QuizQuestionRepository quizQuestionRepository;
     private final QuestionDataValidator questionDataValidator;
+    private final QuizCsvFileReader quizCsvFileReader;
+    private final QuizCsvRowParser quizCsvRowParser;
 
     // ==================== Customer ====================
 
@@ -517,9 +513,12 @@ public class QuizServiceImpl implements QuizService {
      * Bulk-import quizzes from a CSV file.
      *
      * <p>CSV format (header required):
-     * <pre>title,contextId,level,questionContent,option1,option2,option3,option4,correctAnswer,explanation</pre>
+     * <pre>title,contextId,level,questionType,questionContent,option1..option6,correctAnswer,caseSensitive,trimWhitespace,explanation</pre>
+     * Required columns: title, contextId, level, questionContent. questionType defaults to
+     * MULTIPLE_CHOICE, so the legacy 4-option format still imports unchanged.
      *
-     * <p>Rows sharing the same {@code title} are grouped into one quiz.
+     * <p>Rows sharing the same {@code title} are grouped into one quiz and may mix question
+     * types, but must share contextId and level (difficulty belongs to the quiz).
      * A single {@code @Transactional} session is used for the entire call so that
      * all repository calls share the same Hibernate session and configured DB schema.
      * Per-quiz isolation is handled by the try/catch in the processing loop.
@@ -527,66 +526,24 @@ public class QuizServiceImpl implements QuizService {
     @Override
     @Transactional
     public QuizImportResponse importQuizzesFromCsv(MultipartFile file, UUID userId) {
-        log.info("importQuizzesFromCsv: filename={}, size={}", file.getOriginalFilename(), file.getSize());
+        log.info("importQuizzesFromCsv: filename={}, size={}",
+                file != null ? file.getOriginalFilename() : null, file != null ? file.getSize() : 0);
 
-        // ── 1. Basic file validation ──────────────────────────────────────────
-        if (file == null || file.isEmpty()) {
-            throw new InvalidRequestException("File CSV không được để trống");
-        }
-        String originalName = file.getOriginalFilename();
-        if (originalName == null || !originalName.toLowerCase().endsWith(".csv")) {
-            throw new InvalidRequestException("Chỉ chấp nhận file .csv");
-        }
-
-        // ── 2. Required CSV headers ───────────────────────────────────────────
-        List<String> requiredHeaders = Arrays.asList(
-                "title", "contextId", "level",
-                "questionContent", "option1", "option2", "option3", "option4",
-                "correctAnswer", "explanation"
-        );
-
-        // ── 3. Parse and group by title ───────────────────────────────────────
+        // ── 1. Read file (encoding, BOM, headers) and group by title ──────────
         Map<String, List<CSVRecord>> grouped = new LinkedHashMap<>();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
-
-            CSVParser parser = CSVFormat.DEFAULT
-                    .builder()
-                    .setHeader()
-                    .setSkipHeaderRecord(true)
-                    .setIgnoreEmptyLines(true)
-                    .setTrim(true)
-                    .build()
-                    .parse(reader);
-
-            // Validate that all required headers are present
-            for (String header : requiredHeaders) {
-                if (!parser.getHeaderMap().containsKey(header)) {
-                    throw new InvalidRequestException(
-                            "File CSV thiếu cột tiêu đề bắt buộc: '" + header + "'");
-                }
+        for (CSVRecord record : quizCsvFileReader.read(file)) {
+            String title = record.isSet("title") ? record.get("title").trim() : "";
+            if (title.isBlank()) {
+                continue; // skip rows with no title
             }
-
-            for (CSVRecord record : parser) {
-                String title = record.get("title").trim();
-                if (title.isBlank()) {
-                    continue; // skip rows with no title
-                }
-                grouped.computeIfAbsent(title, k -> new ArrayList<>()).add(record);
-            }
-
-        } catch (InvalidRequestException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Failed to parse CSV file", e);
-            throw new SystemException("Không thể đọc file CSV: " + e.getMessage());
+            grouped.computeIfAbsent(title, k -> new ArrayList<>()).add(record);
         }
 
         if (grouped.isEmpty()) {
             throw new InvalidRequestException("File CSV không chứa hàng dữ liệu hợp lệ nào");
         }
 
-        // ── 4. Process each quiz group ────────────────────────────────────────
+        // ── 2. Process each quiz group ────────────────────────────────────────
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
@@ -634,15 +591,33 @@ public class QuizServiceImpl implements QuizService {
 
     /**
      * Validates and persists one quiz group (quiz + questions).
+     * Every row is parsed and validated before anything is saved, so one bad row
+     * never leaves a half-imported quiz behind.
      * Called from within the outer {@code @Transactional} session in
      * {@link #importQuizzesFromCsv}, so all DB access shares the same
      * Hibernate session and schema context.
      */
     private QuizStaffResponse saveQuizGroup(String title, List<CSVRecord> rows, User user) {
-        // Validate quiz-level fields from the first row
         CSVRecord first = rows.get(0);
 
+        // Difficulty belongs to the quiz, so every row must declare the same level
+        QuizLevel level = parseRowLevel(first);
+        for (CSVRecord row : rows.subList(1, rows.size())) {
+            QuizLevel rowLevel = parseRowLevel(row);
+            if (rowLevel != level) {
+                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": level '" + rowLevel.name()
+                        + "' khác với level '" + level.name() + "' của các câu trước trong quiz '" + title
+                        + "'. Độ khó được tính cho cả quiz — hãy tách câu này sang quiz khác hoặc sửa level cho giống nhau");
+            }
+        }
+
         String contextIdStr = first.get("contextId").trim();
+        for (CSVRecord row : rows.subList(1, rows.size())) {
+            if (!contextIdStr.equals(row.get("contextId").trim())) {
+                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row)
+                        + ": contextId khác với dòng đầu của quiz '" + title + "'");
+            }
+        }
         UUID contextUuid;
         try {
             contextUuid = UUID.fromString(contextIdStr);
@@ -651,14 +626,25 @@ public class QuizServiceImpl implements QuizService {
         }
 
         HistoricalContext context = historicalContextRepository.findById(contextUuid)
+                .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "HistoricalContext not found for contextId: " + contextIdStr));
-
-        QuizLevel level = parseLevel(first.get("level").trim());
 
         // Duplicate-title check
         if (quizRepository.existsByTitleIgnoreCase(title)) {
             throw new DataConflictException("Quiz với tiêu đề '" + title + "' already exists");
+        }
+
+        // Parse and validate every question before persisting anything
+        List<QuestionRequest> questionRequests = new ArrayList<>();
+        for (CSVRecord row : rows) {
+            QuestionRequest request = quizCsvRowParser.parse(row);
+            try {
+                questionDataValidator.validate(request.getQuestionType(), request.getQuestionData());
+            } catch (InvalidRequestException e) {
+                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
+            }
+            questionRequests.add(request);
         }
 
         // Build and save the Quiz entity (draft by default)
@@ -671,62 +657,8 @@ public class QuizServiceImpl implements QuizService {
                 .build();
         quiz = quizRepository.save(quiz);
 
-        // Build and save questions
-        for (int i = 0; i < rows.size(); i++) {
-            CSVRecord row = rows.get(i);
-            int rowNum = i + 1;
-
-            String questionContent = row.get("questionContent").trim();
-            if (questionContent.isBlank()) {
-                throw new InvalidRequestException(
-                        "Hàng " + rowNum + ": questionContent must not be empty");
-            }
-
-            String[] rawOptions = {
-                    row.get("option1").trim(),
-                    row.get("option2").trim(),
-                    row.get("option3").trim(),
-                    row.get("option4").trim()
-            };
-            for (int o = 0; o < rawOptions.length; o++) {
-                if (rawOptions[o].isBlank()) {
-                    throw new InvalidRequestException(
-                            "Hàng " + rowNum + ": option" + (o + 1) + " must not be empty");
-                }
-            }
-
-            int correctIndex;
-            try {
-                correctIndex = Integer.parseInt(row.get("correctAnswer").trim());
-            } catch (NumberFormatException e) {
-                throw new InvalidRequestException(
-                        "Hàng " + rowNum + ": correctAnswer must be an integer (0-3)");
-            }
-            if (correctIndex < 0 || correctIndex > 3) {
-                throw new InvalidRequestException(
-                        "Hàng " + rowNum + ": correctAnswer must be between 0 and 3, got: " + correctIndex);
-            }
-
-            // Build typed questionData from CSV columns
-            List<QuestionOption> optionList = new ArrayList<>();
-            for (int o = 0; o < rawOptions.length; o++) {
-                optionList.add(QuestionOption.builder().id(String.valueOf(o)).text(rawOptions[o]).build());
-            }
-            MultipleChoiceQuestionData mcData = MultipleChoiceQuestionData.builder()
-                    .options(optionList)
-                    .correctOptionIds(List.of(String.valueOf(correctIndex)))
-                    .build();
-
-            String explanation = row.get("explanation").trim();
-
-            QuestionRequest qr = QuestionRequest.builder()
-                    .content(questionContent)
-                    .questionType(QuestionType.MULTIPLE_CHOICE)
-                    .questionData(objectMapper.valueToTree(mcData))
-                    .explanation(explanation.isBlank() ? null : explanation)
-                    .build();
-
-            questionRepository.save(buildQuestion(qr, quiz));
+        for (QuestionRequest request : questionRequests) {
+            questionRepository.save(buildQuestion(request, quiz));
         }
 
         // Reload to populate questions list
@@ -735,6 +667,14 @@ public class QuizServiceImpl implements QuizService {
     }
 
     // ==================== Private Helpers ====================
+
+    private QuizLevel parseRowLevel(CSVRecord row) {
+        try {
+            return parseLevel(row.get("level").trim());
+        } catch (InvalidRequestException e) {
+            throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
+        }
+    }
 
     /**
      * Re-validates the (type, data) pair a partial update would leave on the question,
