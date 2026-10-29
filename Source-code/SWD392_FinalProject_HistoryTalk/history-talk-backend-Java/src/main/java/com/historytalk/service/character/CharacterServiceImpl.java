@@ -59,8 +59,9 @@ public class CharacterServiceImpl implements CharacterService {
         boolean includeDraft = isStaffOrAdmin(role);
         boolean includeDeleted = false;
         Page<Character> result = characterRepository.findAllWithFilter(normalize(search), era, includeDraft, includeDeleted, pageable);
+        List<CharacterResponse> content = mapCharactersBatch(result.getContent());
         return PaginatedResponse.<CharacterResponse>builder()
-                .content(result.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()))
+                .content(content)
                 .totalElements(result.getTotalElements())
                 .totalPages(result.getTotalPages())
                 .currentPage(page)
@@ -113,49 +114,41 @@ public class CharacterServiceImpl implements CharacterService {
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
-        if (!isStaffOrAdmin(role)) {
+        UUID resolvedUserSchoolId = null;
+        boolean staffOrAdmin = isStaffOrAdmin(role);
+        if (!staffOrAdmin) {
             if (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null) {
                 throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
             }
-            if (context.getSchool() != null) {
-                String userId = SecurityUtils.getUserId();
-                UUID userSchoolId = null;
-                if (userId != null) {
-                    try {
-                        userSchoolId = userRepository.findById(UUID.fromString(userId))
-                                .map(User::getSchool)
-                                .map(com.historytalk.entity.school.School::getId)
-                                .orElse(null);
-                    } catch (Exception ex) {
-                        log.debug("Error retrieving user school: {}", ex.getMessage());
-                    }
+            String userId = SecurityUtils.getUserId();
+            if (userId != null) {
+                try {
+                    resolvedUserSchoolId = userRepository.findById(UUID.fromString(userId))
+                            .map(User::getSchool)
+                            .map(com.historytalk.entity.school.School::getId)
+                            .orElse(null);
+                } catch (Exception ex) {
+                    log.debug("Error retrieving user school: {}", ex.getMessage());
                 }
-                if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
+            }
+            if (context.getSchool() != null) {
+                if (resolvedUserSchoolId == null || !resolvedUserSchoolId.equals(context.getSchool().getId())) {
                     throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
                 }
             }
         }
 
-        boolean includeDraft = isStaffOrAdmin(role);
+        final UUID callerSchoolId = resolvedUserSchoolId;
+        boolean includeDraft = staffOrAdmin;
         boolean includeDeleted = false;
-        return characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
+        List<Character> filteredCharacters = characterRepository.findByContextIdOrderByNameAsc(UUID.fromString(contextId), includeDraft, includeDeleted)
                 .stream()
                 .filter(c -> {
-                    if (c.getSchool() == null || isStaffOrAdmin(role)) return true;
-                    String userId = SecurityUtils.getUserId();
-                    UUID userSchoolId = null;
-                    if (userId != null) {
-                        try {
-                            userSchoolId = userRepository.findById(UUID.fromString(userId))
-                                    .map(User::getSchool)
-                                    .map(com.historytalk.entity.school.School::getId)
-                                    .orElse(null);
-                        } catch (Exception ignored) {}
-                    }
-                    return userSchoolId != null && userSchoolId.equals(c.getSchool().getId());
+                    if (c.getSchool() == null || staffOrAdmin) return true;
+                    return callerSchoolId != null && callerSchoolId.equals(c.getSchool().getId());
                 })
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+                .toList();
+        return mapCharactersBatch(filteredCharacters);
     }
 
     @Transactional
@@ -302,9 +295,7 @@ public class CharacterServiceImpl implements CharacterService {
 
     @Transactional(readOnly = true)
     public List<CharacterResponse> getDeletedCharacters() {
-        return characterRepository.findAllDeleted().stream()
-                .map(this::mapToResponseWithInactive)
-                .toList();
+        return mapCharactersBatch(characterRepository.findAllDeleted());
     }
 
     @Transactional
@@ -384,10 +375,41 @@ public class CharacterServiceImpl implements CharacterService {
                 .toList();
     }
 
+    private List<CharacterResponse> mapCharactersBatch(List<Character> characters) {
+        if (characters.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> primaryContextIds = characters.stream()
+                .map(this::resolvePrimaryContext)
+                .filter(java.util.Objects::nonNull)
+                .map(HistoricalContext::getContextId)
+                .collect(Collectors.toSet());
+
+        java.util.Map<UUID, List<Document>> docsByContextId = new java.util.HashMap<>();
+        if (!primaryContextIds.isEmpty()) {
+            for (Document doc : documentRepository.findByEntityIdInAndEntityTypeOrderByUploadDateDesc(
+                    primaryContextIds, EntityType.CONTEXT, false)) {
+                docsByContextId.computeIfAbsent(doc.getEntityId(), k -> new java.util.ArrayList<>()).add(doc);
+            }
+        }
+
+        return characters.stream()
+                .map(c -> {
+                    HistoricalContext ctx = resolvePrimaryContext(c);
+                    List<Document> docs = ctx == null ? List.of() : docsByContextId.getOrDefault(ctx.getContextId(), List.of());
+                    return mapToResponse(c, ctx, docs);
+                })
+                .collect(Collectors.toList());
+    }
+
     private CharacterResponse mapToResponse(Character character) {
         HistoricalContext ctx = resolvePrimaryContext(character);
         List<Document> contextDocs = ctx == null ? List.of() : documentRepository
             .findByEntityIdAndEntityTypeOrderByUploadDateDesc(ctx.getContextId(), EntityType.CONTEXT, false);
+        return mapToResponse(character, ctx, contextDocs);
+    }
+
+    private CharacterResponse mapToResponse(Character character, HistoricalContext ctx, List<Document> contextDocs) {
         List<CharacterResponse.EventInfo> events = contextDocs.stream()
             .map(doc -> CharacterResponse.EventInfo.builder()
                 .id(doc.getDocId().toString())
@@ -470,14 +492,17 @@ public class CharacterServiceImpl implements CharacterService {
 
         log.warn("Create character request still uses deprecated context mapping fields: contextId/contextIds");
 
-        Set<HistoricalContext> contexts = new HashSet<>();
-        for (String id : ids) {
-            HistoricalContext ctx = contextRepository.findById(UUID.fromString(id))
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Historical Context not found with id: " + id));
-            contexts.add(ctx);
+        List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
+        List<HistoricalContext> found = contextRepository.findAllById(uuids);
+        if (found.size() != ids.size()) {
+            Set<UUID> foundIds = found.stream().map(HistoricalContext::getContextId).collect(Collectors.toSet());
+            for (String id : ids) {
+                if (!foundIds.contains(UUID.fromString(id))) {
+                    throw new ResourceNotFoundException("Historical Context not found with id: " + id);
+                }
+            }
         }
-        return contexts;
+        return new HashSet<>(found);
     }
 
     private HistoricalContext resolvePrimaryContext(Character character) {

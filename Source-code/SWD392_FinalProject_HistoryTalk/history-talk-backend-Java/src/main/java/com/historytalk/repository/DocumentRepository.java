@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     @Query("""
             SELECT d FROM Document d
+            LEFT JOIN FETCH d.createdBy
             WHERE d.entityId = :entityId
               AND d.entityType = :entityType
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
@@ -25,6 +27,20 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     @Query("""
             SELECT d FROM Document d
+            LEFT JOIN FETCH d.createdBy
+            WHERE d.entityId IN :entityIds
+              AND d.entityType = :entityType
+              AND (:includeDeleted = true OR d.deletedAt IS NULL)
+            ORDER BY d.uploadedAt DESC
+            """)
+    List<Document> findByEntityIdInAndEntityTypeOrderByUploadDateDesc(
+            @Param("entityIds") Collection<UUID> entityIds,
+            @Param("entityType") EntityType entityType,
+            @Param("includeDeleted") boolean includeDeleted);
+
+    @Query("""
+            SELECT d FROM Document d
+            LEFT JOIN FETCH d.createdBy
             WHERE d.createdBy.uid = :uid
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
             ORDER BY d.uploadedAt DESC
@@ -35,6 +51,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     @Query("""
             SELECT d FROM Document d
+            LEFT JOIN FETCH d.createdBy
             WHERE d.createdBy.uid = :uid
               AND d.entityType = :entityType
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
@@ -47,6 +64,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     @Query("""
             SELECT d FROM Document d
+            LEFT JOIN FETCH d.createdBy
             WHERE d.entityType = :entityType
               AND (:search IS NULL OR :search = ''
                    OR d.title ILIKE CONCAT('%', :search, '%')
@@ -61,6 +79,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     @Query("""
             SELECT d FROM Document d
+            LEFT JOIN FETCH d.createdBy
             WHERE d.entityType = :entityType
               AND (:includeDeleted = true OR d.deletedAt IS NULL)
             ORDER BY d.uploadedAt DESC
