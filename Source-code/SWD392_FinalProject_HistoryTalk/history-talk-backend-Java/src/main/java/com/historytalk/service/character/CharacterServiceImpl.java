@@ -492,9 +492,8 @@ public class CharacterServiceImpl implements CharacterService {
     private boolean isStaffOrAdmin(String role) {
         return role != null && (
                 "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                         || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role) || "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role)
+                        || "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role)
         );
     }
 

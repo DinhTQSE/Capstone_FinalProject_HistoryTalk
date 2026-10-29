@@ -91,7 +91,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         }
 
         // School Isolation: Local school character is only accessible to users of the same school
-        if (character.getSchool() != null && !"SYSTEM_ADMIN".equalsIgnoreCase(userRole)) {
+        if (character.getSchool() != null) {
             if (user.getSchool() == null || !user.getSchool().getId().equals(character.getSchool().getId())) {
                 throw new ResourceNotFoundException("Không tìm thấy nhân vật với ID: " + request.getCharacterId());
             }
@@ -109,7 +109,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                     && !isPubliclyVisible(context.getIsPublished(), context.getDeletedAt())) {
                 context = null; // Ignore if not visible
             }
-            if (context != null && context.getSchool() != null && !"SYSTEM_ADMIN".equalsIgnoreCase(userRole)) {
+            if (context != null && context.getSchool() != null) {
                 if (user.getSchool() == null || !user.getSchool().getId().equals(context.getSchool().getId())) {
                     context = null; // Not visible across schools
                 } else if (!canAccessClassOnly(user, userRole, context.getContentScope(), context.getCreatedBy(),
@@ -280,9 +280,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
     private boolean isStaffOrAdmin(String role) {
         return role != null && ("CONTENT_ADMIN".equalsIgnoreCase(role)
-                || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                || "STAFF".equalsIgnoreCase(role)
-                || "ADMIN".equalsIgnoreCase(role));
+                || "STAFF".equalsIgnoreCase(role));
     }
 
     /**
@@ -292,7 +290,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private boolean canAccessClassOnly(User user, String userRole, ContentScope scope, User createdBy,
                                        UUID entityId, EntityType entityType) {
         if (scope != ContentScope.CLASS_ONLY || isStaffOrAdmin(userRole)
-                || "SYSTEM_ADMIN".equalsIgnoreCase(userRole) || user.getRole() == UserRole.SCHOOL_ADMIN) {
+                || user.getRole() == UserRole.SCHOOL_ADMIN) {
             return true;
         }
         if (user.getRole() == UserRole.TEACHER) {

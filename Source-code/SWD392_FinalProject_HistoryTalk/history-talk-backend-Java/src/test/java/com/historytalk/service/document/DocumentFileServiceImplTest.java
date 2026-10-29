@@ -97,6 +97,20 @@ class DocumentFileServiceImplTest {
     }
 
     @Test
+    void uploadPdfFileRejectsSystemAdminBeforeLoadingDocument() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "source.pdf",
+                "application/pdf",
+                "pdf-bytes".getBytes());
+
+        assertThatThrownBy(() -> service.uploadPdfFile(UUID.randomUUID().toString(), file, UUID.randomUUID().toString(), "SYSTEM_ADMIN"))
+                .isInstanceOf(InvalidRequestException.class);
+
+        verifyNoInteractions(documentRepository, storageService);
+    }
+
+    @Test
     void uploadPdfFileThrowsNotFoundWhenDocumentDoesNotExist() {
         UUID docId = UUID.randomUUID();
         MockMultipartFile file = new MockMultipartFile(
@@ -136,7 +150,7 @@ class DocumentFileServiceImplTest {
         DownloadedDocumentFile response = service.downloadPdfFile(
                 docId.toString(),
                 UUID.randomUUID().toString(),
-                "SYSTEM_ADMIN");
+                "CONTENT_ADMIN");
 
         assertThat(response.bytes()).isEqualTo(bytes);
         assertThat(response.contentType()).isEqualTo("application/pdf");

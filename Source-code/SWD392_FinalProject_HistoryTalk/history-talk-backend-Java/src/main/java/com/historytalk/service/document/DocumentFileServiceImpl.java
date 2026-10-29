@@ -102,9 +102,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         if (role == null) return false;
         String r = role.toUpperCase(java.util.Locale.ROOT).replace("ROLE_", "");
         return "CONTENT_ADMIN".equals(r)
-                || "SYSTEM_ADMIN".equals(r)
                 || "STAFF".equals(r)
-                || "ADMIN".equals(r)
                 || "TEACHER".equals(r)
                 || "SCHOOL_ADMIN".equals(r);
     }

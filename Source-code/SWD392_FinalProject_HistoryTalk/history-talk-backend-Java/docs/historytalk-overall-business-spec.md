@@ -98,5 +98,6 @@
 | Purchase Tier via PayOS | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Manage Classrooms & Assignments | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Manage School Accounts (Excel Import) | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
-| Manage Characters, Contexts, Docs | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| View Analytics & System Trash | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Manage Characters, Contexts, Docs, Quizzes, Quests, Map | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Content Trash (restore / purge) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| View Analytics, Manage Users, Schools, Tiers, Payments | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |

@@ -2,7 +2,7 @@
 
 Tài liệu này liệt kê **các API và field mà FE đang dùng** ở màn hình bản đồ, để BE đối chiếu và triển khai phần còn thiếu.
 
-- Màn hình: `/map` (người học), `/staff/map` (CONTENT_ADMIN), `/staff/admin/map` (SYSTEM_ADMIN). Cả 3 dùng chung một component.
+- Màn hình: `/map` (người học), `/staff/map` (CONTENT_ADMIN). Cả 2 dùng chung một component. SYSTEM_ADMIN không có quyền bản đồ.
 - URL state: `?battle=<contextId>` (trận đang chọn) · `&view=detail` (trang trận đánh) · `&view=edit` (editor lược đồ, chỉ admin).
 - Base URL: `${NEXT_PUBLIC_API_BASE_URL}${NEXT_PUBLIC_API_BASE_PATH ?? "/api/v1"}`; gửi token qua axios client chung.
 - Envelope: FE luôn đọc dữ liệu ở `response.data.data`. Khi có lỗi, FE hiển thị toast `response.data.message`.
@@ -158,7 +158,7 @@ Dùng chung API với trang chat, không thay đổi gì:
    - Trả về trong `GET /historical-contexts` (danh sách) và `GET /historical-contexts/{id}`.
    - Nhận trong `POST /historical-contexts` và `PUT /historical-contexts/{id}`. FE đã có sẵn code gửi `battleMap` trong `eventService.update`, chỉ cần nối với nút Lưu.
    - Lưu nguyên object trong một lần cập nhật (không merge từng symbol).
-   - Chỉ CONTENT_ADMIN / SYSTEM_ADMIN được ghi.
+   - Chỉ CONTENT_ADMIN (và TEACHER / SCHOOL_ADMIN với nội dung trường) được ghi.
 2. **Endpoint upload ảnh lược đồ** trả về URL hiển thị được, ví dụ:
    `POST /media/upload` (multipart, field `file`, PNG/JPG/WebP, ≤ 2 MB) → `{ "data": { "url": "https://…" } }`.
    Nếu BE đã có endpoint upload dùng cho `imageUrl` của context hoặc avatar nhân vật, báo lại tên endpoint để FE dùng lại.

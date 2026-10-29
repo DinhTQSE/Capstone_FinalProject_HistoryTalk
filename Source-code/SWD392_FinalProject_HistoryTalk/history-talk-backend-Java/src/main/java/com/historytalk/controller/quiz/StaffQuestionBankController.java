@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @RequestMapping("/api/v1/staff/question-bank")
-@PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+@PreAuthorize("hasRole('CONTENT_ADMIN')")
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Question Bank (Staff)", description = "Manage reusable bank questions independently of quizzes")
 public class StaffQuestionBankController {

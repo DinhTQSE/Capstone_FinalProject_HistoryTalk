@@ -34,7 +34,7 @@ public class DocumentFileController {
     private final DocumentFileService documentFileService;
 
     @PostMapping(value = "/{docId}/upload-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF file for an existing document")
     public ResponseEntity<ApiResponse<DocumentFileResponse>> uploadPdfFile(
@@ -48,7 +48,7 @@ public class DocumentFileController {
     }
 
     @GetMapping("/{docId}/pdf-url")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN', 'SCHOOL_STUDENT')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER', 'SCHOOL_ADMIN', 'SCHOOL_STUDENT')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a signed Supabase URL for an existing PDF document")
     public ResponseEntity<ApiResponse<DocumentPdfUrlResponse>> createPdfUrl(@PathVariable String docId) {

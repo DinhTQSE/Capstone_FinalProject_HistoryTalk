@@ -117,7 +117,7 @@ public class Character {
 
     /**
      * Non-null when this character is school-owned local content.
-     * NULL means global content managed by CONTENT_ADMIN / SYSTEM_ADMIN.
+     * NULL means global content managed by CONTENT_ADMIN.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "school_id", nullable = true)

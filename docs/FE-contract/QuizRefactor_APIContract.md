@@ -165,9 +165,9 @@ Bắt đầu phiên làm bài. Không cần body.
 
 ---
 
-## 8. Quiz — Content Admin/System Admin
+## 8. Quiz — Content Admin
 
-> Tất cả endpoint dưới yêu cầu role `CONTENT_ADMIN` hoặc `SYSTEM_ADMIN`.
+> Tất cả endpoint dưới yêu cầu role `CONTENT_ADMIN`. `SYSTEM_ADMIN` không có quyền quản lý nội dung.
 
 ### Object `ContentAdminQuizSet`
 
@@ -379,5 +379,5 @@ Xóa câu hỏi. Response `200`.
 
 ### Role check
 
-- `/staff/*` endpoints: check `role IN ('CONTENT_ADMIN', 'SYSTEM_ADMIN')` từ JWT → `403` nếu không đủ quyền.
+- `/staff/*` endpoints: check `role = 'CONTENT_ADMIN'` (riêng `/staff/quizzes` cho thêm `TEACHER`, `SCHOOL_ADMIN`; `/staff/quizzes/sessions` chỉ `SYSTEM_ADMIN`) từ JWT → `403` nếu không đủ quyền.
 - `POST /auth/register-content-admin`: chỉ `SYSTEM_ADMIN` được gọi.

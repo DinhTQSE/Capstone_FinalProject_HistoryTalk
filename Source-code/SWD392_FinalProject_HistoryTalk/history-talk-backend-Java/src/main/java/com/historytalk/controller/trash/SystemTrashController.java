@@ -24,9 +24,9 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping({"/api/v1/system/trash", "/api/v1/system-trash", "/api/v1/trash"})
-@PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+@PreAuthorize("hasRole('CONTENT_ADMIN')")
 @SecurityRequirement(name = "bearerAuth")
-@Tag(name = "Content Trash", description = "CONTENT_ADMIN and SYSTEM_ADMIN trash restore and permanent delete APIs")
+@Tag(name = "Content Trash", description = "CONTENT_ADMIN trash restore and permanent delete APIs")
 public class SystemTrashController {
 
     private final TrashService trashService;

@@ -287,7 +287,7 @@ Láº¥y danh sÃ¡ch nhÃ¢n váº­t thuá»™c 1 bá»‘i cáº£nh lá»�
 
 ### `POST /characters`
 
-YÃªu cáº§u role `CONTENT_ADMIN` | `SYSTEM_ADMIN`.
+YÃªu cáº§u role `CONTENT_ADMIN` (hoặc `TEACHER` | `SCHOOL_ADMIN` cho nội dung trường). `SYSTEM_ADMIN` không có quyền nội dung.
 
 **Request:**
 ```json
@@ -410,7 +410,7 @@ Gáº¯n nhÃ¢n váº­t vÃ o bá»‘i cáº£nh. Response `200`.
 
 ### `POST /historical-contexts`
 
-YÃªu cáº§u role `CONTENT_ADMIN` | `SYSTEM_ADMIN`.
+YÃªu cáº§u role `CONTENT_ADMIN` (hoặc `TEACHER` | `SCHOOL_ADMIN` cho nội dung trường). `SYSTEM_ADMIN` không có quyền nội dung.
 
 **Request:**
 ```json
@@ -816,9 +816,9 @@ Báº¯t Ä‘áº§u phiÃªn lÃ m bÃ i. KhÃ´ng cáº§n body.
 
 ---
 
-## 8. Quiz â€” Content Admin/System Admin
+## 8. Quiz â€” Content Admin
 
-> Táº¥t cáº£ endpoint dÆ°á»›i yÃªu cáº§u role `CONTENT_ADMIN` hoáº·c `SYSTEM_ADMIN`.
+> Táº¥t cáº£ endpoint dÆ°á»›i yÃªu cáº§u role `CONTENT_ADMIN`. `SYSTEM_ADMIN` không có quyền quản lý nội dung.
 
 ### Object `ContentAdminQuizSet`
 
@@ -1022,7 +1022,7 @@ XÃ³a cÃ¢u há»i. Response `200`.
 
 ### Role check
 
-- `/staff/*` endpoints: check `role IN ('CONTENT_ADMIN', 'SYSTEM_ADMIN')` tá»« JWT â†’ `403` náº¿u khÃ´ng Ä‘á»§ quyá»n.
+- `/staff/*` endpoints: check `role = 'CONTENT_ADMIN'` (riêng `/staff/quizzes` cho thêm `TEACHER`, `SCHOOL_ADMIN`; `/staff/quizzes/sessions` chỉ `SYSTEM_ADMIN`) tá»« JWT â†’ `403` náº¿u khÃ´ng Ä‘á»§ quyá»n.
 - `POST /auth/register-content-admin`: chá»‰ `SYSTEM_ADMIN` Ä‘Æ°á»£c gá»i.
 
 ---

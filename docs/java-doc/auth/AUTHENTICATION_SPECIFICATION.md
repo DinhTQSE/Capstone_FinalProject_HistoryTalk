@@ -28,7 +28,7 @@ sequenceDiagram
 ### Roles & Permissions (RBAC)
 - **`CUSTOMER`**: Default registered user. Access to chat sessions, quizzes, public characters/contexts, and payment checkout.
 - **`CONTENT_ADMIN`**: Content manager. Can manage characters, contexts, documents, media uploads, and quizzes.
-- **`SYSTEM_ADMIN`**: System administrator. Full system access, including staff registration and payment management.
+- **`SYSTEM_ADMIN`**: Platform operator. Manages user accounts (incl. staff registration), schools, tiers, payments, dashboards and analytics. Has **no** content-management permissions — content belongs to `CONTENT_ADMIN`.
 
 ---
 

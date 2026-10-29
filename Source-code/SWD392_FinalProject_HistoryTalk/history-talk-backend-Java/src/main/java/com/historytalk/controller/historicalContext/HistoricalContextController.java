@@ -90,7 +90,7 @@ public class HistoricalContextController {
      * Create a new historical context (Staff only)
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create a new historical context", description = "Create a new historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> createContext(
@@ -111,7 +111,7 @@ public class HistoricalContextController {
      * Update an existing historical context
      */
     @PutMapping("/{contextId}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
         @Operation(summary = "Update a historical context", description = "Update an existing historical context (Staff/Admin only)")
     public ResponseEntity<ApiResponse<?>> updateContext(
@@ -134,7 +134,7 @@ public class HistoricalContextController {
          * Delete a historical context
          */
     @DeleteMapping("/{contextId}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('CONTENT_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
         @Operation(summary = "Delete a historical context", description = "Delete a historical context (Staff/Admin only)")
     public ResponseEntity<Void> deleteContext(
@@ -153,7 +153,7 @@ public class HistoricalContextController {
      * Soft-delete a historical context (marks as deleted, preserves data)
      */
     @PatchMapping("/{contextId}/soft-delete")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('CONTENT_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Soft-delete a historical context",
                description = "Mark a historical context as deleted (data preserved). Cascades to context documents, chat sessions, and quizzes; mapped characters remain independent.")

@@ -153,11 +153,8 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         return "users/%s/avatar/%s".formatted(userId, fileName);
     }
 
+    // Managing another user's avatar is account management, which belongs to SYSTEM_ADMIN only.
     private boolean isAdmin(String userRole) {
-        return userRole != null && (
-                "ADMIN".equalsIgnoreCase(userRole)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(userRole)
-                        || "CONTENT_ADMIN".equalsIgnoreCase(userRole)
-        );
+        return "SYSTEM_ADMIN".equalsIgnoreCase(userRole);
     }
 }

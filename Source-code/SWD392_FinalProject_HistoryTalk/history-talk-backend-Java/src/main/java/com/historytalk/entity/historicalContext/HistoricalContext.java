@@ -76,7 +76,7 @@ public class HistoricalContext {
      * Nullable JSON object representing the admin-drawn battle-map overlay.
      * Stores version, mode, imageUrl, imageSource, factions[], and symbols[].
      * Validated against the isBattleMap schema in the service layer before saving.
-     * Only CONTENT_ADMIN / SYSTEM_ADMIN may write this field.
+     * Only CONTENT_ADMIN may write this field.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "battle_map", columnDefinition = "jsonb")
@@ -97,7 +97,7 @@ public class HistoricalContext {
 
     /**
      * Non-null when this context is school-owned local content.
-     * NULL means global content managed by CONTENT_ADMIN / SYSTEM_ADMIN.
+     * NULL means global content managed by CONTENT_ADMIN.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "school_id", nullable = true)

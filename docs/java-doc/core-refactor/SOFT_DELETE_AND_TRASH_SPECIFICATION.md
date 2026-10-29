@@ -44,6 +44,6 @@ stateDiagram-v2
 
 | Method | Endpoint | Access Level | Description |
 |---|---|---|---|
-| `GET` | `/api/v1/trash` | `SYSTEM_ADMIN` | List all soft-deleted items in Trash Can (Characters, Contexts, Quizzes, Documents). |
-| `POST` | `/api/v1/trash/{entityType}/{entityId}/restore` | `SYSTEM_ADMIN` | Restore a soft-deleted item back to Active state. |
-| `DELETE` | `/api/v1/trash/{entityType}/{entityId}/purge` | `SYSTEM_ADMIN` | Permanently delete an item from Database (Hard Delete). |
+| `GET` | `/api/v1/trash` | `CONTENT_ADMIN` | List all soft-deleted items in Trash Can (Characters, Contexts, Quizzes, Documents). |
+| `POST` | `/api/v1/trash/{entityType}/{entityId}/restore` | `CONTENT_ADMIN` | Restore a soft-deleted item back to Active state. |
+| `DELETE` | `/api/v1/trash/{entityType}/{entityId}/purge` | `CONTENT_ADMIN` | Permanently delete an item from Database (Hard Delete). |

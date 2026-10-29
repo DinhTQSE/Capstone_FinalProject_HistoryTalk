@@ -416,9 +416,7 @@ public class DocumentMediaServiceImpl implements MediaService {
 
     private boolean isPlatformRole(String role) {
         return isRole(role, "CONTENT_ADMIN")
-                || isRole(role, "SYSTEM_ADMIN")
-                || isRole(role, "STAFF")
-                || isRole(role, "ADMIN");
+                || isRole(role, "STAFF");
     }
 
     private boolean isRole(String role, String expected) {

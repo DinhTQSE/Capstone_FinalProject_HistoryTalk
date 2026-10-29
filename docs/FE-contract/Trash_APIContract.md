@@ -2,7 +2,7 @@
 
 > **Base URL:** `{BACKEND_BASE_URL}/api/v1`  
 > **Auth:** `Authorization: Bearer <accessToken>`  
-> **Required role:** `CONTENT_ADMIN` | `SYSTEM_ADMIN`  
+> **Required role:** `CONTENT_ADMIN` (`SYSTEM_ADMIN` → `403`)  
 > **Response wrapper:** `{ success: boolean, message: string, data: T, timestamp: string }`
 
 ## 1. Types
@@ -267,7 +267,7 @@ Example:
 
 ## 6. FE Integration Notes
 
-- Trash module should be visible to `CONTENT_ADMIN` and `SYSTEM_ADMIN`.
+- Trash module should be visible to `CONTENT_ADMIN` only. `SYSTEM_ADMIN` has no content permissions.
 - Use separate tabs or filters for `characters`, `historical-contexts`, and `quizzes`.
 - Restore and hard delete are bulk-safe; FE can call the same endpoint for one or many selected rows.
 - `NOT_TRASHED` and `NOT_FOUND` are row-level results, not full request failures.

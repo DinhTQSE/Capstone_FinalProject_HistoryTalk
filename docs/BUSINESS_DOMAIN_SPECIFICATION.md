@@ -34,8 +34,8 @@ The application strictly enforces Role-Based Access Control (RBAC) across all RE
 | --- | --- | --- |
 | `GUEST` | Unauthenticated public visitor. | Browse active/published contexts, characters, documents, and public quizzes. |
 | `CUSTOMER` | Registered learner account. | Manage profile, start AI chat sessions, submit quiz answers, check-in daily, complete quests, buy tier packages via PayOS. |
-| `STAFF` / `CONTENT_ADMIN` | Content Operator / Educator. | Create & manage draft/published historical contexts, characters, documents, mappings, quizzes, and staff quests. |
-| `ADMIN` / `SYSTEM_ADMIN` | Platform Operator / Superadmin. | All staff permissions + manage user accounts, system dashboard metrics, revenue analytics, soft-deleted trash recovery/purge, and global system configurations. |
+| `STAFF` / `CONTENT_ADMIN` | Content Operator / Educator. | Create & manage draft/published historical contexts, characters, documents, mappings, map pins/focus, quizzes, question bank, staff quests, and soft-deleted content trash recovery/purge. |
+| `ADMIN` / `SYSTEM_ADMIN` | Platform Operator. | Manage user accounts (incl. creating CONTENT_ADMIN / SYSTEM_ADMIN), schools & school subscriptions, tier packages, payment history, system dashboard metrics, revenue analytics, and quiz session history. **Has no content-management permissions** — content is owned by `CONTENT_ADMIN`. |
 
 ### Authentication & Token Flow
 

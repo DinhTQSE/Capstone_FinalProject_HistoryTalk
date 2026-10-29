@@ -1,6 +1,6 @@
 # Định dạng CSV import quiz
 
-Endpoint (quyền `CONTENT_ADMIN`, `SYSTEM_ADMIN`, `TEACHER`, `SCHOOL_ADMIN`):
+Endpoint (quyền `CONTENT_ADMIN`, `TEACHER`, `SCHOOL_ADMIN`):
 
 | Mục đích | Endpoint |
 |---|---|

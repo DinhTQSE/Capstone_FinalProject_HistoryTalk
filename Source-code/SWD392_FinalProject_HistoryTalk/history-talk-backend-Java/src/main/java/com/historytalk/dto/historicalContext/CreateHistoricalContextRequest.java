@@ -64,7 +64,7 @@ public class CreateHistoricalContextRequest {
      * Optional. Full battleMap object (version, mode, imageUrl, factions[], symbols[]).
      * See map-api.md §5 for the full schema.
      * If null, no battle map is stored. Validated in service before persisting.
-     * Only CONTENT_ADMIN / SYSTEM_ADMIN are permitted to set this.
+     * Only CONTENT_ADMIN are permitted to set this.
      */
     @JsonProperty("battleMap")
     private Object battleMap;

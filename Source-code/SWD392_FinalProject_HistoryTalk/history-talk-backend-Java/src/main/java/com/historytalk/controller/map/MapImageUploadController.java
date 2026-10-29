@@ -47,13 +47,13 @@ public class MapImageUploadController {
      * Returns the permanent public URL so the FE can embed it in
      * {@code battleMap.imageUrl}.
      *
-     * <p>Authorization: CONTENT_ADMIN, SYSTEM_ADMIN, STAFF, ADMIN
+     * <p>Authorization: CONTENT_ADMIN, TEACHER, SCHOOL_ADMIN
      *
      * @param file Binary image file (multipart/form-data, field name {@code file}).
      * @return {@code { "data": { "url": "https://..." } }}
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
             summary = "Upload a battle-map background image",

@@ -771,9 +771,7 @@ public class QuizServiceImpl implements QuizService {
     private boolean isContentManager(String role) {
         return role != null && (
                 "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                         || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role)
         );
     }
 

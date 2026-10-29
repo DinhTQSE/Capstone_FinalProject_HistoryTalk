@@ -53,7 +53,7 @@ erDiagram
 Both Characters and Historical Contexts support a clean 3-state lifecycle:
 
 1. **Draft State (`is_published = FALSE`, `is_active = TRUE`, `deleted_at IS NULL`)**:
-   - Created by `CONTENT_ADMIN` or `SYSTEM_ADMIN`. Visible only to admins for content editing.
+   - Created by `CONTENT_ADMIN` (or `TEACHER` / `SCHOOL_ADMIN` for school-local content). Visible only to content editors.
 2. **Published State (`is_published = TRUE`, `is_active = TRUE`, `deleted_at IS NULL`)**:
    - Publicly accessible via `/api/v1/characters` and `/api/v1/historical-contexts` for all users and AI Chat sessions.
 3. **Trash State (`is_active = FALSE` or `deleted_at IS NOT NULL`)**:

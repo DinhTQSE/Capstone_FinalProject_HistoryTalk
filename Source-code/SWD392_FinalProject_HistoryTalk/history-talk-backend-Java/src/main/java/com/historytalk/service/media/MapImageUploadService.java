@@ -21,7 +21,7 @@ public interface MapImageUploadService {
      *
      * @param file     PNG, JPG, or WebP file; maximum 2 MB.
      * @param userId   Caller's user ID (for logging / audit).
-     * @param userRole Caller's role; must be CONTENT_ADMIN / SYSTEM_ADMIN / STAFF / ADMIN.
+     * @param userRole Caller's role; must be CONTENT_ADMIN / TEACHER / SCHOOL_ADMIN.
      * @return Permanent public Supabase URL to the uploaded image.
      * @throws com.historytalk.exception.InvalidRequestException if the file fails validation.
      */
