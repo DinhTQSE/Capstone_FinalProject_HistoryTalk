@@ -34,12 +34,15 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
 
     /**
      * Question Bank search: non-deleted questions, optionally filtered by type and content.
+     * The `:search = ''` comparison types the parameter as text; without it PostgreSQL binds a null
+     * :search as bytea and LOWER(bytea) fails, which made the whole bank load as empty.
      */
     @Query("""
             SELECT q FROM Question q
             WHERE q.deletedAt IS NULL
             AND (:questionType IS NULL OR q.questionType = :questionType)
-            AND (:search IS NULL OR LOWER(q.content) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:search IS NULL OR :search = ''
+                 OR LOWER(q.content) LIKE LOWER(CONCAT('%', :search, '%')))
             ORDER BY q.createdAt DESC
             """)
     Page<Question> findAllForBank(@Param("questionType") QuestionType questionType,
