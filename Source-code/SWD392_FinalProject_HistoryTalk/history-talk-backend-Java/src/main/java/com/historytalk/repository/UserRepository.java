@@ -37,14 +37,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsBySchoolIdAndStudentCodeIgnoreCase(UUID schoolId, String studentCode);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"school"})
     org.springframework.data.domain.Page<User> findBySchoolIdAndRole(UUID schoolId, UserRole role, org.springframework.data.domain.Pageable pageable);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"school"})
     List<User> findBySchoolIdAndRoleAndDeletedAtIsNull(UUID schoolId, UserRole role);
 
     long countBySchoolIdAndRole(UUID schoolId, UserRole role);
 
     boolean existsByEmailIgnoreCaseAndUidNot(String email, UUID uid);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"school"})
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = :role " +
            "AND (:active IS NULL OR (:active = true AND u.deletedAt IS NULL) OR (:active = false AND u.deletedAt IS NOT NULL)) " +
            "AND (CAST(:search AS string) IS NULL OR :search = '' " +
@@ -60,6 +63,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             org.springframework.data.domain.Pageable pageable
     );
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"school"})
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
            "AND (u.accountStatus IS NULL OR u.accountStatus <> com.historytalk.entity.enums.AccountStatus.DEACTIVATED) " +
            "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.status = 'ACTIVE' " +
@@ -70,6 +74,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             org.springframework.data.domain.Pageable pageable
     );
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"school"})
     @Query("SELECT u FROM User u WHERE u.school.id = :schoolId AND u.role = 'SCHOOL_STUDENT' AND u.deletedAt IS NULL " +
            "AND (u.accountStatus IS NULL OR u.accountStatus <> com.historytalk.entity.enums.AccountStatus.DEACTIVATED) " +
            "AND u.uid NOT IN (SELECT cs.student.uid FROM ClassStudent cs WHERE cs.status = 'ACTIVE' " +

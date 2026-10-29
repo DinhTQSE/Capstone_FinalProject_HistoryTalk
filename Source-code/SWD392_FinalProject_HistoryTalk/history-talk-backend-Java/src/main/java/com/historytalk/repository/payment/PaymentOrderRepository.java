@@ -27,7 +27,8 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     Optional<PaymentOrder> findByOrderCodeForUpdate(@Param("orderCode") Long orderCode);
 
     // Fixed: was findByUser_UidOrderByCreateAtDesc (typo: createAt → createdAt)
-    List<PaymentOrder> findByUser_UidOrderByCreatedAtDesc(UUID uid);
+    @Query("SELECT o FROM PaymentOrder o LEFT JOIN FETCH o.tier WHERE o.user.uid = :uid ORDER BY o.createdAt DESC")
+    List<PaymentOrder> findByUser_UidOrderByCreatedAtDesc(@Param("uid") UUID uid);
 
     // Fixed: was OffsetDateTime, but PaymentOrder.expiredAt is LocalDateTime
     @Query("""
@@ -68,7 +69,7 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
      * Both filters are optional — passing null ignores that filter.
      * JOIN FETCH on user and tier prevents N+1 selects on lazy associations.
      */
-    @Query("""
+    @Query(value = """
         SELECT o FROM PaymentOrder o
         JOIN FETCH o.user u
         JOIN FETCH o.tier t
@@ -76,6 +77,12 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
           AND (:status IS NULL OR o.status = :status)
           AND (:userId IS NULL OR u.uid = :userId)
         ORDER BY o.createdAt DESC
+    """,
+    countQuery = """
+        SELECT COUNT(o) FROM PaymentOrder o
+        WHERE o.deletedAt IS NULL
+          AND (:status IS NULL OR o.status = :status)
+          AND (:userId IS NULL OR o.user.uid = :userId)
     """)
     Page<PaymentOrder> findAllForAdmin(
             @Param("status") PaymentOrderStatus status,
