@@ -24,8 +24,11 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
      *   - characters they own, OR
      *   - SCHOOL_WIDE characters in the same school.
      */
-    @Query("""
+    @Query(value = """
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.school.id = :schoolId
               AND c.deletedAt IS NULL
               AND (
@@ -36,6 +39,18 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))
             ORDER BY c.name ASC
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.deletedAt IS NULL
+              AND (
+                c.createdBy.uid = :teacherId
+                OR c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE
+              )
+              AND (:search IS NULL OR :search = ''
+                   OR c.name ILIKE CONCAT('%', :search, '%')
+                   OR c.background ILIKE CONCAT('%', :search, '%'))
             """)
     Page<Character> findVisibleToTeacher(
             @Param("schoolId") UUID schoolId,
@@ -46,14 +61,25 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
     /**
      * All local characters in the school for School Admin review.
      */
-    @Query("""
+    @Query(value = """
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.school.id = :schoolId
               AND c.deletedAt IS NULL
               AND (:search IS NULL OR :search = ''
                    OR c.name ILIKE CONCAT('%', :search, '%'))
               AND (:scope IS NULL OR c.contentScope = :scope)
             ORDER BY c.name ASC
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.deletedAt IS NULL
+              AND (:search IS NULL OR :search = ''
+                   OR c.name ILIKE CONCAT('%', :search, '%'))
+              AND (:scope IS NULL OR c.contentScope = :scope)
             """)
     Page<Character> findAllBySchool(
             @Param("schoolId") UUID schoolId,
@@ -66,8 +92,11 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
      *   - SCHOOL_WIDE published characters, OR
      *   - CLASS_ONLY published characters assigned to one of the student's enrolled classrooms (or given classroom).
      */
-    @Query("""
+    @Query(value = """
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.school.id = :schoolId
               AND c.isPublished = true
               AND c.contentStatus = com.historytalk.entity.enums.ContentStatus.ACTIVE
@@ -87,6 +116,27 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
                    OR c.name ILIKE CONCAT('%', :search, '%')
                    OR c.background ILIKE CONCAT('%', :search, '%'))
             ORDER BY c.name ASC
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.isPublished = true
+              AND c.contentStatus = com.historytalk.entity.enums.ContentStatus.ACTIVE
+              AND c.deletedAt IS NULL
+              AND (
+                c.contentScope = com.historytalk.entity.enums.ContentScope.SCHOOL_WIDE
+                OR (
+                    c.contentScope = com.historytalk.entity.enums.ContentScope.CLASS_ONLY
+                    AND (:hasClasses = true AND c.characterId IN (
+                        SELECT clc.entityId FROM ClassLocalContent clc
+                        WHERE clc.entityType = com.historytalk.entity.enums.EntityType.CHARACTER
+                          AND clc.classId IN :classIds
+                    ))
+                )
+              )
+              AND (:search IS NULL OR :search = ''
+                   OR c.name ILIKE CONCAT('%', :search, '%')
+                   OR c.background ILIKE CONCAT('%', :search, '%'))
             """)
     Page<Character> findVisibleToStudent(
             @Param("schoolId") UUID schoolId,
@@ -100,6 +150,9 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
      */
     @Query("""
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.school.id = :schoolId
               AND c.isPublished = true
               AND c.deletedAt IS NULL
@@ -109,6 +162,9 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
 
     @Query("""
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.characterId = :id
               AND c.school.id = :schoolId
               AND c.deletedAt IS NULL
@@ -125,16 +181,27 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
 
     // ── Trash & Restore queries ───────────────────────────────────────────────
 
-    @Query("""
+    @Query(value = """
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.school.id = :schoolId
               AND c.deletedAt IS NOT NULL
             ORDER BY c.deletedAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(c) FROM Character c
+            WHERE c.school.id = :schoolId
+              AND c.deletedAt IS NOT NULL
             """)
     Page<Character> findTrashBySchool(@Param("schoolId") UUID schoolId, Pageable pageable);
 
     @Query(value = """
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.school.id = :schoolId
               AND c.createdBy.uid = :creatorId
               AND c.deletedAt IS NOT NULL
@@ -152,6 +219,9 @@ public interface LocalCharacterRepository extends JpaRepository<Character, UUID>
 
     @Query("""
             SELECT c FROM Character c
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.approvedBy
+            LEFT JOIN FETCH c.school
             WHERE c.characterId = :id
               AND c.school.id = :schoolId
               AND c.deletedAt IS NOT NULL

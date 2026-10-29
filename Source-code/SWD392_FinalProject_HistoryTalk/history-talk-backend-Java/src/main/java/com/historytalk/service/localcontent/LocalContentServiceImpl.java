@@ -207,7 +207,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         Page<HistoricalContext> pageResult = localContextRepo.findVisibleToTeacher(
                 school.getId(), teacherId, normalize(search), pageable);
 
-        Page<LocalContentResponse> mapped = pageResult.map(this::mapContextToResponse);
+        Page<LocalContentResponse> mapped = mapContextPage(pageResult);
         if (status != null && !status.isBlank()) {
             List<LocalContentResponse> filtered = mapped.getContent().stream()
                     .filter(r -> r.getStatus() != null && r.getStatus().name().equalsIgnoreCase(status))
@@ -354,7 +354,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         Page<Character> pageResult = localCharacterRepo.findVisibleToTeacher(
                 school.getId(), teacherId, normalize(search), pageable);
 
-        Page<LocalContentResponse> mapped = pageResult.map(this::mapCharacterToResponse);
+        Page<LocalContentResponse> mapped = mapCharacterPage(pageResult);
         if (status != null && !status.isBlank()) {
             List<LocalContentResponse> filtered = mapped.getContent().stream()
                     .filter(r -> r.getStatus() != null && r.getStatus().name().equalsIgnoreCase(status))
@@ -436,7 +436,7 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         Page<HistoricalContext> pageResult = localContextRepo.findAllBySchool(
                 schoolId, normalize(search), scope, pageable);
-        Page<LocalContentResponse> mappedCtx = pageResult.map(this::mapContextToResponse);
+        Page<LocalContentResponse> mappedCtx = mapContextPage(pageResult);
         if (status != null && !status.isBlank()) {
             List<LocalContentResponse> filtered = mappedCtx.getContent().stream()
                     .filter(r -> r.getStatus() != null && r.getStatus().name().equalsIgnoreCase(status))
@@ -456,7 +456,7 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         Page<Character> pageResult = localCharacterRepo.findAllBySchool(
                 schoolId, normalize(search), scope, pageable);
-        Page<LocalContentResponse> mappedChar = pageResult.map(this::mapCharacterToResponse);
+        Page<LocalContentResponse> mappedChar = mapCharacterPage(pageResult);
         if (status != null && !status.isBlank()) {
             List<LocalContentResponse> filtered = mappedChar.getContent().stream()
                     .filter(r -> r.getStatus() != null && r.getStatus().name().equalsIgnoreCase(status))
@@ -516,7 +516,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         Page<HistoricalContext> pageResult = localContextRepo.findVisibleToStudent(
                 school.getId(), hasClasses, safeClassIds, normalize(search), pageable);
 
-        return buildPage(pageResult.map(this::mapContextToResponse));
+        return buildPage(mapContextPage(pageResult));
     }
 
     @Override
@@ -535,7 +535,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         Page<Character> pageResult = localCharacterRepo.findVisibleToStudent(
                 school.getId(), hasClasses, safeClassIds, normalize(search), pageable);
 
-        return buildPage(pageResult.map(this::mapCharacterToResponse));
+        return buildPage(mapCharacterPage(pageResult));
     }
 
     @Override
@@ -828,7 +828,42 @@ public class LocalContentServiceImpl implements LocalContentService {
 
     // ── Mapper: HistoricalContext → LocalContentResponse ─────────────────────
 
+    private Page<LocalContentResponse> mapContextPage(Page<HistoricalContext> page) {
+        if (page.isEmpty()) {
+            return page.map(ctx -> mapContextToResponse(ctx, List.of()));
+        }
+        List<UUID> ids = page.getContent().stream().map(HistoricalContext::getContextId).toList();
+        java.util.Map<UUID, List<String>> classIdsByEntityId = classLocalContentRepo
+                .findByEntityIdInAndEntityType(ids, EntityType.CONTEXT)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ClassLocalContent::getEntityId,
+                        Collectors.mapping(c -> c.getClassId().toString(), Collectors.toList())));
+        return page.map(ctx -> mapContextToResponse(ctx, classIdsByEntityId.getOrDefault(ctx.getContextId(), List.of())));
+    }
+
+    private Page<LocalContentResponse> mapCharacterPage(Page<Character> page) {
+        if (page.isEmpty()) {
+            return page.map(c -> mapCharacterToResponse(c, List.of()));
+        }
+        List<UUID> ids = page.getContent().stream().map(Character::getCharacterId).toList();
+        java.util.Map<UUID, List<String>> classIdsByEntityId = classLocalContentRepo
+                .findByEntityIdInAndEntityType(ids, EntityType.CHARACTER)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ClassLocalContent::getEntityId,
+                        Collectors.mapping(c -> c.getClassId().toString(), Collectors.toList())));
+        return page.map(c -> mapCharacterToResponse(c, classIdsByEntityId.getOrDefault(c.getCharacterId(), List.of())));
+    }
+
     private LocalContentResponse mapContextToResponse(HistoricalContext ctx) {
+        List<String> classIds = classLocalContentRepo
+                .findClassIdsByEntityIdAndEntityType(ctx.getContextId(), EntityType.CONTEXT)
+                .stream().map(UUID::toString).collect(Collectors.toList());
+        return mapContextToResponse(ctx, classIds);
+    }
+
+    private LocalContentResponse mapContextToResponse(HistoricalContext ctx, List<String> classIds) {
         LocalContentResponse.AuthorInfo createdByInfo = ctx.getCreatedBy() != null
                 ? LocalContentResponse.AuthorInfo.builder()
                         .uid(ctx.getCreatedBy().getUid().toString())
@@ -851,10 +886,6 @@ public class LocalContentServiceImpl implements LocalContentService {
                 : (ctx.getDeletedAt() != null ? ContentStatus.INACTIVE
                    : Boolean.TRUE.equals(ctx.getIsPublished()) ? ContentStatus.ACTIVE
                    : ContentStatus.DRAFT);
-
-        List<String> classIds = classLocalContentRepo
-                .findClassIdsByEntityIdAndEntityType(ctx.getContextId(), EntityType.CONTEXT)
-                .stream().map(UUID::toString).collect(Collectors.toList());
 
         return LocalContentResponse.builder()
                 .id(ctx.getContextId().toString())
@@ -890,6 +921,13 @@ public class LocalContentServiceImpl implements LocalContentService {
     // ── Mapper: Character → LocalContentResponse ──────────────────────────────
 
     private LocalContentResponse mapCharacterToResponse(Character c) {
+        List<String> classIds = classLocalContentRepo
+                .findClassIdsByEntityIdAndEntityType(c.getCharacterId(), EntityType.CHARACTER)
+                .stream().map(UUID::toString).collect(Collectors.toList());
+        return mapCharacterToResponse(c, classIds);
+    }
+
+    private LocalContentResponse mapCharacterToResponse(Character c, List<String> classIds) {
         LocalContentResponse.AuthorInfo createdByInfo = c.getCreatedBy() != null
                 ? LocalContentResponse.AuthorInfo.builder()
                         .uid(c.getCreatedBy().getUid().toString())
@@ -918,10 +956,6 @@ public class LocalContentServiceImpl implements LocalContentService {
                         .map(hc -> hc.getContextId().toString())
                         .collect(Collectors.toList())
                 : new ArrayList<>();
-
-        List<String> classIds = classLocalContentRepo
-                .findClassIdsByEntityIdAndEntityType(c.getCharacterId(), EntityType.CHARACTER)
-                .stream().map(UUID::toString).collect(Collectors.toList());
 
         return LocalContentResponse.builder()
                 .id(c.getCharacterId().toString())
@@ -1329,9 +1363,21 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (character.getHistoricalContexts() == null) {
             return List.of();
         }
-        return character.getHistoricalContexts().stream()
+        List<HistoricalContext> activeContexts = character.getHistoricalContexts().stream()
                 .filter(ctx -> ctx.getDeletedAt() == null)
-                .map(this::mapContextToResponse)
+                .toList();
+        if (activeContexts.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = activeContexts.stream().map(HistoricalContext::getContextId).toList();
+        java.util.Map<UUID, List<String>> classIdsByEntityId = classLocalContentRepo
+                .findByEntityIdInAndEntityType(ids, EntityType.CONTEXT)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ClassLocalContent::getEntityId,
+                        Collectors.mapping(c -> c.getClassId().toString(), Collectors.toList())));
+        return activeContexts.stream()
+                .map(ctx -> mapContextToResponse(ctx, classIdsByEntityId.getOrDefault(ctx.getContextId(), List.of())))
                 .toList();
     }
 
@@ -1343,7 +1389,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         Page<HistoricalContext> p = localContextRepo.findTrashBySchoolAndCreator(schoolId, resolveUserId(principal), pageable);
-        return buildPage(p.map(this::mapContextToResponse));
+        return buildPage(mapContextPage(p));
     }
 
     @Override
@@ -1378,7 +1424,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         Page<Character> p = localCharacterRepo.findTrashBySchoolAndCreator(schoolId, resolveUserId(principal), pageable);
-        return buildPage(p.map(this::mapCharacterToResponse));
+        return buildPage(mapCharacterPage(p));
     }
 
     @Override

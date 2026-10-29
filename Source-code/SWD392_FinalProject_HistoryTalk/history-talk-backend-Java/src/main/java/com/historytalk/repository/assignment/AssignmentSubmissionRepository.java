@@ -18,9 +18,11 @@ import java.util.UUID;
 @Repository
 public interface AssignmentSubmissionRepository extends JpaRepository<AssignmentSubmission, UUID> {
 
-    Optional<AssignmentSubmission> findByAssignmentIdAndStudentUid(UUID assignmentId, UUID studentUid);
+    @Query("SELECT s FROM AssignmentSubmission s JOIN FETCH s.assignment a JOIN FETCH a.classroom WHERE s.assignment.id = :assignmentId AND s.student.uid = :studentUid")
+    Optional<AssignmentSubmission> findByAssignmentIdAndStudentUid(@Param("assignmentId") UUID assignmentId, @Param("studentUid") UUID studentUid);
 
-    List<AssignmentSubmission> findByAssignmentId(UUID assignmentId);
+    @Query("SELECT s FROM AssignmentSubmission s JOIN FETCH s.student WHERE s.assignment.id = :assignmentId")
+    List<AssignmentSubmission> findByAssignmentId(@Param("assignmentId") UUID assignmentId);
 
     List<AssignmentSubmission> findByStudentUid(UUID studentUid);
 

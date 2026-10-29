@@ -93,13 +93,18 @@ public class QuizServiceImpl implements QuizService {
             }
         }
         List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search), contextUuid);
+        if (quizzes.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Long> playCountMap = new java.util.HashMap<>();
+        if (userId != null) {
+            List<UUID> quizIds = quizzes.stream().map(Quiz::getQuizId).toList();
+            for (Object[] row : quizSessionRepository.countCompletedByQuizIdsAndUser(quizIds, userId)) {
+                playCountMap.put((UUID) row[0], ((Number) row[1]).longValue());
+            }
+        }
         return quizzes.stream()
-                .map(q -> {
-                    long playCount = userId != null
-                            ? quizSessionRepository.countCompletedByQuizAndUser(q.getQuizId(), userId)
-                            : 0L;
-                    return mapToCustomerResponse(q, playCount);
-                })
+                .map(q -> mapToCustomerResponse(q, playCountMap.getOrDefault(q.getQuizId(), 0L)))
                 .collect(Collectors.toList());
     }
 
@@ -246,7 +251,7 @@ public class QuizServiceImpl implements QuizService {
     public PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, Pageable pageable) {
         log.info("getQuizHistory: userId={}", userId);
         Page<QuizSession> page = quizSessionRepository.findCompletedByUserUid(userId, pageable);
-        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+        return mapToHistoryPaginatedResponse(page);
     }
 
     @Override
@@ -255,7 +260,7 @@ public class QuizServiceImpl implements QuizService {
         if (quizId == null) return getQuizHistory(userId, pageable);
         log.info("getQuizHistory: userId={}, quizId={}", userId, quizId);
         Page<QuizSession> page = quizSessionRepository.findCompletedByUserUidAndQuizId(userId, quizId, pageable);
-        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+        return mapToHistoryPaginatedResponse(page);
     }
 
     @Override
@@ -332,7 +337,7 @@ public class QuizServiceImpl implements QuizService {
     public PaginatedResponse<QuizHistoryResponse> getAllUsersQuizHistory(Pageable pageable) {
         log.info("getAllUsersQuizHistory");
         Page<QuizSession> page = quizSessionRepository.findAllCompleted(pageable);
-        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+        return mapToHistoryPaginatedResponse(page);
     }
 
     @Override
@@ -343,7 +348,7 @@ public class QuizServiceImpl implements QuizService {
         userRepository.findById(uid)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
         Page<QuizSession> page = quizSessionRepository.findCompletedByUserUidForAdmin(uid, pageable);
-        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+        return mapToHistoryPaginatedResponse(page);
     }
 
     // ==================== Staff ====================
@@ -354,7 +359,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("getAllQuizzesForStaff: search={}, era={}", search, era);
         EventEra eraEnum = parseEra(era);
         Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, false, pageable);
-        return toPaginatedResponse(page.map(this::mapToStaffResponse));
+        return mapToStaffPaginatedResponse(page);
     }
 
     @Override
@@ -736,10 +741,36 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
+    private PaginatedResponse<QuizStaffResponse> mapToStaffPaginatedResponse(Page<Quiz> page) {
+        List<Quiz> quizzes = page.getContent();
+        if (quizzes.isEmpty()) {
+            return toPaginatedResponse(page.map(q -> null));
+        }
+        List<UUID> quizIds = quizzes.stream().map(Quiz::getQuizId).toList();
+        Map<UUID, Long> playCountMap = new java.util.HashMap<>();
+        for (Object[] row : quizSessionRepository.countCompletedByQuizIds(quizIds)) {
+            playCountMap.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+        Map<UUID, List<Question>> questionsByQuizId = new java.util.HashMap<>();
+        for (Object[] row : questionRepository.findActiveByQuizIds(quizIds)) {
+            UUID qId = (UUID) row[0];
+            Question question = (Question) row[1];
+            questionsByQuizId.computeIfAbsent(qId, k -> new ArrayList<>()).add(question);
+        }
+        return toPaginatedResponse(page.map(q -> mapToStaffResponse(
+                q,
+                playCountMap.getOrDefault(q.getQuizId(), 0L),
+                questionsByQuizId.getOrDefault(q.getQuizId(), List.of()))));
+    }
+
     private QuizStaffResponse mapToStaffResponse(Quiz quiz) {
-        HistoricalContext ctx = quiz.getHistoricalContext();
         long playCount = quizSessionRepository.countCompletedByQuiz(quiz.getQuizId());
         List<Question> questions = questionRepository.findActiveByQuizId(quiz.getQuizId());
+        return mapToStaffResponse(quiz, playCount, questions);
+    }
+
+    private QuizStaffResponse mapToStaffResponse(Quiz quiz, long playCount, List<Question> questions) {
+        HistoricalContext ctx = quiz.getHistoricalContext();
 
         return QuizStaffResponse.builder()
                 .quizId(quiz.getQuizId().toString())
@@ -845,10 +876,30 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
-    private QuizHistoryResponse mapToHistoryResponse(QuizSession session) {
+    private PaginatedResponse<QuizHistoryResponse> mapToHistoryPaginatedResponse(Page<QuizSession> page) {
+        List<QuizSession> sessions = page.getContent();
+        if (sessions.isEmpty()) {
+            return toPaginatedResponse(page.map(s -> null));
+        }
+        List<UUID> quizIds = sessions.stream()
+                .map(QuizSession::getQuiz)
+                .filter(java.util.Objects::nonNull)
+                .map(Quiz::getQuizId)
+                .distinct()
+                .toList();
+        Map<UUID, Integer> questionCountMap = new java.util.HashMap<>();
+        if (!quizIds.isEmpty()) {
+            for (Object[] row : questionRepository.countActiveByQuizIds(quizIds)) {
+                questionCountMap.put((UUID) row[0], ((Number) row[1]).intValue());
+            }
+        }
+        return toPaginatedResponse(page.map(s -> mapToHistoryResponse(s, questionCountMap)));
+    }
+
+    private QuizHistoryResponse mapToHistoryResponse(QuizSession session, Map<UUID, Integer> questionCountMap) {
         Quiz quiz = session.getQuiz();
         int totalQuestions = quiz != null
-                ? questionRepository.findActiveByQuizId(quiz.getQuizId()).size()
+                ? questionCountMap.getOrDefault(quiz.getQuizId(), 0)
                 : 0;
         int score = session.getScore() != null ? session.getScore().intValue() : 0;
         double percentage = totalQuestions > 0 ? (double) score / totalQuestions * 100.0 : 0.0;

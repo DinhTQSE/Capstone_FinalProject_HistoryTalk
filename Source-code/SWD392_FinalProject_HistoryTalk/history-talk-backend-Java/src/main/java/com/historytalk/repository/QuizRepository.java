@@ -22,6 +22,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
      */
     @Query("""
             SELECT q FROM Quiz q
+            LEFT JOIN FETCH q.historicalContext
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
             AND (:contextId IS NULL OR q.historicalContext.contextId = :contextId)
             AND q.isPublished = true
@@ -35,6 +36,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
      */
     @Query("""
             SELECT q FROM Quiz q
+            LEFT JOIN FETCH q.historicalContext
             WHERE q.quizId = :quizId
             AND q.isPublished = true
             AND q.deletedAt IS NULL
@@ -46,8 +48,16 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
      * era is filtered on historicalContext.era (not on Quiz directly).
      * Shows all non-deleted quizzes regardless of isPublished.
      */
-    @Query("""
+    @Query(value = """
             SELECT q FROM Quiz q
+            JOIN FETCH q.historicalContext hc
+            LEFT JOIN FETCH q.createdBy
+            WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
+            AND (:era IS NULL OR hc.era = :era)
+            AND (:includeDeleted = true OR q.deletedAt IS NULL)
+            """,
+            countQuery = """
+            SELECT COUNT(q) FROM Quiz q
             JOIN q.historicalContext hc
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
             AND (:era IS NULL OR hc.era = :era)
@@ -59,11 +69,18 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
             @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT q FROM Quiz q
+            LEFT JOIN FETCH q.historicalContext
+            LEFT JOIN FETCH q.createdBy
             WHERE q.historicalContext.contextId = :contextId
               AND q.deletedAt IS NULL
             ORDER BY q.createdAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(q) FROM Quiz q
+            WHERE q.historicalContext.contextId = :contextId
+              AND q.deletedAt IS NULL
             """)
     Page<Quiz> findByContextIdAndDeletedAtIsNull(@Param("contextId") UUID contextId, Pageable pageable);
 
@@ -77,7 +94,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
      */
     boolean existsByTitleIgnoreCaseAndQuizIdNot(String title, UUID quizId);
 
-    @Query("SELECT q FROM Quiz q WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
+    @Query("SELECT q FROM Quiz q LEFT JOIN FETCH q.historicalContext LEFT JOIN FETCH q.createdBy WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
     List<Quiz> findAllDeleted();
 
     @Query("SELECT COUNT(q) FROM Quiz q")

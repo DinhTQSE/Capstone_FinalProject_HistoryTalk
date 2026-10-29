@@ -26,6 +26,26 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chatSession.sessionId = :sessionId AND m.isFromAi = false AND m.deletedAt IS NULL")
     long countUserMessagesInSession(@Param("sessionId") UUID sessionId);
 
+    @Query("""
+            SELECT m.chatSession.sessionId, COUNT(m)
+            FROM Message m
+            WHERE m.chatSession.sessionId IN :sessionIds
+            GROUP BY m.chatSession.sessionId
+            """)
+    List<Object[]> countMessagesBySessionIds(@Param("sessionIds") Collection<UUID> sessionIds);
+
+    @Query("""
+            SELECT m.chatSession.sessionId, m.content
+            FROM Message m
+            WHERE m.chatSession.sessionId IN :sessionIds
+              AND m.createdAt = (
+                  SELECT MAX(m2.createdAt)
+                  FROM Message m2
+                  WHERE m2.chatSession.sessionId = m.chatSession.sessionId
+              )
+            """)
+    List<Object[]> findLatestMessageContentBySessionIds(@Param("sessionIds") Collection<UUID> sessionIds);
+
     @Query("SELECT COUNT(m) FROM Message m")
     long countCurrent();
 

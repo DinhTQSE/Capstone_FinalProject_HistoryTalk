@@ -27,4 +27,9 @@ public interface ClassLocalContentRepository extends JpaRepository<com.historyta
 
     @Query("SELECT c.classId FROM ClassLocalContent c WHERE c.entityId = :entityId AND c.entityType = :entityType")
     List<UUID> findClassIdsByEntityIdAndEntityType(@Param("entityId") UUID entityId, @Param("entityType") EntityType entityType);
+
+    @Query("SELECT c FROM ClassLocalContent c WHERE c.entityId IN :entityIds AND c.entityType = :entityType")
+    List<com.historytalk.entity.localcontent.ClassLocalContent> findByEntityIdInAndEntityType(
+            @Param("entityIds") java.util.Collection<UUID> entityIds,
+            @Param("entityType") EntityType entityType);
 }

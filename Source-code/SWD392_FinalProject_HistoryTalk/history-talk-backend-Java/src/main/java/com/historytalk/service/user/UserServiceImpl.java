@@ -17,6 +17,7 @@ import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.mapper.user.UserMapper;
 import com.historytalk.repository.MessageRepository;
+import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
@@ -46,6 +47,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final UserTierRepository userTierRepository;
     private final QuizSessionRepository quizSessionRepository;
+    private final QuestionRepository questionRepository;
     private final MessageRepository messageRepository;
 
     @Override
@@ -211,6 +213,21 @@ public class UserServiceImpl implements UserService {
                 .findCompletedByUserUid(uid, PageRequest.of(0, 100))
                 .getContent();
 
+        Map<UUID, Integer> questionCountByQuizId = new HashMap<>();
+        if (questionRepository != null && !completedSessions.isEmpty()) {
+            List<UUID> quizIds = completedSessions.stream()
+                    .map(QuizSession::getQuiz)
+                    .filter(java.util.Objects::nonNull)
+                    .map(com.historytalk.entity.quiz.Quiz::getQuizId)
+                    .distinct()
+                    .toList();
+            if (!quizIds.isEmpty()) {
+                for (Object[] row : questionRepository.countActiveByQuizIds(quizIds)) {
+                    questionCountByQuizId.put((UUID) row[0], ((Number) row[1]).intValue());
+                }
+            }
+        }
+
         long totalQuizzesAttempted = completedSessions.size();
         double totalScore = 0.0;
         Map<String, Long> eraDistribution = new HashMap<>();
@@ -218,8 +235,10 @@ public class UserServiceImpl implements UserService {
         for (QuizSession s : completedSessions) {
             double sessionPercentage = 0.0;
             if (s.getScore() != null) {
-                int questionCount = (s.getQuiz() != null && s.getQuiz().getQuestions() != null && !s.getQuiz().getQuestions().isEmpty())
-                        ? s.getQuiz().getQuestions().size() : 1;
+                int questionCount = s.getQuiz() != null
+                        ? questionCountByQuizId.getOrDefault(s.getQuiz().getQuizId(), 1)
+                        : 1;
+                if (questionCount <= 0) questionCount = 1;
                 sessionPercentage = s.getScore() <= questionCount ? (s.getScore() * 100.0 / questionCount) : s.getScore().doubleValue();
             }
             totalScore += sessionPercentage;
@@ -237,8 +256,10 @@ public class UserServiceImpl implements UserService {
                 .map(s -> {
                     double pct = 0.0;
                     if (s.getScore() != null) {
-                        int qCount = (s.getQuiz() != null && s.getQuiz().getQuestions() != null && !s.getQuiz().getQuestions().isEmpty())
-                                ? s.getQuiz().getQuestions().size() : 1;
+                        int qCount = s.getQuiz() != null
+                                ? questionCountByQuizId.getOrDefault(s.getQuiz().getQuizId(), 1)
+                                : 1;
+                        if (qCount <= 0) qCount = 1;
                         pct = s.getScore() <= qCount ? (s.getScore() * 100.0 / qCount) : s.getScore().doubleValue();
                     }
                     return UserDashboardResponse.RecentQuizItem.builder()

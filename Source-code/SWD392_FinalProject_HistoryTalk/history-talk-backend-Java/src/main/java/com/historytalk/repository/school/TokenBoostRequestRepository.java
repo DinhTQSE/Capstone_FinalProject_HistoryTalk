@@ -19,8 +19,10 @@ public interface TokenBoostRequestRepository extends JpaRepository<TokenBoostReq
     boolean existsByStudent_UidAndRequestDateAndStatus(
             UUID studentUid, LocalDate requestDate, TokenBoostRequestStatus status);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"classroom", "student", "requester", "teacherReviewedBy", "adminReviewedBy", "reviewedBy"})
     List<TokenBoostRequest> findByStudent_UidOrderByCreatedAtDesc(UUID studentUid);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"classroom", "student", "requester", "teacherReviewedBy", "adminReviewedBy", "reviewedBy"})
     @Query("SELECT r FROM TokenBoostRequest r " +
             "WHERE (r.classroom.teacher.uid = :teacherUid OR r.requester.uid = :teacherUid) " +
             "AND (:status IS NULL OR r.status = :status) " +
@@ -30,6 +32,7 @@ public interface TokenBoostRequestRepository extends JpaRepository<TokenBoostReq
             @Param("status") TokenBoostRequestStatus status,
             Pageable pageable);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"classroom", "student", "requester", "teacherReviewedBy", "adminReviewedBy", "reviewedBy"})
     @Query("SELECT r FROM TokenBoostRequest r " +
             "WHERE r.school.id = :schoolId " +
             "AND (:status IS NULL OR r.status = :status) " +
