@@ -3,8 +3,8 @@ package com.historytalk.service.chat;
 import com.historytalk.dto.chat.ChatHistoryGroupResponse;
 import com.historytalk.dto.chat.ChatHistorySessionItem;
 import com.historytalk.entity.chat.ChatSession;
-import com.historytalk.entity.chat.Message;
 import com.historytalk.repository.ChatSessionRepository;
+import com.historytalk.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,12 +24,28 @@ import java.util.stream.Collectors;
 public class ChatHistoryServiceImpl implements ChatHistoryService {
 
     private final ChatSessionRepository chatSessionRepository;
+    private final MessageRepository messageRepository;
 
     @Transactional(readOnly = true)
     public List<ChatHistoryGroupResponse> getHistory(String userId) {
         log.info("Getting chat history for user={}", userId);
 
         List<ChatSession> sessions = chatSessionRepository.findAllByUserUid(UUID.fromString(userId), false);
+        if (sessions.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> sessionIds = sessions.stream().map(ChatSession::getSessionId).toList();
+        Map<UUID, Integer> countMap = new HashMap<>();
+        Map<UUID, String> lastMsgMap = new HashMap<>();
+        if (messageRepository != null) {
+            for (Object[] row : messageRepository.countMessagesBySessionIds(sessionIds)) {
+                countMap.put((UUID) row[0], ((Number) row[1]).intValue());
+            }
+            for (Object[] row : messageRepository.findLatestMessageContentBySessionIds(sessionIds)) {
+                lastMsgMap.putIfAbsent((UUID) row[0], (String) row[1]);
+            }
+        }
 
         // Group by characterId
         Map<String, List<ChatSession>> grouped = sessions.stream()
@@ -47,7 +64,10 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
                             .sorted(Comparator.comparing(
                                     ChatSession::getLastMessageAt,
                                     Comparator.nullsLast(Comparator.reverseOrder())))
-                            .map(this::mapToSessionItem)
+                            .map(s -> mapToSessionItem(
+                                    s,
+                                    lastMsgMap.get(s.getSessionId()),
+                                    countMap.getOrDefault(s.getSessionId(), 0)))
                             .toList();
 
                     String characterName = groupSessions.get(0).getCharacter() != null 
@@ -71,14 +91,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
                 .toList();
     }
 
-    private ChatHistorySessionItem mapToSessionItem(ChatSession session) {
-        List<Message> messages = session.getMessages();
-
-        String lastMessage = messages.stream()
-            .max(Comparator.comparing(Message::getCreatedAt))
-                .map(Message::getContent)
-                .orElse(null);
-
+    private ChatHistorySessionItem mapToSessionItem(ChatSession session, String lastMessage, int messageCount) {
         return ChatHistorySessionItem.builder()
                 .id(session.getSessionId().toString())
                 .characterId(safeGetCharacterId(session))
@@ -90,7 +103,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
                 .sessionTitle(session.getTitle())
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
-                .messageCount(messages.size())
+                .messageCount(messageCount)
                 .build();
     }
 
