@@ -30,6 +30,17 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             """)
     Page<QuizSession> findCompletedByUserUid(@Param("uid") UUID uid, Pageable pageable);
 
+    /** Completed sessions of one user for one quiz (quiz detail page history). */
+    @Query("""
+            SELECT s FROM QuizSession s
+            WHERE s.user.uid = :uid
+            AND s.quiz.quizId = :quizId
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            ORDER BY s.endTime DESC
+            """)
+    Page<QuizSession> findCompletedByUserUidAndQuizId(@Param("uid") UUID uid, @Param("quizId") UUID quizId, Pageable pageable);
+
     @Query("""
             SELECT s FROM QuizSession s
             WHERE s.endTime IS NOT NULL

@@ -251,6 +251,15 @@ public class QuizServiceImpl implements QuizService {
 
     @Override
     @Transactional(readOnly = true)
+    public PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, UUID quizId, Pageable pageable) {
+        if (quizId == null) return getQuizHistory(userId, pageable);
+        log.info("getQuizHistory: userId={}, quizId={}", userId, quizId);
+        Page<QuizSession> page = quizSessionRepository.findCompletedByUserUidAndQuizId(userId, quizId, pageable);
+        return toPaginatedResponse(page.map(this::mapToHistoryResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public QuizSessionDetailResponse getSessionDetail(String sessionId, UUID userId) {
         log.info("getSessionDetail: sessionId={}, userId={}", sessionId, userId);
         UUID sessionUuid = parseUuid(sessionId, "sessionId");

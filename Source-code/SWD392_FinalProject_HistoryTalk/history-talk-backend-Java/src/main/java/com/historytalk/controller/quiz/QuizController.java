@@ -107,12 +107,14 @@ public class QuizController {
     @Operation(summary = "Get my quiz history", description = "Paginated list of completed quiz sessions for the current user.")
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizHistoryResponse>>> getMyQuizHistory(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            // The quiz detail page asks for one quiz's attempts; without this filter it received every attempt.
+            @RequestParam(required = false) UUID quizId) {
 
-        log.info("GET /api/v1/quizzes/results/me page={} size={}", page, size);
+        log.info("GET /api/v1/quizzes/results/me page={} size={} quizId={}", page, size, quizId);
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         Pageable pageable = PageRequest.of(page, size);
-        PaginatedResponse<QuizHistoryResponse> data = quizService.getQuizHistory(userId, pageable);
+        PaginatedResponse<QuizHistoryResponse> data = quizService.getQuizHistory(userId, quizId, pageable);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz history retrieved successfully"));
     }
 
