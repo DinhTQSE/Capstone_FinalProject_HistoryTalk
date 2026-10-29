@@ -302,7 +302,8 @@ class ClassroomServiceImplTest {
         when(classroomRepository.findBySchoolIdAndDeletedAtIsNullAndClassNameContainingIgnoreCaseOrSchoolIdAndDeletedAtIsNullAndClassCodeContainingIgnoreCase(
                 eq(schoolId), eq("10A1"), eq(schoolId), eq("10A1"), eq(pageable)))
                 .thenReturn(page);
-        when(classStudentRepository.countByClassroomIdAndStatus(any(), eq("ACTIVE"))).thenReturn(20L);
+        when(classStudentRepository.countByClassroomIdsAndStatus(eq(List.of(classroom.getId())), eq("ACTIVE")))
+                .thenReturn(List.<Object[]>of(new Object[]{classroom.getId(), 20L}));
 
         PaginatedResponse<ClassroomResponse> result = classroomService.getSchoolClassrooms(
                 "10A1", 10, 2026, pageable, adminPrincipal);
@@ -324,7 +325,8 @@ class ClassroomServiceImplTest {
 
         when(classStudentRepository.findClassroomsByStudentUid(studentUser.getUid()))
                 .thenReturn(List.of(classroom));
-        lenient().when(classStudentRepository.countByClassroomIdAndStatus(any(), eq("ACTIVE"))).thenReturn(30L);
+        lenient().when(classStudentRepository.countByClassroomIdsAndStatus(any(), eq("ACTIVE")))
+                .thenReturn(List.<Object[]>of(new Object[]{classroom.getId(), 30L}));
 
         List<ClassroomResponse> list = classroomService.getStudentClassrooms(studentPrincipal);
 

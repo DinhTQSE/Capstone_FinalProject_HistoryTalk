@@ -218,9 +218,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             page = classroomRepository.findBySchoolIdAndDeletedAtIsNull(schoolId, pageable);
         }
 
-        List<ClassroomResponse> content = page.getContent().stream()
-                .map(c -> mapToResponse(c, classStudentRepository.countByClassroomIdAndStatus(c.getId(), "ACTIVE")))
-                .collect(Collectors.toList());
+        List<ClassroomResponse> content = mapClassroomsBatch(page.getContent());
 
         return PaginatedResponse.<ClassroomResponse>builder()
                 .content(content)
@@ -253,9 +251,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                     schoolId, teacherUid, pageable);
         }
 
-        List<ClassroomResponse> content = page.getContent().stream()
-                .map(c -> mapToResponse(c, classStudentRepository.countByClassroomIdAndStatus(c.getId(), "ACTIVE")))
-                .collect(Collectors.toList());
+        List<ClassroomResponse> content = mapClassroomsBatch(page.getContent());
 
         return PaginatedResponse.<ClassroomResponse>builder()
                 .content(content)
@@ -275,8 +271,22 @@ public class ClassroomServiceImpl implements ClassroomService {
         UUID studentUid = UUID.fromString(userPrincipal.getUid());
         List<Classroom> classrooms = classStudentRepository.findClassroomsByStudentUid(studentUid);
 
+        return mapClassroomsBatch(classrooms);
+    }
+
+    private List<ClassroomResponse> mapClassroomsBatch(List<Classroom> classrooms) {
+        if (classrooms.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> classroomIds = classrooms.stream().map(Classroom::getId).toList();
+        java.util.Map<UUID, Long> countMap = classStudentRepository
+                .countByClassroomIdsAndStatus(classroomIds, "ACTIVE")
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> ((Number) row[1]).longValue()));
         return classrooms.stream()
-                .map(c -> mapToResponse(c, classStudentRepository.countByClassroomIdAndStatus(c.getId(), "ACTIVE")))
+                .map(c -> mapToResponse(c, countMap.getOrDefault(c.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 

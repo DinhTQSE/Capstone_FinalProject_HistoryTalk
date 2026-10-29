@@ -3,6 +3,7 @@ package com.historytalk.repository.classroom;
 import com.historytalk.entity.classroom.Classroom;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,8 +18,10 @@ import java.time.LocalDateTime;
 @Repository
 public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
 
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Optional<Classroom> findByIdAndSchoolIdAndDeletedAtIsNull(UUID id, UUID schoolId);
 
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Optional<Classroom> findByClassCodeIgnoreCaseAndDeletedAtIsNull(String classCode);
 
     boolean existsByClassCodeIgnoreCase(String classCode);
@@ -30,35 +33,45 @@ public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
             UUID schoolId, String className, Integer academicYear, UUID id);
 
     // Tất cả lớp của trường
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndDeletedAtIsNull(UUID schoolId, Pageable pageable);
 
     // Lọc theo Khối lớp (gradeLevel)
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndGradeLevelAndDeletedAtIsNull(
             UUID schoolId, Integer gradeLevel, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"teacher", "school"})
     List<Classroom> findBySchoolIdAndGradeLevelAndDeletedAtIsNull(UUID schoolId, Integer gradeLevel);
 
     // Lọc theo Năm học (academicYear)
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndAcademicYearAndDeletedAtIsNull(
             UUID schoolId, Integer academicYear, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"teacher", "school"})
     List<Classroom> findBySchoolIdAndAcademicYearAndDeletedAtIsNull(UUID schoolId, Integer academicYear);
 
+    @EntityGraph(attributePaths = {"teacher", "school"})
     List<Classroom> findBySchoolIdAndStatusAndDeletedAtIsNull(UUID schoolId, String status);
 
     // Lọc theo cả Khối lớp và Năm học
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndGradeLevelAndAcademicYearAndDeletedAtIsNull(
             UUID schoolId, Integer gradeLevel, Integer academicYear, Pageable pageable);
 
     // Tìm kiếm theo tên lớp hoặc mã lớp trong trường
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndDeletedAtIsNullAndClassNameContainingIgnoreCaseOrSchoolIdAndDeletedAtIsNullAndClassCodeContainingIgnoreCase(
             UUID schoolId1, String className, UUID schoolId2, String classCode, Pageable pageable);
 
     // Giáo viên: tất cả lớp phụ trách
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndTeacher_UidAndDeletedAtIsNull(
             UUID schoolId, UUID teacherUid, Pageable pageable);
 
     // Giáo viên: lọc theo năm học
+    @EntityGraph(attributePaths = {"teacher", "school"})
     Page<Classroom> findBySchoolIdAndTeacher_UidAndAcademicYearAndDeletedAtIsNull(
             UUID schoolId, UUID teacherUid, Integer academicYear, Pageable pageable);
 
