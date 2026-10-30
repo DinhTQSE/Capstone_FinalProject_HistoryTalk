@@ -183,7 +183,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getName() != null && 
             !request.getName().equalsIgnoreCase(context.getName()) &&
             contextRepository.existsByNameIgnoreCaseAndContextIdNot(request.getName(), UUID.fromString(contextId))) {
-            throw new InvalidRequestException("Tên đã tồn tại"+request.getName());
+            throw new InvalidRequestException("Bối cảnh lịch sử \"" + request.getName() + "\" đã tồn tại");
         }
         
         // Update fields

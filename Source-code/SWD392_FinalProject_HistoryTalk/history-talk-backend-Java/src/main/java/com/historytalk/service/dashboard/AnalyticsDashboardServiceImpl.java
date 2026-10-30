@@ -55,6 +55,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     private final ClassStudentRepository classStudentRepository;
     private final UserRepository userRepository;
     private final QuizRepository quizRepository;
+    private final QuestionRepository questionRepository;
     private final QuizSessionRepository quizSessionRepository;
     private final QuizAnswerDetailRepository quizAnswerDetailRepository;
     private final MessageRepository messageRepository;
@@ -339,11 +340,12 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         Double avgScore = quizSessionRepository.averageScorePercentageByUser(studentUid);
 
         List<QuizSession> recentSessions = quizSessionRepository.findRecentCompletedByUser(studentUid, PageRequest.of(0, 5));
+        Map<UUID, Long> studentQuizQuestionCounts = batchCountQuestionsForSessions(recentSessions);
         List<StudentPersonalDashboardResponse.RecentQuizItem> recentQuizItems = recentSessions.stream()
                 .map(s -> StudentPersonalDashboardResponse.RecentQuizItem.builder()
                         .sessionId(s.getSessionId())
                         .quizTitle(s.getQuiz() != null ? s.getQuiz().getTitle() : "")
-                        .percentage(calculateSessionPercentage(s))
+                        .percentage(calculateSessionPercentage(s, studentQuizQuestionCounts))
                         .completedAt(s.getEndTime())
                         .build())
                 .collect(Collectors.toList());
@@ -395,11 +397,12 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         Double avgScore = quizSessionRepository.averageScorePercentageByUser(userUid);
 
         List<QuizSession> recentSessions = quizSessionRepository.findRecentCompletedByUser(userUid, PageRequest.of(0, 5));
+        Map<UUID, Long> customerQuizQuestionCounts = batchCountQuestionsForSessions(recentSessions);
         List<CustomerPersonalDashboardResponse.RecentQuizItem> recentQuizItems = recentSessions.stream()
                 .map(s -> CustomerPersonalDashboardResponse.RecentQuizItem.builder()
                         .sessionId(s.getSessionId())
                         .quizTitle(s.getQuiz() != null ? s.getQuiz().getTitle() : "")
-                        .percentage(calculateSessionPercentage(s))
+                        .percentage(calculateSessionPercentage(s, customerQuizQuestionCounts))
                         .completedAt(s.getEndTime())
                         .build())
                 .collect(Collectors.toList());
@@ -558,6 +561,41 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         return new UserPrincipal(user);
+    }
+
+    private Map<UUID, Long> batchCountQuestionsForSessions(List<QuizSession> sessions) {
+        if (questionRepository == null || sessions == null || sessions.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<UUID> quizIds = sessions.stream()
+                .map(QuizSession::getQuiz)
+                .filter(Objects::nonNull)
+                .map(com.historytalk.entity.quiz.Quiz::getQuizId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (quizIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object[]> rows = questionRepository.countActiveByQuizIds(quizIds);
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return rows.stream().collect(Collectors.toMap(
+                row -> (UUID) row[0],
+                row -> ((Number) row[1]).longValue(),
+                (a, b) -> a));
+    }
+
+    private double calculateSessionPercentage(QuizSession session, Map<UUID, Long> questionCounts) {
+        if (session.getScore() == null) return 0.0;
+        UUID quizId = session.getQuiz() != null ? session.getQuiz().getQuizId() : null;
+        if (quizId != null && questionCounts != null && questionCounts.containsKey(quizId)) {
+            long count = questionCounts.get(quizId);
+            if (count == 0) return 0.0;
+            return Math.round((session.getScore() * 100.0 / count) * 10.0) / 10.0;
+        }
+        return calculateSessionPercentage(session);
     }
 
     private double calculateSessionPercentage(QuizSession session) {

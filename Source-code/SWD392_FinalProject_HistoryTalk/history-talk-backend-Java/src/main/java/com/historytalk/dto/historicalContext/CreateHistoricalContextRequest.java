@@ -25,13 +25,17 @@ public class CreateHistoricalContextRequest {
     @Size(min = 10, max = 5000, message = "Mô tả bối cảnh phải từ 10 đến 5000 ký tự")
     private String description;
 
+    // Era, year and location place the context on the timeline, era filters and the battle map,
+    // so the staff form requires them; the API enforces the same.
     @JsonProperty("era")
+    @NotNull(message = "Yêu cầu thời đại")
     private EventEra era;
 
     @JsonProperty("category")
     private EventCategory category;
 
     @JsonProperty("year")
+    @NotNull(message = "Yêu cầu năm diễn ra")
     private Integer year;
 
     @JsonProperty("startYear")
@@ -44,6 +48,7 @@ public class CreateHistoricalContextRequest {
     private Boolean isBC = false;
 
     @JsonProperty("location")
+    @NotBlank(message = "Yêu cầu địa điểm")
     @Size(max = 255, message = "Địa điểm tối đa 255 ký tự")
     private String location;
 

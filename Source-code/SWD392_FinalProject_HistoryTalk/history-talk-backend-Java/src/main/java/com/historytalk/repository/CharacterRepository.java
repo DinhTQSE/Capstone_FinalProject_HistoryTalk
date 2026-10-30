@@ -19,6 +19,8 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
     @Query("""
             SELECT DISTINCT c FROM Character c
             JOIN c.historicalContexts hc
+            LEFT JOIN FETCH c.createdBy
+            LEFT JOIN FETCH c.school
             WHERE hc.contextId = :contextId
               AND (:includeDraft = true OR c.isPublished = true)
               AND (:includeDeleted = true OR c.deletedAt IS NULL)
@@ -66,6 +68,7 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     @Query("""
            SELECT c FROM Character c
+           LEFT JOIN FETCH c.createdBy
            WHERE c.school IS NULL AND c.deletedAt IS NOT NULL
            ORDER BY c.name ASC
            """)

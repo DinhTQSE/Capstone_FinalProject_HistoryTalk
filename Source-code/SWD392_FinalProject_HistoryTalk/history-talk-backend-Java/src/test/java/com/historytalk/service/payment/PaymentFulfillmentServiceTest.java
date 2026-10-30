@@ -75,8 +75,6 @@ class PaymentFulfillmentServiceTest {
         when(paymentOrderRepository.findByOrderCodeForUpdate(order.getOrderCode())).thenReturn(Optional.of(order));
         when(paymentOrderRepository.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userTierRepository.findByPaymentOrder_OrderId(orderId)).thenReturn(Optional.empty());
-        when(userTierRepository.findCurrentActiveByUidForUpdate(eq(userId), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
         when(userTierRepository.save(any(UserTier.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -116,7 +114,7 @@ class PaymentFulfillmentServiceTest {
     }
 
     @Test
-    void fulfillPaidOrderMarksFailedWhenUserAlreadyHasDifferentPaidSubscription() {
+    void fulfillPaidOrderSucceedsWhenUserAlreadyHasActiveSubscription() {
         UUID userId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         User user = User.builder()
@@ -124,29 +122,14 @@ class PaymentFulfillmentServiceTest {
                 .userName("customer")
                 .email("customer@example.com")
                 .role(UserRole.CUSTOMER)
-                .token(0)
+                .token(1500)
                 .build();
         Tier tier = Tier.builder()
                 .tierId(UUID.randomUUID())
                 .title("plus")
                 .amount(49_000)
                 .noMonth(1)
-                .limitedToken(100)
-                .build();
-        Tier activeTier = Tier.builder()
-                .tierId(UUID.randomUUID())
-                .title("pro")
-                .amount(99_000)
-                .noMonth(1)
-                .limitedToken(999)
-                .build();
-        UserTier activePaid = UserTier.builder()
-                .id(UUID.randomUUID())
-                .user(user)
-                .tier(activeTier)
-                .startTime(LocalDateTime.now().minusDays(1))
-                .endTime(LocalDateTime.now().plusDays(29))
-                .isActive(true)
+                .limitedToken(5000)
                 .build();
         PaymentOrder order = PaymentOrder.builder()
                 .orderId(orderId)
@@ -161,14 +144,47 @@ class PaymentFulfillmentServiceTest {
         when(paymentOrderRepository.findByOrderCodeForUpdate(order.getOrderCode())).thenReturn(Optional.of(order));
         when(paymentOrderRepository.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userTierRepository.findByPaymentOrder_OrderId(orderId)).thenReturn(Optional.empty());
-        when(userTierRepository.findCurrentActiveByUidForUpdate(eq(userId), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(activePaid));
+        when(userTierRepository.save(any(UserTier.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        boolean fulfilled = paymentFulfillmentService.fulfillPaidOrder(order.getOrderCode());
+
+        assertThat(fulfilled).isTrue();
+        assertThat(order.getFulfillmentStatus()).isEqualTo(PaymentFulfillmentStatus.FULFILLED);
+        assertThat(user.getToken()).isEqualTo(6500);
+        verify(userTierRepository).save(any(UserTier.class));
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void fulfillPaidOrderMarksFailedWhenOrderUserIsMissing() {
+        UUID orderId = UUID.randomUUID();
+        Tier tier = Tier.builder()
+                .tierId(UUID.randomUUID())
+                .title("plus")
+                .amount(49_000)
+                .noMonth(1)
+                .limitedToken(5000)
+                .build();
+        PaymentOrder order = PaymentOrder.builder()
+                .orderId(orderId)
+                .orderCode(111222334L)
+                .user(null)
+                .tier(tier)
+                .amount(49_000)
+                .status(PaymentOrderStatus.PAID)
+                .fulfillmentStatus(PaymentFulfillmentStatus.PENDING)
+                .build();
+
+        when(paymentOrderRepository.findByOrderCodeForUpdate(order.getOrderCode())).thenReturn(Optional.of(order));
+        when(paymentOrderRepository.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userTierRepository.findByPaymentOrder_OrderId(orderId)).thenReturn(Optional.empty());
 
         boolean fulfilled = paymentFulfillmentService.fulfillPaidOrder(order.getOrderCode());
 
         assertThat(fulfilled).isFalse();
         assertThat(order.getFulfillmentStatus()).isEqualTo(PaymentFulfillmentStatus.FAILED);
-        assertThat(order.getFulfillmentError()).contains("active paid subscription");
+        assertThat(order.getFulfillmentError()).contains("Order user is missing or deleted");
         verify(userTierRepository, never()).save(any(UserTier.class));
         verify(userRepository, never()).save(any(User.class));
     }

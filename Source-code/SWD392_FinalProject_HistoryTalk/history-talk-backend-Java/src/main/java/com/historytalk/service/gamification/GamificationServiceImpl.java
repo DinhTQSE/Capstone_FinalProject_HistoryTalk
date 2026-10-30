@@ -231,25 +231,34 @@ public class GamificationServiceImpl implements GamificationService {
                     .stream()
                     .filter(q -> q.getType() == questType)
                     .toList();
+            if (matchingQuests.isEmpty()) return;
 
+            Map<String, UserQuestProgress> existingByQuestId = new HashMap<>();
+            for (UserQuestProgress existing : progressRepository.findByUserUidAndDate(userUid, today)) {
+                existingByQuestId.put(existing.getQuestId(), existing);
+            }
+
+            List<UserQuestProgress> toSave = new ArrayList<>(matchingQuests.size());
             for (DailyQuest q : matchingQuests) {
-                UserQuestProgress p = progressRepository
-                        .findByUserUidAndDateAndQuestId(userUid, today, q.getQuestId())
-                        .orElseGet(() -> UserQuestProgress.builder()
-                                .user(user)
-                                .date(today)
-                                .questId(q.getQuestId())
-                                .progress(0)
-                                .completed(false)
-                                .claimed(false)
-                                .build());
+                UserQuestProgress p = existingByQuestId.get(q.getQuestId());
+                if (p == null) {
+                    p = UserQuestProgress.builder()
+                            .user(user)
+                            .date(today)
+                            .questId(q.getQuestId())
+                            .progress(0)
+                            .completed(false)
+                            .claimed(false)
+                            .build();
+                }
 
                 p.setProgress(p.getProgress() + 1);
                 if (p.getProgress() >= q.getTarget()) {
                     p.setCompleted(true);
                 }
-                progressRepository.save(p);
+                toSave.add(p);
             }
+            progressRepository.saveAll(toSave);
         } catch (Exception e) {
             log.warn("Failed to record quest progress for user {}: {}", userId, e.getMessage());
         }

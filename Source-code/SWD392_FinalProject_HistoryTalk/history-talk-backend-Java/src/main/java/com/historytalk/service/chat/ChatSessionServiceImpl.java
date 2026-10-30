@@ -64,9 +64,25 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacter(
                 UUID.fromString(userId),
                 UUID.fromString(characterId));
+        if (sessions.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> sessionIds = sessions.stream().map(ChatSession::getSessionId).toList();
+        java.util.Map<UUID, Integer> countMap = new java.util.HashMap<>();
+        java.util.Map<UUID, String> lastMsgMap = new java.util.HashMap<>();
+        for (Object[] row : messageRepository.countMessagesBySessionIds(sessionIds)) {
+            countMap.put((UUID) row[0], ((Number) row[1]).intValue());
+        }
+        for (Object[] row : messageRepository.findLatestMessageContentBySessionIds(sessionIds)) {
+            lastMsgMap.putIfAbsent((UUID) row[0], (String) row[1]);
+        }
 
         return sessions.stream()
-                .map(this::mapToResponse)
+                .map(s -> mapToResponse(
+                        s,
+                        lastMsgMap.get(s.getSessionId()),
+                        countMap.getOrDefault(s.getSessionId(), 0)))
                 .toList();
     }
 
@@ -193,7 +209,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         saved.setLastMessageAt(LocalDateTime.now());
         chatSessionRepository.save(saved);
 
-        return mapToResponse(saved);
+        return mapToResponse(saved, greetingText, 1);
     }
 
     @Transactional
@@ -239,16 +255,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         log.info("Chat session soft deleted: {}", sessionId);
     }
 
-    private ChatSessionResponse mapToResponse(ChatSession session) {
-        List<Message> messages = session.getMessages();
-        String lastMessage = null;
-        if (!messages.isEmpty()) {
-            lastMessage = messages.stream()
-                    .max(Comparator.comparing(Message::getCreatedAt))
-                    .map(Message::getContent)
-                    .orElse(null);
-        }
-
+    private ChatSessionResponse mapToResponse(ChatSession session, String lastMessage, int messageCount) {
         return ChatSessionResponse.builder()
                 .id(session.getSessionId().toString())
                 .characterId(safeGetCharacterId(session))
@@ -256,7 +263,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .title(session.getTitle())
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
-                .messageCount(messages.size())
+                .messageCount(messageCount)
                 .build();
     }
 

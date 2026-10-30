@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,14 +33,47 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
             """)
     List<Question> findActiveByQuizId(@Param("quizId") UUID quizId);
 
+    @Query("""
+            SELECT qz.quizId, q
+            FROM Quiz qz, Question q
+            WHERE qz.quizId IN :quizIds
+              AND q.deletedAt IS NULL
+              AND (
+                  (q.quiz IS NOT NULL AND q.quiz.quizId = qz.quizId)
+                  OR EXISTS (SELECT qq FROM QuizQuestion qq
+                             WHERE qq.quiz.quizId = qz.quizId
+                             AND qq.question.questionId = q.questionId)
+              )
+            ORDER BY q.createdAt ASC
+            """)
+    List<Object[]> findActiveByQuizIds(@Param("quizIds") Collection<UUID> quizIds);
+
+    @Query("""
+            SELECT qz.quizId, COUNT(DISTINCT q.questionId)
+            FROM Quiz qz, Question q
+            WHERE qz.quizId IN :quizIds
+              AND q.deletedAt IS NULL
+              AND (
+                  (q.quiz IS NOT NULL AND q.quiz.quizId = qz.quizId)
+                  OR EXISTS (SELECT qq FROM QuizQuestion qq
+                             WHERE qq.quiz.quizId = qz.quizId
+                             AND qq.question.questionId = q.questionId)
+              )
+            GROUP BY qz.quizId
+            """)
+    List<Object[]> countActiveByQuizIds(@Param("quizIds") Collection<UUID> quizIds);
+
     /**
      * Question Bank search: non-deleted questions, optionally filtered by type and content.
+     * The `:search = ''` comparison types the parameter as text; without it PostgreSQL binds a null
+     * :search as bytea and LOWER(bytea) fails, which made the whole bank load as empty.
      */
     @Query("""
             SELECT q FROM Question q
             WHERE q.deletedAt IS NULL
             AND (:questionType IS NULL OR q.questionType = :questionType)
-            AND (:search IS NULL OR LOWER(q.content) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:search IS NULL OR :search = ''
+                 OR LOWER(q.content) LIKE LOWER(CONCAT('%', :search, '%')))
             ORDER BY q.createdAt DESC
             """)
     Page<Question> findAllForBank(@Param("questionType") QuestionType questionType,

@@ -21,29 +21,72 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
 
     Optional<QuizSession> findBySessionId(UUID sessionId);
 
-    @Query("""
+    @Query(value = """
             SELECT s FROM QuizSession s
+            JOIN FETCH s.quiz q
+            LEFT JOIN FETCH q.historicalContext
             WHERE s.user.uid = :uid
             AND s.endTime IS NOT NULL
             AND s.deletedAt IS NULL
             ORDER BY s.endTime DESC
+            """,
+            countQuery = """
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.user.uid = :uid
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
             """)
     Page<QuizSession> findCompletedByUserUid(@Param("uid") UUID uid, Pageable pageable);
 
-    @Query("""
+    /** Completed sessions of one user for one quiz (quiz detail page history). */
+    @Query(value = """
             SELECT s FROM QuizSession s
+            JOIN FETCH s.quiz q
+            LEFT JOIN FETCH q.historicalContext
+            WHERE s.user.uid = :uid
+            AND s.quiz.quizId = :quizId
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            ORDER BY s.endTime DESC
+            """,
+            countQuery = """
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.user.uid = :uid
+            AND s.quiz.quizId = :quizId
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            """)
+    Page<QuizSession> findCompletedByUserUidAndQuizId(@Param("uid") UUID uid, @Param("quizId") UUID quizId, Pageable pageable);
+
+    @Query(value = """
+            SELECT s FROM QuizSession s
+            JOIN FETCH s.quiz q
+            LEFT JOIN FETCH q.historicalContext
             WHERE s.endTime IS NOT NULL
               AND s.deletedAt IS NULL
             ORDER BY s.endTime DESC
+            """,
+            countQuery = """
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.endTime IS NOT NULL
+              AND s.deletedAt IS NULL
             """)
     Page<QuizSession> findAllCompleted(Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT s FROM QuizSession s
+            JOIN FETCH s.quiz q
+            LEFT JOIN FETCH q.historicalContext
             WHERE s.user.uid = :uid
               AND s.endTime IS NOT NULL
               AND s.deletedAt IS NULL
             ORDER BY s.endTime DESC
+            """,
+            countQuery = """
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.user.uid = :uid
+              AND s.endTime IS NOT NULL
+              AND s.deletedAt IS NULL
             """)
     Page<QuizSession> findCompletedByUserUidForAdmin(@Param("uid") UUID uid, Pageable pageable);
 
@@ -55,6 +98,16 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             AND s.deletedAt IS NULL
             """)
     long countCompletedByQuizAndUser(@Param("quizId") UUID quizId, @Param("uid") UUID uid);
+
+    @Query("""
+            SELECT s.quiz.quizId, COUNT(s) FROM QuizSession s
+            WHERE s.quiz.quizId IN :quizIds
+            AND s.user.uid = :uid
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            GROUP BY s.quiz.quizId
+            """)
+    List<Object[]> countCompletedByQuizIdsAndUser(@Param("quizIds") Collection<UUID> quizIds, @Param("uid") UUID uid);
 
     @Query("""
             SELECT s FROM QuizSession s
@@ -73,6 +126,15 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             AND s.deletedAt IS NULL
             """)
     long countCompletedByQuiz(@Param("quizId") UUID quizId);
+
+    @Query("""
+            SELECT s.quiz.quizId, COUNT(s) FROM QuizSession s
+            WHERE s.quiz.quizId IN :quizIds
+            AND s.endTime IS NOT NULL
+            AND s.deletedAt IS NULL
+            GROUP BY s.quiz.quizId
+            """)
+    List<Object[]> countCompletedByQuizIds(@Param("quizIds") Collection<UUID> quizIds);
 
     @Query("SELECT COUNT(s) FROM QuizSession s WHERE s.deletedAt IS NULL")
     long countStartedSessions();
@@ -174,6 +236,8 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
 
     @Query("""
             SELECT s FROM QuizSession s
+            JOIN FETCH s.quiz q
+            LEFT JOIN FETCH q.historicalContext
             WHERE s.user.uid = :uid
               AND s.endTime IS NOT NULL
               AND s.deletedAt IS NULL

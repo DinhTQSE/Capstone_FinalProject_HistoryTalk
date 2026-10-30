@@ -22,6 +22,9 @@ public interface QuizService {
 
     PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, Pageable pageable);
 
+    /** Same as {@link #getQuizHistory(UUID, Pageable)} limited to one quiz; quizId = null means every quiz. */
+    PaginatedResponse<QuizHistoryResponse> getQuizHistory(UUID userId, UUID quizId, Pageable pageable);
+
     // userId = null means admin mode (SYSTEM_ADMIN) — skip ownership check
     QuizSessionDetailResponse getSessionDetail(String sessionId, UUID userId);
 

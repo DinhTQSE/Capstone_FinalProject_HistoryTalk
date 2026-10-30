@@ -31,15 +31,21 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
     @Query("SELECT cs.student.uid FROM ClassStudent cs WHERE cs.classroom.id = :classroomId AND cs.status = 'ACTIVE'")
     List<UUID> findEnrolledStudentUids(@Param("classroomId") UUID classroomId);
 
-    @Query("SELECT cs.classroom FROM ClassStudent cs WHERE cs.student.uid = :studentUid " +
-            "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'")
+    @Query("SELECT cs.classroom.id, COUNT(cs) FROM ClassStudent cs WHERE cs.classroom.id IN :classroomIds AND cs.status = :status GROUP BY cs.classroom.id")
+    List<Object[]> countByClassroomIdsAndStatus(@Param("classroomIds") java.util.Collection<UUID> classroomIds, @Param("status") String status);
+
+    @Query("SELECT c FROM ClassStudent cs JOIN cs.classroom c LEFT JOIN FETCH c.teacher LEFT JOIN FETCH c.school WHERE cs.student.uid = :studentUid " +
+            "AND c.deletedAt IS NULL AND cs.status = 'ACTIVE'")
     List<Classroom> findClassroomsByStudentUid(@Param("studentUid") UUID studentUid);
 
-    @Query("SELECT cs.classroom FROM ClassStudent cs WHERE cs.student.uid = :studentUid " +
-            "AND cs.classroom.deletedAt IS NULL AND cs.classroom.status = 'ACTIVE' AND cs.status = 'ACTIVE'")
+    @Query("SELECT c FROM ClassStudent cs JOIN cs.classroom c LEFT JOIN FETCH c.teacher LEFT JOIN FETCH c.school WHERE cs.student.uid = :studentUid " +
+            "AND c.deletedAt IS NULL AND c.status = 'ACTIVE' AND cs.status = 'ACTIVE'")
     List<Classroom> findActiveClassroomsByStudentUid(@Param("studentUid") UUID studentUid);
 
-    @Query("SELECT cs FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
+    @Query(value = "SELECT cs FROM ClassStudent cs JOIN FETCH cs.student WHERE cs.classroom.id = :classroomId " +
+            "AND cs.classroom.school.id = :schoolId " +
+            "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'",
+            countQuery = "SELECT COUNT(cs) FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
             "AND cs.classroom.school.id = :schoolId " +
             "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE'")
     org.springframework.data.domain.Page<ClassStudent> findStudentsInClassroom(
@@ -47,7 +53,15 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
             @Param("schoolId") UUID schoolId,
             org.springframework.data.domain.Pageable pageable);
 
-    @Query("SELECT cs FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
+    @Query(value = "SELECT cs FROM ClassStudent cs JOIN FETCH cs.student WHERE cs.classroom.id = :classroomId " +
+            "AND cs.classroom.school.id = :schoolId " +
+            "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE' " +
+            "AND (CAST(:keyword AS string) IS NULL OR :keyword = '' " +
+            "     OR cs.student.fullName ILIKE CONCAT('%', CAST(:keyword AS string), '%') " +
+            "     OR (cs.student.studentCode IS NOT NULL AND cs.student.studentCode ILIKE CONCAT('%', CAST(:keyword AS string), '%')) " +
+            "     OR cs.student.userName ILIKE CONCAT('%', CAST(:keyword AS string), '%') " +
+            "     OR cs.student.email ILIKE CONCAT('%', CAST(:keyword AS string), '%'))",
+            countQuery = "SELECT COUNT(cs) FROM ClassStudent cs WHERE cs.classroom.id = :classroomId " +
             "AND cs.classroom.school.id = :schoolId " +
             "AND cs.classroom.deletedAt IS NULL AND cs.status = 'ACTIVE' " +
             "AND (CAST(:keyword AS string) IS NULL OR :keyword = '' " +

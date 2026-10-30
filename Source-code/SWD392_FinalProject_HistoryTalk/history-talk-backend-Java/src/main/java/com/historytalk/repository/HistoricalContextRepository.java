@@ -24,8 +24,20 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        Page<HistoricalContext> findByCreatedByUid(UUID uid, Pageable pageable);
 
-       @Query("""
+       @Query(value = """
                      SELECT hc FROM HistoricalContext hc
+                     LEFT JOIN FETCH hc.createdBy
+                     WHERE hc.school IS NULL
+                       AND (:search IS NULL OR :search = ''
+                            OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                            OR LOWER(hc.description) LIKE LOWER(CONCAT('%', :search, '%')))
+                     AND (:era IS NULL OR hc.era = :era)
+                     AND (:category IS NULL OR hc.category = :category)
+                     AND (:includeDraft = true OR hc.isPublished = true)
+                     AND (:includeDeleted = true OR hc.deletedAt IS NULL)
+                     """,
+              countQuery = """
+                     SELECT COUNT(hc) FROM HistoricalContext hc
                      WHERE hc.school IS NULL
                        AND (:search IS NULL OR :search = ''
                             OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -45,6 +57,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        @Query("""
                      SELECT hc FROM HistoricalContext hc
+                     LEFT JOIN FETCH hc.createdBy
                      WHERE hc.school IS NULL
                        AND (:search IS NULL OR :search = ''
                             OR LOWER(hc.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -59,6 +72,7 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
 
        @Query("""
                SELECT hc FROM HistoricalContext hc
+               LEFT JOIN FETCH hc.createdBy
                WHERE hc.school IS NULL
                  AND hc.deletedAt IS NOT NULL
                ORDER BY hc.createdAt DESC

@@ -73,7 +73,7 @@ class QuizServiceImplTest {
 
         when(quizRepository.findAllForStaff(eq("history"), any(), eq(false), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(quiz), pageable, 1));
-        when(questionRepository.findActiveByQuizId(quiz.getQuizId())).thenReturn(List.of());
+        when(questionRepository.findActiveByQuizIds(List.of(quiz.getQuizId()))).thenReturn(List.of());
 
         PaginatedResponse<QuizStaffResponse> response =
                 quizService.getAllQuizzesForStaff("history", null, pageable, "CONTENT_ADMIN");

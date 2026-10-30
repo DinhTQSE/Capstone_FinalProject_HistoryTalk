@@ -69,8 +69,11 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
         Page<AssignmentSubmission> page = assignmentSubmissionRepository.findStudentSubmissions(
                 studentUid, classroomId, status, pageable);
 
+        java.util.Map<UUID, String> targetTitles = resolveTargetTitlesBatch(
+                page.getContent().stream().map(AssignmentSubmission::getAssignment).toList());
+
         List<StudentAssignmentResponse> responses = page.getContent().stream()
-                .map(this::mapToStudentAssignmentResponse)
+                .map(s -> mapToStudentAssignmentResponse(s, targetTitles.get(s.getAssignment().getTargetId())))
                 .toList();
 
         return PaginatedResponse.<StudentAssignmentResponse>builder()
@@ -247,6 +250,11 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
     private StudentAssignmentResponse mapToStudentAssignmentResponse(AssignmentSubmission s) {
         Assignment a = s.getAssignment();
+        return mapToStudentAssignmentResponse(s, getTargetTitleSafely(a.getAssignmentType(), a.getTargetId()));
+    }
+
+    private StudentAssignmentResponse mapToStudentAssignmentResponse(AssignmentSubmission s, String resolvedTargetTitle) {
+        Assignment a = s.getAssignment();
         boolean isExpired = a.getDeadline() != null && LocalDateTime.now().isAfter(a.getDeadline());
 
         return StudentAssignmentResponse.builder()
@@ -257,7 +265,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 .description(a.getDescription())
                 .assignmentType(a.getAssignmentType())
                 .targetId(a.getTargetId())
-                .targetTitle(getTargetTitleSafely(a.getAssignmentType(), a.getTargetId()))
+                .targetTitle(resolvedTargetTitle)
                 .deadline(a.getDeadline())
                 .minRequirement(a.getMinRequirement())
                 .submissionStatus(s.getStatus())
@@ -268,6 +276,39 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 .submittedAt(s.getSubmittedAt())
                 .isExpired(isExpired)
                 .build();
+    }
+
+    private java.util.Map<UUID, String> resolveTargetTitlesBatch(List<Assignment> assignments) {
+        java.util.Map<UUID, String> result = new java.util.HashMap<>();
+        if (assignments == null || assignments.isEmpty()) {
+            return result;
+        }
+        try {
+            List<UUID> contextIds = assignments.stream()
+                    .filter(a -> a.getAssignmentType() == AssignmentType.CONTEXT_READING && a.getTargetId() != null)
+                    .map(Assignment::getTargetId).distinct().toList();
+            if (!contextIds.isEmpty()) {
+                historicalContextRepository.findAllById(contextIds)
+                        .forEach(hc -> result.put(hc.getContextId(), hc.getName()));
+            }
+            List<UUID> charIds = assignments.stream()
+                    .filter(a -> a.getAssignmentType() == AssignmentType.AI_CHAT_ROLEPLAY && a.getTargetId() != null)
+                    .map(Assignment::getTargetId).distinct().toList();
+            if (!charIds.isEmpty()) {
+                characterRepository.findAllById(charIds)
+                        .forEach(c -> result.put(c.getCharacterId(), c.getName()));
+            }
+            List<UUID> quizIds = assignments.stream()
+                    .filter(a -> a.getAssignmentType() == AssignmentType.QUIZ_TEST && a.getTargetId() != null)
+                    .map(Assignment::getTargetId).distinct().toList();
+            if (!quizIds.isEmpty()) {
+                quizRepository.findAllById(quizIds)
+                        .forEach(q -> result.put(q.getQuizId(), q.getTitle()));
+            }
+        } catch (Exception e) {
+            log.warn("Could not batch load target titles: {}", e.getMessage());
+        }
+        return result;
     }
 
     private StudentSubmissionResponse mapToStudentSubmissionResponse(AssignmentSubmission s) {
