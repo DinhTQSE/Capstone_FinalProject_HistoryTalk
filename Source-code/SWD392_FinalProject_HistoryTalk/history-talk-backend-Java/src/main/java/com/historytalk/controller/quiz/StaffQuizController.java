@@ -104,7 +104,7 @@ public class StaffQuizController {
      * Permanent hard delete.
      */
     @DeleteMapping("/{quizId}")
-    @Operation(summary = "Delete quiz", description = "Permanently delete a quiz and all its questions.")
+    @Operation(summary = "Delete quiz", description = "Permanently delete a quiz. Its questions stay in the question bank.")
     public ResponseEntity<ApiResponse<Void>> deleteQuiz(
             @PathVariable String quizId) {
 
@@ -163,7 +163,7 @@ public class StaffQuizController {
      * Hard delete a question.
      */
     @DeleteMapping("/{quizId}/questions/{questionId}")
-    @Operation(summary = "Delete question", description = "Permanently delete a question from a quiz.")
+    @Operation(summary = "Delete question", description = "Remove a question from this quiz. The question stays in the question bank.")
     public ResponseEntity<ApiResponse<Void>> deleteQuestion(
             @PathVariable String quizId,
             @PathVariable String questionId) {

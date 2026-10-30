@@ -54,6 +54,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -407,15 +408,14 @@ public class QuizServiceImpl implements QuizService {
                 .build();
         quiz = quizRepository.save(quiz);
 
-        // Save each question
+        // Save each question and link it in request order
         if (request.getQuestions() != null) {
+            int orderIndex = 0;
             for (QuestionRequest qr : request.getQuestions()) {
-                questionRepository.save(buildQuestion(qr, quiz));
+                linkQuestion(quiz, questionRepository.save(buildQuestion(qr)), orderIndex++);
             }
         }
 
-        // Reload to get questions populated
-        quiz = quizRepository.findById(quiz.getQuizId()).orElseThrow();
         return mapToStaffResponse(quiz);
     }
 
@@ -479,7 +479,8 @@ public class QuizServiceImpl implements QuizService {
         log.info("addQuestion: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
-        Question question = questionRepository.save(buildQuestion(request, quiz));
+        Question question = questionRepository.save(buildQuestion(request));
+        linkQuestion(quiz, question, quizQuestionRepository.findMaxOrderIndex(quiz.getQuizId()) + 1);
         return mapToQuestionResponse(question);
     }
 
@@ -495,7 +496,7 @@ public class QuizServiceImpl implements QuizService {
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
-        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
+        if (!quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quizUuid, question.getQuestionId())) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
@@ -520,18 +521,8 @@ public class QuizServiceImpl implements QuizService {
     @Transactional
     public void deleteQuestion(String quizId, String questionId) {
         log.info("deleteQuestion: quizId={}, questionId={}", quizId, questionId);
-        UUID quizUuid = parseUuid(quizId, "quizId");
-        quizRepository.findById(quizUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
-
-        Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
-
-        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
-            throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
-        }
-
-        questionRepository.delete(question);
+        // Questions live in the bank and may be shared, so removing one from a quiz only drops the link
+        unlinkQuestionFromQuiz(quizId, questionId);
     }
 
     // ==================== Import ====================
@@ -690,12 +681,11 @@ public class QuizServiceImpl implements QuizService {
                 .build();
         quiz = quizRepository.save(quiz);
 
+        int orderIndex = 0;
         for (QuestionRequest request : questionRequests) {
-            questionRepository.save(buildQuestion(request, quiz));
+            linkQuestion(quiz, questionRepository.save(buildQuestion(request)), orderIndex++);
         }
 
-        // Reload to populate questions list
-        quiz = quizRepository.findById(quiz.getQuizId()).orElseThrow();
         return mapToStaffResponse(quiz);
     }
 
@@ -726,12 +716,19 @@ public class QuizServiceImpl implements QuizService {
         questionDataValidator.validate(effectiveType, effectiveData);
     }
 
-    private Question buildQuestion(QuestionRequest request, Quiz quiz) {
+    private void linkQuestion(Quiz quiz, Question question, int orderIndex) {
+        quizQuestionRepository.save(QuizQuestion.builder()
+                .quiz(quiz)
+                .question(question)
+                .orderIndex(orderIndex)
+                .build());
+    }
+
+    private Question buildQuestion(QuestionRequest request) {
         QuestionType type = request.getQuestionType() != null
                 ? request.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
         questionDataValidator.validate(type, request.getQuestionData());
         return Question.builder()
-                .quiz(quiz)
                 .content(request.getContent())
                 .explanation(request.getExplanation())
                 .questionType(type)
@@ -875,14 +872,14 @@ public class QuizServiceImpl implements QuizService {
         };
     }
 
-    private QuestionBankResponse mapToBankResponse(Question q) {
+    private QuestionBankResponse mapToBankResponse(Question q, boolean assignedToQuiz) {
         return QuestionBankResponse.builder()
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
                 .explanation(q.getExplanation())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
                 .questionData(deserializeJsonNode(q.getQuestionData()))
-                .assignedToQuiz(q.getQuiz() != null)
+                .assignedToQuiz(assignedToQuiz)
                 .build();
     }
 
@@ -1050,16 +1047,22 @@ public class QuizServiceImpl implements QuizService {
             }
         }
         Page<Question> page = questionRepository.findAllForBank(typeEnum, normalize(search), pageable);
-        return toPaginatedResponse(page.map(this::mapToBankResponse));
+        if (page.isEmpty()) {
+            return toPaginatedResponse(page.map(q -> mapToBankResponse(q, false)));
+        }
+        // One lookup for the whole page; links to soft-deleted quizzes do not count
+        Set<UUID> linked = quizQuestionRepository.findActivelyLinkedQuestionIds(
+                page.getContent().stream().map(Question::getQuestionId).toList());
+        return toPaginatedResponse(page.map(q -> mapToBankResponse(q, linked.contains(q.getQuestionId()))));
     }
 
     @Override
     @Transactional
     public QuestionBankResponse createBankQuestion(QuestionRequest request) {
         log.info("createBankQuestion: type={}", request.getQuestionType());
-        Question question = buildQuestion(request, null);
+        Question question = buildQuestion(request);
         question = questionRepository.save(question);
-        return mapToBankResponse(question);
+        return mapToBankResponse(question, false);
     }
 
     @Override
@@ -1085,7 +1088,8 @@ public class QuizServiceImpl implements QuizService {
             question.setQuestionData(serializeJsonNode(request.getQuestionData()));
         }
         question = questionRepository.save(question);
-        return mapToBankResponse(question);
+        UUID id = question.getQuestionId();
+        return mapToBankResponse(question, quizQuestionRepository.findActivelyLinkedQuestionIds(List.of(id)).contains(id));
     }
 
     @Override

@@ -36,8 +36,8 @@ public interface QuizAnswerDetailRepository extends JpaRepository<QuizAnswerDeta
                    END AS "wrongRate"
             FROM quiz_answer_detail qad
             JOIN question question ON question.question_id = qad.question_id
-            JOIN quiz q ON q.quiz_id = question.quiz_id
             JOIN quiz_session qs ON qs.session_id = qad.session_id
+            JOIN quiz q ON q.quiz_id = qs.quiz_id
             WHERE qad.deleted_at IS NULL
               AND question.deleted_at IS NULL
               AND q.deleted_at IS NULL

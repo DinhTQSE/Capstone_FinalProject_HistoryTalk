@@ -63,8 +63,12 @@ public class Quiz {
     @Column(name = "deleted_at", nullable = true)
     private LocalDateTime deletedAt;
 
+    /** Read-only view over quiz_question; write links via QuizQuestionRepository. */
     @Builder.Default
-    @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "quiz_question",
+            joinColumns = @JoinColumn(name = "quiz_id"),
+            inverseJoinColumns = @JoinColumn(name = "question_id"))
     private List<Question> questions = new ArrayList<>();
 
     public Boolean getIsDraft() {

@@ -17,49 +17,30 @@ import java.util.UUID;
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
 
     /**
-     * Get all non-deleted questions for a quiz — from both the direct FK column
-     * and the quiz_question link table (bank-attached questions).
+     * Get all non-deleted questions linked to a quiz through quiz_question, in quiz order.
      */
     @Query("""
-            SELECT q FROM Question q
-            WHERE q.deletedAt IS NULL
-            AND (
-                (q.quiz IS NOT NULL AND q.quiz.quizId = :quizId)
-                OR EXISTS (SELECT qq FROM QuizQuestion qq
-                           WHERE qq.quiz.quizId = :quizId
-                           AND qq.question.questionId = q.questionId)
-            )
-            ORDER BY q.createdAt ASC
+            SELECT q FROM QuizQuestion qq JOIN qq.question q
+            WHERE qq.quiz.quizId = :quizId
+              AND q.deletedAt IS NULL
+            ORDER BY qq.orderIndex ASC, q.createdAt ASC
             """)
     List<Question> findActiveByQuizId(@Param("quizId") UUID quizId);
 
     @Query("""
-            SELECT qz.quizId, q
-            FROM Quiz qz, Question q
-            WHERE qz.quizId IN :quizIds
+            SELECT qq.quiz.quizId, q FROM QuizQuestion qq JOIN qq.question q
+            WHERE qq.quiz.quizId IN :quizIds
               AND q.deletedAt IS NULL
-              AND (
-                  (q.quiz IS NOT NULL AND q.quiz.quizId = qz.quizId)
-                  OR EXISTS (SELECT qq FROM QuizQuestion qq
-                             WHERE qq.quiz.quizId = qz.quizId
-                             AND qq.question.questionId = q.questionId)
-              )
-            ORDER BY q.createdAt ASC
+            ORDER BY qq.orderIndex ASC, q.createdAt ASC
             """)
     List<Object[]> findActiveByQuizIds(@Param("quizIds") Collection<UUID> quizIds);
 
+    // The composite PK keeps each (quiz, question) pair unique, so no DISTINCT is needed
     @Query("""
-            SELECT qz.quizId, COUNT(DISTINCT q.questionId)
-            FROM Quiz qz, Question q
-            WHERE qz.quizId IN :quizIds
+            SELECT qq.quiz.quizId, COUNT(q) FROM QuizQuestion qq JOIN qq.question q
+            WHERE qq.quiz.quizId IN :quizIds
               AND q.deletedAt IS NULL
-              AND (
-                  (q.quiz IS NOT NULL AND q.quiz.quizId = qz.quizId)
-                  OR EXISTS (SELECT qq FROM QuizQuestion qq
-                             WHERE qq.quiz.quizId = qz.quizId
-                             AND qq.question.questionId = q.questionId)
-              )
-            GROUP BY qz.quizId
+            GROUP BY qq.quiz.quizId
             """)
     List<Object[]> countActiveByQuizIds(@Param("quizIds") Collection<UUID> quizIds);
 

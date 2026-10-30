@@ -31,10 +31,6 @@ public class Question {
     @Column(name = "question_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID questionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id", nullable = true)
-    private Quiz quiz;
-
     //    @Lob
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;

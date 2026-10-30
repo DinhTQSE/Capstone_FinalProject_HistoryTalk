@@ -2,6 +2,7 @@ package com.historytalk.service.quiz;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.PaginatedResponse;
+import com.historytalk.dto.quiz.CreateQuizRequest;
 import com.historytalk.dto.quiz.QuestionRequest;
 import com.historytalk.dto.quiz.QuizStaffResponse;
 import com.historytalk.entity.enums.QuestionType;
@@ -9,10 +10,13 @@ import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
+import com.historytalk.entity.quiz.QuizQuestion;
+import com.historytalk.entity.quiz.QuizQuestionId;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
+import com.historytalk.repository.QuizQuestionRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
@@ -36,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +67,9 @@ class QuizServiceImplTest {
 
     @Mock
     private QuestionDataValidator questionDataValidator;
+
+    @Mock
+    private QuizQuestionRepository quizQuestionRepository;
 
     @InjectMocks
     private QuizServiceImpl quizService;
@@ -101,7 +109,6 @@ class QuizServiceImplTest {
         Quiz quiz = activeQuiz();
         Question question = Question.builder()
                 .questionId(UUID.randomUUID())
-                .quiz(quiz)
                 .content("Ai chỉ huy?")
                 .questionType(QuestionType.MULTIPLE_CHOICE)
                 .questionData("{\"options\":[],\"correctOptionIds\":[]}")
@@ -112,6 +119,8 @@ class QuizServiceImplTest {
 
         when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
         when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quiz.getQuizId(), question.getQuestionId()))
+                .thenReturn(true);
         when(objectMapper.readTree(question.getQuestionData())).thenReturn(new ObjectMapper().createObjectNode());
         doThrow(new InvalidRequestException("invalid")).when(questionDataValidator)
                 .validate(eq(QuestionType.MATCHING), any());
@@ -145,6 +154,113 @@ class QuizServiceImplTest {
                 .isInstanceOf(InvalidRequestException.class);
 
         verify(questionRepository, never()).save(any());
+    }
+
+    @Test
+    void createQuiz_linksEachQuestionInOrder() {
+        Quiz template = activeQuiz();
+        UUID quizId = template.getQuizId();
+        CreateQuizRequest request = CreateQuizRequest.builder()
+                .title("Bạch Đằng")
+                .contextId(template.getHistoricalContext().getContextId().toString())
+                .level("EASY")
+                .questions(List.of(questionRequest("Câu 1"), questionRequest("Câu 2")))
+                .build();
+
+        when(quizRepository.existsByTitleIgnoreCase("Bạch Đằng")).thenReturn(false);
+        when(userRepository.findById(template.getCreatedBy().getUid())).thenReturn(Optional.of(template.getCreatedBy()));
+        when(historicalContextRepository.findById(template.getHistoricalContext().getContextId()))
+                .thenReturn(Optional.of(template.getHistoricalContext()));
+        when(quizRepository.save(any(Quiz.class))).thenAnswer(inv -> {
+            Quiz q = inv.getArgument(0);
+            q.setQuizId(quizId);
+            return q;
+        });
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> {
+            Question q = inv.getArgument(0);
+            q.setQuestionId(UUID.randomUUID());
+            return q;
+        });
+
+        quizService.createQuiz(request, template.getCreatedBy().getUid());
+
+        ArgumentCaptor<QuizQuestion> links = ArgumentCaptor.forClass(QuizQuestion.class);
+        verify(quizQuestionRepository, times(2)).save(links.capture());
+        assertThat(links.getAllValues()).extracting(QuizQuestion::getOrderIndex).containsExactly(0, 1);
+        assertThat(links.getAllValues()).allSatisfy(l -> assertThat(l.getQuiz().getQuizId()).isEqualTo(quizId));
+        assertThat(links.getAllValues()).extracting(l -> l.getQuestion().getContent())
+                .containsExactly("Câu 1", "Câu 2");
+    }
+
+    @Test
+    void addQuestion_linksAfterCurrentMaxOrder() {
+        Quiz quiz = activeQuiz();
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> {
+            Question q = inv.getArgument(0);
+            q.setQuestionId(UUID.randomUUID());
+            return q;
+        });
+        when(quizQuestionRepository.findMaxOrderIndex(quiz.getQuizId())).thenReturn(4);
+
+        quizService.addQuestion(quiz.getQuizId().toString(), questionRequest("Câu mới"));
+
+        ArgumentCaptor<QuizQuestion> link = ArgumentCaptor.forClass(QuizQuestion.class);
+        verify(quizQuestionRepository).save(link.capture());
+        assertThat(link.getValue().getOrderIndex()).isEqualTo(5);
+        assertThat(link.getValue().getQuiz()).isSameAs(quiz);
+    }
+
+    @Test
+    void updateQuestion_notLinkedToQuiz_rejected() {
+        Quiz quiz = activeQuiz();
+        Question question = Question.builder().questionId(UUID.randomUUID()).content("Câu khác").build();
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quiz.getQuizId(), question.getQuestionId()))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> quizService.updateQuestion(
+                quiz.getQuizId().toString(), question.getQuestionId().toString(), questionRequest("Sửa")))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("Câu hỏi không thuộc về quiz");
+        verify(questionRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteQuestion_unlinksWithoutDeletingQuestion() {
+        Quiz quiz = activeQuiz();
+        Question question = Question.builder().questionId(UUID.randomUUID()).build();
+        QuizQuestion link = QuizQuestion.builder().quiz(quiz).question(question).orderIndex(0).build();
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(quizQuestionRepository.findById(new QuizQuestionId(quiz.getQuizId(), question.getQuestionId())))
+                .thenReturn(Optional.of(link));
+
+        quizService.deleteQuestion(quiz.getQuizId().toString(), question.getQuestionId().toString());
+
+        verify(quizQuestionRepository).delete(link);
+        verify(questionRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteQuiz_keepsQuestionsInBank() {
+        Quiz quiz = activeQuiz();
+        quiz.setQuestions(new java.util.ArrayList<>(List.of(Question.builder().questionId(UUID.randomUUID()).build())));
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+
+        quizService.deleteQuiz(quiz.getQuizId().toString());
+
+        verify(quizRepository).delete(quiz);
+        verify(questionRepository, never()).delete(any());
+        verify(questionRepository, never()).deleteAll(any());
+    }
+
+    private QuestionRequest questionRequest(String content) {
+        return QuestionRequest.builder()
+                .content(content)
+                .questionType(QuestionType.FILL_IN_BLANK)
+                .build();
     }
 
     private Quiz activeQuiz() {

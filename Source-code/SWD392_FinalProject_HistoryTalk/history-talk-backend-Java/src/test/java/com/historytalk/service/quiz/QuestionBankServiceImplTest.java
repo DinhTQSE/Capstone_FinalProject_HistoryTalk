@@ -1,6 +1,7 @@
 package com.historytalk.service.quiz;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.AnswerDetailRequest;
 import com.historytalk.dto.quiz.AttachQuestionRequest;
 import com.historytalk.dto.quiz.QuestionBankResponse;
@@ -33,15 +34,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -341,7 +348,7 @@ class QuestionBankServiceImplTest {
     // ==================== Question Bank ====================
 
     @Test
-    void createBankQuestion_FillInBlank_savesWithNullQuiz() throws Exception {
+    void createBankQuestion_FillInBlank_savesQuestion() throws Exception {
         FillInBlankQuestionData qData = new FillInBlankQuestionData(
                 List.of("Ngô Quyền"), false, true);
 
@@ -360,7 +367,6 @@ class QuestionBankServiceImplTest {
                     .content(q.getContent())
                     .questionType(q.getQuestionType())
                     .questionData(q.getQuestionData())
-                    .quiz(q.getQuiz())
                     .explanation(q.getExplanation())
                     .build();
         });
@@ -368,7 +374,6 @@ class QuestionBankServiceImplTest {
         quizService.createBankQuestion(request);
 
         Question saved = captor.getValue();
-        assertThat(saved.getQuiz()).isNull();
         assertThat(saved.getQuestionType()).isEqualTo(QuestionType.FILL_IN_BLANK);
         assertThat(saved.getQuestionData()).isNotNull();
     }
@@ -382,7 +387,7 @@ class QuestionBankServiceImplTest {
         var context = com.historytalk.entity.historicalContext.HistoricalContext.builder()
                 .contextId(contextId).build();
         Quiz quiz = Quiz.builder().quizId(quizId).historicalContext(context).build();
-        Question question = Question.builder().questionId(questionId).quiz(null).build();
+        Question question = Question.builder().questionId(questionId).build();
 
         when(quizRepository.findById(quizId)).thenReturn(Optional.of(quiz));
         when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
@@ -438,5 +443,55 @@ class QuestionBankServiceImplTest {
         quizService.unlinkQuestionFromQuiz(quizId.toString(), questionId.toString());
 
         verify(quizQuestionRepository).delete(link);
+    }
+
+    @Test
+    void getQuestionBank_assignedToQuizComesFromActiveLinks() {
+        Question linked = Question.builder().questionId(UUID.randomUUID()).content("Q1").build();
+        Question unlinked = Question.builder().questionId(UUID.randomUUID()).content("Q2").build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(questionRepository.findAllForBank(any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(linked, unlinked), pageable, 2));
+        when(quizQuestionRepository.findActivelyLinkedQuestionIds(any()))
+                .thenReturn(Set.of(linked.getQuestionId()));
+
+        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, pageable);
+
+        assertThat(result.getContent()).extracting(QuestionBankResponse::isAssignedToQuiz)
+                .containsExactly(true, false);
+        verify(quizQuestionRepository, times(1)).findActivelyLinkedQuestionIds(any());
+    }
+
+    @Test
+    void getQuestionBank_linkOnlyToDeletedQuiz_notAssigned() {
+        // The link row exists, but its quiz is soft-deleted, so the repository reports no active link
+        Question question = Question.builder().questionId(UUID.randomUUID()).content("Q1").build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(questionRepository.findAllForBank(any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(question), pageable, 1));
+        when(quizQuestionRepository.findActivelyLinkedQuestionIds(any())).thenReturn(Set.of());
+
+        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, pageable);
+
+        assertThat(result.getContent().get(0).isAssignedToQuiz()).isFalse();
+    }
+
+    @Test
+    void createBankQuestion_isNotAssigned() {
+        QuestionRequest request = QuestionRequest.builder()
+                .content("Ai chiến thắng Bạch Đằng 938?")
+                .questionType(QuestionType.FILL_IN_BLANK)
+                .questionData(objectMapper.valueToTree(new FillInBlankQuestionData(List.of("Ngô Quyền"), false, true)))
+                .build();
+        when(questionRepository.save(any())).thenAnswer(inv -> {
+            Question q = inv.getArgument(0);
+            q.setQuestionId(UUID.randomUUID());
+            return q;
+        });
+
+        QuestionBankResponse response = quizService.createBankQuestion(request);
+
+        assertThat(response.isAssignedToQuiz()).isFalse();
+        verify(quizQuestionRepository, never()).findActivelyLinkedQuestionIds(any());
     }
 }

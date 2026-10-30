@@ -10,6 +10,7 @@ import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
+import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
@@ -116,6 +117,11 @@ class QuizServiceImplImportTest {
                 .getAcceptedAnswers()).containsExactly("938", "năm 938");
         assertThat(objectMapper.readValue(saved.get(2).getQuestionData(), MatchingQuestionData.class)
                 .getCorrectPairs()).hasSize(2);
+
+        ArgumentCaptor<QuizQuestion> links = ArgumentCaptor.forClass(QuizQuestion.class);
+        verify(quizQuestionRepository, times(3)).save(links.capture());
+        assertThat(links.getAllValues()).extracting(QuizQuestion::getOrderIndex).containsExactly(0, 1, 2);
+        assertThat(links.getAllValues()).extracting(QuizQuestion::getQuestion).containsExactlyElementsOf(saved);
     }
 
     @Test

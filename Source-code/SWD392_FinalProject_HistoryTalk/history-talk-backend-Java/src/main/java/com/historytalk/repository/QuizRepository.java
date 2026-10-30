@@ -125,10 +125,11 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
                    ), 0.0) AS "averageScorePercentage"
             FROM quiz q
             LEFT JOIN (
-                SELECT quiz_id, COUNT(*) AS question_count
-                FROM question
-                WHERE deleted_at IS NULL
-                GROUP BY quiz_id
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
             ) qc ON qc.quiz_id = q.quiz_id
             LEFT JOIN quiz_session qs
               ON qs.quiz_id = q.quiz_id
