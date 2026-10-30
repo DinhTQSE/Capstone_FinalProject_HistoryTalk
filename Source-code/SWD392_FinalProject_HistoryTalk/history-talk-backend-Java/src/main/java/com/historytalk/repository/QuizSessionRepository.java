@@ -153,10 +153,11 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             ), 0.0)
             FROM quiz_session qs
             JOIN (
-                SELECT quiz_id, COUNT(*) AS question_count
-                FROM question
-                WHERE deleted_at IS NULL
-                GROUP BY quiz_id
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
             ) qc ON qc.quiz_id = qs.quiz_id
             WHERE qs.deleted_at IS NULL
               AND qs.end_time IS NOT NULL
@@ -199,10 +200,11 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             ), 0.0)
             FROM quiz_session qs
             JOIN (
-                SELECT quiz_id, COUNT(*) AS question_count
-                FROM question
-                WHERE deleted_at IS NULL
-                GROUP BY quiz_id
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
             ) qc ON qc.quiz_id = qs.quiz_id
             WHERE qs.deleted_at IS NULL
               AND qs.end_time IS NOT NULL
@@ -222,10 +224,11 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
                 ), 0.0) AS "averageScorePercentage"
             FROM quiz_session qs
             LEFT JOIN (
-                SELECT quiz_id, COUNT(*) AS question_count
-                FROM question
-                WHERE deleted_at IS NULL
-                GROUP BY quiz_id
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
             ) qc ON qc.quiz_id = qs.quiz_id
             WHERE qs.deleted_at IS NULL
               AND qs.end_time IS NOT NULL
