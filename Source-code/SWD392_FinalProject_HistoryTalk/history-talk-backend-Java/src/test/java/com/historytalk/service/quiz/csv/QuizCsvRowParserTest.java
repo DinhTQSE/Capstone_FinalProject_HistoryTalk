@@ -6,6 +6,7 @@ import com.historytalk.dto.quiz.quizdata.MatchingItem;
 import com.historytalk.dto.quiz.quizdata.MatchingPair;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.exception.InvalidRequestException;
 import org.apache.commons.csv.CSVRecord;
@@ -230,6 +231,28 @@ class QuizCsvRowParserTest {
     }
 
     // ==================== Helpers ====================
+
+    // ==================== Difficulty (level column) ====================
+
+    @Test
+    void parsesLevelIntoQuestionDifficulty() {
+        QuestionRequest request = parser.parse(rec(Map.of(
+                "level", "hard", "option1", "A", "option2", "B", "correctAnswer", "0")));
+
+        assertThat(request.getDifficulty()).isEqualTo(QuestionDifficulty.HARD);
+    }
+
+    @Test
+    void blankLevelIsRejectedWithLineNumber() {
+        assertInvalid(Map.of("level", "", "option1", "A", "option2", "B", "correctAnswer", "0"),
+                "Dòng 2: level không được để trống");
+    }
+
+    @Test
+    void invalidLevelIsRejectedWithLineNumber() {
+        assertInvalid(Map.of("level", "VERY_HARD", "option1", "A", "option2", "B", "correctAnswer", "0"),
+                "Dòng 2: level không hợp lệ: 'VERY_HARD'. Giá trị hợp lệ: EASY, MEDIUM, HARD");
+    }
 
     private void assertInvalid(Map<String, String> overrides, String message) {
         assertThatThrownBy(() -> parser.parse(rec(overrides)))

@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * Response for GET /quizzes and GET /quizzes/:quizId (Customer).
- * Shape matches contract QuizSet: { quizId, title, level, era, playCount, contextTitle? }
+ * Shape matches contract QuizSet: { quizId, title, era, playCount, contextTitle? }
  */
 @Data
 @Builder
@@ -18,9 +18,6 @@ public class QuizCustomerResponse {
     private String quizId;
 
     private String title;
-
-    /** EASY | MEDIUM | HARD */
-    private String level;
 
     /** ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY — sourced from historicalContext.era */
     private String era;

@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Request body for POST /staff/quizzes
- * Shape: { title, contextId, era?, level, questions[] }
+ * Shape: { title, contextId, questions[] } — difficulty is set per question
  */
 @Data
 @Builder
@@ -30,9 +30,6 @@ public class CreateQuizRequest {
 
     /** Optional. Must match EventEra enum: ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY */
 //    private String era;
-
-    @NotNull(message = "Yêu cầu cấp độ (Level)")
-    private String level;
 
     @NotEmpty(message = "Yêu cầu ít nhất một câu hỏi")
     @Valid

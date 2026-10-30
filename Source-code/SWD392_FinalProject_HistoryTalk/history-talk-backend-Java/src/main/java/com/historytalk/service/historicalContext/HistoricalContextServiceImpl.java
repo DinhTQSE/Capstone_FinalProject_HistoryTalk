@@ -296,13 +296,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             }
         });
 
-        // Cascade to Quizzes and their children
+        // Cascade to Quizzes
         if (context.getQuizzes() != null) {
             context.getQuizzes().forEach(quiz -> {
+                // Questions live in the bank and may be shared by other quizzes, so only the quiz is soft-deleted
                 quiz.setDeletedAt(now);
-                if (quiz.getQuestions() != null) {
-                    quiz.getQuestions().forEach(q -> q.setDeletedAt(now));
-                }
                 // Note: QuizSessions aren't directly fetched via Quiz mapping usually,
                 // but handled in @Where or soft-deleted individually.
                 // Currently Quiz entity does not map quizSessions.

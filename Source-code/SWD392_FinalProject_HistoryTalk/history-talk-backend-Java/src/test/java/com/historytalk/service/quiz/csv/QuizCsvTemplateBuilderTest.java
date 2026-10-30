@@ -2,6 +2,7 @@ package com.historytalk.service.quiz.csv;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.quiz.QuestionRequest;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.service.quiz.QuestionDataValidator;
 import org.apache.commons.csv.CSVRecord;
@@ -55,6 +56,8 @@ class QuizCsvTemplateBuilderTest {
                     .doesNotThrowAnyException();
         }
         assertThat(records).extracting(r -> r.get("title")).containsOnly(records.get(0).get("title"));
-        assertThat(records).extracting(r -> r.get("level")).containsOnly("EASY");
+        // One quiz whose questions each carry their own difficulty
+        assertThat(requests).extracting(QuestionRequest::getDifficulty).containsExactly(
+                QuestionDifficulty.EASY, QuestionDifficulty.MEDIUM, QuestionDifficulty.HARD);
     }
 }

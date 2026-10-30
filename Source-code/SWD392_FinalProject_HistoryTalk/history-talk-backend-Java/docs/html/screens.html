@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HistoryTalk Screen Wireframes</title>
+<style>
+  :root {
+    --bg: #f4f4f5; --paper: #ffffff; --ink: #27272a; --muted: #71717a; --line: #a1a1aa; --soft: #e4e4e7; --fill: #f4f4f5;
+    --pub: #334155; --cus: #2563eb; --tea: #16a34a; --sa: #d97706; --ca: #7c3aed; --sys: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--ink); font-size: 13px; }
+  header.top { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid var(--soft); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header.top h1 { font-size: 18px; margin: 0; }
+  header.top a { color: var(--cus); text-decoration: none; font-size: 14px; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .filters button { font: inherit; border: 1px solid var(--soft); background: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .filters button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .layout { display: grid; grid-template-columns: 250px 1fr; gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  nav.toc { position: sticky; top: 70px; align-self: start; max-height: calc(100vh - 90px); overflow: auto; background: #fff; border: 1px solid var(--soft); border-radius: 10px; padding: 12px; }
+  nav.toc h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 0 4px; }
+  nav.toc h3:first-child { margin-top: 0; }
+  nav.toc a { display: block; color: var(--ink); text-decoration: none; padding: 3px 6px; border-radius: 6px; }
+  nav.toc a:hover { background: var(--fill); }
+  .note { background: #fff; border: 1px solid var(--soft); border-radius: 10px; padding: 10px 14px; margin-bottom: 20px; color: var(--muted); }
+
+  /* screen card */
+  .screen { margin-bottom: 34px; scroll-margin-top: 80px; }
+  .shead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .shead .sid { font-weight: 700; padding: 2px 8px; border-radius: 6px; color: #fff; }
+  .shead h2 { font-size: 16px; margin: 0; }
+  .shead .meta { color: var(--muted); }
+  .shead button { margin-left: auto; font: inherit; font-size: 12px; border: 1px solid var(--soft); background: #fff; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+
+  /* browser frame */
+  .frame { background: var(--paper); border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; max-width: 1100px; }
+  .chrome { display: flex; align-items: center; gap: 8px; background: var(--fill); border-bottom: 2px solid var(--ink); padding: 6px 10px; }
+  .chrome i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink); display: inline-block; }
+  .chrome .url { flex: 1; background: #fff; border: 1.5px solid var(--line); border-radius: 6px; padding: 2px 8px; color: var(--muted); font-family: Consolas, monospace; font-size: 12px; }
+  .appbar { display: flex; align-items: center; gap: 16px; padding: 8px 14px; border-bottom: 1.5px solid var(--line); }
+  .appbar .logo { font-weight: 800; letter-spacing: .02em; }
+  .appbar .menu { display: flex; gap: 14px; color: var(--muted); }
+  .appbar .menu b { color: var(--ink); text-decoration: underline; }
+  .appbar .right { margin-left: auto; display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  .avatar { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--fill); display: inline-block; }
+  .shell { display: grid; grid-template-columns: 180px 1fr; min-height: 340px; }
+  .side { border-right: 1.5px solid var(--line); padding: 10px; background: #fafafa; }
+  .side div { padding: 6px 8px; border-radius: 6px; color: var(--muted); }
+  .side div.on { background: var(--soft); color: var(--ink); font-weight: 600; }
+  .content { padding: 16px 18px; }
+  .center { display: flex; justify-content: center; padding: 26px 16px; }
+  .center > .card { width: 420px; }
+
+  /* popup */
+  .dim { background: repeating-linear-gradient(45deg, #e4e4e7 0 8px, #f4f4f5 8px 16px); padding: 34px 16px; display: flex; justify-content: center; }
+  .modal { background: #fff; border: 2px dashed var(--ink); border-radius: 14px; width: 460px; padding: 16px 18px; box-shadow: 0 6px 0 rgba(0,0,0,.08); }
+  .modal .mt { display: flex; justify-content: space-between; font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+
+  /* wireframe components */
+  .h { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 8px; }
+  .row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 10px; }
+  .row.mid { align-items: center; }
+  .row.end { justify-content: flex-end; }
+  .row.between { justify-content: space-between; align-items: center; }
+  .grow { flex: 1; min-width: 180px; }
+  .card { border: 1.5px solid var(--line); border-radius: 8px; padding: 12px; background: #fff; }
+  .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; min-width: 120px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .input { border: 1.5px solid var(--line); border-radius: 6px; padding: 6px 8px; min-height: 30px; color: var(--muted); background: #fff; }
+  .input.area { min-height: 62px; }
+  .input.sel::after { content: " ▾"; float: right; }
+  .btn { display: inline-block; border: 1.5px solid var(--ink); border-radius: 6px; padding: 6px 14px; background: #fff; font-weight: 600; white-space: nowrap; }
+  .btn.p { background: var(--ink); color: #fff; }
+  .btn.sm { padding: 2px 8px; font-size: 12px; font-weight: 500; }
+  .btn.block { display: block; text-align: center; }
+  .link { color: var(--ink); text-decoration: underline; }
+  .chk { display: inline-flex; gap: 6px; align-items: center; margin-right: 12px; }
+  .chk i { width: 14px; height: 14px; border: 1.5px solid var(--ink); border-radius: 3px; display: inline-block; text-align: center; line-height: 11px; font-style: normal; font-size: 11px; }
+  .chk.r i { border-radius: 50%; }
+  .tabs { display: flex; border-bottom: 1.5px solid var(--line); margin-bottom: 12px; }
+  .tabs span { padding: 6px 12px; color: var(--muted); }
+  .tabs span.on { color: var(--ink); font-weight: 700; border: 1.5px solid var(--line); border-bottom: 2px solid #fff; border-radius: 6px 6px 0 0; margin-bottom: -1.5px; background: #fff; }
+  .img { border: 1.5px solid var(--line); border-radius: 6px; background:
+          linear-gradient(to top right, transparent calc(50% - 1px), var(--soft) 50%, transparent calc(50% + 1px)),
+          linear-gradient(to top left, transparent calc(50% - 1px), var(--soft) 50%, transparent calc(50% + 1px)), #fafafa;
+         display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; }
+  table.t { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  table.t th, table.t td { border: 1.5px solid var(--soft); padding: 6px 8px; text-align: left; vertical-align: middle; }
+  table.t th { background: var(--fill); font-weight: 600; }
+  .badge { display: inline-block; border: 1.5px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 11px; }
+  .badge.ok { border-color: #16a34a; color: #166534; }
+  .badge.warn { border-color: #d97706; color: #92400e; }
+  .badge.bad { border-color: #dc2626; color: #991b1b; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .stat { border: 1.5px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .stat .v { font-size: 18px; font-weight: 700; }
+  .stat .k { color: var(--muted); font-size: 12px; }
+  .chart { border: 1.5px solid var(--line); border-radius: 8px; height: 130px; display: flex; align-items: flex-end; gap: 6px; padding: 10px; position: relative; }
+  .chart b { flex: 1; background: var(--soft); border: 1.5px solid var(--line); border-bottom: none; }
+  .chart span { position: absolute; top: 6px; left: 10px; color: var(--muted); font-size: 12px; }
+  .map { border: 1.5px solid var(--line); border-radius: 8px; background: #f0fdf4; position: relative; overflow: hidden; }
+  .map::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--soft) 1px, transparent 1px), linear-gradient(90deg, var(--soft) 1px, transparent 1px); background-size: 40px 40px; opacity: .7; }
+  .pin { position: absolute; transform: translate(-50%, -100%); font-size: 12px; white-space: nowrap; }
+  .pin::before { content: "📍"; margin-right: 2px; }
+  .bubble { max-width: 72%; border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; }
+  .bubble.ai { background: var(--fill); }
+  .bubble.me { margin-left: auto; border-color: var(--ink); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chips span { border: 1.5px dashed var(--line); border-radius: 999px; padding: 2px 10px; color: var(--muted); }
+  .pager { text-align: center; color: var(--muted); letter-spacing: .2em; }
+  .qr { width: 150px; height: 150px; border: 2px solid var(--ink); background:
+        repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 12px),
+        repeating-linear-gradient(0deg, transparent 0 6px, #fff 6px 12px); opacity: .85; }
+  .slider { height: 6px; border-radius: 3px; background: var(--soft); position: relative; margin: 10px 0; }
+  .slider::after { content: ""; position: absolute; left: 35%; top: -6px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; }
+  .dropzone { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); margin-bottom: 10px; }
+  .muted { color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav.toc { position: static; max-height: none; } .shell { grid-template-columns: 1fr; } .side { display: none; } .grid3, .grid4 { grid-template-columns: 1fr 1fr; } }
+  @media print { header.top, nav.toc, .shead button { display: none; } .layout { display: block; padding: 0; } .screen { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>HistoryTalk – Screen Wireframes</h1>
+  <a href="index.html">← Index</a>
+  <a href="diagrams.html">Diagrams →</a>
+  <div class="filters" id="filters"></div>
+</header>
+<div class="layout">
+  <nav class="toc" id="toc"></nav>
+  <main>
+    <div class="note">Bản phác bố cục (low-fidelity) cho các màn hình trong SRS mục 3.2 – 3.12. Khung viền nét liền = màn hình; khung nét đứt trên nền gạch chéo = pop-up. Ô có dấu X = ảnh/media. Mỗi màn hình có nút <b>⬇ PNG</b> để chèn vào báo cáo Word.</div>
+    <div id="screens"></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+// ───────────── Component helpers ─────────────
+const h = t => `<div class="h">${t}</div>`;
+const sub = t => `<p class="sub">${t}</p>`;
+const row = (...x) => `<div class="row">${x.join("")}</div>`;
+const rowMid = (...x) => `<div class="row mid">${x.join("")}</div>`;
+const rowEnd = (...x) => `<div class="row end">${x.join("")}</div>`;
+const rowB = (...x) => `<div class="row between">${x.join("")}</div>`;
+const grow = (...x) => `<div class="grow">${x.join("")}</div>`;
+const card = (...x) => `<div class="card">${x.join("")}</div>`;
+const inp = (label, val = "", w) => `<div class="field" ${w ? `style="width:${w}px"` : ""}>${label ? `<label>${label}</label>` : ""}<div class="input">${val}</div></div>`;
+const sel = (label, val = "Tất cả", w) => `<div class="field" ${w ? `style="width:${w}px"` : ""}>${label ? `<label>${label}</label>` : ""}<div class="input sel">${val}</div></div>`;
+const area = (label, val = "") => `<div class="field">${label ? `<label>${label}</label>` : ""}<div class="input area">${val}</div></div>`;
+const btn = (t, p) => `<span class="btn${p ? " p" : ""}">${t}</span>`;
+const sm = t => `<span class="btn sm">${t}</span>`;
+const bigBtn = (t, p = true) => `<span class="btn block${p ? " p" : ""}">${t}</span>`;
+const link = t => `<span class="link">${t}</span>`;
+const chk = (t, on) => `<span class="chk"><i>${on ? "✓" : ""}</i>${t}</span>`;
+const rad = (t, on) => `<span class="chk r"><i>${on ? "●" : ""}</i>${t}</span>`;
+const tabs = (arr, on = 0) => `<div class="tabs">${arr.map((t, i) => `<span class="${i === on ? "on" : ""}">${t}</span>`).join("")}</div>`;
+const img = (label, hgt = 90, w) => `<div class="img" style="height:${hgt}px;${w ? `width:${w}px;flex:none` : ""}">${label}</div>`;
+const tbl = (head, rows) => `<table class="t"><tr>${head.map(x => `<th>${x}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</table>`;
+const badge = (t, tone = "") => `<span class="badge ${tone}">${t}</span>`;
+const stats = arr => `<div class="stats">${arr.map(([k, v]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("")}</div>`;
+const chart = (label, bars = [40, 65, 50, 80, 60, 90, 70]) => `<div class="chart"><span>${label}</span>${bars.map(b => `<b style="height:${b}%"></b>`).join("")}</div>`;
+const map = (hgt, pins = []) => `<div class="map" style="height:${hgt}px">${pins.map(([t, x, y]) => `<span class="pin" style="left:${x}%;top:${y}%">${t}</span>`).join("")}</div>`;
+const ai = t => `<div class="bubble ai"><b>AI:</b> ${t}</div>`;
+const me = t => `<div class="bubble me"><b>Bạn:</b> ${t}</div>`;
+const chips = arr => `<div class="chips">${arr.map(x => `<span>${x}</span>`).join("")}</div>`;
+const pager = () => `<div class="pager">‹ 1 2 3 … 8 ›</div>`;
+const drop = t => `<div class="dropzone">📁 ${t}</div>`;
+const g2 = (...x) => `<div class="grid2">${x.join("")}</div>`;
+const g3 = (...x) => `<div class="grid3">${x.join("")}</div>`;
+const g4 = (...x) => `<div class="grid4">${x.join("")}</div>`;
+
+// ───────────── Frames ─────────────
+const ROLE = {
+  pub: { name: "Public", color: "var(--pub)" },
+  cus: { name: "Learner", color: "var(--cus)" },
+  stu: { name: "School Student", color: "var(--cus)" },
+  tea: { name: "Teacher", color: "var(--tea)" },
+  sa:  { name: "School Admin", color: "var(--sa)" },
+  ca:  { name: "Content Admin", color: "var(--ca)" },
+  sys: { name: "System Admin", color: "var(--sys)" }
+};
+const LEARNER_MENU = ["Trang chủ", "Bối cảnh", "Nhân vật", "Bản đồ", "Quiz", "Bài tập"];
+const SIDE = {
+  tea: ["Lớp của tôi", "Bài tập", "Nội dung địa phương", "Yêu cầu token", "Thống kê lớp"],
+  sa:  ["Tổng quan", "Lớp học", "Giáo viên", "Học sinh", "Nội dung địa phương", "Hạn mức token", "Ticket token"],
+  ca:  ["Bối cảnh", "Nhân vật", "Tài liệu & OCR", "Quiz & Ngân hàng", "Báo cáo câu hỏi", "Bản đồ", "Thùng rác", "Nhiệm vụ ngày"],
+  sys: ["Tổng quan", "Trường học", "Người dùng", "Gói dịch vụ", "Thanh toán", "— Nội dung —"]
+};
+const chrome = url => `<div class="chrome"><i></i><i></i><i></i><div class="url">historytalk.vn${url}</div></div>`;
+
+function frameAuth(s) { return `${chrome(s.url)}<div class="center"><div class="card">${s.body}</div></div>`; }
+function frameLearner(s) {
+  const menu = LEARNER_MENU.map(m => m === s.menu ? `<b>${m}</b>` : m).join("</span><span>");
+  return `${chrome(s.url)}<div class="appbar"><span class="logo">HistoryTalk</span><div class="menu"><span>${menu}</span></div><div class="right">🪙 1.420 token <span class="avatar"></span></div></div><div class="content">${s.body}</div>`;
+}
+function frameAdmin(s) {
+  const items = SIDE[s.role].map(m => `<div class="${m === s.menu ? "on" : ""}">${m}</div>`).join("");
+  return `${chrome(s.url)}<div class="appbar"><span class="logo">HistoryTalk</span><span class="muted">${ROLE[s.role].name}${s.school ? " · THPT A" : ""}</span><div class="right">🔔 <span class="avatar"></span></div></div><div class="shell"><div class="side">${items}</div><div class="content">${s.body}</div></div>`;
+}
+function framePopup(s) { return `${chrome(s.url)}<div class="dim"><div class="modal"><div class="mt"><span>${s.modalTitle || s.title}</span><span>✕</span></div>${s.body}</div></div>`; }
+function render(s) {
+  const k = s.kind || "learner";
+  if (k === "auth") return frameAuth(s);
+  if (k === "admin") return frameAdmin(s);
+  if (k === "popup") return framePopup(s);
+  return frameLearner(s);
+}
+
+// ───────────── Screens ─────────────
+const S = [];
+const add = o => S.push(o);
+
+// ===== 3.2 Authentication & Account =====
+add({ id: "S-02", title: "Login", sec: "3.2.1", role: "pub", kind: "auth", url: "/login", body:
+  h("ĐĂNG NHẬP HỆ THỐNG") + sub("HistoryTalk – Chắp cánh tri thức lịch sử") +
+  inp("Email", "nguyenvana@gmail.com") + inp("Mật khẩu", "•••••••• 👁") +
+  rowEnd(link("Quên mật khẩu?")) + bigBtn("ĐĂNG NHẬP") +
+  `<p class="sub" style="text-align:center;margin:10px 0">— HOẶC —</p>` + bigBtn("(G) Tiếp tục với Google", false) +
+  `<p class="sub" style="text-align:center;margin-top:10px">Chưa có tài khoản? ${link("Đăng ký ngay")}</p>` });
+
+add({ id: "S-03", title: "Register", sec: "3.2.2", role: "pub", kind: "auth", url: "/register", body:
+  h("ĐĂNG KÝ TÀI KHOẢN") + inp("Tên đăng nhập *", "3–50 ký tự") + inp("Email *") + inp("Mật khẩu *", "≥ 8 ký tự") + inp("Xác nhận mật khẩu *") +
+  bigBtn("ĐĂNG KÝ") + `<p class="sub" style="text-align:center;margin-top:10px">Đã có tài khoản? ${link("Đăng nhập")}</p>` });
+
+add({ id: "S-04", title: "Forgot / Reset Password", sec: "3.2.3", role: "pub", kind: "popup", url: "/login", modalTitle: "Quên mật khẩu", body:
+  g2(card(`<b>Bước 1</b>`, inp("Email"), bigBtn("Gửi liên kết")),
+     card(`<b>Bước 2 (từ email)</b>`, inp("Mật khẩu mới"), inp("Xác nhận mật khẩu"), bigBtn("Đặt lại mật khẩu"))) +
+  sub("Luôn hiển thị MSG05 sau bước 1. Liên kết hiệu lực 15 phút.") });
+
+add({ id: "S-05", title: "Change Password", sec: "3.2.4", role: "pub", kind: "auth", url: "/profile/change-password", body:
+  h("ĐỔI MẬT KHẨU") + sub("⚠ Vì lý do bảo mật, vui lòng đổi mật khẩu trước khi tiếp tục (lần đăng nhập đầu).") +
+  inp("Mật khẩu hiện tại") + inp("Mật khẩu mới", "6–100 ký tự") + inp("Xác nhận mật khẩu mới") + rowB(btn("Hủy"), btn("Lưu mật khẩu", true)) });
+
+add({ id: "S-06", title: "User Profile", sec: "3.2.5", role: "cus", menu: "", url: "/profile", body:
+  h("HỒ SƠ CÁ NHÂN") +
+  row(`<div style="width:150px">${img("Ảnh đại diện", 120)}<div style="margin-top:6px">${sm("Đổi ảnh (≤ 5 MB)")}</div></div>`,
+      grow(g2(inp("Tên đăng nhập (chỉ đọc)", "thpta_hs_hs1023"), inp("Vai trò / Gói", "Học sinh · free"),
+              inp("Họ tên", "Nguyễn Văn An"), inp("Ngày sinh", "15/01/2008"),
+              sel("Giới tính", "Nam"), inp("Số điện thoại", "0901234567")), inp("Địa chỉ"))) +
+  rowB(row(btn("Đổi mật khẩu"), btn("Vô hiệu hóa tài khoản"), btn("Đăng xuất")), btn("Lưu thay đổi", true)) });
+
+// ===== 3.3 Learning content =====
+add({ id: "S-07", title: "Learner Home", sec: "3.6.1", role: "cus", menu: "Trang chủ", url: "/home", body:
+  rowB(h("XIN CHÀO, AN!"), row(badge("🔥 Chuỗi 5 ngày", "warn"), btn("Điểm danh", true))) +
+  tabs(["Tổng quan", "Nhiệm vụ hằng ngày"], 1) +
+  tbl(["Nhiệm vụ", "Tiến độ", "Thưởng", ""], [
+    ["Trò chuyện với một nhân vật lịch sử", "1/1 ✓", "+500", btn("Nhận thưởng", true)],
+    ["Hoàn thành 1 bài trắc nghiệm lịch sử", "0/1", "+500", sm("Chưa xong")],
+    ["Khám phá 1 bối cảnh lịch sử", "0/1", "+300", sm("Chưa xong")]]) +
+  g2(card(`<b>Ngày học trong tháng</b>`, img("Lịch – các ngày đã học", 90)), card(`<b>Trò chuyện gần đây / Bài tập đang làm</b>`, sub("Võ Nguyên Giáp · 18/10"), sub("Ngô Quyền · 15/10"), sub("Bài: Điện Biên Phủ – hạn 30/10"))) });
+
+add({ id: "S-08", title: "Historical Contexts", sec: "3.3.1", role: "cus", menu: "Bối cảnh", url: "/contexts", body:
+  rowB(h("BỐI CẢNH LỊCH SỬ"), row(inp("", "🔍 Tìm kiếm...", 220), sel("", "Thời kỳ: Tất cả", 160), sel("", "Loại: Tất cả", 140))) +
+  g4(...["Bạch Đằng · 938", "Như Nguyệt · 1077", "Đống Đa · 1789", "Điện Biên Phủ · 1954"].map(t => card(img("Ảnh bìa", 80), `<div style="margin-top:6px"><b>${t}</b></div>`))) +
+  `<div style="height:10px"></div>` + pager() });
+
+add({ id: "S-09", title: "Context Details", sec: "3.3.1", role: "cus", menu: "Bối cảnh", url: "/contexts/:id", body:
+  row(img("Ảnh / video", 140, 260), grow(h("CHIẾN DỊCH ĐIỆN BIÊN PHỦ (1954)"), sub("Thời kỳ: Hiện đại · Loại: Chiến tranh · Địa điểm: Điện Biên"), row(btn("Xem trên bản đồ"), btn("Làm quiz")))) +
+  tabs(["Tổng quan", "Tài liệu", "Bản đồ", "Quiz"]) + area("", "Mô tả bối cảnh...") +
+  `<b>Nhân vật liên quan</b>` + row(card("Võ Nguyên Giáp ", sm("Trò chuyện")), card("Tô Vĩnh Diện ", sm("Trò chuyện"))) });
+
+add({ id: "S-10", title: "Characters", sec: "3.3.2", role: "cus", menu: "Nhân vật", url: "/characters", body:
+  rowB(h("NHÂN VẬT LỊCH SỬ"), row(inp("", "🔍 Tìm theo tên...", 220), sel("", "Bối cảnh: Tất cả", 170))) +
+  tbl(["", "Nhân vật", "Năm", "Bối cảnh", ""], [
+    [img("ảnh", 34, 34), "Ngô Quyền", "898–944", "Chiến thắng Bạch Đằng", sm("Xem")],
+    [img("ảnh", 34, 34), "Lý Thường Kiệt", "1019–1105", "Phòng tuyến Như Nguyệt", sm("Xem")],
+    [img("ảnh", 34, 34), "Võ Nguyên Giáp", "1911–2013", "Điện Biên Phủ", sm("Xem")]]) + pager() });
+
+add({ id: "S-11", title: "Character Details", sec: "3.3.2", role: "cus", menu: "Nhân vật", url: "/characters/:id", body:
+  row(img("Ảnh / mô hình 3D", 180, 200), grow(h("ĐẠI TƯỚNG VÕ NGUYÊN GIÁP"), sub("1911 – 2013 · Tổng tư lệnh Quân đội nhân dân Việt Nam"),
+      tabs(["Tiểu sử", "Tính cách", "Bối cảnh liên quan"]), area("", "Tiểu sử..."), btn("💬 Trò chuyện", true))) });
+
+add({ id: "S-15", title: "Historical Map", sec: "3.3.3", role: "cus", menu: "Bản đồ", url: "/map?context=:id", body:
+  rowB(h("BẢN ĐỒ LỊCH SỬ – ĐIỆN BIÊN PHỦ (1954)"), sel("", "Bối cảnh: Điện Biên Phủ", 220)) +
+  row(grow(map(260, [["Him Lam", 30, 30], ["Độc Lập", 55, 20], ["Mường Thanh", 50, 60], ["Hồng Cúm", 45, 85]])),
+      `<div style="width:240px">${card(`<b>THÔNG TIN ĐIỂM</b>`, sub("Cứ điểm Him Lam"), area("", "Mô tả..."), btn("Xem bối cảnh"), " ", btn("Trò chuyện"))}</div>`) +
+  rowMid(sm("‹"), grow(`<b>Diễn biến:</b> Bước 2/6 – Tấn công Him Lam 13/3/1954`), sm("›")) });
+
+// ===== 3.4 Chat =====
+add({ id: "S-12", title: "Character Chat", sec: "3.4.1", role: "cus", menu: "Nhân vật", url: "/chat/:sessionId", body:
+  rowB(row(sm("← Quay lại"), `<div><b>ĐẠI TƯỚNG VÕ NGUYÊN GIÁP</b><div class="muted">Chiến dịch Điện Biên Phủ (1954)</div></div>`), badge("Còn lại: 1.420 token", "ok")) +
+  card(ai("Chào cháu. Ta là Võ Nguyên Giáp... Cháu muốn hỏi ta điều gì?"),
+       me("Vì sao Đại tướng đổi phương châm tác chiến?"),
+       ai("[đang trả lời…] Quyết định chuyển từ “đánh nhanh thắng nhanh” sang “đánh chắc tiến chắc” là…<br><i class='muted'>Trích dẫn: “…”</i>")) +
+  `<div style="height:8px"></div>` + chips(["Kéo pháo vào Điện Biên?", "Vai trò của dân công?"]) +
+  rowMid(grow(inp("", "Nhập câu hỏi (tối đa 4000 ký tự)...")), btn("GỬI", true)) });
+
+add({ id: "S-13", title: "Out-of-Token Popup", sec: "3.4.1", role: "cus", kind: "popup", url: "/chat/:sessionId", modalTitle: "Hết token", body:
+  sub("Customer: “Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.” (MSG10)") +
+  sub("Học sinh/GV: “Bạn đã hết hạn mức Token AI trong ngày…” (MSG23)") +
+  rowB(btn("Đóng"), row(btn("Xin thêm token (học sinh)"), btn("Nâng cấp gói (customer)", true))) });
+
+add({ id: "S-14", title: "Chat History", sec: "3.4.2", role: "cus", menu: "Nhân vật", url: "/chat-history", body:
+  rowB(h("LỊCH SỬ TRÒ CHUYỆN"), sel("", "Nhân vật: Tất cả", 190)) +
+  tbl(["Nhân vật", "Thời gian", "Tin nhắn cuối", ""], [
+    ["Võ Nguyên Giáp", "18/10/2026 20:15", "“Vì sao đổi phương châm...”", sm("Mở") + " " + sm("Xóa")],
+    ["Ngô Quyền", "15/10/2026 19:02", "“Cọc gỗ được cắm thế nào...”", sm("Mở") + " " + sm("Xóa")]]) + pager() });
+
+// ===== 3.5 Quiz =====
+add({ id: "S-16", title: "Quiz Catalog", sec: "3.5.1", role: "cus", menu: "Quiz", url: "/quizzes", body:
+  rowB(h("BÀI TRẮC NGHIỆM"), row(sel("", "Mức độ: Tất cả", 150), sel("", "Bối cảnh: Tất cả", 170))) +
+  tbl(["Bài", "Bối cảnh", "Mức độ", "Số câu", ""], [
+    ["Kháng chiến chống Pháp", "Điện Biên Phủ", badge("MEDIUM"), "15", sm("Làm bài")],
+    ["Nhà Trần chống Nguyên", "Bạch Đằng 1288", badge("HARD"), "20", sm("Làm bài")]]) + pager() });
+
+add({ id: "S-17", title: "Quiz Player", sec: "3.5.1", role: "cus", menu: "Quiz", url: "/quizzes/:id/play", body:
+  rowB(h("BÀI KIỂM TRA: KHÁNG CHIẾN CHỐNG THỰC DÂN PHÁP"), badge("⏱ 12:45", "warn")) +
+  card(`<b>Câu 4 / 15 · Trắc nghiệm</b>`, sub("Vị tướng nào trực tiếp chỉ huy chiến dịch Điện Biên Phủ năm 1954?"),
+       g2(chk("A. Nguyễn Chí Thanh"), chk("B. Võ Nguyên Giáp", true), chk("C. Đồng Sỹ Nguyên"), chk("D. Chu Văn Tấn")),
+       `<div class="muted" style="margin-top:8px">(Điền khuyết: ô nhập · Ghép cặp: 2 cột kéo nối)</div>`) +
+  `<div style="height:10px"></div>` + rowB(btn("Câu trước"), btn("Câu tiếp")) +
+  rowB(`<span>Danh sách câu: [1✓] [2✓] [3✓] [4] [5] … [15]</span>`, btn("NỘP BÀI", true)) });
+
+add({ id: "S-18", title: "Quiz Result", sec: "3.5.2", role: "cus", menu: "Quiz", url: "/quizzes/results/:sessionId", body:
+  rowB(h("KẾT QUẢ: 12/15 câu đúng (80%)"), `<span>Đánh giá: ☆☆☆☆☆</span>`) +
+  tbl(["Câu", "Kết quả", "Giải thích / Đáp án đúng", ""], [
+    ["4", badge("Đúng", "ok"), "Đại tướng Võ Nguyên Giáp là Tổng tư lệnh...", ""],
+    ["7", badge("Sai", "bad"), "Đáp án đúng: ...", sm("Báo lỗi câu hỏi")]]) +
+  rowB(btn("Làm lại"), btn("Về danh sách", true)) });
+
+add({ id: "S-19", title: "My Quiz Results", sec: "3.5.2", role: "cus", menu: "Quiz", url: "/quizzes/results/me", body:
+  h("KẾT QUẢ CỦA TÔI") + tbl(["Bài", "Ngày làm", "Điểm", ""], [
+    ["Kháng chiến chống Pháp", "20/10/2026 19:30", "12/15", sm("Xem")],
+    ["Nhà Trần chống Nguyên", "12/10/2026 08:10", "15/20", sm("Xem")]]) + pager() });
+
+// ===== 3.7 Student =====
+add({ id: "S-20", title: "My Classes", sec: "3.7.1", role: "stu", menu: "Bài tập", url: "/classes", body:
+  h("LỚP CỦA TÔI") + g3(card(`<b>12A1</b>`, sub("GV chủ nhiệm: Trần Thị B"), sub("Năm học 2026"), sm("Xem bài tập"))) });
+
+add({ id: "S-21", title: "My Assignments", sec: "3.7.1", role: "stu", menu: "Bài tập", url: "/assignments", body:
+  rowB(h("BÀI TẬP CỦA TÔI"), row(sel("", "Lớp: 12A1", 130), sel("", "Trạng thái: Tất cả", 170))) +
+  tbl(["Bài tập", "Loại", "Hạn nộp", "Trạng thái", "Điểm"], [
+    ["Tìm hiểu Điện Biên Phủ", "Đọc bối cảnh", "30/10 23:59", badge("Chưa làm"), "—"],
+    ["Trò chuyện Võ Nguyên Giáp", "Chat AI", "01/11 23:59", badge("Đang làm", "warn"), "—"],
+    ["Kiểm tra Điện Biên Phủ", "Trắc nghiệm", "05/11 23:59", badge("Đã nộp", "ok"), "8.67"]]) });
+
+add({ id: "S-22", title: "Assignment Workspace", sec: "3.7.2", role: "stu", menu: "Bài tập", url: "/assignments/:id", body:
+  rowB(`<div>${h("TRÒ CHUYỆN VỚI ĐẠI TƯỚNG VÕ NGUYÊN GIÁP")}<div class="muted">Lớp 12A1 – GV: Trần Thị B · Hạn nộp: 23:59 01/11/2026</div></div>`, badge("ĐANG LÀM", "warn")) +
+  card(`<b>Yêu cầu:</b> tối thiểu 5 tin nhắn với nhân vật`, `<div style="margin:8px 0">Đã gửi: <b>3/5</b></div>`, btn("Tiếp tục chat")) +
+  `<div style="height:10px"></div>` + rowEnd(btn("NỘP BÀI TẬP", true)) });
+
+add({ id: "S-23", title: "Token Request Popup", sec: "3.7.3", role: "stu", kind: "popup", url: "/chat/:sessionId", modalTitle: "Xin thêm token", body:
+  inp("Số token", "500") + area("Lý do", "Cần hoàn thành bài chat với ...") + sub("Gửi tới giáo viên chủ nhiệm. Tối đa 1 yêu cầu chờ duyệt mỗi ngày.") +
+  rowB(btn("Hủy"), btn("Gửi yêu cầu", true)) });
+
+// ===== 3.8 Payment =====
+add({ id: "S-24", title: "Subscription Packages", sec: "3.8.1", role: "cus", menu: "", url: "/payment", body:
+  h("GÓI DỊCH VỤ") + g3(
+    card(`<b>FREE</b>`, `<div class="h">0đ</div>`, sub("20 token khi đăng ký"), badge("Đang dùng", "ok")),
+    card(`<b>PLUS</b>`, `<div class="h">49.000đ</div>`, sub("1 tháng · +100 token"), btn("Thanh toán ngay", true)),
+    card(`<b>PRO</b>`, `<div class="h">99.000đ</div>`, sub("1 tháng · +999 token"), btn("Thanh toán ngay", true))) +
+  sub("Không thể mua thêm khi đang có gói trả phí còn hiệu lực (MSG40).") });
+
+add({ id: "S-25", title: "VietQR Payment Popup", sec: "3.8.1", role: "cus", kind: "popup", url: "/payment", modalTitle: "Thanh toán gói PRO – 1 tháng", body:
+  sub("Số tiền: <b>99.000 VNĐ</b> · Quyền lợi: +999 token") +
+  row(`<div class="qr"></div>`, grow(sub("1. Mở ứng dụng ngân hàng"), sub("2. Quét mã QR"), sub("3. Kiểm tra nội dung: <b>HISTALK998241</b>"))) +
+  rowB(`<span>Hết hạn sau: <b>14:32</b></span>`, badge("Đang chờ thanh toán ⟳", "warn")) + rowEnd(btn("Hủy giao dịch")) });
+
+add({ id: "S-26", title: "Payment History", sec: "3.8.2", role: "cus", menu: "", url: "/payment/history", body:
+  h("LỊCH SỬ THANH TOÁN") + tbl(["Mã đơn", "Gói", "Số tiền", "Trạng thái", "Thời gian"], [
+    ["1729401234567", "pro · 1 tháng", "99.000 VNĐ", badge("Đã thanh toán", "ok"), "20/10/2026 14:02"],
+    ["1729301234500", "plus · 1 tháng", "49.000 VNĐ", badge("Hết hạn", "bad"), "12/10/2026 09:30"]]) + pager() });
+
+// ===== 3.9 Teacher =====
+add({ id: "S-27", title: "Teacher Classes", sec: "3.9", role: "tea", kind: "admin", school: true, menu: "Lớp của tôi", url: "/teaching/classes", body:
+  h("LỚP CHỦ NHIỆM") + g3(card(`<b>12A1</b>`, sub("42 học sinh · Năm học 2026"), row(sm("Bài tập"), sm("Thống kê"), sm("Danh sách"))),
+                          card(`<b>12A2</b>`, sub("40 học sinh · Năm học 2026"), row(sm("Bài tập"), sm("Thống kê"), sm("Danh sách")))) });
+
+add({ id: "S-28", title: "Class Analytics", sec: "3.9.4", role: "tea", kind: "admin", school: true, menu: "Thống kê lớp", url: "/teaching/classes/:id/analytics", body:
+  h("THỐNG KÊ LỚP 12A1") + stats([["Sĩ số", "42"], ["Tỉ lệ hoàn thành", "86%"], ["Điểm TB", "7.42"], ["Token dùng hôm nay", "12.300"]]) +
+  tbl(["Học sinh", "Bài đã nộp", "Điểm TB", "Token hôm nay", "Hạn mức"], [["Nguyễn Văn An", "5/5", "8.30", "320", "1.000"], ["Lê Thị Bình", "3/5", "6.10", "980", "1.000"]]) });
+
+add({ id: "S-29", title: "Assignment Manager", sec: "3.9.1", role: "tea", kind: "admin", school: true, menu: "Bài tập", url: "/teaching/assignments", body:
+  rowB(h("BÀI TẬP"), row(sel("", "Lớp: 12A1", 130), btn("+ Tạo bài tập", true))) +
+  tbl(["Tiêu đề", "Loại", "Hạn nộp", "Đã nộp / Muộn / Chưa", ""], [
+    ["Trò chuyện Võ Nguyên Giáp", "Chat AI", "01/11 23:59", "28 / 3 / 11", sm("Bảng điểm") + " " + sm("Sửa") + " " + sm("Hủy")],
+    ["Kiểm tra Điện Biên Phủ", "Trắc nghiệm", "05/11 23:59", "10 / 0 / 32", sm("Bảng điểm") + " " + sm("Sửa") + " " + sm("Hủy")]]) });
+
+add({ id: "S-30", title: "Create / Edit Assignment", sec: "3.9.1", role: "tea", kind: "admin", school: true, menu: "Bài tập", url: "/teaching/assignments/new", body:
+  h("TẠO BÀI TẬP LỊCH SỬ MỚI") + inp("Tiêu đề * (3–255 ký tự)", "Tìm hiểu Chiến dịch Điện Biên Phủ 1954") + area("Mô tả") +
+  g2(sel("Lớp * (chỉ lớp chủ nhiệm)", "12A1"), sel("Nội dung mục tiêu *", "Đại tướng Võ Nguyên Giáp")) +
+  `<div class="field"><label>Loại *</label><div>${rad("Đọc bối cảnh")} ${rad("Trò chuyện AI", true)} ${rad("Bài trắc nghiệm")}</div></div>` +
+  g2(inp("Yêu cầu tối thiểu", "5 tin nhắn (đọc: 180 giây · quiz: 1)"), inp("Hạn nộp *", "23:59 30/10/2026")) +
+  rowB(btn("Hủy"), btn("Giao bài tập", true)) });
+
+add({ id: "S-31", title: "Assignment Gradebook", sec: "3.9.2", role: "tea", kind: "admin", school: true, menu: "Bài tập", url: "/teaching/assignments/:id", body:
+  h("BẢNG ĐIỂM: TRÒ CHUYỆN VÕ NGUYÊN GIÁP") + sub("Lớp 12A1 · Hạn 01/11 23:59") +
+  stats([["Đã nộp", "28"], ["Nộp muộn", "3"], ["Đang làm", "5"], ["Chưa làm", "6"], ["Điểm TB", "8.12"]]) +
+  tbl(["Học sinh", "Trạng thái", "Tin nhắn", "Điểm", "Nộp lúc"], [
+    ["Nguyễn Văn An", badge("Đã nộp", "ok"), "6/5", "10.0", "29/10 21:05"],
+    ["Lê Thị Bình", badge("Đang làm", "warn"), "2/5", "—", "—"]]) });
+
+add({ id: "S-32", title: "Local Content Library", sec: "3.9.3", role: "tea", kind: "admin", school: true, menu: "Nội dung địa phương", url: "/teaching/local", body:
+  rowB(h("NỘI DUNG ĐỊA PHƯƠNG"), btn("+ Tạo", true)) + tabs(["Bối cảnh", "Nhân vật", "Thùng rác"], 1) +
+  tbl(["Tên", "Phạm vi", "Trạng thái", "Ghi chú duyệt", ""], [
+    ["Anh hùng Nguyễn Trung Trực", "Toàn trường", badge("Đã phát hành", "ok"), "—", sm("Sửa") + " " + sm("Xóa")],
+    ["Nghĩa quân Rạch Giá", "Theo lớp", badge("Bản nháp"), "Bổ sung nguồn", sm("Sửa") + " " + sm("Xóa")]]) });
+
+add({ id: "S-33", title: "Local Content Editor", sec: "3.9.3", role: "tea", kind: "admin", school: true, menu: "Nội dung địa phương", url: "/teaching/local/:id", body:
+  h("SOẠN NỘI DUNG ĐỊA PHƯƠNG") + tabs(["Thông tin", "Tài liệu", "Media", "Bài kiểm tra"]) +
+  g2(inp("Tên *", "Lịch sử Rạch Giá"), sel("Phạm vi", "Theo lớp / Toàn trường")) + area("Mô tả *") +
+  row(btn("+ Tài liệu văn bản"), btn("📁 Tải PDF")) + rowB(btn("Lưu nháp"), btn("Phát hành", true)) });
+
+add({ id: "S-34", title: "Token Requests Inbox", sec: "3.9.5", role: "tea", kind: "admin", school: true, menu: "Yêu cầu token", url: "/teaching/token-requests", body:
+  rowB(h("YÊU CẦU TOKEN CỦA HỌC SINH"), sel("", "Trạng thái: Chờ duyệt", 190)) +
+  tbl(["Học sinh", "Lớp", "Token", "Lý do", ""], [["Nguyễn Văn An", "12A1", "500", "Cần hoàn thành bài chat", sm("Duyệt") + " " + sm("Từ chối") + " " + sm("Chuyển lên QTT")]]) +
+  row(btn("+ Cấp token trực tiếp"), btn("+ Tạo ticket gửi Quản trị trường")) });
+
+add({ id: "S-35", title: "Grant Tokens Popup", sec: "3.9.5", role: "tea", kind: "popup", url: "/teaching/token-requests", modalTitle: "Cấp token trực tiếp", body:
+  sel("Học sinh (lớp chủ nhiệm)", "Nguyễn Văn An – 12A1") + inp("Số token", "300") + inp("Lý do", "Hoàn thành tốt bài tập") +
+  sub("Trừ vào hạn mức còn lại trong ngày của giáo viên.") + rowB(btn("Hủy"), btn("Cấp token", true)) });
+
+// ===== 3.10 School Admin =====
+add({ id: "S-36", title: "School Dashboard", sec: "3.10.9", role: "sa", kind: "admin", school: true, menu: "Tổng quan", url: "/school", body:
+  rowB(h("TỔNG QUAN TRƯỜNG THPT A"), row(badge("ENTERPRISE_MEDIUM · ACTIVE", "ok"), btn("Kết thúc năm học"))) +
+  stats([["Giáo viên", "24"], ["Học sinh", "912"], ["Lớp", "24"], ["Quỹ token còn", "8% ⚠"]]) + sub("Hợp đồng: 01/09/2026 – 31/05/2027") +
+  g2(chart("Token dùng theo lớp"), chart("Tỉ lệ hoàn thành bài tập theo lớp", [70, 85, 60, 90, 75])) });
+
+add({ id: "S-37", title: "Classroom Manager", sec: "3.10.2", role: "sa", kind: "admin", school: true, menu: "Lớp học", url: "/school/classes", body:
+  rowB(h("QUẢN LÝ LỚP HỌC"), row(sel("", "Năm học: 2026", 140), sel("", "Khối: Tất cả", 120), btn("+ Thêm lớp", true))) +
+  tbl(["Lớp", "Khối", "Sĩ số", "GV chủ nhiệm", "Hạn mức/ngày", "Trạng thái", ""], [
+    ["12A1", "12", "42", "Trần Thị B", "1.500", badge("ACTIVE", "ok"), sm("Danh sách") + " " + sm("Sửa") + " " + sm("Xóa")],
+    ["12A2", "12", "40", "Lê Văn C", "—", badge("ACTIVE", "ok"), sm("Danh sách") + " " + sm("Sửa") + " " + sm("Xóa")]]) });
+
+add({ id: "S-38", title: "Class Roster", sec: "3.10.2", role: "sa", kind: "admin", school: true, menu: "Lớp học", url: "/school/classes/:id", body:
+  h("LỚP 12A1 – DANH SÁCH") + tabs(["Thông tin", "Học sinh", "Giáo viên"], 1) +
+  row(btn("+ Thêm học sinh"), btn("Chuyển lớp"), btn("Xóa khỏi lớp"), btn("Import CSV vào lớp")) +
+  tbl(["", "Mã HS", "Họ tên", "Ngày vào lớp"], [[chk(""), "HS1023", "Nguyễn Văn An", "05/09/2026"], [chk(""), "HS1024", "Lê Thị Bình", "05/09/2026"]]) });
+
+add({ id: "S-39", title: "Teachers", sec: "3.10.3", role: "sa", kind: "admin", school: true, menu: "Giáo viên", url: "/school/teachers", body:
+  rowB(h("GIÁO VIÊN"), row(inp("", "🔍 Tìm tên/email...", 200), sel("", "Trạng thái", 120), btn("+ Thêm GV", true))) +
+  tbl(["Tài khoản", "Họ tên", "Bộ môn", "Trạng thái", ""], [["thpta_gv_tranb", "Trần Thị B", "Lịch sử", badge("ACTIVE", "ok"), sm("Sửa") + " " + sm("Khóa") + " " + sm("Đặt lại MK")]]) });
+
+add({ id: "S-40", title: "Students", sec: "3.10.4", role: "sa", kind: "admin", school: true, menu: "Học sinh", url: "/school/students", body:
+  rowB(h("HỌC SINH"), row(inp("", "🔍 Tìm tên/mã...", 180), sel("", "Lớp", 100), sel("", "Trạng thái", 120), btn("Import CSV", true))) +
+  tbl(["Mã", "Họ tên", "Lớp", "Trạng thái", ""], [
+    ["HS1023", "Nguyễn Văn An", "12A1", badge("ACTIVE", "ok"), sm("Sửa") + " " + sm("Khóa") + " " + sm("Đặt lại MK") + " " + sm("Cấp token")],
+    ["HS0870", "Phạm Văn Dũng", "—", badge("DEACTIVATED", "bad"), sm("Sửa") + " " + sm("Mở khóa")]]) + pager() });
+
+add({ id: "S-41", title: "Student CSV Import Popup", sec: "3.10.1", role: "sa", kind: "popup", url: "/school/students", modalTitle: "Import tài khoản học sinh (CSV)", body:
+  rowB(`<span>1. Tải file mẫu</span>`, sm("student_import_template.csv")) + drop("Kéo thả hoặc nhấn để chọn tệp .csv") +
+  inp("Token ban đầu mỗi học sinh", "10000") + rowB(btn("Hủy"), btn("Bắt đầu import", true)) +
+  card(`<b>Kết quả:</b> 448 thành công, 2 lỗi`, `<div style="margin-top:6px">${sm("Tải danh sách tài khoản & lỗi")}</div>`) });
+
+add({ id: "S-42", title: "Local Content Moderation", sec: "3.10.5", role: "sa", kind: "admin", school: true, menu: "Nội dung địa phương", url: "/school/content", body:
+  rowB(h("NỘI DUNG ĐỊA PHƯƠNG CỦA TRƯỜNG"), row(sel("", "Trạng thái", 120), sel("", "Loại", 110))) +
+  tbl(["Tên", "Loại", "Giáo viên", "Trạng thái", ""], [["Anh hùng Nguyễn Trung Trực", "Nhân vật", "Lê Văn C", badge("ACTIVE", "ok"), sm("Xem")]]) +
+  card(`<b>Xem: thông tin + tài liệu</b>`, area("", "Nội dung..."), row(sel("Trạng thái", "ACTIVE / DRAFT / INACTIVE", 220), grow(inp("Ghi chú duyệt")), btn("Lưu", true))) });
+
+add({ id: "S-43", title: "Token Policy & Pool", sec: "3.10.6", role: "sa", kind: "admin", school: true, menu: "Hạn mức token", url: "/school/tokens", body:
+  rowB(h("HẠN MỨC TOKEN CỦA TRƯỜNG"), badge("ENTERPRISE_MEDIUM · 01/09–31/05")) +
+  stats([["Tổng quỹ", "20.000.000"], ["Còn lại", "1.600.000 (8%)"]]) +
+  g2(inp("Mặc định / học sinh / ngày", "1000"), inp("Mặc định / giáo viên / ngày", "10000")) +
+  row(sel("Theo lớp", "12A1", 140), inp("Hạn mức", "1500", 120), sel("Hoặc theo khối", "12", 140), inp("Hạn mức", "1500", 120)) + rowEnd(btn("Lưu", true)) });
+
+add({ id: "S-44", title: "Token Ticket Review", sec: "3.10.7", role: "sa", kind: "admin", school: true, menu: "Ticket token", url: "/school/token-requests", body:
+  rowB(h("TICKET XIN TOKEN"), badge("Quỹ còn lại: 1.600.000")) +
+  tbl(["Người gửi", "Cho", "Token", "Lý do", "Trạng thái", ""], [["GV Trần Thị B", "HS Nguyễn Văn An", "2.000", "Ôn thi", badge("PENDING_ADMIN", "warn"), sm("Duyệt") + " " + sm("Từ chối")]]) });
+
+add({ id: "S-45", title: "Academic Year Rollover Popup", sec: "3.10.8", role: "sa", kind: "popup", url: "/school", modalTitle: "Kết thúc năm học", body:
+  sel("Năm học đã hoàn thành", "2025") + `<div style="margin:8px 0">${chk("Vô hiệu hóa học sinh khối 12 đã tốt nghiệp", true)}</div>` +
+  sub("Các lớp của năm học sẽ chuyển ARCHIVED; token vẫn giữ trong quỹ trường.") + rowB(btn("Hủy"), btn("Xác nhận", true)) });
+
+// ===== 3.11 Content Admin =====
+add({ id: "S-46", title: "Context Management", sec: "3.11.1", role: "ca", kind: "admin", menu: "Bối cảnh", url: "/staff/contexts", body:
+  rowB(h("QUẢN LÝ BỐI CẢNH LỊCH SỬ"), row(inp("", "🔍 Tìm...", 160), sel("", "Trạng thái", 120), btn("+ Thêm bối cảnh", true))) +
+  tbl(["Tên", "Năm", "Trạng thái", ""], [
+    ["Chiến dịch Điện Biên Phủ", "1954", badge("Đã phát hành", "ok"), sm("Sửa") + " " + sm("Ẩn") + " " + sm("Thùng rác")],
+    ["Khởi nghĩa Hai Bà Trưng", "40", badge("Bản nháp"), sm("Sửa") + " " + sm("Phát hành") + " " + sm("Thùng rác")]]) +
+  card(`<b>FORM</b>`, g3(inp("Tên *"), sel("Thời kỳ"), sel("Loại")), g4(inp("Năm"), inp("Năm bắt đầu"), inp("Năm kết thúc"), `<div class="field"><label>&nbsp;</label>${chk("TCN")}</div>`),
+       g3(inp("Địa điểm"), inp("Vĩ độ"), inp("Kinh độ")), area("Mô tả"), row(img("Ảnh", 60, 120), img("Video", 60, 120), img("Bản đồ trận đánh", 60, 140)),
+       rowEnd(btn("Lưu nháp"), btn("Phát hành", true))) });
+
+add({ id: "S-47", title: "Character Management", sec: "3.11.2", role: "ca", kind: "admin", menu: "Nhân vật", url: "/staff/characters", body:
+  rowB(h("QUẢN LÝ NHÂN VẬT"), row(inp("", "🔍 Tìm...", 160), sel("", "Bối cảnh", 130), btn("+ Thêm nhân vật", true))) +
+  row(`<div style="width:140px">${img("Ảnh đại diện", 140)}</div>`,
+      grow(g2(inp("Tên *", "Võ Nguyên Giáp"), inp("Chức danh", "Đại tướng")),
+           g2(inp("Sinh (ngày/tháng/năm, TCN)", "25/08/1911"), inp("Mất (ngày/tháng/năm, TCN)", "04/10/2013")),
+           g2(sel("Bối cảnh liên kết", "Điện Biên Phủ ✕  +"), inp("Mô hình 3D (URL)")))) +
+  area("Tiểu sử") + area("Tính cách / cách xưng hô (persona)", "Xưng “ta”, gọi người học là “cháu”...") + rowEnd(btn("Lưu nháp"), btn("Phát hành", true)) });
+
+add({ id: "S-48", title: "Document & OCR Hub", sec: "3.11.3", role: "ca", kind: "admin", menu: "Tài liệu & OCR", url: "/staff/documents", body:
+  rowB(h("THƯ VIỆN TÀI LIỆU & OCR"), btn("+ Tải tài liệu", true)) +
+  row(sel("Gắn với", "Nhân vật", 140), sel("", "Võ Nguyên Giáp", 200)) +
+  tbl(["Tên tài liệu", "Loại", "Trạng thái", ""], [
+    ["Điện Biên Phủ – Điểm hẹn lịch sử", "PDF", badge("ACTIVE", "ok"), sm("Xem PDF") + " " + sm("Sửa") + " " + sm("Xóa")],
+    ["Đại Việt sử ký (bản scan)", "PDF", badge("Đang trích xuất 45/96 (OCR)", "warn"), ""]]) +
+  card(`<b>Văn bản trích xuất (xem & chỉnh trước khi lưu)</b>`, area("", "Trang 1: ..."), rowEnd(btn("Lưu nội dung & lập chỉ mục", true))) });
+
+add({ id: "S-49", title: "Quiz & Question Bank", sec: "3.11.4", role: "ca", kind: "admin", menu: "Quiz & Ngân hàng", url: "/staff/quizzes", body:
+  h("BÀI KIỂM TRA & NGÂN HÀNG CÂU HỎI") + tabs(["Bài kiểm tra", "Ngân hàng câu hỏi", "Import CSV"]) +
+  g3(inp("Tên bài", "Kháng chiến chống Pháp"), sel("Bối cảnh", "Điện Biên Phủ"), sel("Mức độ", "MEDIUM")) +
+  tbl(["#", "Câu hỏi", "Loại", ""], [
+    ["1", "Ai chỉ huy chiến dịch Điện Biên Phủ?", "Trắc nghiệm", sm("Sửa") + " " + sm("Gỡ")],
+    ["2", "Năm diễn ra chiến dịch là ____", "Điền khuyết", sm("Sửa") + " " + sm("Gỡ")],
+    ["3", "Nối nhân vật với sự kiện", "Ghép cặp", sm("Sửa") + " " + sm("Gỡ")]]) +
+  rowB(row(btn("+ Thêm câu hỏi"), btn("Gắn câu từ ngân hàng")), btn("Phát hành", true)) });
+
+add({ id: "S-50", title: "Question Reports", sec: "3.11.4", role: "ca", kind: "admin", menu: "Báo cáo câu hỏi", url: "/staff/quizzes/reports", body:
+  h("BÁO CÁO CÂU HỎI") + tbl(["Câu hỏi", "Bài", "Người báo", "Lý do", ""], [["Năm diễn ra chiến dịch là ____", "Kháng chiến chống Pháp", "an@gmail.com", "Đáp án chưa đúng", sm("Sửa câu") + " " + sm("Đánh dấu đã xử lý")]]) });
+
+add({ id: "S-51", title: "Map Editor", sec: "3.11.5", role: "ca", kind: "admin", menu: "Bản đồ", url: "/staff/map", body:
+  rowB(h("BẢN ĐỒ: CHIẾN DỊCH ĐIỆN BIÊN PHỦ"), sel("", "Bối cảnh", 160)) + tabs(["Điểm ghim", "Diễn biến (focus)"]) +
+  row(grow(map(230, [["Vị trí đã chọn", 40, 45], ["Độc Lập", 60, 25]])),
+      `<div style="width:260px">${inp("Nhãn *", "Cứ điểm Him Lam")}${g2(inp("Vĩ độ", "21.39"), inp("Kinh độ", "103.02"))}${g2(sel("Loại điểm", "Trận đánh"), inp("Năm", "1954"))}${area("Mô tả")}${inp("Đường đi (GeoJSON)", "tùy chọn")}${rowEnd(btn("Lưu", true))}</div>`) +
+  sub("Diễn biến: 1. Tổng quan · 2. Him Lam · 3. Độc Lập … (kéo thả để sắp xếp)") });
+
+add({ id: "S-52", title: "Trash & Recovery", sec: "3.11.6", role: "ca", kind: "admin", menu: "Thùng rác", url: "/staff/trash", body:
+  h("THÙNG RÁC & KHÔI PHỤC") + tabs(["Bối cảnh", "Nhân vật", "Bài kiểm tra"]) +
+  tbl(["", "Tên", "Xóa lúc"], [[chk("", true), "Khởi nghĩa Bà Triệu", "05/10/2026"], [chk("", true), "Đề ôn tập số 3", "25/09/2026"]]) +
+  rowB(btn("Khôi phục đã chọn", true), btn("Xóa vĩnh viễn đã chọn")) });
+
+add({ id: "S-53", title: "Daily Quest Configuration", sec: "3.11.7", role: "ca", kind: "admin", menu: "Nhiệm vụ ngày", url: "/staff/quests", body:
+  h("NHIỆM VỤ HẰNG NGÀY") + tbl(["Loại", "Tiêu đề", "Mục tiêu", "Thưởng", ""], [
+    ["CHAT", "Trò chuyện với một nhân vật lịch sử", "1", "500", sm("Sửa")],
+    ["QUIZ", "Hoàn thành 1 bài trắc nghiệm lịch sử", "1", "500", sm("Sửa")],
+    ["READ_CONTEXT", "Khám phá 1 bối cảnh lịch sử", "1", "300", sm("Sửa")]]) });
+
+// ===== 3.12 System Admin =====
+add({ id: "S-54", title: "System Dashboard", sec: "3.12.5", role: "sys", kind: "admin", menu: "Tổng quan", url: "/staff/admin", body:
+  h("TỔNG QUAN HỆ THỐNG") + tabs(["Tổng quan", "Doanh thu", "Token", "Nội dung", "Sức khỏe"]) +
+  stats([["Người dùng", "4.820"], ["Trường", "18"], ["Phiên chat hôm nay", "1.240"], ["Doanh thu tháng", "18.540.000đ"]]) +
+  g2(chart("Doanh thu theo ngày"), chart("Token theo ngày", [55, 60, 72, 48, 80, 66, 90])) +
+  rowMid(`<b>Sức khỏe:</b>`, badge("Database ●", "ok"), badge("AI Service ●", "ok"), badge("Storage ●", "ok")) });
+
+add({ id: "S-55", title: "School Tenants", sec: "3.12.1", role: "sys", kind: "admin", menu: "Trường học", url: "/staff/admin/schools", body:
+  rowB(h("TRƯỜNG HỌC"), row(inp("", "🔍 Tìm...", 160), sel("", "Trạng thái", 120), btn("+ Thêm trường", true))) +
+  tbl(["Mã", "Tên trường", "Gói", "Hợp đồng", "Trạng thái", ""], [["THPTA", "THPT A", "MEDIUM", "01/09/2026 – 31/05/2027", badge("ACTIVE", "ok"), sm("Chi tiết")]]) +
+  card(`<b>THÊM TRƯỜNG</b>`, g2(inp("Mã trường (để trống để tự sinh)", "THPTA"), inp("Tên trường *", "THPT A")),
+       g3(inp("Địa chỉ"), inp("Email liên hệ *"), inp("SĐT")),
+       `<div class="field"><label>Gói *</label><div>${rad("SMALL 5.000.000")} ${rad("MEDIUM 20.000.000", true)} ${rad("LARGE 50.000.000")}</div></div>`,
+       chk("Đồng ý điều khoản nội dung lịch sử địa phương", true), rowEnd(btn("Hủy"), btn("Tạo trường", true))) });
+
+add({ id: "S-56", title: "School Details", sec: "3.12.1–3.12.2", role: "sys", kind: "admin", menu: "Trường học", url: "/staff/admin/schools/:id", body:
+  h("THPT A") + tabs(["Thông tin", "Quản trị trường", "Gói & token"], 2) +
+  stats([["Gói hiện tại", "MEDIUM"], ["Hợp đồng", "01/09/2026–31/05/2027"], ["Quỹ còn lại", "1.600.000 / 20.000.000"]]) +
+  card(row(sel("Gia hạn năm sau (chỉ tháng 5)", "LARGE", 220), `<div class="field"><label>&nbsp;</label>${btn("Đăng ký")}</div>`),
+       rowB(`<span>Kích hoạt năm học mới (từ 01/09, sau khi gia hạn)</span>`, btn("Kích hoạt")),
+       row(inp("Nạp thêm token", "1000000", 200), `<div class="field"><label>&nbsp;</label>${btn("Nạp", true)}</div>`)) +
+  sub("Tab Quản trị trường: danh sách tài khoản {school_code}_admin · thêm · sửa · khóa · đặt lại MK · xóa") });
+
+add({ id: "S-57", title: "User Accounts", sec: "3.12.3", role: "sys", kind: "admin", menu: "Người dùng", url: "/staff/admin/accounts", body:
+  rowB(h("TÀI KHOẢN NGƯỜI DÙNG"), row(inp("", "🔍 Tìm email/tên...", 180), sel("", "Vai trò", 110), sel("", "Trạng thái", 110))) +
+  row(btn("+ Tạo tài khoản quản trị", true), btn("Khôi phục đã chọn"), btn("Khôi phục tất cả")) +
+  tbl(["", "Email", "Vai trò", "Trường", "Trạng thái", ""], [
+    [chk(""), "an@gmail.com", "CUSTOMER", "—", badge("ACTIVE", "ok"), sm("Sửa") + " " + sm("Vô hiệu hóa")],
+    [chk(""), "content01@htalk.vn", "CONTENT_ADMIN", "—", badge("ACTIVE", "ok"), sm("Sửa") + " " + sm("Đổi vai trò")],
+    [chk(""), "old@gmail.com", "CUSTOMER", "—", badge("Đã xóa", "bad"), sm("Khôi phục")]]) + pager() });
+
+add({ id: "S-58", title: "Subscription Tiers", sec: "3.12.4", role: "sys", kind: "admin", menu: "Gói dịch vụ", url: "/staff/admin/subscriptions", body:
+  rowB(h("CẤU HÌNH GÓI DỊCH VỤ"), btn("+ Thêm gói", true)) +
+  tbl(["Gói", "Giá (VNĐ)", "Số tháng", "Token", "Kích hoạt", ""], [
+    ["free", "0", "1", "20", "✓", sm("Sửa")],
+    ["plus", "49.000", "1", "100", "✓", sm("Sửa") + " " + sm("Ẩn") + " " + sm("Xóa")],
+    ["pro", "99.000", "1", "999", "✓", sm("Sửa") + " " + sm("Ẩn") + " " + sm("Xóa")]]) });
+
+add({ id: "S-59", title: "Payment Audit Log", sec: "3.12.5", role: "sys", kind: "admin", menu: "Thanh toán", url: "/staff/admin/payment/history", body:
+  rowB(h("NHẬT KÝ THANH TOÁN"), sel("", "Trạng thái: Tất cả", 170)) +
+  tbl(["Mã đơn", "Người dùng", "Gói", "Số tiền", "Trạng thái", "Fulfillment"], [
+    ["1729401234567", "an@gmail.com", "pro", "99.000", badge("PAID", "ok"), badge("FULFILLED", "ok")],
+    ["1729401239999", "bb@gmail.com", "plus", "49.000", badge("PAID", "ok"), badge("FAILED → retry", "bad")],
+    ["1729301234500", "cc@gmail.com", "plus", "49.000", badge("EXPIRED", "bad"), "—"]]) + pager() });
+
+// ───────────── Build page ─────────────
+const GROUPS = [
+  ["pub", "Public & Auth"], ["cus", "Learner"], ["stu", "Student"], ["tea", "Teacher"],
+  ["sa", "School Admin"], ["ca", "Content Admin"], ["sys", "System Admin"]
+];
+const host = document.getElementById("screens");
+const toc = document.getElementById("toc");
+
+for (const [key, label] of GROUPS) {
+  const list = S.filter(s => s.role === key);
+  if (!list.length) continue;
+  const h3 = document.createElement("h3"); h3.textContent = label; h3.dataset.role = key; toc.appendChild(h3);
+  for (const s of list) {
+    const a = document.createElement("a"); a.href = "#" + s.id; a.textContent = `${s.id} ${s.title}`; a.dataset.role = key; toc.appendChild(a);
+    const el = document.createElement("section");
+    el.className = "screen"; el.id = s.id; el.dataset.role = key;
+    el.innerHTML = `
+      <div class="shead">
+        <span class="sid" style="background:${ROLE[key].color}">${s.id}</span>
+        <h2>${s.title}${s.kind === "popup" ? " (pop-up)" : ""}</h2>
+        <span class="meta">SRS ${s.sec} · ${ROLE[key].name}</span>
+        <button>⬇ PNG</button>
+      </div>
+      <div class="frame">${render(s)}</div>`;
+    el.querySelector("button").onclick = () => exportPng(el.querySelector(".frame"), s.id);
+    host.appendChild(el);
+  }
+}
+
+// role filter
+const filters = document.getElementById("filters");
+[["all", "Tất cả"], ...GROUPS].forEach(([k, label], i) => {
+  const b = document.createElement("button"); b.textContent = label; if (i === 0) b.classList.add("on");
+  b.onclick = () => {
+    filters.querySelectorAll("button").forEach(x => x.classList.remove("on")); b.classList.add("on");
+    document.querySelectorAll("[data-role]").forEach(n => { n.style.display = (k === "all" || n.dataset.role === k) ? "" : "none"; });
+  };
+  filters.appendChild(b);
+});
+
+function exportPng(node, id) {
+  if (!window.html2canvas) { alert("html2canvas chưa tải được (cần internet)."); return; }
+  html2canvas(node, { backgroundColor: "#ffffff", scale: 2 }).then(c => {
+    c.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `historytalk-${id}.png`; a.click(); });
+  });
+}
+</script>
+</body>
+</html>
