@@ -26,12 +26,14 @@
 - **Do not edit files outside the quiz/question module**: no changes to `service/dashboard/*`, `dto/dashboard/*`, `repository/dashboard/*`, `service/user/*`, `service/assignment/*` or their tests. Single approved exception: the quiz cascade block in `HistoricalContextServiceImpl.softDeleteContext` (lines ~300-308) plus its test. Native SQL that lives in quiz-module repositories (`QuizRepository`, `QuizAnswerDetailRepository`) is fixed in place so it keeps running after the column drops.
 - Migrations use the explicit `historical_schema.` prefix (same as `V34`) and timestamp versions `V20261031…`.
 - Vietnamese error messages, matching existing style.
-- Do not touch the uncommitted time-limit change already in `QuizServiceImpl.submitQuiz` (lines ~173-181); keep it as-is.
+- Do not alter the time-limit check in `QuizServiceImpl.submitQuiz` (committed in `5cecfff`) or the batch-loading helpers merged from `main` (`mapToStaffPaginatedResponse`, `mapToHistoryPaginatedResponse`, `getQuizHistory(userId, quizId, pageable)`); only their repository queries change underneath.
+- Keep the `:search = ''` guard in `QuestionRepository.findAllForBank` (merged from `main`, fixes PostgreSQL binding a null `:search` as bytea).
+- Baseline before Task 1 (branch `Bao-mainBranch` @ `f92f2a2`): `mvn test` → 360 run, 14 failures, all outside quiz (`DocumentFileServiceImplTest` 3, `SupabaseDocumentStorageServiceTest` 8, `PasswordResetEmailServiceImplTest` 2, `UserServiceImplTest.updateMyProfileRejectsDeactivatedUser` 1). "Suite green" in this plan means: no failures beyond these 14.
 
 ## Review Focus
 
 1. **Questions created after V34 exist only in `question.quiz_id`** (`createQuiz`, `addQuestion`, CSV import never wrote `quiz_question`). If migration 1 does not backfill them, those quizzes appear empty. → Task 1 migration step + manual DB check in Task 3.
-2. **Callers outside the module still use `quiz.getQuestions()`** (`UserServiceImpl`, `StudentAssignmentServiceImpl`). They must keep compiling and working without edits. → `Quiz.questions` is remapped as a read-only `@ManyToMany` over `quiz_question` in Task 1; `mvn test` (whole suite) must stay green.
+2. **Callers outside the module still depend on quiz membership**: `quiz.getQuestions()` fallbacks in `StudentAssignmentServiceImpl` (~L210) and `AnalyticsDashboardServiceImpl` (~L603), and the batch query `QuestionRepository.countActiveByQuizIds` used by `UserServiceImpl` and `AnalyticsDashboardServiceImpl`. They must keep compiling and returning correct counts without edits. → `Quiz.questions` is remapped as a read-only `@ManyToMany` over `quiz_question`, and `findActiveByQuizIds` / `countActiveByQuizIds` are rewritten link-only with unchanged signatures (Task 1); whole suite must stay at baseline.
 3. **Dashboard native queries reference `q.level` and `question.quiz_id`**; after the drops they would throw SQL errors. → Task 1 / Task 2 rewrite them inside the quiz repositories; dashboard Java untouched (top-quiz `level` becomes `NULL`).
 4. **A shared bank question removed from one quiz must not disappear from the bank or other quizzes.** → `deleteQuestion(quizId, questionId)` becomes unlink-only (Task 1 test `deleteQuestion_unlinksWithoutDeletingQuestion`).
 5. **Partial question updates without difficulty must not wipe it** (null = no change), but creation without difficulty must fail with a clear message. → Task 2 tests `updateQuestion_nullDifficultyKeepsExisting`, `createBankQuestion_missingDifficulty_rejected`.
@@ -49,7 +51,8 @@
 - Create: `JAVA/src/main/resources/db/migration/V20261031100000__question_membership_via_link_table_only.sql`
 - Modify: `JAVA/src/main/java/com/historytalk/entity/quiz/Question.java` (remove `quiz` field, lines 34-36)
 - Modify: `JAVA/src/main/java/com/historytalk/entity/quiz/Quiz.java` (`questions` mapping, lines 69-71)
-- Modify: `JAVA/src/main/java/com/historytalk/repository/QuestionRepository.java` (`findActiveByQuizId`)
+- Modify: `JAVA/src/main/java/com/historytalk/repository/QuestionRepository.java` (`findActiveByQuizId`, `findActiveByQuizIds`, `countActiveByQuizIds`)
+- Modify: `JAVA/src/main/java/com/historytalk/controller/quiz/StaffQuizController.java` (`@Operation` descriptions of delete quiz / delete question only)
 - Modify: `JAVA/src/main/java/com/historytalk/repository/QuizQuestionRepository.java`
 - Modify: `JAVA/src/main/java/com/historytalk/repository/QuizRepository.java` (`findTopQuizzesForDashboard` question-count subquery)
 - Modify: `JAVA/src/main/java/com/historytalk/repository/QuizAnswerDetailRepository.java` (`findTopWrongQuestionsForDashboard` join)
@@ -203,6 +206,19 @@ private List<Question> questions = new ArrayList<>();
   ORDER BY qq.orderIndex ASC, q.createdAt ASC
   ```
   Update the Javadoc (no more "direct FK column").
+- `QuestionRepository.findActiveByQuizIds` (merged from `main`, returns `[quizId, Question]` rows; signature unchanged):
+  ```
+  SELECT qq.quiz.quizId, q FROM QuizQuestion qq JOIN qq.question q
+  WHERE qq.quiz.quizId IN :quizIds AND q.deletedAt IS NULL
+  ORDER BY qq.orderIndex ASC, q.createdAt ASC
+  ```
+- `QuestionRepository.countActiveByQuizIds` (returns `[quizId, count]`; signature unchanged):
+  ```
+  SELECT qq.quiz.quizId, COUNT(q) FROM QuizQuestion qq JOIN qq.question q
+  WHERE qq.quiz.quizId IN :quizIds AND q.deletedAt IS NULL
+  GROUP BY qq.quiz.quizId
+  ```
+  (`COUNT(DISTINCT …)` is no longer needed: the composite PK makes each (quiz, question) pair unique.)
 - `QuizQuestionRepository`: add
   ```java
   @Query("""
@@ -230,6 +246,8 @@ private List<Question> questions = new ArrayList<>();
   - `updateBankQuestion`: `findActivelyLinkedQuestionIds(List.of(id)).contains(id)`.
 - `deleteQuiz` stays `quizRepository.delete(quiz)`; with the cascade gone (Step 4) this removes only the quiz and its link rows (DB `ON DELETE CASCADE` on `quiz_question`).
 - Update the import Javadoc mentioning the direct FK if any.
+
+`StaffQuizController` `@Operation` descriptions: delete quiz → `"Permanently delete a quiz. Its questions stay in the question bank."`; delete question → `"Remove a question from this quiz. The question stays in the question bank."`
 
 `HistoricalContextServiceImpl.softDeleteContext`: in the "Cascade to Quizzes" block keep `quiz.setDeletedAt(now)` and delete the `quiz.getQuestions().forEach(q -> q.setDeletedAt(now))` branch. Replace the comment with: `// Questions live in the bank and may be shared by other quizzes, so only the quiz is soft-deleted`. Touch nothing else in that file.
 
@@ -259,6 +277,7 @@ git commit -m "refactor(java): use quiz_question as the only quiz-question membe
 - Modify: `dto/quiz/QuestionRequest.java`, `dto/quiz/QuestionResponse.java`, `dto/quiz/QuestionBankResponse.java` (add `difficulty` to each)
 - Modify: `repository/QuestionRepository.java` (`findAllForBank` filter), `repository/QuizRepository.java` (dashboard query `level`)
 - Modify: `service/quiz/QuizService.java`, `service/quiz/QuizServiceImpl.java`, `controller/quiz/StaffQuestionBankController.java`
+- Modify: `controller/quiz/StaffQuizController.java` (`@Operation` text only: create quiz, update quiz metadata, CSV import description — drop "level" as a quiz attribute; import text says `level` is each question's difficulty)
 - Modify: `service/quiz/csv/QuizCsvRowParser.java`
 - Test: `QuizServiceImplTest.java`, `QuestionBankServiceImplTest.java`, `QuizServiceImplImportTest.java`, `csv/QuizCsvRowParserTest.java`
 
@@ -351,7 +370,7 @@ ALTER TABLE historical_schema.quiz DROP COLUMN IF EXISTS level;
 
 - [ ] **Step 5: Repositories**
 
-- `QuestionRepository.findAllForBank`: add `AND (:difficulty IS NULL OR q.difficulty = :difficulty)` and `@Param("difficulty") QuestionDifficulty difficulty` (param order per Interfaces).
+- `QuestionRepository.findAllForBank`: keep the existing `:search = ''` guard; add `AND (:difficulty IS NULL OR q.difficulty = :difficulty)` and `@Param("difficulty") QuestionDifficulty difficulty` (param order per Interfaces).
 - `QuizRepository.findTopQuizzesForDashboard`: replace `q.level AS level` with `CAST(NULL AS varchar) AS level` and remove `q.level` from `GROUP BY`. `DashboardTopQuizProjection` / `SystemDashboardServiceImpl` stay untouched.
 
 - [ ] **Step 6: CSV row parser**
