@@ -170,6 +170,16 @@ public class QuizServiceImpl implements QuizService {
         //     }
         // }
 
+        // Time limit check — 59s grace: deadline 11:06:00 accepts up to 11:06:59.999, rejects from 11:07:00
+        if (session.getLimitedTime() != null && session.getStartTime() != null) {
+            LocalDateTime rejectFrom = session.getStartTime()
+                    .plusSeconds(session.getLimitedTime())
+                    .plusSeconds(60);
+            if (!LocalDateTime.now().isBefore(rejectFrom)) {
+                throw new InvalidRequestException("Đã hết thời gian làm bài");
+            }
+        }
+
         // Load ordered questions
         List<Question> questions = questionRepository.findActiveByQuizId(session.getQuiz().getQuizId());
 
