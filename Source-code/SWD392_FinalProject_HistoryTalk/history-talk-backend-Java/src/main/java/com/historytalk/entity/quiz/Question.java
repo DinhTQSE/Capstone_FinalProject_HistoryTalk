@@ -1,5 +1,6 @@
 package com.historytalk.entity.quiz;
 
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -46,6 +47,10 @@ public class Question {
 
     @Column(name = "question_data", columnDefinition = "text", nullable = true)
     private String questionData;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "difficulty", length = 10, nullable = false)
+    private QuestionDifficulty difficulty;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)

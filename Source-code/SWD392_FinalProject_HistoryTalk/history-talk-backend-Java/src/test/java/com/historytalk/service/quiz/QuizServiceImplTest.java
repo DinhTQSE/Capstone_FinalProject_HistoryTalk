@@ -4,14 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.quiz.CreateQuizRequest;
 import com.historytalk.dto.quiz.QuestionRequest;
+import com.historytalk.dto.quiz.QuestionResponse;
 import com.historytalk.dto.quiz.QuizStaffResponse;
+import com.historytalk.dto.quiz.QuizStartResponse;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
-import com.historytalk.entity.enums.QuizLevel;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.quiz.QuizQuestionId;
+import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.HistoricalContextRepository;
@@ -163,7 +166,6 @@ class QuizServiceImplTest {
         CreateQuizRequest request = CreateQuizRequest.builder()
                 .title("Bạch Đằng")
                 .contextId(template.getHistoricalContext().getContextId().toString())
-                .level("EASY")
                 .questions(List.of(questionRequest("Câu 1"), questionRequest("Câu 2")))
                 .build();
 
@@ -256,10 +258,84 @@ class QuizServiceImplTest {
         verify(questionRepository, never()).deleteAll(any());
     }
 
+    @Test
+    void updateQuestion_nullDifficultyKeepsExisting() {
+        Quiz quiz = activeQuiz();
+        Question question = Question.builder().questionId(UUID.randomUUID()).content("Cũ")
+                .difficulty(QuestionDifficulty.HARD).build();
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quiz.getQuizId(), question.getQuestionId()))
+                .thenReturn(true);
+
+        quizService.updateQuestion(quiz.getQuizId().toString(), question.getQuestionId().toString(),
+                QuestionRequest.builder().content("Mới").questionType(null).build());
+
+        ArgumentCaptor<Question> saved = ArgumentCaptor.forClass(Question.class);
+        verify(questionRepository).save(saved.capture());
+        assertThat(saved.getValue().getContent()).isEqualTo("Mới");
+        assertThat(saved.getValue().getDifficulty()).isEqualTo(QuestionDifficulty.HARD);
+    }
+
+    @Test
+    void quizStaffResponseJsonHasNoLevel() throws Exception {
+        QuizStaffResponse response = QuizStaffResponse.builder()
+                .quizId(UUID.randomUUID().toString())
+                .title("Tran Dynasty Quiz")
+                .build();
+
+        String json = new ObjectMapper().writeValueAsString(response);
+
+        assertThat(json).doesNotContain("\"level\"");
+    }
+
+    @Test
+    void startQuiz_questionsCarryDifficulty() {
+        Quiz quiz = activeQuiz();
+        User learner = User.builder().uid(UUID.randomUUID()).userName("learner").build();
+        when(quizRepository.findActiveById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(userRepository.findById(learner.getUid())).thenReturn(Optional.of(learner));
+        when(quizSessionRepository.save(any(QuizSession.class))).thenAnswer(inv -> {
+            QuizSession s = inv.getArgument(0);
+            s.setSessionId(UUID.randomUUID());
+            return s;
+        });
+        when(questionRepository.findActiveByQuizId(quiz.getQuizId())).thenReturn(List.of(
+                questionWithDifficulty(QuestionDifficulty.EASY), questionWithDifficulty(QuestionDifficulty.HARD)));
+
+        QuizStartResponse response = quizService.startQuiz(quiz.getQuizId().toString(), learner.getUid(), null);
+
+        assertThat(response.getQuestions()).extracting(QuestionResponse::getDifficulty)
+                .containsExactly(QuestionDifficulty.EASY, QuestionDifficulty.HARD);
+    }
+
+    @Test
+    void staffQuizDetail_questionsCarryDifficulty() {
+        Quiz quiz = activeQuiz();
+        when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
+        when(questionRepository.findActiveByQuizId(quiz.getQuizId())).thenReturn(List.of(
+                questionWithDifficulty(QuestionDifficulty.MEDIUM), questionWithDifficulty(QuestionDifficulty.EASY)));
+
+        QuizStaffResponse response = quizService.getQuizByIdForStaff(quiz.getQuizId().toString());
+
+        assertThat(response.getQuestions()).extracting(QuestionResponse::getDifficulty)
+                .containsExactly(QuestionDifficulty.MEDIUM, QuestionDifficulty.EASY);
+    }
+
+    private Question questionWithDifficulty(QuestionDifficulty difficulty) {
+        return Question.builder()
+                .questionId(UUID.randomUUID())
+                .content("Câu " + difficulty)
+                .questionType(QuestionType.FILL_IN_BLANK)
+                .difficulty(difficulty)
+                .build();
+    }
+
     private QuestionRequest questionRequest(String content) {
         return QuestionRequest.builder()
                 .content(content)
                 .questionType(QuestionType.FILL_IN_BLANK)
+                .difficulty(QuestionDifficulty.EASY)
                 .build();
     }
 
@@ -277,7 +353,6 @@ class QuizServiceImplTest {
         return Quiz.builder()
                 .quizId(UUID.randomUUID())
                 .title("Tran Dynasty Quiz")
-                .level(QuizLevel.EASY)
                 .historicalContext(context)
                 .createdBy(creator)
                 .isPublished(true)

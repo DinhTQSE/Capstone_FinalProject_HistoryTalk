@@ -1,6 +1,6 @@
 package com.historytalk.entity.enums;
 
-public enum QuizLevel {
+public enum QuestionDifficulty {
     EASY,
     MEDIUM,
     HARD

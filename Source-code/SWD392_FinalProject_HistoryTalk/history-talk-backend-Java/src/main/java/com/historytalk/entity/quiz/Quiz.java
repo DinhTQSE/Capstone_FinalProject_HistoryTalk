@@ -2,7 +2,6 @@ package com.historytalk.entity.quiz;
 
 import com.historytalk.entity.user.User;
 import com.historytalk.entity.historicalContext.HistoricalContext;
-import com.historytalk.entity.enums.QuizLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -43,10 +42,6 @@ public class Quiz {
 
     @Column(name = "title", length = 255, nullable = false)
     private String title;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "level", nullable = false)
-    private QuizLevel level;
 
     @Builder.Default
     @Column(name = "is_published", nullable = false)

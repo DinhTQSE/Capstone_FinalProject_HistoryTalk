@@ -33,13 +33,14 @@ public class StaffQuestionBankController {
     @Operation(summary = "List/search question bank")
     public ResponseEntity<ApiResponse<PaginatedResponse<QuestionBankResponse>>> getQuestionBank(
             @RequestParam(required = false) String questionType,
+            @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.info("GET /api/v1/staff/question-bank type={} search={}", questionType, search);
+        log.info("GET /api/v1/staff/question-bank type={} difficulty={} search={}", questionType, difficulty, search);
         Pageable pageable = PageRequest.of(page, size);
-        PaginatedResponse<QuestionBankResponse> data = quizService.getQuestionBank(questionType, search, pageable);
+        PaginatedResponse<QuestionBankResponse> data = quizService.getQuestionBank(questionType, difficulty, search, pageable);
         return ResponseEntity.ok(ApiResponse.success(data, "Lấy danh sách câu hỏi thành công"));
     }
 

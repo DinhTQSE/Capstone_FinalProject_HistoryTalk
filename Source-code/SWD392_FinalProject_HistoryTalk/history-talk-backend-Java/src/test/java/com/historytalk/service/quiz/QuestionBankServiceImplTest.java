@@ -17,6 +17,7 @@ import com.historytalk.dto.quiz.quizdata.MatchingItem;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
 import com.historytalk.dto.quiz.quizdata.QuestionOption;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
@@ -24,6 +25,7 @@ import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.*;
 import com.historytalk.service.gamification.GamificationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -355,6 +357,7 @@ class QuestionBankServiceImplTest {
         QuestionRequest request = QuestionRequest.builder()
                 .content("Ai chiến thắng Bạch Đằng 938?")
                 .questionType(QuestionType.FILL_IN_BLANK)
+                .difficulty(QuestionDifficulty.EASY)
                 .questionData(objectMapper.valueToTree(qData))
                 .build();
 
@@ -450,12 +453,12 @@ class QuestionBankServiceImplTest {
         Question linked = Question.builder().questionId(UUID.randomUUID()).content("Q1").build();
         Question unlinked = Question.builder().questionId(UUID.randomUUID()).content("Q2").build();
         Pageable pageable = PageRequest.of(0, 20);
-        when(questionRepository.findAllForBank(any(), any(), any()))
+        when(questionRepository.findAllForBank(any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(linked, unlinked), pageable, 2));
         when(quizQuestionRepository.findActivelyLinkedQuestionIds(any()))
                 .thenReturn(Set.of(linked.getQuestionId()));
 
-        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, pageable);
+        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, null, pageable);
 
         assertThat(result.getContent()).extracting(QuestionBankResponse::isAssignedToQuiz)
                 .containsExactly(true, false);
@@ -467,22 +470,18 @@ class QuestionBankServiceImplTest {
         // The link row exists, but its quiz is soft-deleted, so the repository reports no active link
         Question question = Question.builder().questionId(UUID.randomUUID()).content("Q1").build();
         Pageable pageable = PageRequest.of(0, 20);
-        when(questionRepository.findAllForBank(any(), any(), any()))
+        when(questionRepository.findAllForBank(any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(question), pageable, 1));
         when(quizQuestionRepository.findActivelyLinkedQuestionIds(any())).thenReturn(Set.of());
 
-        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, pageable);
+        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, null, pageable);
 
         assertThat(result.getContent().get(0).isAssignedToQuiz()).isFalse();
     }
 
     @Test
     void createBankQuestion_isNotAssigned() {
-        QuestionRequest request = QuestionRequest.builder()
-                .content("Ai chiến thắng Bạch Đằng 938?")
-                .questionType(QuestionType.FILL_IN_BLANK)
-                .questionData(objectMapper.valueToTree(new FillInBlankQuestionData(List.of("Ngô Quyền"), false, true)))
-                .build();
+        QuestionRequest request = fillInBlankRequest(QuestionDifficulty.EASY);
         when(questionRepository.save(any())).thenAnswer(inv -> {
             Question q = inv.getArgument(0);
             q.setQuestionId(UUID.randomUUID());
@@ -493,5 +492,71 @@ class QuestionBankServiceImplTest {
 
         assertThat(response.isAssignedToQuiz()).isFalse();
         verify(quizQuestionRepository, never()).findActivelyLinkedQuestionIds(any());
+    }
+
+    // ==================== Difficulty ====================
+
+    @Test
+    void getQuestionBank_passesDifficultyFilter() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(questionRepository.findAllForBank(null, QuestionDifficulty.HARD, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        quizService.getQuestionBank(null, "hard", null, pageable);
+
+        verify(questionRepository).findAllForBank(null, QuestionDifficulty.HARD, null, pageable);
+    }
+
+    @Test
+    void getQuestionBank_invalidDifficulty_rejected() {
+        assertThatThrownBy(() -> quizService.getQuestionBank(null, "X", null, PageRequest.of(0, 20)))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("EASY, MEDIUM, HARD");
+    }
+
+    @Test
+    void getQuestionBank_responseIncludesDifficulty() {
+        Question question = Question.builder().questionId(UUID.randomUUID()).content("Q1")
+                .difficulty(QuestionDifficulty.MEDIUM).build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(questionRepository.findAllForBank(any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(question), pageable, 1));
+        when(quizQuestionRepository.findActivelyLinkedQuestionIds(any())).thenReturn(Set.of());
+
+        PaginatedResponse<QuestionBankResponse> result = quizService.getQuestionBank(null, null, null, pageable);
+
+        assertThat(result.getContent().get(0).getDifficulty()).isEqualTo(QuestionDifficulty.MEDIUM);
+    }
+
+    @Test
+    void createBankQuestion_missingDifficulty_rejected() {
+        assertThatThrownBy(() -> quizService.createBankQuestion(fillInBlankRequest(null)))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Yêu cầu độ khó (difficulty)");
+        verify(questionRepository, never()).save(any());
+    }
+
+    @Test
+    void updateBankQuestion_appliesDifficulty() {
+        Question question = Question.builder().questionId(UUID.randomUUID()).content("Q1")
+                .questionType(QuestionType.FILL_IN_BLANK).difficulty(QuestionDifficulty.EASY).build();
+        when(questionRepository.findById(question.getQuestionId())).thenReturn(Optional.of(question));
+        when(questionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(quizQuestionRepository.findActivelyLinkedQuestionIds(any())).thenReturn(Set.of());
+
+        QuestionBankResponse response = quizService.updateBankQuestion(question.getQuestionId().toString(),
+                QuestionRequest.builder().questionType(null).difficulty(QuestionDifficulty.HARD).build());
+
+        assertThat(question.getDifficulty()).isEqualTo(QuestionDifficulty.HARD);
+        assertThat(response.getDifficulty()).isEqualTo(QuestionDifficulty.HARD);
+    }
+
+    private QuestionRequest fillInBlankRequest(QuestionDifficulty difficulty) {
+        return QuestionRequest.builder()
+                .content("Ai chiến thắng Bạch Đằng 938?")
+                .questionType(QuestionType.FILL_IN_BLANK)
+                .difficulty(difficulty)
+                .questionData(objectMapper.valueToTree(new FillInBlankQuestionData(List.of("Ngô Quyền"), false, true)))
+                .build();
     }
 }

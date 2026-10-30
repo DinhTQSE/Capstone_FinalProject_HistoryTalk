@@ -1,6 +1,7 @@
 package com.historytalk.dto.quiz;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,6 +19,7 @@ public class QuestionBankResponse {
     private String content;
     private String explanation;
     private QuestionType questionType;
+    private QuestionDifficulty difficulty;
 
     /** Full typed payload including correct answers (staff-only). */
     private JsonNode questionData;
