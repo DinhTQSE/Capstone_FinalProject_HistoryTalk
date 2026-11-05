@@ -4,11 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.historicalContext.HistoricalContextResponse;
 import com.historytalk.entity.historicalContext.HistoricalContext;
+import com.historytalk.entity.quiz.Question;
+import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.service.map.MapFocusService;
+import com.historytalk.service.map.MapPinService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -42,6 +46,12 @@ class HistoricalContextServiceImplTest {
 
     @Mock
     private ChatSessionRepository chatSessionRepository;
+
+    @Mock
+    private MapPinService mapPinService;
+
+    @Mock
+    private MapFocusService mapFocusService;
 
     @InjectMocks
     private HistoricalContextServiceImpl historicalContextService;
@@ -106,6 +116,24 @@ class HistoricalContextServiceImplTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 historicalContextService.getContextById(context.getContextId().toString(), "USER"))
                 .isInstanceOf(com.historytalk.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void softDeleteContext_softDeletesQuizzesButKeepsQuestions() {
+        Question question = Question.builder().questionId(UUID.randomUUID()).build();
+        Quiz quiz = Quiz.builder()
+                .quizId(UUID.randomUUID())
+                .questions(new java.util.ArrayList<>(List.of(question)))
+                .build();
+        HistoricalContext context = activeContext();
+        context.setQuizzes(new java.util.ArrayList<>(List.of(quiz)));
+        when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
+
+        historicalContextService.softDeleteContext(
+                context.getContextId().toString(), UUID.randomUUID().toString(), "CONTENT_ADMIN");
+
+        assertThat(quiz.getDeletedAt()).isNotNull();
+        assertThat(question.getDeletedAt()).isNull();
     }
 
     private HistoricalContext activeContext() {

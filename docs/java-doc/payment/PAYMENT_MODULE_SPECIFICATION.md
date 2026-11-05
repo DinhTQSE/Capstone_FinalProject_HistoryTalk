@@ -6,13 +6,13 @@ This specification details the payment flow, PayOS checkout integration, webhook
 
 ## 1. Overview & Subscription Model
 
-HistoryTalk offers tier-based subscriptions (`free`, `plus`, `pro`) that grant monthly AI chat tokens:
+HistoryTalk offers tier-based subscriptions (`free`, `plus`, `pro`) with monthly and yearly billing options that grant daily AI chat tokens:
 
-| Tier Title | Price (VND) | Monthly Tokens | Duration |
-|---|---|---|---|
-| `free` | 0 VND | 20 tokens | 1 Month |
-| `plus` | 49,000 VND | 100 tokens | 1 Month |
-| `pro` | 99,000 VND | 999 tokens | 1 Month |
+| Tier Title | Monthly Price (VND) | Yearly Price (VND) | Daily Tokens | Duration |
+|---|---|---|---|---|
+| `free` | 0 VND | — | 1,500 tokens/day | 1 Month |
+| `plus` | 49,000 VND | 499,000 VND | 5,000 tokens/day | 1 Month / 12 Months |
+| `pro` | 99,000 VND | 999,000 VND | 10,000 tokens/day | 1 Month / 12 Months |
 
 ---
 

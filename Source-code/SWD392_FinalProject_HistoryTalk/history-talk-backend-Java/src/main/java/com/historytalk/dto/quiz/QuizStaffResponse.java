@@ -26,9 +26,6 @@ public class QuizStaffResponse {
     /** ANCIENT | MEDIEVAL | MODERN | CONTEMPORARY — sourced from historicalContext.era */
     private String era;
 
-    /** EASY | MEDIUM | HARD */
-    private String level;
-
     /** Total completed sessions across all users */
     private int playCount;
 

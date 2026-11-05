@@ -104,6 +104,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
                 .messageCount(messageCount)
+                .mode(session.getMode().name())
                 .build();
     }
 

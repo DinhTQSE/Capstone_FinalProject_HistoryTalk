@@ -6,10 +6,11 @@ import com.historytalk.dto.quiz.quizdata.FillInBlankQuestionData;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
 import com.historytalk.entity.enums.QuestionType;
-import com.historytalk.entity.enums.QuizLevel;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
+import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
@@ -116,6 +117,11 @@ class QuizServiceImplImportTest {
                 .getAcceptedAnswers()).containsExactly("938", "năm 938");
         assertThat(objectMapper.readValue(saved.get(2).getQuestionData(), MatchingQuestionData.class)
                 .getCorrectPairs()).hasSize(2);
+
+        ArgumentCaptor<QuizQuestion> links = ArgumentCaptor.forClass(QuizQuestion.class);
+        verify(quizQuestionRepository, times(3)).save(links.capture());
+        assertThat(links.getAllValues()).extracting(QuizQuestion::getOrderIndex).containsExactly(0, 1, 2);
+        assertThat(links.getAllValues()).extracting(QuizQuestion::getQuestion).containsExactlyElementsOf(saved);
     }
 
     @Test
@@ -130,22 +136,24 @@ class QuizServiceImplImportTest {
         assertThat(captor.getValue().getExplanation()).isNull();
         assertThat(objectMapper.readValue(captor.getValue().getQuestionData(), MultipleChoiceQuestionData.class)
                 .getCorrectOptionIds()).containsExactly("0");
+        assertThat(captor.getValue().getDifficulty()).isEqualTo(QuestionDifficulty.MEDIUM);
         ArgumentCaptor<Quiz> quizCaptor = ArgumentCaptor.forClass(Quiz.class);
         verify(quizRepository).save(quizCaptor.capture());
-        assertThat(quizCaptor.getValue().getLevel()).isEqualTo(QuizLevel.MEDIUM);
         assertThat(quizCaptor.getValue().getIsPublished()).isFalse();
     }
 
     @Test
-    void mixedLevelInOneQuizIsRejected() {
+    void mixedLevelsInOneQuizImportWithPerQuestionDifficulty() {
         QuizImportResponse response = importCsv(HEADER
                 + row("Q", "EASY", "", "Câu 1", "A,B,C,D", "0", "")
                 + row("Q", "HARD", "", "Câu 2", "A,B,C,D", "1", ""));
 
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).contains("Dòng 3", "HARD", "EASY");
-        verify(quizRepository, never()).save(any());
-        verify(questionRepository, never()).save(any());
+        assertThat(response.getErrors()).isEmpty();
+        assertThat(response.getSuccessCount()).isEqualTo(1);
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        verify(questionRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Question::getDifficulty)
+                .containsExactly(QuestionDifficulty.EASY, QuestionDifficulty.HARD);
     }
 
     @Test

@@ -74,7 +74,7 @@ public class StaffQuizController {
      * Create a new quiz with initial questions.
      */
     @PostMapping
-    @Operation(summary = "Create quiz", description = "Create a new quiz with title, context, level, and initial questions.")
+    @Operation(summary = "Create quiz", description = "Create a new quiz with title, context, and initial questions; each question carries its own difficulty.")
     public ResponseEntity<ApiResponse<QuizStaffResponse>> createQuiz(
             @Valid @RequestBody CreateQuizRequest request) {
 
@@ -89,7 +89,7 @@ public class StaffQuizController {
      * Partial update of quiz metadata (not questions).
      */
     @PutMapping("/{quizId}")
-    @Operation(summary = "Update quiz metadata", description = "Update title, contextId, or level. All fields are optional.")
+    @Operation(summary = "Update quiz metadata", description = "Update title, contextId, or isPublished. All fields are optional.")
     public ResponseEntity<ApiResponse<QuizStaffResponse>> updateQuiz(
             @PathVariable String quizId,
             @RequestBody UpdateQuizRequest request) {
@@ -104,7 +104,7 @@ public class StaffQuizController {
      * Permanent hard delete.
      */
     @DeleteMapping("/{quizId}")
-    @Operation(summary = "Delete quiz", description = "Permanently delete a quiz and all its questions.")
+    @Operation(summary = "Delete quiz", description = "Permanently delete a quiz. Its questions stay in the question bank.")
     public ResponseEntity<ApiResponse<Void>> deleteQuiz(
             @PathVariable String quizId) {
 
@@ -163,7 +163,7 @@ public class StaffQuizController {
      * Hard delete a question.
      */
     @DeleteMapping("/{quizId}/questions/{questionId}")
-    @Operation(summary = "Delete question", description = "Permanently delete a question from a quiz.")
+    @Operation(summary = "Delete question", description = "Remove a question from this quiz. The question stays in the question bank.")
     public ResponseEntity<ApiResponse<Void>> deleteQuestion(
             @PathVariable String quizId,
             @PathVariable String questionId) {
@@ -188,10 +188,11 @@ public class StaffQuizController {
                     "Duplicate titles and invalid rows are skipped and reported in the response. " +
                     "All imported quizzes are created as drafts (isPublished = false). " +
                     "Required columns: title, contextId, level, questionContent. " +
+                    "'level' (EASY | MEDIUM | HARD) is each question's own difficulty. " +
                     "Optional: questionType (MULTIPLE_CHOICE | FILL_IN_BLANK | MATCHING, default MULTIPLE_CHOICE), " +
                     "option1..option6, correctAnswer, explanation, caseSensitive, trimWhitespace. " +
                     "File must be UTF-8 comma-separated; download GET /import/template. " +
-                    "All rows of one title must share contextId and level."
+                    "All rows of one title must share contextId."
     )
     public ResponseEntity<ApiResponse<QuizImportResponse>> importQuizzes(
             @RequestPart("file") MultipartFile file) {

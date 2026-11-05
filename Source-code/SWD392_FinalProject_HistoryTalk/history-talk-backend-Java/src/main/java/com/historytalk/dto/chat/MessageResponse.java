@@ -1,5 +1,6 @@
 package com.historytalk.dto.chat;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,6 +28,11 @@ public class MessageResponse {
 
     @JsonProperty("quotes")
     private java.util.List<String> quotes;
+
+    /** Grade of the learner's previous answer. Only present on exam feedback messages. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonProperty("examVerdict")
+    private String examVerdict;
 
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;

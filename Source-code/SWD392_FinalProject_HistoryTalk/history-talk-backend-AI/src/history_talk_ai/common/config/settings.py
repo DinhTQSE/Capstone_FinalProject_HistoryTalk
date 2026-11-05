@@ -22,10 +22,14 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_USERNAME: str = ""
     OLLAMA_PASSWORD: str = ""
-    LLM_MODEL: str = "qwen2.5:14b"
+    LLM_MODEL: str = "qwen3.8:27b"
     LLM_TEMPERATURE: float = 0.7
     # Max tokens for character response (not counting the structured wrapper)
     LLM_MAX_TOKENS: int = 1024
+    # Reranked chunks put into the prompt. Each one adds noticeably to the time to first token.
+    RAG_TOP_K: int = 3
+    # Used for questions such as "tóm tắt cả trận đánh". The reranker on the LLM server returns at most 5.
+    RAG_TOP_K_BROAD: int = 5
 
     # ── Supabase ──────────────────────────────────────────────────────────────
     SUPABASE_URL: str = ""

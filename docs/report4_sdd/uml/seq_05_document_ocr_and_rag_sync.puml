@@ -33,7 +33,7 @@ DocSvc -> AiClient : processDocument(docId, entityId, content)
 AiClient -> FastAPI : POST /v1/chat/process-document (X-Internal-Api-Key)
 FastAPI -> FastAPI : Delete existing chunks for docId
 FastAPI -> FastAPI : _semantic_chunking(content) via BGE-M3 sentence cosine distances
-FastAPI -> FastAPI : Generate 768-D embeddings concurrently (Semaphore=15) via Ollama bge-m3
+FastAPI -> FastAPI : Generate 1024-D embeddings concurrently (Semaphore=15) via Ollama bge-m3
 FastAPI -> VecDB : Batch INSERT INTO vector_chunk (100 records/batch)
 FastAPI --> AiClient : 200 OK (Indexed chunks count)
 AiClient --> Ctrl : Completed

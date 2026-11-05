@@ -15,7 +15,7 @@ Quiz được import luôn ở trạng thái nháp (`isPublished = false`).
 |---|---|---|
 | `title` | ✅ | Tên quiz. Các dòng cùng `title` thuộc cùng một quiz, mỗi dòng là một câu hỏi. |
 | `contextId` | ✅ | UUID của bối cảnh lịch sử (chưa bị xoá). |
-| `level` | ✅ | `EASY`, `MEDIUM` hoặc `HARD` — độ khó của **cả quiz**. |
+| `level` | ✅ | `EASY`, `MEDIUM` hoặc `HARD` — độ khó của **từng câu hỏi**. Không phân biệt hoa thường. |
 | `questionContent` | ✅ | Nội dung câu hỏi. |
 | `questionType` | | `MULTIPLE_CHOICE` (mặc định khi để trống), `FILL_IN_BLANK`, `MATCHING`. Không phân biệt hoa thường. |
 | `option1` … `option6` | | Lựa chọn (MC) hoặc cặp nối (MATCHING). |
@@ -39,7 +39,7 @@ Với MATCHING, vế phải được xáo trộn trước khi lưu nên thứ t�
 ## Quy tắc theo quiz
 
 - Một quiz được phép trộn nhiều loại câu hỏi.
-- Mọi dòng cùng `title` phải có **cùng `contextId` và cùng `level`**. Độ khó được tính cho cả quiz; câu khác độ khó cần đưa sang quiz khác.
+- Mọi dòng cùng `title` phải có **cùng `contextId`**. Mỗi câu có thể có `level` khác nhau — quiz không còn độ khó chung.
 - Chỉ cần **một dòng lỗi** là cả quiz đó bị bỏ qua (không lưu gì). Các quiz khác trong file vẫn được import. Lỗi trả về trong `errors` dạng `Quiz '<title>' skipped — validation error: Dòng N: ...`, với N là số dòng trong file (dòng tiêu đề = dòng 1).
 - Tiêu đề trùng với quiz đã có → quiz bị bỏ qua.
 - Dòng có `title` trống bị bỏ qua.
@@ -49,8 +49,8 @@ Với MATCHING, vế phải được xáo trộn trước khi lưu nên thứ t�
 ```csv
 title,contextId,level,questionType,questionContent,option1,option2,option3,option4,correctAnswer,explanation
 Bạch Đằng 938,<uuid>,EASY,MULTIPLE_CHOICE,Ai chỉ huy?,Ngô Quyền,Lê Lợi,Trần Hưng Đạo,Lý Thường Kiệt,0,
-Bạch Đằng 938,<uuid>,EASY,FILL_IN_BLANK,Trận Bạch Đằng diễn ra năm nào?,,,,,938|năm 938,
-Bạch Đằng 938,<uuid>,EASY,MATCHING,Nối nhân vật với trận đánh,Ngô Quyền => Bạch Đằng 938,Lê Lợi => Chi Lăng,,,,
+Bạch Đằng 938,<uuid>,MEDIUM,FILL_IN_BLANK,Trận Bạch Đằng diễn ra năm nào?,,,,,938|năm 938,
+Bạch Đằng 938,<uuid>,HARD,MATCHING,Nối nhân vật với trận đánh,Ngô Quyền => Bạch Đằng 938,Lê Lợi => Chi Lăng,,,,
 ```
 
 File CSV cũ (`title,contextId,level,questionContent,option1..option4,correctAnswer,explanation`, không có `questionType`) vẫn import được như trước.

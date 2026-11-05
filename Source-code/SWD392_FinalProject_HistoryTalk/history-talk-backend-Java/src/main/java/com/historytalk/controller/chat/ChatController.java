@@ -6,6 +6,7 @@ import com.historytalk.dto.PaginatedResponse;
 import com.historytalk.dto.chat.ChatHistoryGroupResponse;
 import com.historytalk.dto.chat.ChatScenarioResponse;
 import com.historytalk.dto.chat.ChatSessionResponse;
+import com.historytalk.dto.chat.CheckMessageRequest;
 import com.historytalk.dto.chat.CreateChatSessionRequest;
 import com.historytalk.dto.chat.GetMessagesResponse;
 import com.historytalk.dto.chat.SendMessageRequest;
@@ -116,6 +117,16 @@ public class ChatController {
         String userId = SecurityUtils.getUserId();
         GetMessagesResponse result = messageService.getMessages(id, userId);
         return ResponseEntity.ok(ApiResponse.success(result, "Messages retrieved successfully"));
+    }
+
+    /**
+     * POST /v1/chat/messages/check
+     * Checks a message before it is shown or sent. Saves nothing, calls no AI and costs no tokens.
+     */
+    @PostMapping("/messages/check")
+    public ResponseEntity<ApiResponse<?>> checkMessage(@Valid @RequestBody CheckMessageRequest request) {
+        messageService.checkMessageContent(request.getContent());
+        return ResponseEntity.ok(ApiResponse.success(null, "Message content is allowed"));
     }
 
     /**

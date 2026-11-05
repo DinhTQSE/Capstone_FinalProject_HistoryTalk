@@ -1,6 +1,7 @@
 package com.historytalk.service.quiz.csv;
 
 import com.historytalk.dto.quiz.QuestionRequest;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.exception.InvalidRequestException;
 import org.apache.commons.csv.CSVRecord;
@@ -23,6 +24,10 @@ public class QuizCsvRowParser {
             .map(Enum::name)
             .collect(Collectors.joining(", "));
 
+    private static final String VALID_DIFFICULTIES = Arrays.stream(QuestionDifficulty.values())
+            .map(Enum::name)
+            .collect(Collectors.joining(", "));
+
     private final Map<QuestionType, QuestionCsvParserStrategy> strategies = new EnumMap<>(QuestionType.class);
 
     public QuizCsvRowParser(List<QuestionCsvParserStrategy> strategies) {
@@ -34,6 +39,7 @@ public class QuizCsvRowParser {
     public QuestionRequest parse(CSVRecord row) {
         try {
             QuestionType type = parseType(QuizCsvColumns.value(row, QuizCsvColumns.QUESTION_TYPE));
+            QuestionDifficulty difficulty = parseDifficulty(QuizCsvColumns.value(row, QuizCsvColumns.LEVEL));
             String content = QuizCsvColumns.value(row, QuizCsvColumns.QUESTION_CONTENT);
             if (content.isEmpty()) {
                 throw new InvalidRequestException("questionContent không được để trống");
@@ -47,6 +53,7 @@ public class QuizCsvRowParser {
                     .content(content)
                     .explanation(explanation.isEmpty() ? null : explanation)
                     .questionType(type)
+                    .difficulty(difficulty)
                     .questionData(strategy.parseQuestionData(row))
                     .build();
         } catch (InvalidRequestException e) {
@@ -62,6 +69,18 @@ public class QuizCsvRowParser {
             return QuestionType.valueOf(raw.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException("questionType không hợp lệ: '" + raw + "'. Giá trị hợp lệ: " + VALID_TYPES);
+        }
+    }
+
+    /** The CSV column keeps its historical name {@code level}; it is now each question's own difficulty. */
+    private static QuestionDifficulty parseDifficulty(String raw) {
+        if (raw.isEmpty()) {
+            throw new InvalidRequestException("level không được để trống");
+        }
+        try {
+            return QuestionDifficulty.valueOf(raw.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException("level không hợp lệ: '" + raw + "'. Giá trị hợp lệ: " + VALID_DIFFICULTIES);
         }
     }
 }

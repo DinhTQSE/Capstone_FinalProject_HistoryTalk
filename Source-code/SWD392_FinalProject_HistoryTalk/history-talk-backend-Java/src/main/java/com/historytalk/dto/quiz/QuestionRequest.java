@@ -1,6 +1,7 @@
 package com.historytalk.dto.quiz;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -21,6 +22,9 @@ public class QuestionRequest {
 
     @Builder.Default
     private QuestionType questionType = QuestionType.MULTIPLE_CHOICE;
+
+    /** Required on create; null = no change on update. */
+    private QuestionDifficulty difficulty;
 
     /**
      * Typed payload — required for all question types.

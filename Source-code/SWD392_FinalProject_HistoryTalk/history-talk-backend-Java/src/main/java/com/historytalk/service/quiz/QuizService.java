@@ -59,7 +59,7 @@ public interface QuizService {
 
     // ==================== Question Bank ====================
 
-    PaginatedResponse<QuestionBankResponse> getQuestionBank(String questionType, String search, Pageable pageable);
+    PaginatedResponse<QuestionBankResponse> getQuestionBank(String questionType, String difficulty, String search, Pageable pageable);
 
     QuestionBankResponse createBankQuestion(QuestionRequest request);
 

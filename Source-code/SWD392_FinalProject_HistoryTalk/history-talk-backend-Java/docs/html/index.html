@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HistoryTalk SRS Visuals</title>
+<style>
+  body { margin: 0; font-family: "Segoe UI", Roboto, Arial, sans-serif; background: #f8fafc; color: #0f172a; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px; }
+  h1 { margin: 0 0 6px; font-size: 24px; }
+  p { color: #64748b; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 24px; }
+  a.card { display: block; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; text-decoration: none; color: inherit; }
+  a.card:hover { border-color: #2563eb; }
+  a.card h2 { margin: 0 0 6px; font-size: 17px; }
+  ul { color: #475569; padding-left: 18px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>HistoryTalk – SRS Visuals</h1>
+  <p>Hình minh họa cho <code>docs/HistoryTalk_Report3_SRS.md</code>. Mỗi sơ đồ/màn hình có nút tải SVG/PNG để chèn vào báo cáo Word. Cần kết nối internet để tải thư viện Mermaid và html2canvas.</p>
+  <div class="grid">
+    <a class="card" href="diagrams.html">
+      <h2>Diagrams</h2>
+      <ul>
+        <li>Context diagram (1.1)</li>
+        <li>4 use case diagrams (2.2.1)</li>
+        <li>3 screens flows (3.1.1)</li>
+        <li>3 ERD parts (3.1.5)</li>
+      </ul>
+    </a>
+    <a class="card" href="screens.html">
+      <h2>Screen wireframes</h2>
+      <ul>
+        <li>S-02 – S-59, grouped by role</li>
+        <li>Low-fidelity layout sketches</li>
+        <li>Pop-ups shown over a hatched background</li>
+      </ul>
+    </a>
+  </div>
+</main>
+</body>
+</html>

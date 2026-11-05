@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS historical_schema.vector_chunk (
     doc_id          UUID NOT NULL REFERENCES historical_schema.document(doc_id) ON DELETE CASCADE,
     entity_id       UUID NOT NULL,
     content         TEXT NOT NULL,
-    embedding       vector(768),
+    embedding       vector(1024),
     sequence_number INT NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

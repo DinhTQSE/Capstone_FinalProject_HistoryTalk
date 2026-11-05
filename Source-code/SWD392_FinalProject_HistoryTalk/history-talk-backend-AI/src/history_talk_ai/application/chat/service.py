@@ -2,7 +2,9 @@ import json
 import uuid
 import logging
 import asyncio
-import random
+import re
+import time
+import unicodedata
 from typing import List
 import httpx
 from supabase import create_client, Client
@@ -22,9 +24,24 @@ logger = logging.getLogger(__name__)
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 # ── Ollama HTTP Client ────────────────────────────────────────────────────────
+# Compared without diacritics, so "tóm tắt" and "tom tat" both match
+_BROAD_QUESTION_KEYWORDS = (
+    "tom tat", "tong quan", "tong hop", "toan bo", "toan canh", "toan dien",
+    "ke lai", "dien bien", "trinh bay", "phan tich", "so sanh", "ca tran", "ca cuoc",
+)
+
+
+class RagUnavailableError(Exception):
+    """Documents could not be searched, so an answer would not be grounded in them."""
+
+
+_CJK_PATTERN = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
+
 # Use a global client to reuse connections (Connection Pooling) for faster requests
+# A short connect timeout makes a stopped GPU server fail in seconds instead of minutes
+_LLM_TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 ollama_client = httpx.AsyncClient(
-    timeout=120.0,
+    timeout=_LLM_TIMEOUT,
     follow_redirects=True,
     headers={"ngrok-skip-browser-warning": "true", "User-Agent": "HistoryTalk-AI/1.0"}
 )
@@ -33,14 +50,15 @@ ollama_client = httpx.AsyncClient(
 def _ollama_url(path: str) -> str:
     return f"{settings.OLLAMA_BASE_URL.rstrip('/')}{path}"
 
-async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+async def _call_ollama(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
     """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
         "stream": False,
+        "think": False,
         "options": {
-            "temperature": settings.LLM_TEMPERATURE,
+            "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
             "num_predict": settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
             "repeat_penalty": 1.15,
@@ -75,6 +93,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         "model": settings.LLM_MODEL,
         "messages": messages,
         "stream": True,
+        "think": False,
         "options": {
             "temperature": settings.LLM_TEMPERATURE,
             "num_predict": settings.LLM_MAX_TOKENS,
@@ -94,7 +113,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
             _ollama_url("/api/chat"),
             json=payload,
             auth=auth,
-            timeout=120.0
+            timeout=_LLM_TIMEOUT
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -117,7 +136,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def _call_external(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+async def _call_external(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
     """Make an async call to an external OpenAI-compatible API (e.g. OpenAI, Gemini, Groq)."""
     api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
     headers = {
@@ -128,7 +147,7 @@ async def _call_external(messages: list[dict], expect_json: bool = True) -> tupl
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
-        "temperature": settings.LLM_TEMPERATURE,
+        "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
         "max_tokens": settings.LLM_MAX_TOKENS,
         "stream": False,
     }
@@ -176,7 +195,7 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
             f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
             json=payload,
             headers=headers,
-            timeout=120.0
+            timeout=_LLM_TIMEOUT
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -206,11 +225,36 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def _call_llm(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
-    """Router to call either Ollama or External API based on settings."""
+def _is_broad_question(question: str) -> bool:
+    """A question about a whole event needs more chunks than a question about one fact."""
+    decomposed = unicodedata.normalize("NFD", question.lower().replace("đ", "d"))
+    plain = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+    return any(keyword in plain for keyword in _BROAD_QUESTION_KEYWORDS)
+
+
+def _contains_cjk(text: str) -> bool:
+    return _CJK_PATTERN.search(text) is not None
+
+
+async def _call_provider(messages: list[dict], expect_json: bool, temperature: float | None) -> tuple[str, int, int]:
     if settings.LLM_PROVIDER.lower() in ("external", "google"):
-        return await _call_external(messages, expect_json)
-    return await _call_ollama(messages, expect_json)
+        return await _call_external(messages, expect_json, temperature)
+    return await _call_ollama(messages, expect_json, temperature)
+
+
+async def _call_llm(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
+    """Call the configured provider, retrying once if the reply leaks Chinese into a Vietnamese conversation."""
+    content, prompt_tokens, completion_tokens = await _call_provider(messages, expect_json, temperature)
+
+    # Sources may legitimately quote Hán characters, in which case the reply may quote them too.
+    if not _contains_cjk(content) or any(_contains_cjk(m.get("content", "")) for m in messages):
+        return content, prompt_tokens, completion_tokens
+
+    logger.warning("LLM reply contains Chinese characters, retrying once.")
+    content, retry_prompt_tokens, retry_completion_tokens = await _call_provider(messages, expect_json, temperature)
+    if _contains_cjk(content):
+        raise ValueError("LLM reply still contains Chinese characters after retrying.")
+    return content, prompt_tokens + retry_prompt_tokens, completion_tokens + retry_completion_tokens
 
 async def _call_llm_stream(messages: list[dict]) -> tuple:
     """Router to stream from either Ollama or External API based on settings."""
@@ -250,6 +294,9 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
                 embedding = data.get("embedding", [])
                 if embedding:
                     return embedding
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            logger.error(f"Cannot reach the LLM server for embedding: {e}")
+            return []
         except Exception as e:
             logger.warning(f"Ollama embedding attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
@@ -259,13 +306,13 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
     return []
 
 async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> tuple[str, List[str]]:
-    """Retrieve history context from Supabase VectorChunk and rerank via Kaggle."""
+    """Retrieve history context from Supabase VectorChunk and rerank via the LLM server."""
     query_vector = await get_embedding_from_ollama(user_question)
     if not query_vector:
-        return "", []
-        
+        raise RagUnavailableError("Không kết nối được máy chủ AI để tra cứu tư liệu. Vui lòng thử lại sau.")
+
     try:
-        response = supabase.rpc(
+        response = supabase.schema(settings.SUPABASE_SCHEMA).rpc(
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
@@ -279,14 +326,21 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
             return "", []
         texts = [chunk.get("content", "") for chunk in chunks if chunk.get("content")]
         
-        # Gọi sang Kaggle API để Rerank
+        # Gọi sang LLM server để Rerank
         try:
+            auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
             rerank_res = await ollama_client.post(
-                _ollama_url("/api/rerank").replace("11434", "8000"), # Giả sử Nginx route /api/rerank
-                json={"query": user_question, "documents": texts}
+                _ollama_url("/api/rerank"),
+                json={"query": user_question, "documents": texts},
+                auth=auth,
             )
             rerank_res.raise_for_status()
-            top_docs = rerank_res.json().get("top_docs", [])
+            is_broad = _is_broad_question(user_question)
+            top_k = settings.RAG_TOP_K_BROAD if is_broad else settings.RAG_TOP_K
+            top_docs = rerank_res.json().get("top_docs", [])[:top_k]
+            # A general question scores low against every specific chunk, which does not make them irrelevant.
+            if is_broad and not top_docs:
+                top_docs = texts[:top_k]
         except Exception as e:
             logger.error(f"Rerank API failed: {e}. Fallback to top 2.")
             top_docs = texts[:2]
@@ -295,7 +349,60 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         return context_str, top_docs
     except Exception as e:
         logger.error(f"Supabase RPC error: {e}")
-        return "", []
+        raise RagUnavailableError("Không tra cứu được tư liệu lịch sử. Vui lòng thử lại sau.") from e
+
+
+def _build_final_user_content(user_message: str, rag_context: str) -> str:
+    """Put the grounding rules next to the question, where the model follows them most closely."""
+    if not rag_context:
+        return (
+            "[KHÔNG TÌM THẤY TƯ LIỆU CHO CÂU NÀY]\n"
+            "LỆNH: Chỉ được dùng thông tin trong phần THÔNG TIN LỊCH SỬ CỦA BẠN. Chào hỏi hoặc chuyện sinh hoạt thường ngày thì trả lời tự nhiên. "
+            "Nếu được hỏi về sự kiện, con số, tên người hay địa danh không có ở đó, BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không tự suy diễn.\n\n"
+            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
+        )
+    broad_rule = (
+        "5. Câu này cần tổng hợp nhiều sự việc: được trả lời tối đa 200 từ, kể theo trình tự thời gian.\n"
+        if _is_broad_question(user_message)
+        else ""
+    )
+    return (
+        f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
+        "LỆNH RAG:\n"
+        "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
+        "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
+        "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
+        "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n"
+        f"{broad_rule}\n"
+        f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
+    )
+
+
+async def _generate_suggested_questions(messages: list[dict], reply: str) -> tuple[List[str], int, int]:
+    """Suggestions are optional, so failing to generate them must never fail the reply itself."""
+    sq_prompt = (
+        "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
+        "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
+        "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
+        "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
+    )
+    sq_messages = messages + [
+        {"role": "assistant", "content": reply},
+        {"role": "user", "content": sq_prompt},
+    ]
+    try:
+        sq_text, prompt_tokens, completion_tokens = await _call_llm(sq_messages, expect_json=False)
+    except Exception as e:
+        logger.warning(f"Failed to generate suggested questions: {e}")
+        return [], 0, 0
+
+    questions = []
+    for line in sq_text.strip().split("\n"):
+        clean_line = re.sub(r"^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*", "", line.strip()).strip()
+        clean_line = clean_line.strip('"').strip("'")
+        if len(clean_line) > 5:
+            questions.append(clean_line)
+    return questions[:3], prompt_tokens, completion_tokens
 
 
 # ── Public service functions ──────────────────────────────────────────────────
@@ -335,38 +442,14 @@ async def generate_reply(
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    # Gemma 2 không có system role chuẩn, ta bọc system prompt vào user message đầu tiên.
-    messages = [{
-        "role": "user", 
-        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
-    }]
+    messages = [{"role": "system", "content": system_prompt}]
     
     # Inject conversation history
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = user_message
-    if rag_context:
-        print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
-        final_user_content = (
-            f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
-            "LỆNH RAG:\n"
-            "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
-            "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
-            "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n\n"
-            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
-        )
-        
-    # Xác suất 30% ép AI hỏi vặn lại (chỉ khi không phải tin nhắn đầu tiên của session)
-    if message_history and random.random() < 0.3:
-        skip_suggestions = True
-        final_user_content += (
-            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi đơn giản ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
-            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. Nhằm mục đích người học trả lời cho nhân vật nghe chứ không phải câu hỏi để người học hỏi nhân vật!"
-            "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'. Ngươi phải hỏi câu gì mà ngươi biết câu trả lời để con nhận xét người kia trả lời đúng hay sai. Cuối câu hỏi đó phải có dấu '?'."
-        )
+    final_user_content = _build_final_user_content(user_message, rag_context)
 
     messages.append({"role": "user", "content": final_user_content})
 
@@ -377,29 +460,7 @@ async def generate_reply(
     sq_ct = 0
     
     if not skip_suggestions:
-        sq_prompt = (
-            "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
-            "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
-            "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
-        )
-        sq_messages = messages + [
-            {"role": "assistant", "content": response_text},
-            {"role": "user", "content": sq_prompt}
-        ]
-        
-        sq_text, sq_pt, sq_ct = await _call_llm(sq_messages, expect_json=False)
-        try:
-            import re
-            lines = sq_text.strip().split('\n')
-            for line in lines:
-                clean_line = re.sub(r'^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
-                clean_line = clean_line.strip('"').strip("'")
-                if clean_line and len(clean_line) > 5:
-                    suggested_questions.append(clean_line)
-            suggested_questions = suggested_questions[:3]
-        except Exception as e:
-            logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, response_text)
 
     return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct, quotes_used
 
@@ -430,39 +491,18 @@ async def generate_reply_stream(
                 
     rag_context = ""
     quotes_used = []
+    started_at = time.perf_counter()
     rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
+    rag_seconds = time.perf_counter() - started_at
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    # Gemma 2 không có system role chuẩn, ta bọc system prompt vào user message đầu tiên.
-    messages = [{
-        "role": "user", 
-        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
-    }]
+    messages = [{"role": "system", "content": system_prompt}]
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = user_message
-    if rag_context:
-        final_user_content = (
-            f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
-            "LỆNH RAG:\n"
-            "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
-            "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
-            "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại.\n\n"
-            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
-        )
-        
-    # Xác suất 30% ép AI hỏi vặn lại (chỉ khi không phải tin nhắn đầu tiên của session)
-    if message_history and random.random() < 0.3:
-        skip_suggestions = True
-        final_user_content += (
-            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
-            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. "
-            "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'."
-        )
+    final_user_content = _build_final_user_content(user_message, rag_context)
 
     messages.append({"role": "user", "content": final_user_content})
 
@@ -477,40 +517,20 @@ async def generate_reply_stream(
             prompt_tokens = chunk.get("prompt_tokens", 0)
             completion_tokens = chunk.get("completion_tokens", 0)
         else:
+            if not full_message:
+                logger.info(f"Chat stream timing: rag={rag_seconds:.2f}s first_token={time.perf_counter() - started_at:.2f}s")
             full_message += chunk
-            await asyncio.sleep(0.05)  # SLOW DOWN YIELD SPEED (50ms per chunk)
             yield chunk
-            
+
+    if _contains_cjk(full_message) and not any(_contains_cjk(m["content"]) for m in messages):
+        logger.warning("Streamed LLM reply contains Chinese characters.")
+
     suggested_questions = []
     sq_pt = 0
     sq_ct = 0
 
     if not skip_suggestions:
-        # Now that the message is done, generate suggested questions synchronously but fast
-        # By asking specifically for 3 suggested questions based on the last reply.
-        sq_prompt = (
-            "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
-            "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
-            "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
-        )
-        sq_messages = messages + [
-            {"role": "assistant", "content": full_message},
-            {"role": "user", "content": sq_prompt}
-        ]
-        
-        sq_text, sq_pt, sq_ct = await _call_llm(sq_messages, expect_json=False)
-        try:
-            import re
-            lines = sq_text.strip().split('\n')
-            for line in lines:
-                clean_line = re.sub(r'^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
-                clean_line = clean_line.strip('"').strip("'")
-                if clean_line and len(clean_line) > 5:
-                    suggested_questions.append(clean_line)
-            suggested_questions = suggested_questions[:3]
-        except Exception as e:
-            logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, full_message)
 
     yield {
         "suggestedQuestions": suggested_questions,

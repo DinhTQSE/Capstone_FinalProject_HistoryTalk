@@ -1,5 +1,6 @@
 package com.historytalk.dto.chat;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,4 +28,9 @@ public class SendMessageResponse {
 
     @JsonProperty("completionTokens")
     private Integer completionTokens;
+
+    /** Only present for exam sessions. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonProperty("exam")
+    private ExamProgressResponse exam;
 }

@@ -16,7 +16,7 @@ import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuestType;
 import com.historytalk.entity.enums.QuestionType;
-import com.historytalk.entity.enums.QuizLevel;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
@@ -54,6 +54,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -174,6 +175,16 @@ public class QuizServiceImpl implements QuizService {
         //         throw new InvalidRequestException("Đã hết thời gian làm bài");
         //     }
         // }
+
+        // Time limit check — 59s grace: deadline 11:06:00 accepts up to 11:06:59.999, rejects from 11:07:00
+        if (session.getLimitedTime() != null && session.getStartTime() != null) {
+            LocalDateTime rejectFrom = session.getStartTime()
+                    .plusSeconds(session.getLimitedTime())
+                    .plusSeconds(60);
+            if (!LocalDateTime.now().isBefore(rejectFrom)) {
+                throw new InvalidRequestException("Đã hết thời gian làm bài");
+            }
+        }
 
         // Load ordered questions
         List<Question> questions = questionRepository.findActiveByQuizId(session.getQuiz().getQuizId());
@@ -386,26 +397,22 @@ public class QuizServiceImpl implements QuizService {
         HistoricalContext context = historicalContextRepository.findById(parseUuid(request.getContextId(), "contextId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
 
-        QuizLevel level = parseLevel(request.getLevel());
-
         Quiz quiz = Quiz.builder()
                 .title(request.getTitle())
-                .level(level)
                 .historicalContext(context)
                 .createdBy(user)
                 .isPublished(Boolean.TRUE.equals(request.getIsPublished()))
                 .build();
         quiz = quizRepository.save(quiz);
 
-        // Save each question
+        // Save each question and link it in request order
         if (request.getQuestions() != null) {
+            int orderIndex = 0;
             for (QuestionRequest qr : request.getQuestions()) {
-                questionRepository.save(buildQuestion(qr, quiz));
+                linkQuestion(quiz, questionRepository.save(buildQuestion(qr)), orderIndex++);
             }
         }
 
-        // Reload to get questions populated
-        quiz = quizRepository.findById(quiz.getQuizId()).orElseThrow();
         return mapToStaffResponse(quiz);
     }
 
@@ -430,10 +437,6 @@ public class QuizServiceImpl implements QuizService {
                     .findById(parseUuid(request.getContextId(), "contextId"))
                     .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
             quiz.setHistoricalContext(context);
-        }
-
-        if (request.getLevel() != null && !request.getLevel().isBlank()) {
-            quiz.setLevel(parseLevel(request.getLevel()));
         }
 
         if (request.getIsPublished() != null) {
@@ -469,7 +472,8 @@ public class QuizServiceImpl implements QuizService {
         log.info("addQuestion: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
-        Question question = questionRepository.save(buildQuestion(request, quiz));
+        Question question = questionRepository.save(buildQuestion(request));
+        linkQuestion(quiz, question, quizQuestionRepository.findMaxOrderIndex(quiz.getQuizId()) + 1);
         return mapToQuestionResponse(question);
     }
 
@@ -485,7 +489,7 @@ public class QuizServiceImpl implements QuizService {
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
-        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
+        if (!quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quizUuid, question.getQuestionId())) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
         }
 
@@ -502,6 +506,9 @@ public class QuizServiceImpl implements QuizService {
         if (request.getQuestionData() != null) {
             question.setQuestionData(serializeJsonNode(request.getQuestionData()));
         }
+        if (request.getDifficulty() != null) {
+            question.setDifficulty(request.getDifficulty());
+        }
 
         questionRepository.save(question);
     }
@@ -510,18 +517,8 @@ public class QuizServiceImpl implements QuizService {
     @Transactional
     public void deleteQuestion(String quizId, String questionId) {
         log.info("deleteQuestion: quizId={}, questionId={}", quizId, questionId);
-        UUID quizUuid = parseUuid(quizId, "quizId");
-        quizRepository.findById(quizUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
-
-        Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
-
-        if (question.getQuiz() == null || !question.getQuiz().getQuizId().equals(quizUuid)) {
-            throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
-        }
-
-        questionRepository.delete(question);
+        // Questions live in the bank and may be shared, so removing one from a quiz only drops the link
+        unlinkQuestionFromQuiz(quizId, questionId);
     }
 
     // ==================== Import ====================
@@ -532,10 +529,11 @@ public class QuizServiceImpl implements QuizService {
      * <p>CSV format (header required):
      * <pre>title,contextId,level,questionType,questionContent,option1..option6,correctAnswer,caseSensitive,trimWhitespace,explanation</pre>
      * Required columns: title, contextId, level, questionContent. questionType defaults to
-     * MULTIPLE_CHOICE, so the legacy 4-option format still imports unchanged.
+     * MULTIPLE_CHOICE, so the legacy 4-option format still imports unchanged. {@code level} is
+     * each question's own difficulty.
      *
      * <p>Rows sharing the same {@code title} are grouped into one quiz and may mix question
-     * types, but must share contextId and level (difficulty belongs to the quiz).
+     * types and difficulties, but must share contextId.
      * A single {@code @Transactional} session is used for the entire call so that
      * all repository calls share the same Hibernate session and configured DB schema.
      * Per-quiz isolation is handled by the try/catch in the processing loop.
@@ -623,17 +621,6 @@ public class QuizServiceImpl implements QuizService {
                     + QUIZ_TITLE_MAX_LENGTH + " ký tự");
         }
 
-        // Difficulty belongs to the quiz, so every row must declare the same level
-        QuizLevel level = parseRowLevel(first);
-        for (CSVRecord row : rows.subList(1, rows.size())) {
-            QuizLevel rowLevel = parseRowLevel(row);
-            if (rowLevel != level) {
-                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": level '" + rowLevel.name()
-                        + "' khác với level '" + level.name() + "' của các câu trước trong quiz '" + title
-                        + "'. Độ khó được tính cho cả quiz — hãy tách câu này sang quiz khác hoặc sửa level cho giống nhau");
-            }
-        }
-
         String contextIdStr = first.get("contextId").trim();
         for (CSVRecord row : rows.subList(1, rows.size())) {
             if (!contextIdStr.equals(row.get("contextId").trim())) {
@@ -673,31 +660,21 @@ public class QuizServiceImpl implements QuizService {
         // Build and save the Quiz entity (draft by default)
         Quiz quiz = Quiz.builder()
                 .title(title)
-                .level(level)
                 .historicalContext(context)
                 .createdBy(user)
                 .isPublished(false)
                 .build();
         quiz = quizRepository.save(quiz);
 
+        int orderIndex = 0;
         for (QuestionRequest request : questionRequests) {
-            questionRepository.save(buildQuestion(request, quiz));
+            linkQuestion(quiz, questionRepository.save(buildQuestion(request)), orderIndex++);
         }
 
-        // Reload to populate questions list
-        quiz = quizRepository.findById(quiz.getQuizId()).orElseThrow();
         return mapToStaffResponse(quiz);
     }
 
     // ==================== Private Helpers ====================
-
-    private QuizLevel parseRowLevel(CSVRecord row) {
-        try {
-            return parseLevel(row.get("level").trim());
-        } catch (InvalidRequestException e) {
-            throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
-        }
-    }
 
     /**
      * Re-validates the (type, data) pair a partial update would leave on the question,
@@ -716,15 +693,26 @@ public class QuizServiceImpl implements QuizService {
         questionDataValidator.validate(effectiveType, effectiveData);
     }
 
-    private Question buildQuestion(QuestionRequest request, Quiz quiz) {
+    private void linkQuestion(Quiz quiz, Question question, int orderIndex) {
+        quizQuestionRepository.save(QuizQuestion.builder()
+                .quiz(quiz)
+                .question(question)
+                .orderIndex(orderIndex)
+                .build());
+    }
+
+    private Question buildQuestion(QuestionRequest request) {
+        if (request.getDifficulty() == null) {
+            throw new InvalidRequestException("Yêu cầu độ khó (difficulty)");
+        }
         QuestionType type = request.getQuestionType() != null
                 ? request.getQuestionType() : QuestionType.MULTIPLE_CHOICE;
         questionDataValidator.validate(type, request.getQuestionData());
         return Question.builder()
-                .quiz(quiz)
                 .content(request.getContent())
                 .explanation(request.getExplanation())
                 .questionType(type)
+                .difficulty(request.getDifficulty())
                 .questionData(serializeJsonNode(request.getQuestionData()))
                 .build();
     }
@@ -734,7 +722,6 @@ public class QuizServiceImpl implements QuizService {
         return QuizCustomerResponse.builder()
                 .quizId(quiz.getQuizId().toString())
                 .title(quiz.getTitle())
-                .level(quiz.getLevel() != null ? quiz.getLevel().name() : null)
                 .era(ctx != null && ctx.getEra() != null ? ctx.getEra().name() : null)
                 .playCount((int) playCount)
                 .contextTitle(ctx != null ? ctx.getName() : null)
@@ -776,7 +763,6 @@ public class QuizServiceImpl implements QuizService {
                 .quizId(quiz.getQuizId().toString())
                 .title(quiz.getTitle())
                 .era(ctx != null && ctx.getEra() != null ? ctx.getEra().name() : null)
-                .level(quiz.getLevel() != null ? quiz.getLevel().name() : null)
                 .playCount((int) playCount)
                 .contextId(ctx != null ? ctx.getContextId().toString() : null)
                 .contextTitle(ctx != null ? ctx.getName() : null)
@@ -813,6 +799,7 @@ public class QuizServiceImpl implements QuizService {
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .difficulty(q.getDifficulty())
                 .questionData(sanitizeQuestionDataForLearner(q))
                 .explanation(q.getExplanation())
                 .build();
@@ -823,6 +810,7 @@ public class QuizServiceImpl implements QuizService {
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .difficulty(q.getDifficulty())
                 .questionData(deserializeJsonNode(q.getQuestionData()))
                 .explanation(q.getExplanation())
                 .build();
@@ -865,14 +853,15 @@ public class QuizServiceImpl implements QuizService {
         };
     }
 
-    private QuestionBankResponse mapToBankResponse(Question q) {
+    private QuestionBankResponse mapToBankResponse(Question q, boolean assignedToQuiz) {
         return QuestionBankResponse.builder()
                 .questionId(q.getQuestionId().toString())
                 .content(q.getContent())
                 .explanation(q.getExplanation())
                 .questionType(q.getQuestionType() != null ? q.getQuestionType() : QuestionType.MULTIPLE_CHOICE)
+                .difficulty(q.getDifficulty())
                 .questionData(deserializeJsonNode(q.getQuestionData()))
-                .assignedToQuiz(q.getQuiz() != null)
+                .assignedToQuiz(assignedToQuiz)
                 .build();
     }
 
@@ -1030,7 +1019,8 @@ public class QuizServiceImpl implements QuizService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<QuestionBankResponse> getQuestionBank(String questionType, String search, Pageable pageable) {
+    public PaginatedResponse<QuestionBankResponse> getQuestionBank(String questionType, String difficulty,
+                                                                   String search, Pageable pageable) {
         QuestionType typeEnum = null;
         if (questionType != null && !questionType.isBlank()) {
             try {
@@ -1039,17 +1029,24 @@ public class QuizServiceImpl implements QuizService {
                 throw new InvalidRequestException("Loại câu hỏi không hợp lệ: " + questionType);
             }
         }
-        Page<Question> page = questionRepository.findAllForBank(typeEnum, normalize(search), pageable);
-        return toPaginatedResponse(page.map(this::mapToBankResponse));
+        Page<Question> page = questionRepository.findAllForBank(
+                typeEnum, parseDifficulty(difficulty), normalize(search), pageable);
+        if (page.isEmpty()) {
+            return toPaginatedResponse(page.map(q -> mapToBankResponse(q, false)));
+        }
+        // One lookup for the whole page; links to soft-deleted quizzes do not count
+        Set<UUID> linked = quizQuestionRepository.findActivelyLinkedQuestionIds(
+                page.getContent().stream().map(Question::getQuestionId).toList());
+        return toPaginatedResponse(page.map(q -> mapToBankResponse(q, linked.contains(q.getQuestionId()))));
     }
 
     @Override
     @Transactional
     public QuestionBankResponse createBankQuestion(QuestionRequest request) {
         log.info("createBankQuestion: type={}", request.getQuestionType());
-        Question question = buildQuestion(request, null);
+        Question question = buildQuestion(request);
         question = questionRepository.save(question);
-        return mapToBankResponse(question);
+        return mapToBankResponse(question, false);
     }
 
     @Override
@@ -1074,8 +1071,12 @@ public class QuizServiceImpl implements QuizService {
         if (request.getQuestionData() != null) {
             question.setQuestionData(serializeJsonNode(request.getQuestionData()));
         }
+        if (request.getDifficulty() != null) {
+            question.setDifficulty(request.getDifficulty());
+        }
         question = questionRepository.save(question);
-        return mapToBankResponse(question);
+        UUID id = question.getQuestionId();
+        return mapToBankResponse(question, quizQuestionRepository.findActivelyLinkedQuestionIds(List.of(id)).contains(id));
     }
 
     @Override
@@ -1160,14 +1161,12 @@ public class QuizServiceImpl implements QuizService {
         }
     }
 
-    private QuizLevel parseLevel(String level) {
-        if (level == null || level.isBlank()) {
-            throw new InvalidRequestException("Yêu cầu cấp độ (Level)");
-        }
+    private QuestionDifficulty parseDifficulty(String difficulty) {
+        if (difficulty == null || difficulty.isBlank()) return null;
         try {
-            return QuizLevel.valueOf(level.toUpperCase());
+            return QuestionDifficulty.valueOf(difficulty.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Giá trị cấp độ (level) không hợp lệ: " + level + ". Giá trị hợp lệ: EASY, MEDIUM, HARD");
+            throw new InvalidRequestException("Giá trị độ khó (difficulty) không hợp lệ: " + difficulty + ". Giá trị hợp lệ: EASY, MEDIUM, HARD");
         }
     }
 }

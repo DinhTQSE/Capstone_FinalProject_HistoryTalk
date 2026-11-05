@@ -70,7 +70,7 @@ Structured into **7 core feature subsystems**, each containing a **Class Diagram
 - **5.1 Five-Group Technology & AI Usage Declaration** (Third-party services, Development stack with versions, Source Control & CI/CD, Deployment environments & rollback, AI tools across project stages).
 - **5.2 AI / LLM / RAG Technical Specification (5 Mandatory Review 2 Items)**:
   - `arch_ai_rag_pipeline.puml` / `.png`: Detailed RAG Ingestion & Retrieval-Reranking-Generation Pipeline Diagram.
-  - Models & Versions (`Gemma-2-9B-IT` / OpenAI-compatible LLM, `BAAI/bge-m3` 768-D embeddings, Cross-Encoder Reranker, `Tess4J 5.10.0` Vietnamese OCR).
+  - Models & Versions (`Gemma-2-9B-IT` / OpenAI-compatible LLM, `BAAI/bge-m3` 1024-D embeddings, Cross-Encoder Reranker, `Tess4J 5.10.0` Vietnamese OCR).
   - Pipeline specification (Dynamic 80th-percentile semantic chunking, Supabase PgVector HNSW `m=16, ef_construction=64`, Top-10 hybrid retrieval $\rightarrow$ Kaggle Reranker $\rightarrow$ 1st-person persona prompt with 30% Socratic reverse-questioning).
   - Evaluation Metrics & Thresholds (TTFT $< 1.5\text{s}$, Faithfulness / Groundedness, Historical Fact Accuracy, Context Recall).
   - Fallback & Guardrail Mechanisms (Reranker fallback to Top-2 cosine chunks, Ollama `/api/embeddings` $\leftrightarrow$ `/api/embed` retry with exponential backoff, strict "Sử sách không ghi chép" anti-hallucination guardrail, PayOS reconciliation scheduler).

@@ -112,7 +112,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     @Query(value = """
             SELECT CAST(q.quiz_id AS text) AS "quizId",
                    q.title AS title,
-                   q.level AS level,
+                   CAST(NULL AS varchar) AS level,
                    COUNT(qs.session_id) AS "startedSessions",
                    COUNT(qs.session_id) FILTER (WHERE qs.end_time IS NOT NULL) AS "completedSessions",
                    COALESCE(AVG(
@@ -125,10 +125,11 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
                    ), 0.0) AS "averageScorePercentage"
             FROM quiz q
             LEFT JOIN (
-                SELECT quiz_id, COUNT(*) AS question_count
-                FROM question
-                WHERE deleted_at IS NULL
-                GROUP BY quiz_id
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
             ) qc ON qc.quiz_id = q.quiz_id
             LEFT JOIN quiz_session qs
               ON qs.quiz_id = q.quiz_id
@@ -136,7 +137,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
              AND qs.created_at >= :from
              AND qs.created_at < :to
             WHERE q.deleted_at IS NULL
-            GROUP BY q.quiz_id, q.title, q.level
+            GROUP BY q.quiz_id, q.title
             ORDER BY "completedSessions" DESC, "startedSessions" DESC, q.title ASC
             LIMIT :limit
             """, nativeQuery = true)

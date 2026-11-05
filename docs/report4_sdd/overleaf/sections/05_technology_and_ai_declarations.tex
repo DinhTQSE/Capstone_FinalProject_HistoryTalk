@@ -28,7 +28,7 @@ Table~\ref{tab:tech_declaration} declares all third-party services, development 
 \cline{2-3}
 & Kaggle Cross-Encoder Reranker API & Purpose: Reranks candidate vector chunks by semantic relevance to the learner's query.\newline Data Exchanged: User historical question and candidate chunk texts. \\
 \cline{2-3}
-& Supabase PgVector Cloud (supabase-py) & Purpose: Hosted vector database storing 768-D embeddings and executing cosine similarity searches.\newline Data Exchanged: Document chunk texts, 768-D float vectors, and entity UUID filters. \\
+& Supabase PgVector Cloud (supabase-py) & Purpose: Hosted vector database storing 1024-D embeddings and executing cosine similarity searches.\newline Data Exchanged: Document chunk texts, 1024-D float vectors, and entity UUID filters. \\
 \hline
 
 \multirow{5}{2.9cm}{\textbf{2. Development Technologies}}
@@ -95,7 +95,7 @@ Because HistoryTalk incorporates Conversational AI and Retrieval-Augmented Gener
 
 2 & Models \& Versions &
 $\bullet$ Primary Roleplay \& Title LLM: Gemma-2-9B-IT (hosted via Ollama with num\_ctx=8192, temperature=0.3, repeat\_penalty=1.15) and configurable External OpenAI-Compatible API (LLM\_PROVIDER=\ab ollama|external in settings.py).\newline
-$\bullet$ Dense Embedding Model: BAAI/bge-m3 (768-dimensional multilingual dense embeddings optimized for Vietnamese historical terminology).\newline
+$\bullet$ Dense Embedding Model: BAAI/bge-m3 (1024-dimensional multilingual dense embeddings optimized for Vietnamese historical terminology).\newline
 $\bullet$ Cross-Encoder Reranker: Hosted Kaggle Cross-Encoder Reranker (/api/rerank) scoring query--passage pairs.\newline
 $\bullet$ Document OCR Model: Tesseract 5 / Tess4J with Vietnamese language pack (vie.traineddata). \\
 \hline
@@ -103,7 +103,7 @@ $\bullet$ Document OCR Model: Tesseract 5 / Tess4J with Vietnamese language pack
 3 & End-to-End RAG Pipeline &
 $\bullet$ Step 1 -- Hybrid Extraction: PdfType\ab Classifier inspects uploaded PDFs; digital PDFs are extracted via Apache PDFBox, whereas scanned archival PDFs are routed to OcrServiceImpl (Tess4J).\newline
 $\bullet$ Step 2 -- Dynamic Semantic Chunking (\_semantic\_\ab chunking): Splits text into sentences, computes bge-m3 embeddings, calculates cosine distances between adjacent sentences, and splits chunks dynamically at the 80th percentile distance threshold ($\ge 0.35$) or max\_chunk\_\ab chars = 1200.\newline
-$\bullet$ Step 3 -- Vector Indexing: Generates 768-D embeddings and batch-inserts into vector\_chunk indexed with PgVector HNSW (m = 16, ef\_\ab construction = 64).\newline
+$\bullet$ Step 3 -- Vector Indexing: Generates 1024-D embeddings and batch-inserts into vector\_chunk indexed with PgVector HNSW (m = 16, ef\_\ab construction = 64).\newline
 $\bullet$ Step 4 -- Filtered Retrieval \& Reranking (retrieve\_\ab history\_\ab context): Embeds the user query, performs vector similarity search in Supabase PgVector (filtered by characterId, contextId, and linked context/event UUIDs), and reranks the top candidate chunks via the Kaggle Reranker API.\newline
 $\bullet$ Step 5 -- Grounded Persona Prompting \& Socratic Dialogue: Injects retrieved passages into build\_chat\_\ab system\_prompt, enforces first-person Vietnamese pronouns (\vn{\textit{Ta, Trẫm, Tôi}}), applies a 30\% probability Socratic reverse-questioning directive on follow-up turns, streams tokens via SSE, and generates 3 suggested follow-up questions. \\
 \hline

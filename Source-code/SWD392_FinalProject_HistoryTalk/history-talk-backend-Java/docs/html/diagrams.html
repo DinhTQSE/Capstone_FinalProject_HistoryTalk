@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HistoryTalk SRS Diagrams</title>
+<style>
+  :root { --bg: #f5f5f5; --panel: #ffffff; --ink: #000000; --muted: #555555; --line: #d4d4d4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--ink); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header a { color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; padding: 24px; }
+  nav { position: sticky; top: 72px; align-self: start; background: var(--panel); border: 1px solid var(--line); padding: 12px; font-size: 13px; }
+  nav h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 12px 0 6px; }
+  nav h3:first-child { margin-top: 0; }
+  nav a { display: block; color: var(--ink); text-decoration: none; padding: 4px 6px; }
+  nav a:hover { background: #eeeeee; }
+  section.diagram { background: var(--panel); border: 1px solid var(--line); padding: 16px 20px 20px; margin-bottom: 28px; scroll-margin-top: 80px; }
+  .dhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .dhead h2 { font-size: 17px; margin: 0; }
+  .ref { color: var(--muted); font-size: 13px; }
+  .desc { color: var(--muted); font-size: 13px; margin: 6px 0 12px; }
+  .tools button { font: inherit; font-size: 12px; border: 1px solid #999; background: #fff; padding: 4px 10px; cursor: pointer; margin-left: 6px; }
+  .tools button:hover { background: #eee; }
+  .canvas { overflow: auto; border: 1px solid var(--line); background: #fff; padding: 8px; }
+  .canvas svg { display: block; margin: 0 auto; }
+  .err { color: #b91c1c; white-space: pre-wrap; font-family: Consolas, monospace; font-size: 12px; }
+  .caption { text-align: center; font-size: 14px; margin-top: 10px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { position: static; } }
+  @media print { header, nav, .tools { display: none; } .layout { display: block; padding: 0; } section.diagram { break-inside: avoid; border: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>HistoryTalk – SRS Diagrams</h1>
+  <a href="index.html">← Index</a>
+  <a href="screens.html">Screens (wireframes) →</a>
+</header>
+<div class="layout">
+  <nav id="toc"></nav>
+  <main id="diagrams"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<script>
+// ─────────────────────────── Basics ───────────────────────────
+const FONT = "Arial, Helvetica, sans-serif";
+const PAL = {                       // solid draw.io palette: [fill, stroke]
+  blue:   ["#dae8fc", "#6c8ebf"],
+  green:  ["#d5e8d4", "#82b366"],
+  yellow: ["#fff2cc", "#d6b656"],
+  red:    ["#f8cecc", "#b85450"],
+  purple: ["#e1d5e7", "#9673a6"],
+  orange: ["#ffe6cc", "#d79b00"],
+  grey:   ["#f5f5f5", "#666666"],
+  white:  ["#ffffff", "#000000"]
+};
+const ROLE = { pub: "white", cus: "blue", tea: "green", sa: "orange", ca: "purple", sys: "red" };
+
+const mctx = document.createElement("canvas").getContext("2d");
+const tw = (t, size = 14, bold = false) => { mctx.font = `${bold ? "bold " : ""}${size}px ${FONT}`; return mctx.measureText(t).width; };
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const r1 = n => Math.round(n * 10) / 10;
+
+function T(x, y, s, { size = 14, bold = false, anchor = "middle", fill = "#000" } = {}) {
+  return `<text x="${r1(x)}" y="${r1(y)}" font-family="${FONT}" font-size="${size}"${bold ? ' font-weight="bold"' : ""} text-anchor="${anchor}" dominant-baseline="central" fill="${fill}">${esc(s)}</text>`;
+}
+function labelBox(cx, cy, lines, size = 13) {     // solid white box behind edge labels
+  const w = Math.max(...lines.map(l => tw(l, size))) + 8, lh = size + 3, h = lines.length * lh + 4;
+  let s = `<rect x="${r1(cx - w / 2)}" y="${r1(cy - h / 2)}" width="${r1(w)}" height="${r1(h)}" fill="#ffffff"/>`;
+  lines.forEach((l, i) => { s += T(cx, cy - h / 2 + 2 + lh * i + lh / 2, l, { size }); });
+  return s;
+}
+function wrap(text, max) {
+  const words = text.split(" "), out = []; let cur = "";
+  for (const w of words) { if ((cur + " " + w).trim().length > max && cur) { out.push(cur); cur = w; } else cur = (cur + " " + w).trim(); }
+  if (cur) out.push(cur);
+  return out;
+}
+const DEFS = `<defs>
+  <marker id="arr" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,1 L11,6 L0,11 z" fill="#000"/></marker>
+  <marker id="open" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1,1 L11,6 L1,11" fill="none" stroke="#000" stroke-width="1.5"/></marker>
+  <marker id="gen" viewBox="0 0 18 18" refX="17" refY="9" markerWidth="18" markerHeight="18" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L17,9 L1,17 z" fill="#ffffff" stroke="#000" stroke-width="1.5"/></marker>
+  <marker id="erMany" viewBox="-26 -10 28 20" refX="0" refY="0" markerWidth="28" markerHeight="20" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,-8 L-14,0 L0,8 M-14,0 L0,0" fill="none" stroke="#000" stroke-width="1.5"/><circle cx="-19" cy="0" r="4" fill="#ffffff" stroke="#000" stroke-width="1.5"/></marker>
+  <marker id="erOne" viewBox="-26 -10 28 20" refX="0" refY="0" markerWidth="28" markerHeight="20" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M-6,-8 L-6,8 M-11,-8 L-11,8" fill="none" stroke="#000" stroke-width="1.5"/></marker>
+  <marker id="erZeroOne" viewBox="-26 -10 28 20" refX="0" refY="0" markerWidth="28" markerHeight="20" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M-6,-8 L-6,8" fill="none" stroke="#000" stroke-width="1.5"/><circle cx="-15" cy="0" r="4" fill="#ffffff" stroke="#000" stroke-width="1.5"/></marker>
+</defs>`;
+const svgWrap = (w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w)}" height="${Math.ceil(h)}" viewBox="0 0 ${Math.ceil(w)} ${Math.ceil(h)}">${DEFS}<rect width="100%" height="100%" fill="#ffffff"/>${body}</svg>`;
+const pathOf = pts => "M" + pts.map(p => `${r1(p.x)},${r1(p.y)}`).join(" L");
+
+const elk = new ELK();
+
+// ─────────────────────────── Use case diagram ───────────────────────────
+function actorSize(a) {
+  const lines = a.name.split("\n");
+  if (a.system) return { w: Math.max(...lines.map(l => tw(l, 14, true))) + 30, h: 30 + lines.length * 18, lines };
+  return { w: Math.max(80, ...lines.map(l => tw(l, 14, true)) ) + 10, h: 66 + lines.length * 18, lines };
+}
+async function renderUseCase(spec) {
+  const ucLines = spec.ucs.map(u => wrap(u.name, 24));
+  const OW = Math.max(...ucLines.flat().map(l => tw(l, 14))) + 56;
+  const ucNodes = spec.ucs.map((u, i) => ({ id: u.id, width: OW, height: Math.max(48, ucLines[i].length * 18 + 22) }));
+  const actorNodes = spec.actors.map(a => { const s = actorSize(a); return { id: a.id, width: s.w, height: s.h }; });
+  const elkEdges = [];
+  spec.assoc.forEach(([a, u], i) => {
+    const act = spec.actors.find(x => x.id === a);
+    elkEdges.push(act.side === "R" ? { id: "as" + i, sources: [u], targets: [a] } : { id: "as" + i, sources: [a], targets: [u] });
+  });
+  (spec.rel || []).forEach(([f, t], i) => elkEdges.push({ id: "rl" + i, sources: [f], targets: [t] }));
+  const graph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered", "elk.direction": "RIGHT", "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+      "elk.edgeRouting": "POLYLINE", "elk.layered.spacing.nodeNodeBetweenLayers": "150", "elk.spacing.nodeNode": "22",
+      "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES", "elk.layered.crossingMinimization.forceNodeModelOrder": "true", "elk.padding": "[top=20,left=20,bottom=20,right=20]"
+    },
+    children: [
+      ...actorNodes.filter(n => spec.actors.find(a => a.id === n.id).side !== "R"),
+      { id: "boundary", layoutOptions: { "elk.padding": "[top=56,left=50,bottom=30,right=50]", "elk.layered.spacing.nodeNodeBetweenLayers": "130", "elk.spacing.nodeNode": "26", "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES", "elk.layered.crossingMinimization.forceNodeModelOrder": "true" }, children: ucNodes },
+      ...actorNodes.filter(n => spec.actors.find(a => a.id === n.id).side === "R")
+    ],
+    edges: elkEdges
+  };
+  const res = await elk.layout(graph);
+  const pos = {};
+  (function walk(n, ox, oy) { for (const c of n.children || []) { pos[c.id] = { x: ox + c.x, y: oy + c.y, w: c.width, h: c.height }; walk(c, ox + c.x, oy + c.y); } })(res, 0, 0);
+
+  const ovalPoint = (id, toward) => {
+    const p = pos[id], cx = p.x + p.w / 2, cy = p.y + p.h / 2, rx = p.w / 2, ry = p.h / 2;
+    const dx = toward.x - cx, dy = toward.y - cy, t = 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+    return { x: cx + dx * t, y: cy + dy * t };
+  };
+  const actorAnchor = (a, side) => {
+    const p = pos[a.id];
+    if (a.system) return { x: side === "R" ? p.x : p.x + p.w, y: p.y + p.h / 2 };
+    return { x: p.x + p.w / 2 + (side === "R" ? -20 : 20), y: p.y + 30 };
+  };
+  let lines = "", shapes = "", labels = "";
+  const b = pos.boundary;
+  shapes += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#ffffff" stroke="#000" stroke-width="1.5"/>`;
+  shapes += T(b.x + b.w / 2, b.y + 26, spec.boundary, { size: 16, bold: true });
+
+  spec.assoc.forEach(([aid, uid]) => {
+    const a = spec.actors.find(x => x.id === aid);
+    const from = actorAnchor(a, a.side);
+    const o = pos[uid];
+    const to = { x: a.side === "R" ? o.x + o.w : o.x, y: o.y + o.h / 2 };
+    lines += `<path d="${pathOf([from, to])}" fill="none" stroke="#000" stroke-width="1.3"/>`;
+  });
+  (spec.rel || []).forEach(([f, t, kind]) => {
+    const pf = pos[f], pt = pos[t];
+    const cf = { x: pf.x + pf.w / 2, y: pf.y + pf.h / 2 }, ct = { x: pt.x + pt.w / 2, y: pt.y + pt.h / 2 };
+    const a = ovalPoint(f, ct), z = ovalPoint(t, cf);
+    lines += `<path d="${pathOf([a, z])}" fill="none" stroke="#000" stroke-width="1.3" stroke-dasharray="7 5" marker-end="url(#open)"/>`;
+    const len = Math.hypot(z.x - a.x, z.y - a.y) || 1, nx = -(z.y - a.y) / len, ny = (z.x - a.x) / len, sgn = ny > 0 ? -1 : 1;
+    labels += labelBox((a.x + z.x) / 2 + nx * 14 * sgn, (a.y + z.y) / 2 + ny * 14 * sgn, [`«${kind}»`]);
+  });
+  (spec.gen || []).forEach(([child, parent]) => {
+    const c = pos[child], p = pos[parent];
+    const from = { x: c.x + c.w / 2, y: c.y }, to = { x: p.x + p.w / 2, y: p.y + p.h + 2 };
+    lines += `<path d="${pathOf([from, to])}" fill="none" stroke="#000" stroke-width="1.5" marker-end="url(#gen)"/>`;
+  });
+  spec.ucs.forEach((u, i) => {
+    const p = pos[u.id];
+    shapes += `<ellipse cx="${r1(p.x + p.w / 2)}" cy="${r1(p.y + p.h / 2)}" rx="${r1(p.w / 2)}" ry="${r1(p.h / 2)}" fill="#ffffff" stroke="#000" stroke-width="1.5"/>`;
+    ucLines[i].forEach((l, k) => shapes += T(p.x + p.w / 2, p.y + p.h / 2 + (k - (ucLines[i].length - 1) / 2) * 18, l, { size: 14 }));
+  });
+  spec.actors.forEach(a => {
+    const p = pos[a.id], s = actorSize(a), cx = p.x + p.w / 2;
+    if (a.system) {
+      shapes += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="#ffffff" stroke="#000" stroke-width="1.5"/>`;
+      shapes += T(cx, p.y + 14, "«system»", { size: 12 });
+      s.lines.forEach((l, k) => shapes += T(cx, p.y + 34 + k * 18, l, { size: 14, bold: true }));
+    } else {
+      const y = p.y;
+      shapes += `<g fill="#ffffff" stroke="#000" stroke-width="2"><circle cx="${cx}" cy="${y + 10}" r="9"/><path d="M${cx},${y + 19} L${cx},${y + 42} M${cx - 17},${y + 27} L${cx + 17},${y + 27} M${cx},${y + 42} L${cx - 14},${y + 60} M${cx},${y + 42} L${cx + 14},${y + 60}" fill="none"/></g>`;
+      const nw = Math.max(...s.lines.map(l => tw(l, 14, true))) + 8;
+      labels += `<rect x="${r1(cx - nw / 2)}" y="${y + 64}" width="${r1(nw)}" height="${s.lines.length * 18 + 4}" fill="#ffffff"/>`;
+      s.lines.forEach((l, k) => labels += T(cx, y + 75 + k * 18, l, { size: 14, bold: true }));
+    }
+  });
+  return svgWrap(res.width, res.height, shapes + lines + labels);
+}
+
+// ─────────────────────────── Screens flow ───────────────────────────
+async function renderFlow(spec) {
+  const nodes = spec.nodes.map(n => {
+    const lines = [n.sid, n.name];
+    const w = Math.max(tw(n.sid, 14, true), tw(n.name, 14), n.tabs ? tw("Tabs: " + n.tabs, 12) : 0) + (n.pop ? 60 : 30);
+    const h = n.pop ? 64 : (n.tabs ? 74 : 54);
+    return { id: n.id, width: Math.max(w, 150), height: h };
+  });
+  const edges = spec.edges.map(([s, t, lab], i) => {
+    const e = { id: "e" + i, sources: [s], targets: [t] };
+    if (lab) e.labels = [{ text: lab, width: tw(lab, 13) + 10, height: 20 }];
+    return e;
+  });
+  const res = await elk.layout({
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered", "elk.direction": spec.dir || "RIGHT", "elk.edgeRouting": "ORTHOGONAL",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "70", "elk.spacing.nodeNode": "26", "elk.spacing.edgeNode": "20",
+      "elk.spacing.edgeEdge": "14", "elk.layered.spacing.edgeNodeBetweenLayers": "20", "elk.layered.spacing.edgeEdgeBetweenLayers": "14",
+      "elk.edgeLabels.placement": "CENTER", "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX", "elk.padding": "[top=24,left=24,bottom=24,right=24]"
+    },
+    children: nodes, edges
+  });
+  let es = "", ns = "", ls = "";
+  for (const e of res.edges) {
+    for (const sct of e.sections || []) {
+      const pts = [sct.startPoint, ...(sct.bendPoints || []), sct.endPoint];
+      es += `<path d="${pathOf(pts)}" fill="none" stroke="#000" stroke-width="1.5" marker-end="url(#arr)"/>`;
+    }
+    for (const l of e.labels || []) ls += labelBox(l.x + l.width / 2, l.y + l.height / 2, [l.text]);
+  }
+  for (const c of res.children) {
+    const n = spec.nodes.find(x => x.id === c.id);
+    const [fill, stroke] = PAL[ROLE[n.r]];
+    const cx = c.x + c.width / 2;
+    if (n.pop) {
+      ns += `<ellipse cx="${r1(cx)}" cy="${r1(c.y + c.height / 2)}" rx="${r1(c.width / 2)}" ry="${r1(c.height / 2)}" fill="${fill}" stroke="${stroke === "#000000" ? "#000" : stroke}" stroke-width="2"/>`;
+      ns += T(cx, c.y + c.height / 2 - 9, n.sid, { size: 14, bold: true });
+      ns += T(cx, c.y + c.height / 2 + 10, n.name, { size: 14 });
+    } else {
+      ns += `<rect x="${r1(c.x)}" y="${r1(c.y)}" width="${r1(c.width)}" height="${r1(c.height)}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
+      let y = c.y + 17;
+      if (n.tabs) {
+        for (let k = 0; k < 3; k++) ns += `<path d="M${r1(c.x + 8 + k * 30)},${r1(c.y + 14)} L${r1(c.x + 11 + k * 30)},${r1(c.y + 5)} L${r1(c.x + 33 + k * 30)},${r1(c.y + 5)} L${r1(c.x + 36 + k * 30)},${r1(c.y + 14)}" fill="#ffffff" stroke="${stroke}" stroke-width="1.2"/>`;
+        y += 10;
+      }
+      ns += T(cx, y, n.sid, { size: 14, bold: true });
+      ns += T(cx, y + 19, n.name, { size: 14 });
+      if (n.tabs) ns += T(cx, y + 37, "Tabs: " + n.tabs, { size: 12, fill: "#333" });
+    }
+  }
+  return svgWrap(res.width, res.height, es + ns + ls);
+}
+
+// ─────────────────────────── ERD ───────────────────────────
+async function renderERD(spec) {
+  const HEAD = 32, ROWH = 19;
+  const nodes = spec.entities.map(e => {
+    const w = Math.max(tw(e.name, 15, true), ...e.attrs.map(a => tw(a, 13))) + 28;
+    return { id: e.name, width: Math.max(170, w), height: HEAD + e.attrs.length * ROWH + 10 };
+  });
+  const edges = spec.rels.map(([a, b], i) => ({ id: "r" + i, sources: [a], targets: [b] }));
+  const res = await elk.layout({
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered", "elk.direction": spec.dir || "DOWN", "elk.edgeRouting": "ORTHOGONAL",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "80", "elk.spacing.nodeNode": "50", "elk.spacing.edgeNode": "28",
+      "elk.spacing.edgeEdge": "16", "elk.layered.spacing.edgeNodeBetweenLayers": "28", "elk.layered.spacing.edgeEdgeBetweenLayers": "16",
+      "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES", "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.padding": "[top=30,left=30,bottom=30,right=30]"
+    },
+    children: nodes, edges
+  });
+  const MK = { one: "erOne", zeroOne: "erZeroOne", many: "erMany" };
+  let es = "", ns = "";
+  res.edges.forEach((e, i) => {
+    const [, , ca, cb] = spec.rels[i];
+    for (const sct of e.sections || []) {
+      const pts = [sct.startPoint, ...(sct.bendPoints || []), sct.endPoint];
+      es += `<path d="${pathOf(pts)}" fill="none" stroke="#000" stroke-width="1.5" marker-start="url(#${MK[ca]})" marker-end="url(#${MK[cb]})"/>`;
+    }
+  });
+  for (const c of res.children) {
+    const e = spec.entities.find(x => x.name === c.id);
+    const [fill, stroke] = PAL[e.color];
+    ns += `<rect x="${r1(c.x)}" y="${r1(c.y)}" width="${r1(c.width)}" height="${r1(c.height)}" fill="#ffffff" stroke="${stroke}" stroke-width="1.8"/>`;
+    ns += `<rect x="${r1(c.x)}" y="${r1(c.y)}" width="${r1(c.width)}" height="${HEAD}" fill="${fill}" stroke="${stroke}" stroke-width="1.8"/>`;
+    ns += T(c.x + c.width / 2, c.y + HEAD / 2, e.name, { size: 15, bold: true });
+    e.attrs.forEach((a, k) => {
+      const key = /\((PK|FK|PK, FK)\)$/.test(a);
+      ns += T(c.x + 12, c.y + HEAD + 8 + k * ROWH + ROWH / 2, a, { size: 13, anchor: "start", bold: /\(PK/.test(a) });
+    });
+  }
+  return svgWrap(res.width, res.height, es + ns);
+}
+
+// ─────────────────────────── Diagram data ───────────────────────────
+const UC_DIAGRAMS = {
+  uc1: {
+    boundary: "HistoryTalk System",
+    actors: [
+      { id: "L", name: "Learner\n(Customer /\nSchool Student)", side: "L" },
+      { id: "GG", name: "Google Identity", side: "R", system: true },
+      { id: "EM", name: "Email Service", side: "R", system: true },
+      { id: "AI", name: "AI Service", side: "R", system: true }
+    ],
+    ucs: [
+      ["UC01", "UC-01 Log In"], ["UC02", "UC-02 Register Account"], ["UC03", "UC-03 Reset Password"], ["UC04", "UC-04 Change Password"],
+      ["UC05", "UC-05 Update Profile"], ["UC06", "UC-06 Log Out"], ["UC08", "UC-08 View Historical Contexts"], ["UC09", "UC-09 View Characters"],
+      ["UC10", "UC-10 Explore Historical Map"], ["UC11", "UC-11 Chat with Historical Character"], ["UC12", "UC-12 View Chat History"],
+      ["UC13", "UC-13 Take Quiz"], ["UC14", "UC-14 Rate Quiz and Report Question"], ["UC15", "UC-15 View Quiz Results"],
+      ["UC16", "UC-16 Claim Daily Rewards"], ["UC17", "UC-17 View Learning Dashboard"]
+    ].map(([id, name]) => ({ id, name })),
+    assoc: [
+      ...["UC01","UC02","UC03","UC04","UC05","UC06","UC08","UC09","UC10","UC11","UC12","UC13","UC14","UC15","UC16","UC17"].map(u => ["L", u]),
+      ["GG", "UC01"], ["EM", "UC03"], ["AI", "UC11"]
+    ]
+  },
+  uc2: {
+    boundary: "HistoryTalk System",
+    actors: [
+      { id: "S", name: "School Student", side: "L" },
+      { id: "C", name: "Customer", side: "L" },
+      { id: "P", name: "PayOS Gateway", side: "R", system: true }
+    ],
+    ucs: [
+      ["UC18", "UC-18 View My Classes"], ["UC19", "UC-19 Complete Assignment"], ["UC20", "UC-20 Request Extra Tokens"],
+      ["UC21", "UC-21 Purchase Subscription Package"], ["UC22", "UC-22 View Payment History"], ["UC07", "UC-07 Deactivate Own Account"],
+      ["UC11", "UC-11 Chat with Historical Character"], ["UC13", "UC-13 Take Quiz"]
+    ].map(([id, name]) => ({ id, name })),
+    assoc: [["S", "UC18"], ["S", "UC19"], ["S", "UC20"], ["C", "UC21"], ["C", "UC22"], ["C", "UC07"], ["P", "UC21"]],
+    rel: [["UC19", "UC11", "include"], ["UC19", "UC13", "include"]]
+  },
+  uc3: {
+    boundary: "HistoryTalk System – School Tenant",
+    actors: [
+      { id: "T", name: "Teacher", side: "L" },
+      { id: "SA", name: "School Admin", side: "R" }
+    ],
+    ucs: [
+      ["UC23", "UC-23 Manage Assignments"], ["UC24", "UC-24 View Assignment Gradebook"], ["UC25", "UC-25 Manage Local Content"],
+      ["UC26", "UC-26 View Class Analytics"], ["UC27", "UC-27 Review Student Token Requests"], ["UC28", "UC-28 Request Tokens from School Admin"],
+      ["UC30", "UC-30 Manage Classrooms"],
+      ["UC29", "UC-29 Import Student Accounts"], ["UC31", "UC-31 Manage Teachers"], ["UC32", "UC-32 Manage Students"],
+      ["UC33", "UC-33 Moderate Local Content"], ["UC34", "UC-34 Configure Token Policy"], ["UC35", "UC-35 Review Token Tickets"],
+      ["UC36", "UC-36 Roll Over Academic Year"], ["UC37", "UC-37 View School Dashboard"]
+    ].map(([id, name]) => ({ id, name })),
+    assoc: [
+      ...["UC23","UC24","UC25","UC26","UC27","UC28","UC30"].map(u => ["T", u]),
+      ...["UC30","UC29","UC31","UC32","UC33","UC34","UC35","UC36","UC37"].map(u => ["SA", u])
+    ]
+  },
+  uc4: {
+    boundary: "HistoryTalk System – Administration",
+    actors: [
+      { id: "CA", name: "Content Admin", side: "L" },
+      { id: "SYS", name: "System Admin", side: "L" },
+      { id: "AI", name: "AI Service", side: "R", system: true }
+    ],
+    ucs: [
+      ["UC38", "UC-38 Manage Historical Contexts"], ["UC39", "UC-39 Manage Characters"], ["UC40", "UC-40 Manage Reference Documents"],
+      ["UC41", "UC-41 Manage Quizzes and Question Bank"], ["UC42", "UC-42 Manage Map Data"], ["UC43", "UC-43 Restore Trashed Content"],
+      ["UC44", "UC-44 Configure Daily Quests"],
+      ["UC45", "UC-45 Provision School Tenant"], ["UC46", "UC-46 Manage School Subscription"], ["UC47", "UC-47 Manage User Accounts"],
+      ["UC48", "UC-48 Configure Subscription Tiers"], ["UC49", "UC-49 View System Dashboard"]
+    ].map(([id, name]) => ({ id, name })),
+    assoc: [
+      ...["UC38","UC39","UC40","UC41","UC42","UC43","UC44"].map(u => ["CA", u]),
+      ...["UC45","UC46","UC47","UC48","UC49"].map(u => ["SYS", u]),
+      ["AI", "UC40"]
+    ],
+    gen: [["SYS", "CA"]]
+  }
+};
+
+const FLOWS = {
+  sf1: {
+    nodes: [
+      ["S01", "S-01", "Landing", "pub"], ["S02", "S-02", "Login", "pub"], ["S03", "S-03", "Register", "pub"],
+      ["S04", "S-04", "Forgot / Reset Password", "pub", 1], ["S05", "S-05", "Change Password", "pub"],
+      ["S07", "S-07", "Learner Home", "cus", 0, "Overview | Daily Quests"], ["S06", "S-06", "User Profile", "cus"],
+      ["S08", "S-08", "Historical Contexts", "cus"], ["S09", "S-09", "Context Details", "cus", 0, "Overview | Documents | Map | Quizzes"],
+      ["S15", "S-15", "Historical Map", "cus"], ["S10", "S-10", "Characters", "cus"], ["S11", "S-11", "Character Details", "cus"],
+      ["S12", "S-12", "Character Chat", "cus"], ["S13", "S-13", "Out-of-Token Popup", "cus", 1], ["S14", "S-14", "Chat History", "cus"],
+      ["S16", "S-16", "Quiz Catalog", "cus"], ["S17", "S-17", "Quiz Player", "cus"], ["S18", "S-18", "Quiz Result", "cus"],
+      ["S18R", "S-18a", "Report Question Popup", "cus", 1], ["S19", "S-19", "My Quiz Results", "cus"],
+      ["S20", "S-20", "My Classes", "cus"], ["S21", "S-21", "My Assignments", "cus"], ["S22", "S-22", "Assignment Workspace", "cus"],
+      ["S23", "S-23", "Token Request Popup", "cus", 1], ["S24", "S-24", "Subscription Packages", "cus"],
+      ["S25", "S-25", "VietQR Payment Popup", "cus", 1], ["S26", "S-26", "Payment History", "cus"]
+    ],
+    edges: [
+      ["S01", "S02"], ["S01", "S03"], ["S02", "S04"], ["S02", "S05", "first login"], ["S02", "S07"],
+      ["S07", "S06"], ["S06", "S05"], ["S07", "S08"], ["S08", "S09"], ["S09", "S15"], ["S07", "S10"], ["S10", "S11"], ["S11", "S12"],
+      ["S12", "S13"], ["S07", "S14"], ["S14", "S12"], ["S07", "S16"], ["S16", "S17"], ["S17", "S18"], ["S18", "S18R"], ["S07", "S19"],
+      ["S07", "S20"], ["S07", "S21"], ["S21", "S22"], ["S22", "S12"], ["S22", "S17"], ["S13", "S23", "student"], ["S13", "S24", "customer"],
+      ["S07", "S24"], ["S24", "S25"], ["S07", "S26"]
+    ]
+  },
+  sf2: {
+    nodes: [
+      ["L", "S-02", "Login", "pub"],
+      ["S27", "S-27", "Teacher Classes", "tea"], ["S28", "S-28", "Class Analytics", "tea"], ["S29", "S-29", "Assignment Manager", "tea"],
+      ["S30", "S-30", "Create / Edit Assignment", "tea"], ["S31", "S-31", "Assignment Gradebook", "tea"],
+      ["S32", "S-32", "Local Content Library", "tea", 0, "Contexts | Characters | Trash"],
+      ["S33", "S-33", "Local Content Editor", "tea", 0, "Info | Documents | Media | Quizzes"],
+      ["S34", "S-34", "Token Requests Inbox", "tea"], ["S35", "S-35", "Grant Tokens Popup", "tea", 1],
+      ["S36", "S-36", "School Dashboard", "sa"], ["S37", "S-37", "Classroom Manager", "sa"], ["S38", "S-38", "Class Roster", "sa", 0, "Info | Students | Teacher"],
+      ["S39", "S-39", "Teachers", "sa"], ["S40", "S-40", "Students", "sa"], ["S41", "S-41", "Student CSV Import Popup", "sa", 1],
+      ["S42", "S-42", "Local Content Moderation", "sa"], ["S43", "S-43", "Token Policy & Pool", "sa"], ["S44", "S-44", "Token Ticket Review", "sa"],
+      ["S45", "S-45", "Academic Year Rollover Popup", "sa", 1]
+    ],
+    edges: [
+      ["L", "S27", "TEACHER"], ["S27", "S28"], ["S27", "S29"], ["S29", "S30"], ["S29", "S31"], ["S27", "S32"], ["S32", "S33"],
+      ["S27", "S34"], ["S34", "S35"], ["S27", "S38"],
+      ["L", "S36", "SCHOOL_ADMIN"], ["S36", "S37"], ["S37", "S38"], ["S36", "S39"], ["S36", "S40"], ["S40", "S41"], ["S38", "S41"],
+      ["S36", "S42"], ["S36", "S43"], ["S36", "S44"], ["S36", "S45"]
+    ]
+  },
+  sf3: {
+    nodes: [
+      ["L", "S-02", "Login", "pub"],
+      ["S46", "S-46", "Context Management", "ca"], ["S47", "S-47", "Character Management", "ca"], ["S48", "S-48", "Document & OCR Hub", "ca"],
+      ["S49", "S-49", "Quiz & Question Bank", "ca", 0, "Quizzes | Question Bank | Import"], ["S50", "S-50", "Question Reports", "ca"],
+      ["S51", "S-51", "Map Editor", "ca", 0, "Pins | Focuses"], ["S52", "S-52", "Trash & Recovery", "ca"], ["S53", "S-53", "Daily Quest Configuration", "ca"],
+      ["S54", "S-54", "System Dashboard", "sys", 0, "Overview | Revenue | Tokens | Content | Health"], ["S55", "S-55", "School Tenants", "sys"],
+      ["S56", "S-56", "School Details", "sys", 0, "Info | School Admins | Subscription"], ["S57", "S-57", "User Accounts", "sys"],
+      ["S58", "S-58", "Subscription Tiers", "sys"], ["S59", "S-59", "Payment Audit Log", "sys"]
+    ],
+    edges: [
+      ["L", "S46", "CONTENT_ADMIN"], ["S46", "S47"], ["S46", "S48"], ["S46", "S49"], ["S49", "S50"], ["S46", "S51"], ["S46", "S52"], ["S46", "S53"],
+      ["L", "S54", "SYSTEM_ADMIN"], ["S54", "S55"], ["S55", "S56"], ["S54", "S57"], ["S54", "S58"], ["S54", "S59"], ["S54", "S46", "content rights"]
+    ]
+  }
+};
+for (const f of Object.values(FLOWS)) f.nodes = f.nodes.map(([id, sid, name, r, pop, tabs]) => ({ id, sid, name, r, pop: !!pop, tabs }));
+
+const E = (name, color, attrs) => ({ name, color, attrs });
+const ERDS = {
+  erd1: {
+    entities: [
+      E("School", "blue", ["id (PK)", "school_code", "name", "package_type", "total_school_token_quota", "unallocated_token_quota", "subscription_start_date", "subscription_end_date", "default_daily_student_quota", "default_daily_teacher_quota", "status"]),
+      E("User", "blue", ["uid (PK)", "user_name", "email", "password", "role", "school_id (FK)", "student_code", "account_status", "token", "daily_tokens_used", "daily_bonus_tokens", "last_token_reset_at", "must_change_password"]),
+      E("Classroom", "green", ["id (PK)", "school_id (FK)", "teacher_id (FK)", "class_name", "grade_level", "academic_year", "daily_token_quota", "status"]),
+      E("ClassStudent", "green", ["id (PK)", "classroom_id (FK)", "student_id (FK)", "joined_at", "status"]),
+      E("ClassLocalContent", "green", ["id (PK)", "class_id (FK)", "entity_id", "entity_type", "assigned_by"]),
+      E("TokenBoostRequest", "orange", ["id (PK)", "school_id (FK)", "classroom_id (FK)", "student_id (FK)", "requester_id (FK)", "requested_tokens", "approved_tokens", "status"]),
+      E("Tier", "yellow", ["tier_id (PK)", "title", "amount", "no_month", "limited_token", "is_active"]),
+      E("UserTier", "yellow", ["id (PK)", "uid (FK)", "tier_id (FK)", "payment_order_id (FK)", "start_time", "end_time", "is_active"]),
+      E("PaymentOrder", "yellow", ["id (PK)", "order_code", "uid (FK)", "tier_id (FK)", "amount", "status", "fulfillment_status", "expired_at"]),
+      E("PaymentTransaction", "yellow", ["id (PK)", "order_id (FK)", "status"]),
+      E("DailyCheckIn", "purple", ["id (PK)", "uid (FK)", "check_in_date", "streak_count"]),
+      E("DailyQuest", "purple", ["id (PK)", "quest_type", "title", "target", "reward_tokens"]),
+      E("UserQuestProgress", "purple", ["id (PK)", "uid (FK)", "quest_id (FK)", "progress", "claimed"])
+    ],
+    rels: [
+      ["School", "User", "zeroOne", "many"], ["School", "Classroom", "one", "many"], ["User", "Classroom", "zeroOne", "many"],
+      ["Classroom", "ClassStudent", "one", "many"], ["User", "ClassStudent", "one", "many"], ["Classroom", "ClassLocalContent", "one", "many"],
+      ["School", "TokenBoostRequest", "one", "many"], ["User", "TokenBoostRequest", "one", "many"],
+      ["Tier", "UserTier", "one", "many"], ["User", "UserTier", "one", "many"], ["User", "PaymentOrder", "one", "many"],
+      ["Tier", "PaymentOrder", "one", "many"], ["PaymentOrder", "PaymentTransaction", "one", "many"], ["PaymentOrder", "UserTier", "zeroOne", "zeroOne"],
+      ["User", "DailyCheckIn", "one", "many"], ["DailyQuest", "UserQuestProgress", "one", "many"], ["User", "UserQuestProgress", "one", "many"]
+    ]
+  },
+  erd2: {
+    entities: [
+      E("HistoricalContext", "purple", ["context_id (PK)", "name", "era", "category", "start_year", "end_year", "is_bc", "is_published", "school_id (FK)", "content_scope", "content_status"]),
+      E("Character", "purple", ["character_id (PK)", "name", "title", "background", "personality", "is_published", "school_id (FK)", "content_status"]),
+      E("Document", "purple", ["doc_id (PK)", "context_id (FK)", "character_id (FK)", "title", "document_type", "content", "status"]),
+      E("DocumentMediaMetadata", "purple", ["id (PK)", "doc_id (FK)", "media_type"]),
+      E("VectorChunk", "grey", ["chunk_id (PK)", "doc_id (FK)", "content", "embedding"]),
+      E("MapPin", "green", ["pin_id (PK)", "context_id (FK)", "label", "pin_type", "latitude", "longitude", "pin_year", "path_geojson"]),
+      E("MapFocus", "green", ["focus_id (PK)", "context_id (FK)", "name", "latitude", "longitude", "zoom_level", "order_index"]),
+      E("ChatSession", "blue", ["session_id (PK)", "uid (FK)", "character_id (FK)", "created_at"]),
+      E("Message", "blue", ["message_id (PK)", "session_id (FK)", "is_from_ai", "content", "token", "suggested_questions"]),
+      E("Quiz", "yellow", ["quiz_id (PK)", "context_id (FK)", "title", "level", "is_published"]),
+      E("Question", "yellow", ["question_id (PK)", "content", "question_type", "question_data", "explanation"]),
+      E("QuizQuestion", "yellow", ["quiz_id (PK, FK)", "question_id (PK, FK)", "order_index"]),
+      E("QuizSession", "yellow", ["session_id (PK)", "quiz_id (FK)", "uid (FK)", "start_time", "end_time", "score"]),
+      E("QuizAnswerDetail", "yellow", ["id (PK)", "session_id (FK)", "question_id (FK)", "answer_data", "is_correct"]),
+      E("QuestionReport", "orange", ["id (PK)", "question_id (FK)", "uid (FK)", "reason", "resolved"]),
+      E("QuizRating", "orange", ["id (PK)", "quiz_id (FK)", "uid (FK)", "rating"])
+    ],
+    rels: [
+      ["HistoricalContext", "Character", "many", "many"], ["HistoricalContext", "Document", "zeroOne", "many"], ["Character", "Document", "zeroOne", "many"],
+      ["Document", "DocumentMediaMetadata", "one", "many"], ["Document", "VectorChunk", "one", "many"],
+      ["HistoricalContext", "MapPin", "one", "many"], ["HistoricalContext", "MapFocus", "one", "many"],
+      ["Character", "ChatSession", "one", "many"], ["ChatSession", "Message", "one", "many"],
+      ["HistoricalContext", "Quiz", "one", "many"], ["Quiz", "QuizQuestion", "one", "many"], ["Question", "QuizQuestion", "one", "many"],
+      ["Quiz", "QuizSession", "one", "many"], ["QuizSession", "QuizAnswerDetail", "one", "many"], ["Question", "QuizAnswerDetail", "one", "many"],
+      ["Question", "QuestionReport", "one", "many"], ["Quiz", "QuizRating", "one", "many"]
+    ]
+  },
+  erd3: {
+    entities: [
+      E("Classroom", "grey", ["id (PK)", "class_name", "teacher_id (FK)"]),
+      E("User", "grey", ["uid (PK)", "role"]),
+      E("Assignment", "green", ["id (PK)", "classroom_id (FK)", "teacher_id (FK)", "title", "description", "assignment_type", "target_id", "min_requirement", "deadline", "status"]),
+      E("AssignmentSubmission", "green", ["id (PK)", "assignment_id (FK)", "student_id (FK)", "status", "score", "message_count", "reading_duration_seconds", "quiz_session_id (FK)", "chat_session_id", "started_at", "submitted_at"]),
+      E("QuizSession", "grey", ["session_id (PK)", "score"])
+    ],
+    rels: [
+      ["Classroom", "Assignment", "one", "many"], ["User", "Assignment", "one", "many"], ["Assignment", "AssignmentSubmission", "one", "many"],
+      ["User", "AssignmentSubmission", "one", "many"], ["QuizSession", "AssignmentSubmission", "zeroOne", "zeroOne"]
+    ]
+  }
+};
+
+const CONTEXT = {
+  system: ["HistoryTalk", "Platform", "(Spring Boot core +", "FastAPI AI service)"],
+  left: [
+    { name: "Customer", color: "blue", in: "Registration, chat questions, quiz answers, payment request", out: "AI answers, quiz results, token balance" },
+    { name: "School Student", color: "blue", in: "Chat questions, assignment submissions, token requests", out: "Assignments, scores, AI answers" },
+    { name: "Teacher", color: "green", in: "Assignments, local content, token grants", out: "Gradebook, class analytics" },
+    { name: "School Admin", color: "orange", in: "Student import, classes, token policy", out: "School dashboard, token tickets" },
+    { name: "Content Admin", color: "purple", in: "Contexts, characters, documents, quizzes, map data", out: "Extracted text, question reports" },
+    { name: "System Admin", color: "red", in: "Schools, user accounts, subscription tiers", out: "System dashboard, payment audit log" }
+  ],
+  right: [
+    { name: "PayOS Gateway", color: "green", out: "Payment link request", in: "Signed payment webhook" },
+    { name: "LLM Provider\n+ Re-ranker", color: "green", out: "Grounded prompt, texts to embed", in: "Streamed answer, token usage, embeddings" },
+    { name: "Google Identity", color: "green", out: "ID token verification request", in: "Verified Google identity" },
+    { name: "Email Service\n(SMTP)", color: "green", out: "Reset links, temporary passwords", in: "Delivery status" },
+    { name: "Supabase\nStorage + DB", color: "yellow", out: "Files, records, vector chunks", in: "Signed URLs, query results" }
+  ]
+};
+
+const LIST = [
+  { group: "1. Overall Description", id: "context", fig: "Figure 1: Context Diagram of HistoryTalk system", ref: "SRS 1.1",
+    desc: "The system is the central process; each external entity has one incoming and one outgoing data flow.", build: () => renderContext(CONTEXT) },
+  { group: "2. Use Case Diagrams", id: "uc1", fig: "Figure 2: Use Case Diagram 1 – Account & Learning", ref: "SRS 2.2.1", desc: "UC-01 – UC-06, UC-08 – UC-17.", build: () => renderUseCase(UC_DIAGRAMS.uc1) },
+  { group: "2. Use Case Diagrams", id: "uc2", fig: "Figure 3: Use Case Diagram 2 – Student & Customer Payment", ref: "SRS 2.2.1", desc: "UC-07, UC-18 – UC-22; Complete Assignment «include» Chat / Take Quiz.", build: () => renderUseCase(UC_DIAGRAMS.uc2) },
+  { group: "2. Use Case Diagrams", id: "uc3", fig: "Figure 4: Use Case Diagram 3 – School (B2B)", ref: "SRS 2.2.1", desc: "Teacher UC-23 – UC-28, School Admin UC-29 – UC-37; UC-30 is shared.", build: () => renderUseCase(UC_DIAGRAMS.uc3) },
+  { group: "2. Use Case Diagrams", id: "uc4", fig: "Figure 5: Use Case Diagram 4 – Administration", ref: "SRS 2.2.1", desc: "Content Admin UC-38 – UC-44, System Admin UC-45 – UC-49; System Admin generalizes Content Admin.", build: () => renderUseCase(UC_DIAGRAMS.uc4) },
+  { group: "3.1.1 Screens Flow", id: "sf1", fig: "Figure 6: Screens Flow A – Public, Customer and Student", ref: "SRS 3.1.1", desc: "Rectangle = screen, oval = pop-up, tab marks = screen with tabs. Colour = role (white public, blue learner).", build: () => renderFlow(FLOWS.sf1) },
+  { group: "3.1.1 Screens Flow", id: "sf2", fig: "Figure 7: Screens Flow B – Teacher and School Admin", ref: "SRS 3.1.1", desc: "Green = Teacher, orange = School Admin.", build: () => renderFlow(FLOWS.sf2) },
+  { group: "3.1.1 Screens Flow", id: "sf3", fig: "Figure 8: Screens Flow C – Content Admin and System Admin", ref: "SRS 3.1.1", desc: "Purple = Content Admin, red = System Admin.", build: () => renderFlow(FLOWS.sf3) },
+  { group: "3.1.5 ERD", id: "erd1", fig: "Figure 9: ERD Part 1 – Users, schools, classes, tokens, payment, gamification", ref: "SRS 3.1.5", desc: "Crow's-foot notation: ‖ exactly one, o| zero or one, o< zero or many.", build: () => renderERD(ERDS.erd1) },
+  { group: "3.1.5 ERD", id: "erd2", fig: "Figure 10: ERD Part 2 – Content, chat, map, quiz", ref: "SRS 3.1.5", desc: "HistoricalContext and Character are many-to-many (join table context_character).", build: () => renderERD(ERDS.erd2) },
+  { group: "3.1.5 ERD", id: "erd3", fig: "Figure 11: ERD Part 3 – Assignments", ref: "SRS 3.1.5", desc: "One assignment targets one classroom and one context, character or quiz (target_id).", build: () => renderERD({ ...ERDS.erd3, dir: "RIGHT" }) }
+];
+function renderContext(spec) {
+  const EW = 200, EH = 66, GAP = 340, RX = 175, M = 30, ROW = 124;
+  const n = Math.max(spec.left.length, spec.right.length);
+  const H = (n - 1) * ROW, RY = H / 2 + 120;
+  const cx = M + EW + GAP + RX, cy = M + RY, top = cy - H / 2 - EH / 2;
+  const W = cx + RX + GAP + EW + M, SH = cy + RY + M;
+  const ex = y => RX * Math.sqrt(Math.max(0, 1 - ((y - cy) / RY) ** 2));
+  let edges = "", nodes = "", labels = "";
+  const side = (list, isLeft) => {
+    const step = list.length > 1 ? H / (list.length - 1) : 0;
+    list.forEach((e, i) => {
+      const y0 = top + i * step, x0 = isLeft ? M : W - M - EW;
+      const [fill, stroke] = PAL[e.color];
+      nodes += `<rect x="${x0}" y="${y0}" width="${EW}" height="${EH}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
+      const nl = e.name.split("\n");
+      nl.forEach((l, k) => nodes += T(x0 + EW / 2, y0 + EH / 2 + (k - (nl.length - 1) / 2) * 19, l, { size: 15, bold: true }));
+      const flows = isLeft
+        ? [{ y: y0 + 18, toSystem: true, text: e.in, up: true }, { y: y0 + EH - 18, toSystem: false, text: e.out, up: false }]
+        : [{ y: y0 + 18, toSystem: false, text: e.out, up: true }, { y: y0 + EH - 18, toSystem: true, text: e.in, up: false }];
+      flows.forEach(f => {
+        const entX = isLeft ? x0 + EW : x0;
+        const sysX = isLeft ? cx - ex(f.y) : cx + ex(f.y);
+        const a = f.toSystem ? { x: entX, y: f.y } : { x: sysX, y: f.y };
+        const b = f.toSystem ? { x: sysX, y: f.y } : { x: entX, y: f.y };
+        edges += `<path d="${pathOf([a, b])}" fill="none" stroke="#000" stroke-width="1.5" marker-end="url(#arr)"/>`;
+        const lines = wrap(f.text, 40);
+        const off = (lines.length * 8 + 7) * (f.up ? -1 : 1);
+        labels += labelBox((entX + sysX) / 2, f.y + off, lines);
+      });
+    });
+  };
+  side(spec.left, true); side(spec.right, false);
+  const [sf, ss] = PAL.red;
+  nodes += `<ellipse cx="${cx}" cy="${cy}" rx="${RX}" ry="${RY}" fill="${sf}" stroke="${ss}" stroke-width="2"/>`;
+  spec.system.forEach((l, k) => nodes += T(cx, cy + (k - (spec.system.length - 1) / 2) * 26, l, { size: k < 2 ? 22 : 15, bold: k < 2 }));
+  return svgWrap(W, SH, edges + nodes + labels);
+}
+
+// ─────────────────────────── Page build ───────────────────────────
+(async () => {
+  const host = document.getElementById("diagrams"), toc = document.getElementById("toc");
+  let last = "";
+  const only = new URLSearchParams(location.search).get("only");   // e.g. diagrams.html?only=uc1
+  for (const d of LIST.filter(x => !only || x.id === only)) {
+    if (d.group !== last) { const h = document.createElement("h3"); h.textContent = d.group; toc.appendChild(h); last = d.group; }
+    const a = document.createElement("a"); a.href = "#" + d.id; a.textContent = d.fig.replace(/^Figure \d+: /, ""); toc.appendChild(a);
+    const sec = document.createElement("section");
+    sec.className = "diagram"; sec.id = d.id;
+    sec.innerHTML = `<div class="dhead"><h2>${d.fig.replace(/^Figure \d+: /, "")}</h2><div><span class="ref">${d.ref}</span>
+      <span class="tools"><button data-a="svg">⬇ SVG</button><button data-a="png">⬇ PNG</button></span></div></div>
+      <p class="desc">${d.desc}</p><div class="canvas">Rendering…</div><div class="caption">${d.fig}.</div>`;
+    host.appendChild(sec);
+    const cv = sec.querySelector(".canvas");
+    try { cv.innerHTML = await d.build(); }
+    catch (e) { cv.innerHTML = `<div class="err">${esc(e.stack || e)}</div>`; }
+    sec.querySelector('[data-a="svg"]').onclick = () => saveSvg(cv, d.id);
+    sec.querySelector('[data-a="png"]').onclick = () => savePng(cv, d.id);
+  }
+  document.title = "HistoryTalk SRS Diagrams";
+  document.body.dataset.ready = "1";
+})();
+
+function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+function saveSvg(cv, id) { const s = cv.querySelector("svg"); if (s) download(new Blob([s.outerHTML], { type: "image/svg+xml" }), `historytalk-${id}.svg`); }
+function savePng(cv, id) {
+  const s = cv.querySelector("svg"); if (!s) return;
+  const w = +s.getAttribute("width"), h = +s.getAttribute("height"), k = 2;
+  const img = new Image();
+  img.onload = () => { const c = document.createElement("canvas"); c.width = w * k; c.height = h * k; const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => download(b, `historytalk-${id}.png`), "image/png"); };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s.outerHTML);
+}
+</script>
+</body>
+</html>

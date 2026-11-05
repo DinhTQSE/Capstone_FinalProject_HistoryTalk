@@ -42,4 +42,7 @@ public class ChatHistorySessionItem {
 
     @JsonProperty("messageCount")
     private int messageCount;
+
+    @JsonProperty("mode")
+    private String mode;
 }

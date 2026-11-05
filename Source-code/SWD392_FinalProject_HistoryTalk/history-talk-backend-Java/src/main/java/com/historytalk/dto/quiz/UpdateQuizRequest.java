@@ -23,9 +23,6 @@ public class UpdateQuizRequest {
     /** null = no change. Changing context also changes era. */
     private String contextId;
 
-    /** null = no change. Must match QuizLevel enum: EASY | MEDIUM | HARD */
-    private String level;
-
     /** null = no change */
     private Boolean isPublished;
 }

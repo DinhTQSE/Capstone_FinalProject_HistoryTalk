@@ -8,6 +8,7 @@ import com.historytalk.entity.character.Character;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 
+import com.historytalk.entity.enums.ChatSessionMode;
 import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventEra;
@@ -35,6 +36,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -47,6 +49,8 @@ import java.util.UUID;
 @Slf4j
 public class ChatSessionServiceImpl implements ChatSessionService {
 
+    private static final int DEFAULT_EXAM_QUESTION_COUNT = 5;
+
     private final ChatSessionRepository chatSessionRepository;
     private final UserRepository userRepository;
     private final CharacterRepository characterRepository;
@@ -56,6 +60,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private final ObjectMapper objectMapper;
     private final ClassLocalContentRepository classLocalContentRepository;
     private final ClassStudentRepository classStudentRepository;
+    private final ExamSessionService examSessionService;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> getSessions(String userId, String characterId) {
@@ -86,8 +92,92 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .toList();
     }
 
-    @Transactional
+    // The greeting comes from the LLM, which takes seconds while the connection pool is small,
+    // so the session is saved and the greeting is saved in separate short transactions.
+    private record PreparedSession(
+            ChatSession session,
+            String characterId,
+            String characterName,
+            String contextId,
+            CharacterPayload characterData,
+            ContextPayload contextData) {
+    }
+
     public ChatSessionResponse createSession(String userId, String userRole, CreateChatSessionRequest request) {
+        PreparedSession prepared = transactionTemplate.execute(status -> prepareSession(userId, userRole, request));
+        ChatSession saved = prepared.session();
+
+        // An exam opens with its first question instead of a greeting
+        if (saved.getMode() == ChatSessionMode.EXAM) {
+            try {
+                Message opening = examSessionService.startExam(saved.getSessionId());
+                saved.setLastMessageAt(opening.getCreatedAt());
+                return mapToResponse(saved, opening.getContent(), 1);
+            } catch (RuntimeException e) {
+                transactionTemplate.executeWithoutResult(status -> chatSessionRepository.deleteById(saved.getSessionId()));
+                throw e;
+            }
+        }
+
+        // Send greeting message via AI
+        String greetingText = null;
+        List<String> suggestedQuestionsList = null;
+
+        try {
+            AiChatResult greeting = aiServiceClient.chat(
+                    prepared.characterId(),
+                    prepared.contextId(),
+                    "Hãy chào và giới thiệu ngắn gọn về bản thân.",
+                    Collections.emptyList(),
+                    prepared.characterData(),
+                    prepared.contextData(),
+                    true);
+
+            if (greeting != null && greeting.message() != null && !greeting.message().isBlank()) {
+                greetingText = greeting.message();
+                suggestedQuestionsList = greeting.suggestedQuestions();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to generate greeting for session {}: {}", saved.getSessionId(), e.getMessage());
+        }
+
+        // Fallback greeting if AI fails or returns empty response
+        if (greetingText == null || greetingText.isBlank()) {
+            greetingText = "Xin chào, ta là " + prepared.characterName() + ". Ngươi muốn biết điều gì về ta?";
+        }
+
+        if (suggestedQuestionsList == null || suggestedQuestionsList.isEmpty()) {
+            suggestedQuestionsList = List.of(
+                    "Ngài có thể kể cho ta nghe về cuộc đời của ngài không?",
+                    "Chiến công hoặc sự kiện đáng nhớ nhất của ngài là gì?",
+                    "Ngài có thể chia sẻ thêm về bối cảnh lịch sử thời đó không?");
+        }
+
+        String suggestedQuestionsJson = null;
+        try {
+            suggestedQuestionsJson = objectMapper.writeValueAsString(suggestedQuestionsList);
+        } catch (Exception ex) {
+            log.warn("Failed to serialize suggested questions: {}", ex.getMessage());
+        }
+
+        Message greetingMsg = Message.builder()
+                .content(greetingText)
+                .isFromAi(true)
+                .suggestedQuestions(suggestedQuestionsJson)
+                .chatSession(saved)
+                .build();
+
+        LocalDateTime now = LocalDateTime.now();
+        transactionTemplate.executeWithoutResult(status -> {
+            messageRepository.save(greetingMsg);
+            chatSessionRepository.findById(saved.getSessionId()).ifPresent(session -> session.setLastMessageAt(now));
+        });
+        saved.setLastMessageAt(now);
+
+        return mapToResponse(saved, greetingText, 1);
+    }
+
+    private PreparedSession prepareSession(String userId, String userRole, CreateChatSessionRequest request) {
         log.info("Creating chat session for user={} context={} character={}", userId, request.getContextId(),
                 request.getCharacterId());
 
@@ -144,72 +234,27 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             }
         }
 
+        boolean isExam = request.getMode() == ChatSessionMode.EXAM;
+
         ChatSession session = ChatSession.builder()
                 .user(user)
                 .character(character)
                 .historicalContext(context)
-                .title("")
+                .title(isExam ? "Vấn đáp với " + character.getName() : "")
+                .mode(isExam ? ChatSessionMode.EXAM : ChatSessionMode.CHAT)
+                .examQuestionCount(isExam ? resolveExamQuestionCount(request) : null)
                 .build();
 
         ChatSession saved = chatSessionRepository.save(session);
         log.info("Chat session created with ID={}", saved.getSessionId());
 
-        // Send greeting message via AI
-        String greetingText = null;
-        List<String> suggestedQuestionsList = null;
-
-        try {
-            CharacterPayload characterData = AiServiceClient.buildCharacterPayload(character);
-            ContextPayload contextData = context != null ? AiServiceClient.buildContextPayload(context) : null;
-
-            AiChatResult greeting = aiServiceClient.chat(
-                    character.getCharacterId().toString(),
-                    context != null ? context.getContextId().toString() : "00000000-0000-0000-0000-000000000000",
-                    "Hãy chào và giới thiệu ngắn gọn về bản thân.",
-                    Collections.emptyList(),
-                    characterData,
-                    contextData,
-                    true);
-
-            if (greeting != null && greeting.message() != null && !greeting.message().isBlank()) {
-                greetingText = greeting.message();
-                suggestedQuestionsList = greeting.suggestedQuestions();
-            }
-        } catch (Exception e) {
-            log.warn("Failed to generate greeting for session {}: {}", saved.getSessionId(), e.getMessage());
-        }
-
-        // Fallback greeting if AI fails or returns empty response
-        if (greetingText == null || greetingText.isBlank()) {
-            greetingText = "Xin chào, ta là " + character.getName() + ". Ngươi muốn biết điều gì về ta?";
-        }
-
-        if (suggestedQuestionsList == null || suggestedQuestionsList.isEmpty()) {
-            suggestedQuestionsList = List.of(
-                    "Ngài có thể kể cho ta nghe về cuộc đời của ngài không?",
-                    "Chiến công hoặc sự kiện đáng nhớ nhất của ngài là gì?",
-                    "Ngài có thể chia sẻ thêm về bối cảnh lịch sử thời đó không?");
-        }
-
-        String suggestedQuestionsJson = null;
-        try {
-            suggestedQuestionsJson = objectMapper.writeValueAsString(suggestedQuestionsList);
-        } catch (Exception ex) {
-            log.warn("Failed to serialize suggested questions: {}", ex.getMessage());
-        }
-
-        Message greetingMsg = Message.builder()
-                .content(greetingText)
-                .isFromAi(true)
-                .suggestedQuestions(suggestedQuestionsJson)
-                .chatSession(saved)
-                .build();
-        messageRepository.save(greetingMsg);
-
-        saved.setLastMessageAt(LocalDateTime.now());
-        chatSessionRepository.save(saved);
-
-        return mapToResponse(saved, greetingText, 1);
+        return new PreparedSession(
+                saved,
+                character.getCharacterId().toString(),
+                character.getName(),
+                context != null ? context.getContextId().toString() : "00000000-0000-0000-0000-000000000000",
+                AiServiceClient.buildCharacterPayload(character),
+                context != null ? AiServiceClient.buildContextPayload(context) : null);
     }
 
     @Transactional
@@ -264,7 +309,13 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
                 .messageCount(messageCount)
+                .mode(session.getMode().name())
+                .examQuestionCount(session.getExamQuestionCount())
                 .build();
+    }
+
+    private int resolveExamQuestionCount(CreateChatSessionRequest request) {
+        return request.getExamQuestionCount() != null ? request.getExamQuestionCount() : DEFAULT_EXAM_QUESTION_COUNT;
     }
 
     private String safeGetCharacterId(ChatSession session) {

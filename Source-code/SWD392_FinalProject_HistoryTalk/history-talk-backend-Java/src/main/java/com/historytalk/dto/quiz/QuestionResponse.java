@@ -1,6 +1,7 @@
 package com.historytalk.dto.quiz;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.historytalk.entity.enums.QuestionDifficulty;
 import com.historytalk.entity.enums.QuestionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,8 @@ public class QuestionResponse {
 
     @Builder.Default
     private QuestionType questionType = QuestionType.MULTIPLE_CHOICE;
+
+    private QuestionDifficulty difficulty;
 
     /**
      * Typed payload.

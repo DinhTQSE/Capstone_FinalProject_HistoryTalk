@@ -63,6 +63,26 @@ class ProcessDocumentRequest(BaseModel):
     content: str = Field(..., description="Nội dung toàn bộ tài liệu")
 
 
+class ExamQuestionRequest(BaseModel):
+    characterId: str
+    contextId: Optional[str] = None
+    characterData: Optional[CharacterData] = None
+    contextData: Optional[HistoricalContextData] = None
+    askedQuestions: List[str] = Field(default_factory=list, description="Questions already asked in this session")
+    usedSources: List[str] = Field(default_factory=list, description="Source excerpts already used in this session")
+
+
+class ExamGradeRequest(BaseModel):
+    characterId: str
+    contextId: Optional[str] = None
+    characterData: Optional[CharacterData] = None
+    contextData: Optional[HistoricalContextData] = None
+    question: str
+    expectedAnswer: str
+    sourceExcerpt: str
+    answer: str = Field(..., min_length=1, max_length=4000)
+
+
 # ── Response ──────────────────────────────────────────────────────────────────
 
 class TokenUsage(BaseModel):
@@ -93,6 +113,29 @@ class GenerateTitleResponseData(BaseModel):
 class GenerateTitleResponse(BaseModel):
     success: bool = True
     data: GenerateTitleResponseData
+
+
+class ExamQuestionResponseData(BaseModel):
+    question: str
+    expectedAnswer: str
+    sourceExcerpt: str
+    tokenUsage: TokenUsage = Field(default_factory=TokenUsage)
+
+
+class ExamQuestionResponse(BaseModel):
+    success: bool = True
+    data: ExamQuestionResponseData
+
+
+class ExamGradeResponseData(BaseModel):
+    verdict: Literal["CORRECT", "PARTIAL", "INCORRECT"]
+    feedback: str
+    tokenUsage: TokenUsage = Field(default_factory=TokenUsage)
+
+
+class ExamGradeResponse(BaseModel):
+    success: bool = True
+    data: ExamGradeResponseData
 
 
 class ErrorResponse(BaseModel):

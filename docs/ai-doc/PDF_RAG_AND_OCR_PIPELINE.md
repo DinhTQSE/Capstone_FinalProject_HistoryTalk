@@ -15,7 +15,7 @@ flowchart TD
     E --> F["Text Pre-processing & Sanitization"]
     C --> F
     F --> G["Recursive Character Text Splitter (500 chars, 50 overlap)"]
-    G --> H["Ollama / Gemini Embedding Generation (768-dim)"]
+    G --> H["Ollama bge-m3 Embedding Generation (1024-dim)"]
     H --> I["Supabase PgVector Store (vector_chunk table)"]
 ```
 
@@ -25,7 +25,7 @@ flowchart TD
 
 - **Chunk Size**: 500 characters.
 - **Overlap**: 50 characters (preserves sentence boundaries across chunk splits).
-- **Embedding Dimensions**: 768 dimensions (`bge-m3` or `nomic-embed-text` via Ollama / Gemini Embeddings).
+- **Embedding Dimensions**: 1024 dimensions (`bge-m3` via Ollama).
 - **OCR Quality Threshold**: 300 DPI image rendering, language `vie` (Vietnamese).
 
 ---

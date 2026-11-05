@@ -31,7 +31,7 @@ public class TierServiceImpl implements TierService {
                                 .title("free")
                                 .amount(0)
                                 .noMonth(1)
-                                .limitedToken(20)
+                                .limitedToken(1500)
                                 .isActive(true)
                                 .build(),
                         Tier.builder()
@@ -39,7 +39,7 @@ public class TierServiceImpl implements TierService {
                                 .title("plus")
                                 .amount(49000)
                                 .noMonth(1)
-                                .limitedToken(100)
+                                .limitedToken(5000)
                                 .isActive(true)
                                 .build(),
                         Tier.builder()
@@ -47,12 +47,29 @@ public class TierServiceImpl implements TierService {
                                 .title("pro")
                                 .amount(99000)
                                 .noMonth(1)
-                                .limitedToken(999)
+                                .limitedToken(10000)
+                                .isActive(true)
+                                .build(),
+                        // Yearly plans share the monthly plan's title; no_month = 12 sets the subscription length.
+                        Tier.builder()
+                                .tierId(UUID.fromString("00000000-0000-0000-0000-000000000004"))
+                                .title("plus")
+                                .amount(499000)
+                                .noMonth(12)
+                                .limitedToken(5000)
+                                .isActive(true)
+                                .build(),
+                        Tier.builder()
+                                .tierId(UUID.fromString("00000000-0000-0000-0000-000000000005"))
+                                .title("pro")
+                                .amount(999000)
+                                .noMonth(12)
+                                .limitedToken(10000)
                                 .isActive(true)
                                 .build()
                 );
                 tierRepository.saveAll(defaultTiers);
-                log.info("Default tiers (free, plus, pro) seeded successfully");
+                log.info("Default tiers (free, plus, pro + yearly plus/pro) seeded successfully");
             }
         } catch (Exception e) {
             log.warn("Failed to seed default tiers: {}", e.getMessage());
