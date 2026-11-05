@@ -1,6 +1,7 @@
 package com.historytalk.entity.chat;
 
 import com.historytalk.entity.character.Character;
+import com.historytalk.entity.enums.ChatSessionMode;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.user.User;
 import jakarta.persistence.*;
@@ -48,6 +49,14 @@ public class ChatSession {
     @Builder.Default
     @Column(name = "title", length = 255)
     private String title = "";
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "session_mode", nullable = false, length = 20)
+    private ChatSessionMode mode = ChatSessionMode.CHAT;
+
+    @Column(name = "exam_question_count")
+    private Integer examQuestionCount;
 
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;

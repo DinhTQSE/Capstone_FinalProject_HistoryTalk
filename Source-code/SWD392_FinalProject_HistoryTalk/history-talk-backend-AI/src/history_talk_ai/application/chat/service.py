@@ -2,7 +2,8 @@ import json
 import uuid
 import logging
 import asyncio
-import random
+import re
+import time
 from typing import List
 import httpx
 from supabase import create_client, Client
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 # ── Ollama HTTP Client ────────────────────────────────────────────────────────
+_CJK_PATTERN = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
+
 # Use a global client to reuse connections (Connection Pooling) for faster requests
 ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 
@@ -29,14 +32,15 @@ ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
 def _ollama_url(path: str) -> str:
     return f"{settings.OLLAMA_BASE_URL.rstrip('/')}{path}"
 
-async def _call_ollama(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+async def _call_ollama(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
     """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
         "stream": False,
+        "think": False,
         "options": {
-            "temperature": settings.LLM_TEMPERATURE,
+            "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
             "num_predict": settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
             "repeat_penalty": 1.15,
@@ -71,6 +75,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         "model": settings.LLM_MODEL,
         "messages": messages,
         "stream": True,
+        "think": False,
         "options": {
             "temperature": settings.LLM_TEMPERATURE,
             "num_predict": settings.LLM_MAX_TOKENS,
@@ -113,7 +118,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def _call_external(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
+async def _call_external(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
     """Make an async call to an external OpenAI-compatible API (e.g. OpenAI, Gemini, Groq)."""
     headers = {
         "Authorization": f"Bearer {settings.EXTERNAL_API_KEY}",
@@ -123,7 +128,7 @@ async def _call_external(messages: list[dict], expect_json: bool = True) -> tupl
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
-        "temperature": settings.LLM_TEMPERATURE,
+        "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
         "max_tokens": settings.LLM_MAX_TOKENS,
         "stream": False,
     }
@@ -200,11 +205,29 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def _call_llm(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
-    """Router to call either Ollama or External API based on settings."""
+def _contains_cjk(text: str) -> bool:
+    return _CJK_PATTERN.search(text) is not None
+
+
+async def _call_provider(messages: list[dict], expect_json: bool, temperature: float | None) -> tuple[str, int, int]:
     if settings.LLM_PROVIDER.lower() == "external":
-        return await _call_external(messages, expect_json)
-    return await _call_ollama(messages, expect_json)
+        return await _call_external(messages, expect_json, temperature)
+    return await _call_ollama(messages, expect_json, temperature)
+
+
+async def _call_llm(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
+    """Call the configured provider, retrying once if the reply leaks Chinese into a Vietnamese conversation."""
+    content, prompt_tokens, completion_tokens = await _call_provider(messages, expect_json, temperature)
+
+    # Sources may legitimately quote Hán characters, in which case the reply may quote them too.
+    if not _contains_cjk(content) or any(_contains_cjk(m.get("content", "")) for m in messages):
+        return content, prompt_tokens, completion_tokens
+
+    logger.warning("LLM reply contains Chinese characters, retrying once.")
+    content, retry_prompt_tokens, retry_completion_tokens = await _call_provider(messages, expect_json, temperature)
+    if _contains_cjk(content):
+        raise ValueError("LLM reply still contains Chinese characters after retrying.")
+    return content, prompt_tokens + retry_prompt_tokens, completion_tokens + retry_completion_tokens
 
 async def _call_llm_stream(messages: list[dict]) -> tuple:
     """Router to stream from either Ollama or External API based on settings."""
@@ -253,13 +276,13 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
     return []
 
 async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> tuple[str, List[str]]:
-    """Retrieve history context from Supabase VectorChunk and rerank via Kaggle."""
+    """Retrieve history context from Supabase VectorChunk and rerank via the LLM server."""
     query_vector = await get_embedding_from_ollama(user_question)
     if not query_vector:
         return "", []
         
     try:
-        response = supabase.rpc(
+        response = supabase.schema(settings.SUPABASE_SCHEMA).rpc(
             "match_history_chunks",
             {
                 "query_embedding": query_vector,
@@ -273,11 +296,13 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
             return "", []
         texts = [chunk.get("content", "") for chunk in chunks if chunk.get("content")]
         
-        # Gọi sang Kaggle API để Rerank
+        # Gọi sang LLM server để Rerank
         try:
+            auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
             rerank_res = await ollama_client.post(
-                _ollama_url("/api/rerank").replace("11434", "8000"), # Giả sử Nginx route /api/rerank
-                json={"query": user_question, "documents": texts}
+                _ollama_url("/api/rerank"),
+                json={"query": user_question, "documents": texts},
+                auth=auth,
             )
             rerank_res.raise_for_status()
             top_docs = rerank_res.json().get("top_docs", [])
@@ -329,11 +354,7 @@ async def generate_reply(
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    # Gemma 2 không có system role chuẩn, ta bọc system prompt vào user message đầu tiên.
-    messages = [{
-        "role": "user", 
-        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
-    }]
+    messages = [{"role": "system", "content": system_prompt}]
     
     # Inject conversation history
     for item in message_history:
@@ -353,15 +374,6 @@ async def generate_reply(
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
         
-    # Xác suất 30% ép AI hỏi vặn lại (chỉ khi không phải tin nhắn đầu tiên của session)
-    if message_history and random.random() < 0.3:
-        skip_suggestions = True
-        final_user_content += (
-            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi đơn giản ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
-            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. Nhằm mục đích người học trả lời cho nhân vật nghe chứ không phải câu hỏi để người học hỏi nhân vật!"
-            "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'. Ngươi phải hỏi câu gì mà ngươi biết câu trả lời để con nhận xét người kia trả lời đúng hay sai. Cuối câu hỏi đó phải có dấu '?'."
-        )
-
     messages.append({"role": "user", "content": final_user_content})
 
     response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
@@ -424,15 +436,13 @@ async def generate_reply_stream(
                 
     rag_context = ""
     quotes_used = []
+    started_at = time.perf_counter()
     rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
+    rag_seconds = time.perf_counter() - started_at
     
     system_prompt = build_chat_system_prompt(character, context)
     
-    # Gemma 2 không có system role chuẩn, ta bọc system prompt vào user message đầu tiên.
-    messages = [{
-        "role": "user", 
-        "content": f"{system_prompt}\n\n[BẮT ĐẦU ĐÓNG VAI TỪ ĐÂY]"
-    }]
+    messages = [{"role": "system", "content": system_prompt}]
     for item in message_history:
         messages.append({"role": item.role, "content": item.content})
         
@@ -449,15 +459,6 @@ async def generate_reply_stream(
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
         
-    # Xác suất 30% ép AI hỏi vặn lại (chỉ khi không phải tin nhắn đầu tiên của session)
-    if message_history and random.random() < 0.3:
-        skip_suggestions = True
-        final_user_content += (
-            "\n\n[CHỈ THỊ ĐẶC BIỆT]: Lượt chat này, ngươi BẮT BUỘC phải đặt một câu hỏi ngắn gọn ở cuối cùng để hỏi ngược lại người dùng. "
-            "Trọng tâm câu hỏi phải liên quan đến nội dung ngươi vừa trả lời. "
-            "Ngươi PHẢI phân cách phần trả lời và phần câu hỏi bằng một dòng chỉ chứa 3 dấu gạch ngang '---'."
-        )
-
     messages.append({"role": "user", "content": final_user_content})
 
     full_message = ""
@@ -471,10 +472,14 @@ async def generate_reply_stream(
             prompt_tokens = chunk.get("prompt_tokens", 0)
             completion_tokens = chunk.get("completion_tokens", 0)
         else:
+            if not full_message:
+                logger.info(f"Chat stream timing: rag={rag_seconds:.2f}s first_token={time.perf_counter() - started_at:.2f}s")
             full_message += chunk
-            await asyncio.sleep(0.05)  # SLOW DOWN YIELD SPEED (50ms per chunk)
             yield chunk
-            
+
+    if _contains_cjk(full_message) and not any(_contains_cjk(m["content"]) for m in messages):
+        logger.warning("Streamed LLM reply contains Chinese characters.")
+
     suggested_questions = []
     sq_pt = 0
     sq_ct = 0

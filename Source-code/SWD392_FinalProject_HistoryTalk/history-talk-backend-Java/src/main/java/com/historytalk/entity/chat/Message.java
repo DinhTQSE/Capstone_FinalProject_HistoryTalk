@@ -1,6 +1,7 @@
 package com.historytalk.entity.chat;
 
 
+import com.historytalk.entity.enums.ExamVerdict;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -64,6 +65,23 @@ public class Message {
 
     @Column(name = "message_type", length = 50)
     private String messageType;
+
+    /** The question this message asks, in an exam session. */
+    @Column(name = "exam_question", columnDefinition = "TEXT")
+    private String examQuestion;
+
+    /** Answer key of {@link #examQuestion}. Never return this to clients. */
+    @Column(name = "exam_expected_answer", columnDefinition = "TEXT")
+    private String examExpectedAnswer;
+
+    /** Source excerpt of {@link #examQuestion}. Never return this to clients. */
+    @Column(name = "exam_source", columnDefinition = "TEXT")
+    private String examSource;
+
+    /** Grade of the learner's answer to the previous question. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "exam_verdict", length = 20)
+    private ExamVerdict examVerdict;
 
     @PrePersist
     void ensureDefaults() {

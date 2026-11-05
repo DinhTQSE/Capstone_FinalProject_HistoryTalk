@@ -1,6 +1,7 @@
 package com.historytalk.service.chat;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -115,6 +117,19 @@ public class AiServiceClient {
                         AiMetricsService.TokenUsage tokenUsage) {
         }
 
+        public record ExamQuestionResult(
+                        @JsonProperty("question") String question,
+                        @JsonProperty("expectedAnswer") String expectedAnswer,
+                        @JsonProperty("sourceExcerpt") String sourceExcerpt,
+                        @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+        }
+
+        public record ExamGradeResult(
+                        @JsonProperty("verdict") String verdict,
+                        @JsonProperty("feedback") String feedback,
+                        @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+        }
+
         // ── Internal request / response records ───────────────────────────────
 
         record ChatRequest(
@@ -156,6 +171,36 @@ public class AiServiceClient {
         record GenerateTitleApiResponse(
                         @JsonProperty("success") boolean success,
                         @JsonProperty("data") GenerateTitleData data) {
+        }
+
+        record ExamQuestionRequest(
+                        @JsonProperty("characterId") String characterId,
+                        @JsonProperty("contextId") String contextId,
+                        @JsonProperty("characterData") CharacterPayload characterData,
+                        @JsonProperty("contextData") ContextPayload contextData,
+                        @JsonProperty("askedQuestions") List<String> askedQuestions,
+                        @JsonProperty("usedSources") List<String> usedSources) {
+        }
+
+        record ExamQuestionApiResponse(
+                        @JsonProperty("success") boolean success,
+                        @JsonProperty("data") ExamQuestionResult data) {
+        }
+
+        record ExamGradeRequest(
+                        @JsonProperty("characterId") String characterId,
+                        @JsonProperty("contextId") String contextId,
+                        @JsonProperty("characterData") CharacterPayload characterData,
+                        @JsonProperty("contextData") ContextPayload contextData,
+                        @JsonProperty("question") String question,
+                        @JsonProperty("expectedAnswer") String expectedAnswer,
+                        @JsonProperty("sourceExcerpt") String sourceExcerpt,
+                        @JsonProperty("answer") String answer) {
+        }
+
+        record ExamGradeApiResponse(
+                        @JsonProperty("success") boolean success,
+                        @JsonProperty("data") ExamGradeResult data) {
         }
 
         record ProcessDocumentRequest(
@@ -269,6 +314,82 @@ public class AiServiceClient {
             } catch (Exception e) {
                 onError.accept(e);
             }
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/exam/question.
+         * The result holds the answer key, so callers must not expose it to the learner.
+         */
+        public ExamQuestionResult generateExamQuestion(
+                        String characterId,
+                        String contextId,
+                        CharacterPayload characterData,
+                        ContextPayload contextData,
+                        List<String> askedQuestions,
+                        List<String> usedSources) {
+
+                ExamQuestionRequest request = new ExamQuestionRequest(characterId, contextId, characterData,
+                                contextData, askedQuestions, usedSources);
+                try {
+                        ExamQuestionApiResponse response = restClient.post()
+                                        .uri("/v1/ai/exam/question")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(request)
+                                        .retrieve()
+                                        .body(ExamQuestionApiResponse.class);
+
+                        if (response == null || response.data() == null) {
+                                throw new SystemException("Phản hồi trống từ dịch vụ AI");
+                        }
+
+                        aiMetricsService.recordRequest("exam_question", "success");
+                        aiMetricsService.recordTokens(response.data().tokenUsage());
+                        return response.data();
+                } catch (HttpClientErrorException.UnprocessableEntity e) {
+                        aiMetricsService.recordRequest("exam_question", "failure");
+                        throw new InvalidRequestException("Nhân vật này chưa có đủ tư liệu để vấn đáp.");
+                } catch (RestClientException e) {
+                        aiMetricsService.recordRequest("exam_question", "failure");
+                        log.error("AI service /exam/question call failed: {}", e.getMessage());
+                        throw new SystemException("Dịch vụ AI không khả dụng: " + e.getMessage());
+                }
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/exam/grade.
+         */
+        public ExamGradeResult gradeExamAnswer(
+                        String characterId,
+                        String contextId,
+                        CharacterPayload characterData,
+                        ContextPayload contextData,
+                        String question,
+                        String expectedAnswer,
+                        String sourceExcerpt,
+                        String answer) {
+
+                ExamGradeRequest request = new ExamGradeRequest(characterId, contextId, characterData, contextData,
+                                question, expectedAnswer, sourceExcerpt, answer);
+                try {
+                        ExamGradeApiResponse response = restClient.post()
+                                        .uri("/v1/ai/exam/grade")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(request)
+                                        .retrieve()
+                                        .body(ExamGradeApiResponse.class);
+
+                        if (response == null || response.data() == null) {
+                                throw new SystemException("Phản hồi trống từ dịch vụ AI");
+                        }
+
+                        aiMetricsService.recordRequest("exam_grade", "success");
+                        aiMetricsService.recordTokens(response.data().tokenUsage());
+                        return response.data();
+                } catch (RestClientException e) {
+                        aiMetricsService.recordRequest("exam_grade", "failure");
+                        log.error("AI service /exam/grade call failed: {}", e.getMessage());
+                        throw new SystemException("Dịch vụ AI không khả dụng: " + e.getMessage());
+                }
         }
 
         /**

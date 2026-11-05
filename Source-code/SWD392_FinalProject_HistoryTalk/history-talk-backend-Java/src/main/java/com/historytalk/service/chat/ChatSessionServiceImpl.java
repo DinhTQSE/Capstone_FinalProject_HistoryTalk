@@ -8,6 +8,7 @@ import com.historytalk.entity.character.Character;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 
+import com.historytalk.entity.enums.ChatSessionMode;
 import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventEra;
@@ -47,6 +48,8 @@ import java.util.UUID;
 @Slf4j
 public class ChatSessionServiceImpl implements ChatSessionService {
 
+    private static final int DEFAULT_EXAM_QUESTION_COUNT = 5;
+
     private final ChatSessionRepository chatSessionRepository;
     private final UserRepository userRepository;
     private final CharacterRepository characterRepository;
@@ -56,6 +59,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private final ObjectMapper objectMapper;
     private final ClassLocalContentRepository classLocalContentRepository;
     private final ClassStudentRepository classStudentRepository;
+    private final ExamSessionService examSessionService;
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> getSessions(String userId, String characterId) {
@@ -144,15 +148,25 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             }
         }
 
+        boolean isExam = request.getMode() == ChatSessionMode.EXAM;
+
         ChatSession session = ChatSession.builder()
                 .user(user)
                 .character(character)
                 .historicalContext(context)
-                .title("")
+                .title(isExam ? "Vấn đáp với " + character.getName() : "")
+                .mode(isExam ? ChatSessionMode.EXAM : ChatSessionMode.CHAT)
+                .examQuestionCount(isExam ? resolveExamQuestionCount(request) : null)
                 .build();
 
         ChatSession saved = chatSessionRepository.save(session);
         log.info("Chat session created with ID={}", saved.getSessionId());
+
+        // An exam opens with its first question instead of a greeting
+        if (isExam) {
+            Message opening = examSessionService.startExam(saved);
+            return mapToResponse(saved, opening.getContent(), 1);
+        }
 
         // Send greeting message via AI
         String greetingText = null;
@@ -264,7 +278,13 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .lastMessage(lastMessage)
                 .lastMessageAt(session.getLastMessageAt())
                 .messageCount(messageCount)
+                .mode(session.getMode().name())
+                .examQuestionCount(session.getExamQuestionCount())
                 .build();
+    }
+
+    private int resolveExamQuestionCount(CreateChatSessionRequest request) {
+        return request.getExamQuestionCount() != null ? request.getExamQuestionCount() : DEFAULT_EXAM_QUESTION_COUNT;
     }
 
     private String safeGetCharacterId(ChatSession session) {

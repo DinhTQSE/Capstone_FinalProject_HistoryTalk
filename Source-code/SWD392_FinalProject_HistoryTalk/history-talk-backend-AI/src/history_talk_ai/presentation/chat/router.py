@@ -9,6 +9,12 @@ from history_talk_ai.presentation.chat.schemas import (
     ChatRequest,
     ChatResponse,
     ChatResponseData,
+    ExamGradeRequest,
+    ExamGradeResponse,
+    ExamGradeResponseData,
+    ExamQuestionRequest,
+    ExamQuestionResponse,
+    ExamQuestionResponseData,
     GenerateTitleRequest,
     GenerateTitleResponse,
     GenerateTitleResponseData,
@@ -18,7 +24,7 @@ from history_talk_ai.presentation.chat.schemas import (
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 from history_talk_ai.dataaccess.java_backend import client as java_client
-from history_talk_ai.application.chat import service as llm_service
+from history_talk_ai.application.chat import exam_service, service as llm_service
 from history_talk_ai.dataaccess.java_backend.client import JavaClientNotFoundError, JavaBackendError
 
 router = APIRouter(prefix="/v1/ai", tags=["AI Chat"])
@@ -199,6 +205,96 @@ async def generate_title(body: GenerateTitleRequest) -> GenerateTitleResponse:
     )
 
     return GenerateTitleResponse(data=GenerateTitleResponseData(title=title, tokenUsage=token_usage))
+
+
+# ── POST /v1/ai/exam/question ────────────────────────────────────────────────
+
+@router.post(
+    "/exam/question",
+    response_model=ExamQuestionResponse,
+    summary="Generate the next oral-exam question for a character",
+    description=(
+        "Picks a source excerpt from the character's documents and asks a question answerable from it. "
+        "The expected answer and excerpt are returned for grading and must not be shown to the learner."
+    ),
+)
+async def exam_question(body: ExamQuestionRequest) -> ExamQuestionResponse:
+    character, context = await _resolve_character_and_context(
+        body.characterId,
+        body.contextId,
+        body.characterData,
+        body.contextData,
+    )
+
+    try:
+        question, expected_answer, source, prompt_tokens, completion_tokens = await exam_service.generate_exam_question(
+            character=character,
+            context=context,
+            asked_questions=body.askedQuestions,
+            used_sources=body.usedSources,
+        )
+    except exam_service.ExamSourceUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"LLM error: {exc}",
+        )
+
+    return ExamQuestionResponse(
+        data=ExamQuestionResponseData(
+            question=question,
+            expectedAnswer=expected_answer,
+            sourceExcerpt=source,
+            tokenUsage=TokenUsage(
+                promptTokens=prompt_tokens,
+                completionTokens=completion_tokens,
+                totalTokens=prompt_tokens + completion_tokens,
+            ),
+        )
+    )
+
+
+# ── POST /v1/ai/exam/grade ───────────────────────────────────────────────────
+
+@router.post(
+    "/exam/grade",
+    response_model=ExamGradeResponse,
+    summary="Grade a learner's oral-exam answer against the source excerpt",
+)
+async def exam_grade(body: ExamGradeRequest) -> ExamGradeResponse:
+    character, _ = await _resolve_character_and_context(
+        body.characterId,
+        body.contextId,
+        body.characterData,
+        body.contextData,
+    )
+
+    try:
+        verdict, feedback, prompt_tokens, completion_tokens = await exam_service.grade_exam_answer(
+            character=character,
+            question=body.question,
+            expected_answer=body.expectedAnswer,
+            source=body.sourceExcerpt,
+            answer=body.answer,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"LLM error: {exc}",
+        )
+
+    return ExamGradeResponse(
+        data=ExamGradeResponseData(
+            verdict=verdict,
+            feedback=feedback,
+            tokenUsage=TokenUsage(
+                promptTokens=prompt_tokens,
+                completionTokens=completion_tokens,
+                totalTokens=prompt_tokens + completion_tokens,
+            ),
+        )
+    )
 
 
 # ── POST /v1/ai/documents/process ───────────────────────────────────────────

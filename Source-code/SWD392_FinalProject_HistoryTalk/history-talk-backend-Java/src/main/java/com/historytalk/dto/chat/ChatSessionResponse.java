@@ -1,5 +1,6 @@
 package com.historytalk.dto.chat;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -30,4 +31,11 @@ public class ChatSessionResponse {
 
     @JsonProperty("messageCount")
     private int messageCount;
+
+    @JsonProperty("mode")
+    private String mode;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonProperty("examQuestionCount")
+    private Integer examQuestionCount;
 }

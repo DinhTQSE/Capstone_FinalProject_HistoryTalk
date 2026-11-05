@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
   # =============================================================================
-  # 1. PostgreSQL Database Service (historical_schema + pgcrypto)
+  # 1. PostgreSQL Database Service (historical_schema + pgcrypto + pgvector)
   # =============================================================================
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: historytalk-postgres
     restart: unless-stopped
     ports:

@@ -8,6 +8,7 @@ import com.historytalk.dto.chat.SendMessageRequest;
 import com.historytalk.dto.chat.SendMessageResponse;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
+import com.historytalk.entity.enums.ChatSessionMode;
 
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
@@ -18,14 +19,18 @@ import com.historytalk.service.chat.AiServiceClient.AiChatResult;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
 import com.historytalk.service.chat.AiServiceClient.ContextPayload;
 import com.historytalk.service.chat.AiServiceClient.MessageHistoryItem;
+import com.historytalk.service.chat.ExamSessionService.ExamTurnResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,6 +51,7 @@ public class MessageServiceImpl implements MessageService {
     private final com.historytalk.repository.UserRepository userRepository;
     private final com.historytalk.service.gamification.GamificationService gamificationService;
     private final com.historytalk.service.school.token.DailyTokenAllowanceService dailyTokenAllowanceService;
+    private final ExamSessionService examSessionService;
 
     // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
@@ -53,7 +59,7 @@ public class MessageServiceImpl implements MessageService {
     public GetMessagesResponse getMessages(String sessionId, String userId) {
         log.info("Getting messages for session={} user={}", sessionId, userId);
 
-        chatSessionRepository.findActiveBySessionIdAndUserUid(
+        ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(sessionId), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
 
@@ -74,6 +80,7 @@ public class MessageServiceImpl implements MessageService {
         return GetMessagesResponse.builder()
                 .messages(messageResponses)
                 .suggestedQuestions(suggestedQuestions)
+                .exam(session.getMode() == ChatSessionMode.EXAM ? examSessionService.getProgress(session, messages) : null)
                 .build();
     }
 
@@ -89,6 +96,19 @@ public class MessageServiceImpl implements MessageService {
                         "Chat session not found with ID: " + request.getSessionId()));
 
         verifyUserTokenAndSubscriptionBeforeChat(session.getUser());
+
+        if (session.getMode() == ChatSessionMode.EXAM) {
+            ExamTurnResult turn = examSessionService.submitAnswer(session, request);
+            return SendMessageResponse.builder()
+                    .userMessage(mapToMessageResponse(turn.userMessage()))
+                    .assistantMessage(mapToMessageResponse(turn.assistantMessage()))
+                    .suggestedQuestions(Collections.emptyList())
+                    .remainingTokens(turn.remainingTokens())
+                    .promptTokens(turn.promptTokens())
+                    .completionTokens(turn.completionTokens())
+                    .exam(turn.progress())
+                    .build();
+        }
 
         // Load existing history BEFORE saving new user message
         List<Message> existingMessages = messageRepository
@@ -223,6 +243,10 @@ public class MessageServiceImpl implements MessageService {
                         "Chat session not found with ID: " + request.getSessionId()));
 
         verifyUserTokenAndSubscriptionBeforeChat(session.getUser());
+
+        if (session.getMode() == ChatSessionMode.EXAM) {
+            return streamExamTurn(examSessionService.submitAnswer(session, request));
+        }
 
         // Save user message immediately
         Message userMsg = Message.builder()
@@ -382,6 +406,36 @@ public class MessageServiceImpl implements MessageService {
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
+    /**
+     * Exam turns are generated as a whole because the reply depends on the parsed grade. They are still
+     * sent as the stream events clients already handle, so the streaming endpoint keeps working in exam mode.
+     */
+    private SseEmitter streamExamTurn(ExamTurnResult turn) {
+        MessageResponse assistant = mapToMessageResponse(turn.assistantMessage());
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("suggestedQuestions", Collections.emptyList());
+        metadata.put("promptTokens", turn.promptTokens());
+        metadata.put("completionTokens", turn.completionTokens());
+        metadata.put("quotes_used", assistant.getQuotes());
+        metadata.put("examVerdict", assistant.getExamVerdict());
+        metadata.put("exam", turn.progress());
+
+        SseEmitter emitter = new SseEmitter(180000L);
+        try {
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(
+                    Map.of("type", "text", "data", assistant.getContent()))));
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(
+                    Map.of("type", "metadata", "data", metadata))));
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(
+                    Map.of("type", "done", "remainingTokens", turn.remainingTokens()))));
+            emitter.complete();
+        } catch (IOException e) {
+            emitter.completeWithError(e);
+        }
+        return emitter;
+    }
+
     private void verifyUserTokenAndSubscriptionBeforeChat(com.historytalk.entity.user.User user) {
         if (user == null) {
             return;
@@ -410,6 +464,7 @@ public class MessageServiceImpl implements MessageService {
                 .content(message.getContent())
                 .messageType(message.getMessageType() != null ? message.getMessageType() : "TEXT")
                 .quotes(parseSuggestedQuestions(message.getQuotes()))
+                .examVerdict(message.getExamVerdict() != null ? message.getExamVerdict().name() : null)
                 .createdAt(message.getCreatedAt())
                 .build();
     }

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_USERNAME: str = ""
     OLLAMA_PASSWORD: str = ""
-    LLM_MODEL: str = "qwen2.5:14b"
+    LLM_MODEL: str = "qwen3.8:27b"
     LLM_TEMPERATURE: float = 0.7
     # Max tokens for character response (not counting the structured wrapper)
     LLM_MAX_TOKENS: int = 1024
