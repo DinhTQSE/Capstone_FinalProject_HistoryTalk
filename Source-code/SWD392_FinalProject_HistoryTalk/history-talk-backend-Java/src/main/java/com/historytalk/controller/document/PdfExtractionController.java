@@ -10,6 +10,7 @@ import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,16 +51,28 @@ public class PdfExtractionController {
         return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
     }
 
-    @PostMapping(value = "/upload-and-extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = {"/upload-and-extract", "/upload-and-extract/stream"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Upload PDF and extract raw text for document drafting")
-    public ResponseEntity<ApiResponse<PdfExtractionResponse>> uploadAndExtract(
+    @Operation(summary = "Upload PDF and extract text (supports SSE stream via Accept: text/event-stream or ?stream=true, or synchronous response)")
+    public Object uploadAndExtract(
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) Integer startPage,
-            @RequestParam(required = false) Integer endPage) throws IOException {
+            @RequestParam(required = false) Integer endPage,
+            HttpServletRequest request) throws IOException {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/upload-and-extract by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
+        String acceptHeader = request.getHeader("Accept");
+        String uri = request.getRequestURI();
+        boolean wantsStream = (acceptHeader != null && acceptHeader.contains(MediaType.TEXT_EVENT_STREAM_VALUE))
+                || (uri != null && uri.endsWith("/stream"))
+                || "true".equalsIgnoreCase(request.getParameter("stream"));
+
+        if (wantsStream) {
+            log.info("POST {} (SSE stream mode) by user {}, startPage={}, endPage={}", uri, staffId, startPage, endPage);
+            return handleStreamExtraction(file, startPage, endPage);
+        }
+
+        log.info("POST /api/v1/documents/pdf/upload-and-extract (synchronous mode) by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
         PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage);
         if (response.getFileUrl() == null || response.getFileUrl().isBlank()) {
             response.setFileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded_document.pdf");
@@ -67,16 +80,10 @@ public class PdfExtractionController {
         return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
     }
 
-    @PostMapping(value = "/upload-and-extract/stream", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Upload PDF and stream extraction progress via SSE")
-    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter uploadAndExtractStream(
-            @RequestPart("file") MultipartFile file,
-            @RequestParam(required = false) Integer startPage,
-            @RequestParam(required = false) Integer endPage) {
-        String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/upload-and-extract/stream by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
+    private org.springframework.web.servlet.mvc.method.annotation.SseEmitter handleStreamExtraction(
+            MultipartFile file,
+            Integer startPage,
+            Integer endPage) {
 
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(15 * 60 * 1000L);
 
