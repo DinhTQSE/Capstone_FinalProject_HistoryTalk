@@ -107,6 +107,28 @@ public class AiServiceClient {
                         @JsonProperty("location") String location) {
         }
 
+        public record ImageToDescribeDto(
+                        @JsonProperty("image_base64") String imageBase64,
+                        @JsonProperty("caption") String caption,
+                        @JsonProperty("page_number") Integer pageNumber) {
+        }
+
+        public record DescribedImageDto(
+                        @JsonProperty("page_number") Integer pageNumber,
+                        @JsonProperty("caption") String caption,
+                        @JsonProperty("description_block") String descriptionBlock) {
+        }
+
+        record DescribeImagesRequest(
+                        @JsonProperty("images") List<ImageToDescribeDto> images) {
+        }
+
+        record DescribeImagesResponse(
+                        @JsonProperty("success") boolean success,
+                        @JsonProperty("data") List<DescribedImageDto> data) {
+        }
+
+
         public record MessageHistoryItem(
                         @JsonProperty("role") String role,
                         @JsonProperty("content") String content) {
@@ -475,6 +497,36 @@ public class AiServiceClient {
                 } catch (RestClientException e) {
                         aiMetricsService.recordRequest("delete_document", "failure");
                         log.error("AI service DELETE /documents call failed for doc {}: {}", docId, e.getMessage());
+                }
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/documents/describe-images.
+         * Enriches historical maps and artifacts via Vision Model.
+         */
+        public List<DescribedImageDto> describeImages(List<ImageToDescribeDto> images) {
+                if (images == null || images.isEmpty()) {
+                        return List.of();
+                }
+                DescribeImagesRequest request = new DescribeImagesRequest(images);
+                try {
+                        log.info("Calling AI service to describe {} images", images.size());
+                        DescribeImagesResponse response = restClient.post()
+                                        .uri("/v1/ai/documents/describe-images")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(request)
+                                        .retrieve()
+                                        .body(DescribeImagesResponse.class);
+
+                        if (response != null && response.data() != null) {
+                                aiMetricsService.recordRequest("describe_images", "success");
+                                return response.data();
+                        }
+                        return List.of();
+                } catch (RestClientException e) {
+                        aiMetricsService.recordRequest("describe_images", "failure");
+                        log.error("AI service /documents/describe-images call failed: {}", e.getMessage());
+                        return List.of();
                 }
         }
 

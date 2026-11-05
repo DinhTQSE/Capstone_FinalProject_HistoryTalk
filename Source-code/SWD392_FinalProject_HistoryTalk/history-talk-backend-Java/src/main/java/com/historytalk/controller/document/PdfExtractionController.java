@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,10 +41,12 @@ public class PdfExtractionController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Extract raw text from PDF file for frontend drafting (STATELESS - no DB persistence)")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> extractText(
-            @RequestPart("file") MultipartFile file) throws IOException {
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) Integer startPage,
+            @RequestParam(required = false) Integer endPage) throws IOException {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/extract by user {}", staffId);
-        PdfExtractionResponse response = pdfExtractionService.extractText(file);
+        log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
+        PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage);
         return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
     }
 
@@ -53,11 +56,11 @@ public class PdfExtractionController {
     @Operation(summary = "Upload PDF and extract raw text for document drafting")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> uploadAndExtract(
             @RequestPart("file") MultipartFile file,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String entityType,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String entityId) throws IOException {
+            @RequestParam(required = false) Integer startPage,
+            @RequestParam(required = false) Integer endPage) throws IOException {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/upload-and-extract by user {} for entityType={}, entityId={}", staffId, entityType, entityId);
-        PdfExtractionResponse response = pdfExtractionService.extractText(file);
+        log.info("POST /api/v1/documents/pdf/upload-and-extract by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
+        PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage);
         if (response.getFileUrl() == null || response.getFileUrl().isBlank()) {
             response.setFileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded_document.pdf");
         }
@@ -70,16 +73,16 @@ public class PdfExtractionController {
     @Operation(summary = "Upload PDF and stream extraction progress via SSE")
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter uploadAndExtractStream(
             @RequestPart("file") MultipartFile file,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String entityType,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String entityId) {
+            @RequestParam(required = false) Integer startPage,
+            @RequestParam(required = false) Integer endPage) {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/upload-and-extract/stream by user {}", staffId);
+        log.info("POST /api/v1/documents/pdf/upload-and-extract/stream by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
 
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(15 * 60 * 1000L);
 
         java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                PdfExtractionResponse result = pdfExtractionService.extractText(file);
+                PdfExtractionResponse result = pdfExtractionService.extractText(file, startPage, endPage);
                 if (result.getFileUrl() == null || result.getFileUrl().isBlank()) {
                     result.setFileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded_document.pdf");
                 }
@@ -110,16 +113,16 @@ public class PdfExtractionController {
         return emitter;
     }
 
-    @PostMapping("/{docId}/save-content")
+    @PostMapping(value = "/save-content")
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Save user-edited content to document")
-    public ResponseEntity<ApiResponse<DocumentFileResponse>> saveContent(
-            @RequestBody @Valid SaveDocumentRequest request) {
+    @Operation(summary = "Save or update document content and status (Phase 1 stateless PDF upload -> edit -> save)")
+    public ResponseEntity<ApiResponse<DocumentFileResponse>> saveDocumentContent(
+            @Valid @RequestBody SaveDocumentRequest request) {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
-        log.info("POST /api/v1/documents/{}/save-content by user {} (role={})", request.getDocId(), staffId, staffRole);
+        log.info("POST /api/v1/documents/pdf/save-content for docId {} by user {}", request.getDocId(), staffId);
         DocumentFileResponse response = documentContentService.saveDocumentContent(request, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(response, "Document content saved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Nội dung tài liệu đã được lưu thành công"));
     }
 }

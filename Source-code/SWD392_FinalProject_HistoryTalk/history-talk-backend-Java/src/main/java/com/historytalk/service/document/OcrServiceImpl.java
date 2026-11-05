@@ -38,70 +38,86 @@ public class OcrServiceImpl implements OcrService {
 
     private Tesseract createTesseractInstance() throws IOException {
         Tesseract tesseract = new Tesseract();
-        
-        // Resolve absolute path to tessdata
-        String absoluteDatapath;
-        if (datapath.startsWith("classpath:")) {
-            String resourcePath = datapath.substring("classpath:".length()).trim();
-            if (resourcePath.endsWith("/")) {
-                resourcePath = resourcePath.substring(0, resourcePath.length() - 1);
-            }
+        String effectiveLang = (language != null && !language.isBlank()) ? language : "vie";
+        String languageFile = effectiveLang + ".traineddata";
+        String absoluteDatapath = null;
 
-            // Trích xuất file .traineddata từ file JAR nén ra thư mục tạm của hệ điều hành
-            // Giúp Tesseract C++ đọc được file thực thể khi deploy dạng Docker / Fat JAR
+        // 1. Thử dùng thư mục tessdata gốc trên ổ cứng nếu đang chạy local (IDE / dev mode)
+        try {
+            ClassPathResource directResource = new ClassPathResource("tessdata");
+            File directFolder = directResource.getFile();
+            if (directFolder.exists() && directFolder.isDirectory()) {
+                File directLang = new File(directFolder, languageFile);
+                if (directLang.exists() && directLang.length() > 0) {
+                    absoluteDatapath = directFolder.getAbsolutePath();
+                    log.info("Using local filesystem tessdata directory: {}", absoluteDatapath);
+                }
+            }
+        } catch (Exception ignored) {
+            // Đang chạy bên trong file JAR (trên Docker/Server), getFile() sẽ văng lỗi.
+            // Bỏ qua để chuyển sang bước 2 tự động trích xuất ra /tmp.
+        }
+
+        // 2. Nếu chạy trong JAR hoặc getFile() không được: Trích xuất .traineddata ra thư mục tạm của hệ điều hành
+        if (absoluteDatapath == null) {
             File tempTessDir = new File(System.getProperty("java.io.tmpdir"), "historytalk_tessdata");
             if (!tempTessDir.exists()) {
                 tempTessDir.mkdirs();
             }
 
-            String languageFile = language + ".traineddata";
             File targetLangFile = new File(tempTessDir, languageFile);
-
             if (!targetLangFile.exists() || targetLangFile.length() == 0) {
-                String classpathFile = resourcePath.isEmpty() ? languageFile : resourcePath + "/" + languageFile;
-                ClassPathResource resource = new ClassPathResource(classpathFile);
-                if (resource.exists()) {
-                    try (java.io.InputStream in = resource.getInputStream();
-                         java.io.FileOutputStream out = new java.io.FileOutputStream(targetLangFile)) {
-                        in.transferTo(out);
-                        log.info("Extracted traineddata from JAR to temporary filesystem: {}", targetLangFile.getAbsolutePath());
+                String[] potentialPaths = {
+                    "tessdata/" + languageFile,
+                    languageFile
+                };
+
+                for (String path : potentialPaths) {
+                    ClassPathResource resource = new ClassPathResource(path);
+                    if (resource.exists()) {
+                        try (java.io.InputStream in = resource.getInputStream();
+                             java.io.FileOutputStream out = new java.io.FileOutputStream(targetLangFile)) {
+                            in.transferTo(out);
+                            log.info("Extracted {} from JAR to temporary filesystem: {}", path, targetLangFile.getAbsolutePath());
+                            break;
+                        }
                     }
-                } else {
-                    log.warn("Classpath resource does not exist: {}", classpathFile);
                 }
             }
 
-            absoluteDatapath = tempTessDir.getAbsolutePath();
-            log.debug("Resolved classpath tessdata to OS filesystem: {}", absoluteDatapath);
-        } else {
-            absoluteDatapath = datapath;
+            if (targetLangFile.exists() && targetLangFile.length() > 0) {
+                absoluteDatapath = tempTessDir.getAbsolutePath();
+            }
         }
-        
-        // Validate tessdata directory exists
+
+        // 3. Fallback: Nếu người dùng cấu hình đường dẫn tuyệt đối ngoài hệ điều hành
+        if (absoluteDatapath == null) {
+            if (datapath != null && !datapath.isBlank() && !datapath.startsWith("classpath:")) {
+                File customDir = new File(datapath);
+                if (customDir.exists() && customDir.isDirectory()) {
+                    absoluteDatapath = customDir.getAbsolutePath();
+                }
+            }
+        }
+
+        // 4. Kiểm tra hợp lệ cuối cùng
+        if (absoluteDatapath == null) {
+            throw new IOException("Cannot resolve tessdata directory for language: " + effectiveLang);
+        }
+
         File tessDataDir = new File(absoluteDatapath);
         if (!tessDataDir.exists() || !tessDataDir.isDirectory()) {
             throw new IOException("Tessdata directory does not exist: " + absoluteDatapath);
         }
-        
-        // Validate language file exists
-        String languageFile = language + ".traineddata";
+
         File languageDataFile = new File(tessDataDir, languageFile);
         if (!languageDataFile.exists()) {
-            String availableFiles = String.join(", ", 
-                tessDataDir.list((dir, name) -> name.endsWith(".traineddata")));
-            throw new IOException(
-                "Language data file not found: " + languageFile + 
-                " in directory: " + absoluteDatapath + 
-                ". Available language files: [" + availableFiles + "]. " +
-                "Please download " + languageFile + " from Tesseract GitHub and place it in the tessdata directory."
-            );
+            throw new IOException("Language data file not found: " + languageFile + " in directory: " + absoluteDatapath);
         }
-        
-        log.info("Tessdata directory validated: {}", absoluteDatapath);
-        log.info("Language file found: {}", languageFile);
-        
+
+        log.info("Tesseract configured with datapath: {}, language: {}", absoluteDatapath, effectiveLang);
         tesseract.setDatapath(absoluteDatapath);
-        tesseract.setLanguage(language);
+        tesseract.setLanguage(effectiveLang);
         return tesseract;
     }
 

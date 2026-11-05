@@ -142,3 +142,26 @@ class ErrorResponse(BaseModel):
     success: bool = False
     errorCode: str
     message: str
+
+
+# ── Image Description (VLM) ────────────────────────────────────────────────
+
+class ImageToDescribe(BaseModel):
+    image_base64: str = Field(..., description='Base64 encoded string of image (with or without data URI header)')
+    caption: Optional[str] = Field(None, description='Original caption or title near the image in the textbook')
+    page_number: Optional[int] = Field(None, description='Page number where image appears')
+
+
+class DescribeImagesRequest(BaseModel):
+    images: List[ImageToDescribe] = Field(..., description='List of images extracted from document to describe')
+
+
+class DescribedImageItem(BaseModel):
+    page_number: Optional[int] = None
+    caption: Optional[str] = None
+    description_block: str = Field(..., description='Rich historical context block formatted as markdown')
+
+
+class DescribeImagesResponse(BaseModel):
+    success: bool = True
+    data: List[DescribedImageItem] = Field(default_factory=list)

@@ -21,6 +21,9 @@ from history_talk_ai.presentation.chat.schemas import (
     GenerateTitleResponseData,
     ProcessDocumentRequest,
     TokenUsage,
+    DescribeImagesRequest,
+    DescribeImagesResponse,
+    DescribedImageItem,
 )
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
@@ -372,3 +375,37 @@ async def proxy_context(context_id: str):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
     except JavaBackendError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.message)
+
+
+# ── POST /v1/ai/documents/describe-images ────────────────────────────────────
+
+@router.post(
+    "/documents/describe-images",
+    response_model=DescribeImagesResponse,
+    summary="Analyze historical images and battle maps using Vision Model (Gemini / Qwen-VL)",
+    description=(
+        "Accepts a list of base64 images extracted from historical textbook pages, "
+        "runs them through Vision AI, and returns rich textual context descriptions."
+    ),
+)
+async def describe_images(body: DescribeImagesRequest):
+    try:
+        results = []
+        for item in body.images:
+            desc = await llm_service.describe_historical_image(
+                image_base64=item.image_base64,
+                caption=item.caption
+            )
+            results.append(
+                DescribedImageItem(
+                    page_number=item.page_number,
+                    caption=item.caption,
+                    description_block=desc
+                )
+            )
+        return DescribeImagesResponse(success=True, data=results)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Image description error: {exc}",
+        )
