@@ -80,6 +80,16 @@ public class PdfExtractionController {
 
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(15 * 60 * 1000L);
 
+        // Heartbeat executor: Bắn SSE comment ": ping\n\n" mỗi 3 giây
+        // Giúp Cloudflare, Caddy và Trình duyệt duy trì kết nối liên tục, chống rớt mạng / timeout 524
+        java.util.concurrent.ScheduledExecutorService heartbeatScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        java.util.concurrent.ScheduledFuture<?> heartbeatFuture = heartbeatScheduler.scheduleAtFixedRate(() -> {
+            try {
+                emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event().comment("ping"));
+            } catch (Exception ignored) {
+            }
+        }, 1, 3, java.util.concurrent.TimeUnit.SECONDS);
+
         java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 PdfExtractionResponse result = pdfExtractionService.extractText(file, startPage, endPage);
@@ -107,6 +117,9 @@ public class PdfExtractionController {
                     // Ignore SSE send error
                 }
                 emitter.completeWithError(e);
+            } finally {
+                heartbeatFuture.cancel(true);
+                heartbeatScheduler.shutdown();
             }
         });
 
