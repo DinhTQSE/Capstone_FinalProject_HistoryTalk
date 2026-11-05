@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "ollama"  # "ollama", "external" (OpenAI, Gemini, Groq, v.v.)
     EXTERNAL_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     EXTERNAL_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
+
+    # Vision Model Provider ("google", "ollama")
+    VISION_PROVIDER: str = "ollama"
+    VISION_MODEL: str = "qwen2.5vl:7b"
     
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_USERNAME: str = ""
@@ -23,8 +28,8 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 1024
 
     # ── Supabase ──────────────────────────────────────────────────────────────
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
     SUPABASE_SCHEMA: str = "historical_schema"
 
     # ── App ───────────────────────────────────────────────────────────────────

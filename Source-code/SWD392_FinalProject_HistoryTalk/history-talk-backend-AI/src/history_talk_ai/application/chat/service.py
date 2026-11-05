@@ -23,7 +23,11 @@ supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 # ── Ollama HTTP Client ────────────────────────────────────────────────────────
 # Use a global client to reuse connections (Connection Pooling) for faster requests
-ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
+ollama_client = httpx.AsyncClient(
+    timeout=120.0,
+    follow_redirects=True,
+    headers={"ngrok-skip-browser-warning": "true", "User-Agent": "HistoryTalk-AI/1.0"}
+)
 
 
 def _ollama_url(path: str) -> str:
@@ -115,8 +119,9 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
 
 async def _call_external(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
     """Make an async call to an external OpenAI-compatible API (e.g. OpenAI, Gemini, Groq)."""
+    api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
     headers = {
-        "Authorization": f"Bearer {settings.EXTERNAL_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
@@ -148,8 +153,9 @@ async def _call_external(messages: list[dict], expect_json: bool = True) -> tupl
 
 async def _call_external_stream(messages: list[dict]) -> tuple:
     """Make an async call to an external API with streaming enabled."""
+    api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
     headers = {
-        "Authorization": f"Bearer {settings.EXTERNAL_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
@@ -202,13 +208,13 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
 
 async def _call_llm(messages: list[dict], expect_json: bool = True) -> tuple[str, int, int]:
     """Router to call either Ollama or External API based on settings."""
-    if settings.LLM_PROVIDER.lower() == "external":
+    if settings.LLM_PROVIDER.lower() in ("external", "google"):
         return await _call_external(messages, expect_json)
     return await _call_ollama(messages, expect_json)
 
 async def _call_llm_stream(messages: list[dict]) -> tuple:
     """Router to stream from either Ollama or External API based on settings."""
-    if settings.LLM_PROVIDER.lower() == "external":
+    if settings.LLM_PROVIDER.lower() in ("external", "google"):
         async for chunk in _call_external_stream(messages):
             yield chunk
     else:
@@ -688,3 +694,107 @@ async def delete_document(doc_id: str):
     except Exception as e:
         logger.error(f"Failed to delete chunks for doc {doc_id}: {e}")
         raise
+
+
+async def describe_historical_image(image_base64: str, caption: str = None) -> str:
+    """
+    Describe a historical image.
+    """
+    caption_info = caption if caption else "Không có chú thích"
+
+    # Kiểm tra tính hợp lệ của chuỗi base64 (tránh gửi chuỗi rỗng gây 400 Bad Request cho Ollama)
+    if not image_base64 or not isinstance(image_base64, str):
+        fallback_name = caption or 'Ảnh tư liệu'
+        return f"[TƯ LIỆU HÌNH ẢNH: {fallback_name}]\n- Chú giải tư liệu: {caption_info}\n[HẾT TƯ LIỆU HÌNH ẢNH]"
+
+    # Clean base64 header if present (e.g., data:image/png;base64,...)
+    mime_type = "image/jpeg"
+    raw_b64 = image_base64.strip()
+    if "," in raw_b64 and "base64" in raw_b64:
+        header, raw_b64 = raw_b64.split(",", 1)
+        if "image/png" in header:
+            mime_type = "image/png"
+        elif "image/webp" in header:
+            mime_type = "image/webp"
+
+    raw_b64 = "".join(raw_b64.split())
+    if len(raw_b64) < 100:
+        fallback_name = caption or 'Ảnh tư liệu'
+        return f"[TƯ LIỆU HÌNH ẢNH: {fallback_name}]\n- Chú giải tư liệu: {caption_info}\n[HẾT TƯ LIỆU HÌNH ẢNH]"
+    prompt_text = (
+        "Bạn là chuyên gia thẩm định tư liệu lịch sử Việt Nam. Nguyên tắc tối cao: TRUNG THỰC VỚI NGUYÊN BẢN & KHÔNG SUY ĐOÁN BỊA ĐẶT.\n"
+        f"- Chú thích gốc trong tài liệu: {caption_info}\n\n"
+        "Nhiệm vụ: Phân tích khách quan những gì TRỰC TIẾP NHÌN THẤY trên hình ảnh/lược đồ này theo cấu trúc Markdown sau:\n"
+        "[TƯ LIỆU HÌNH ẢNH]\n"
+        "- Phân loại: (Lược đồ tác chiến / Bản đồ chiến dịch / Ảnh tư liệu hiện trường / Chân dung nhân vật / Hiện vật di tích)\n"
+        "- Nội dung chi tiết trên ảnh: (Đọc CHÍNH XÁC toàn bộ chữ in, mũi tên tiến thoái, tên căn cứ, cứ điểm, địa danh, mốc thời gian, người chỉ huy có trên hình)\n"
+        "- Chú giải khách quan: (Tóm tắt ngắn gọn 1-2 câu về sự kiện được phản ánh trực tiếp trong hình)\n"
+        "- Ghi chú thẩm định: (Nếu chi tiết nào mờ hoặc không có trong hình, TUYỆT ĐỐI không đoán bừa mà ghi rõ: 'Chi tiết trên ảnh không thể hiện')\n"
+        "[HẾT TƯ LIỆU HÌNH ẢNH]"
+    )
+
+    # 1. Thử gọi Google Gemini nếu cấu hình provider là google và có api_key
+    if settings.VISION_PROVIDER.lower() == "google" and settings.GOOGLE_API_KEY:
+        api_key = settings.GOOGLE_API_KEY
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.VISION_MODEL}:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt_text},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": raw_b64.strip()
+                            }
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 1024
+            }
+        }
+        try:
+            res = await ollama_client.post(url, json=payload, timeout=45.0)
+            res.raise_for_status()
+            data = res.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "").strip()
+            fallback_name = caption or 'Ảnh tư liệu'
+            return f"[TƯ LIỆU HÌNH ẢNH: {fallback_name}]\n[HẾT TƯ LIỆU HÌNH ẢNH]"
+        except Exception as e:
+            logger.warning(f"Failed to describe image via Gemini ({e}), falling back to Ollama Vision...")
+
+    # 2. Xử lý qua Ollama Vision (qwen2.5-vl hoặc VLM self-host trên server)
+    model_name = settings.VISION_MODEL if settings.VISION_MODEL not in ("gemini-2.5-flash", "gemini-1.5-flash") else "qwen2.5vl:7b"
+    payload = {
+        "model": model_name,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt_text,
+                "images": [raw_b64.strip()]
+            }
+        ],
+        "stream": False
+    }
+    auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+    try:
+        res = await ollama_client.post(_ollama_url("/api/chat"), json=payload, auth=auth, timeout=180.0)
+        res.raise_for_status()
+        data = res.json()
+        content = data.get("message", {}).get("content", "")
+        if content:
+            return content.strip()
+        fallback_name = caption or 'Ảnh tư liệu'
+        return f"[TƯ LIỆU HÌNH ẢNH: {fallback_name}]\n[HẾT TƯ LIỆU HÌNH ẢNH]"
+    except Exception as e:
+        err_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
+        logger.warning(f"Ollama Vision ({model_name}) error: {err_msg}. Preserving original document caption.")
+        fallback_name = caption or 'Ảnh tư liệu'
+        return f"[TƯ LIỆU HÌNH ẢNH: {fallback_name}]\n- Chú giải tư liệu: {caption_info}\n[HẾT TƯ LIỆU HÌNH ẢNH]"
