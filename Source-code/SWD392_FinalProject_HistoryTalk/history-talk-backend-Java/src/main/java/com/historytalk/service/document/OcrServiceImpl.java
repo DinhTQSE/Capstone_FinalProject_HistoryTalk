@@ -42,11 +42,37 @@ public class OcrServiceImpl implements OcrService {
         // Resolve absolute path to tessdata
         String absoluteDatapath;
         if (datapath.startsWith("classpath:")) {
-            String resourcePath = datapath.substring("classpath:".length());
-            ClassPathResource resource = new ClassPathResource(resourcePath);
-            File tessDataFolder = resource.getFile();
-            absoluteDatapath = tessDataFolder.getAbsolutePath();
-            log.debug("Resolved classpath tessdata to: {}", absoluteDatapath);
+            String resourcePath = datapath.substring("classpath:".length()).trim();
+            if (resourcePath.endsWith("/")) {
+                resourcePath = resourcePath.substring(0, resourcePath.length() - 1);
+            }
+
+            // Trích xuất file .traineddata từ file JAR nén ra thư mục tạm của hệ điều hành
+            // Giúp Tesseract C++ đọc được file thực thể khi deploy dạng Docker / Fat JAR
+            File tempTessDir = new File(System.getProperty("java.io.tmpdir"), "historytalk_tessdata");
+            if (!tempTessDir.exists()) {
+                tempTessDir.mkdirs();
+            }
+
+            String languageFile = language + ".traineddata";
+            File targetLangFile = new File(tempTessDir, languageFile);
+
+            if (!targetLangFile.exists() || targetLangFile.length() == 0) {
+                String classpathFile = resourcePath.isEmpty() ? languageFile : resourcePath + "/" + languageFile;
+                ClassPathResource resource = new ClassPathResource(classpathFile);
+                if (resource.exists()) {
+                    try (java.io.InputStream in = resource.getInputStream();
+                         java.io.FileOutputStream out = new java.io.FileOutputStream(targetLangFile)) {
+                        in.transferTo(out);
+                        log.info("Extracted traineddata from JAR to temporary filesystem: {}", targetLangFile.getAbsolutePath());
+                    }
+                } else {
+                    log.warn("Classpath resource does not exist: {}", classpathFile);
+                }
+            }
+
+            absoluteDatapath = tempTessDir.getAbsolutePath();
+            log.debug("Resolved classpath tessdata to OS filesystem: {}", absoluteDatapath);
         } else {
             absoluteDatapath = datapath;
         }
