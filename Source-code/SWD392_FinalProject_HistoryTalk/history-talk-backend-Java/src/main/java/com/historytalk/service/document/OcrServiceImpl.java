@@ -149,27 +149,23 @@ public class OcrServiceImpl implements OcrService {
             throw new IOException("PDF file does not exist");
         }
 
-        Path tempImageFile = null;
         StringBuilder fullText = new StringBuilder();
 
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
             int pageCount = document.getNumberOfPages();
-            log.info("Starting OCR on PDF with {} pages at {} DPI", pageCount, dpi);
+            log.info("Starting OCR on PDF with {} pages at {} DPI (In-Memory Grayscale Pipeline)", pageCount, dpi);
 
             PDFRenderer renderer = new PDFRenderer(document);
+            Tesseract tesseract = createTesseractInstance();
 
             for (int pageIndex = 0; pageIndex < pageCount; pageIndex++) {
-                tempImageFile = null;
                 BufferedImage image = null;
                 try {
-                    tempImageFile = Files.createTempFile("pdf-ocr-page-", ".png");
-                    
-                    image = renderer.renderImageWithDPI(pageIndex, dpi, ImageType.RGB);
-                    ImageIO.write(image, "png", tempImageFile.toFile());
+                    // Render truc tiep sang GRAYSCALE: Tiet kiem 66% RAM so voi RGB, phu hop chuan binarize cua Tesseract
+                    image = renderer.renderImageWithDPI(pageIndex, dpi, ImageType.GRAY);
 
-                    // Create fresh Tesseract instance for each page
-                    Tesseract tesseract = createTesseractInstance();
-                    String pageText = tesseract.doOCR(tempImageFile.toFile());
+                    // OCR truc tiep tu BufferedImage trong RAM - khong ghi va doc lai file PNG tu dia
+                    String pageText = tesseract.doOCR(image);
                     
                     if (pageText != null && !pageText.isBlank()) {
                         if (fullText.length() > 0) {
@@ -184,17 +180,8 @@ public class OcrServiceImpl implements OcrService {
                     log.error("OCR failed for page {}/{}", pageIndex + 1, pageCount, e);
                     throw new IOException("OCR processing failed on page " + (pageIndex + 1) + ": " + e.getMessage(), e);
                 } finally {
-                    // Properly dispose of BufferedImage
                     if (image != null) {
                         image.flush();
-                    }
-                    // Delete temp image file
-                    if (tempImageFile != null) {
-                        try {
-                            Files.deleteIfExists(tempImageFile);
-                        } catch (IOException e) {
-                            log.warn("Failed to delete temp image file: {}", tempImageFile, e);
-                        }
                     }
                 }
             }
@@ -208,3 +195,4 @@ public class OcrServiceImpl implements OcrService {
         }
     }
 }
+
