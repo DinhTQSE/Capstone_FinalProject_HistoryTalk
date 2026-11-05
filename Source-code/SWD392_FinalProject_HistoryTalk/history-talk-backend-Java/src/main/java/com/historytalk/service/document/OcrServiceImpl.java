@@ -15,6 +15,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.function.BiConsumer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -145,6 +146,11 @@ public class OcrServiceImpl implements OcrService {
 
     @Override
     public String extractTextFromPdf(File pdfFile) throws IOException {
+        return extractTextFromPdf(pdfFile, null);
+    }
+
+    @Override
+    public String extractTextFromPdf(File pdfFile, BiConsumer<Integer, Integer> onProgress) throws IOException {
         if (pdfFile == null || !pdfFile.exists()) {
             throw new IOException("PDF file does not exist");
         }
@@ -172,6 +178,14 @@ public class OcrServiceImpl implements OcrService {
                             fullText.append("\n\n");
                         }
                         fullText.append(pageText);
+                    }
+
+                    if (onProgress != null) {
+                        try {
+                            onProgress.accept(pageIndex + 1, pageCount);
+                        } catch (Exception ex) {
+                            log.warn("Progress callback failed for page {}/{}: {}", pageIndex + 1, pageCount, ex.getMessage());
+                        }
                     }
 
                     log.debug("OCR completed for page {}/{}", pageIndex + 1, pageCount);

@@ -86,15 +86,20 @@ public class PdfExtractionController {
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                PdfExtractionResponse result = pdfExtractionService.extractText(file, startPage, endPage);
+                PdfExtractionResponse result = pdfExtractionService.extractText(
+                        file,
+                        startPage,
+                        endPage,
+                        (page, total) -> {
+                            try {
+                                String progressJson = String.format("{\"type\":\"progress\",\"page\":%d,\"total\":%d}", page, total);
+                                emitter.send(SseEmitter.event().data(progressJson));
+                            } catch (Exception ignored) {
+                            }
+                        }
+                );
                 if (result.getFileUrl() == null || result.getFileUrl().isBlank()) {
                     result.setFileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded_document.pdf");
-                }
-
-                int totalPages = result.getPageCount();
-                for (int i = 1; i <= totalPages; i++) {
-                    String progressJson = String.format("{\"type\":\"progress\",\"page\":%d,\"total\":%d}", i, totalPages);
-                    emitter.send(SseEmitter.event().data(progressJson));
                 }
 
                 String dataJson = objectMapper.writeValueAsString(result);
