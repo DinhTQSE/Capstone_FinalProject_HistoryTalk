@@ -9,6 +9,7 @@ import com.historytalk.entity.chat.Message;
 import com.historytalk.entity.enums.QuestType;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.MessageRepository;
@@ -90,9 +91,9 @@ class MessageServiceImplFailureTest {
         ReflectionTestUtils.setField(request, "sessionId", session.getSessionId().toString());
         ReflectionTestUtils.setField(request, "content", "Câu hỏi");
 
-        when(chatSessionRepository.findActiveBySessionIdAndUserUid(session.getSessionId(), userId))
+        lenient().when(chatSessionRepository.findActiveBySessionIdAndUserUid(session.getSessionId(), userId))
                 .thenReturn(Optional.of(session));
-        when(messageRepository.findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId(), false))
+        lenient().when(messageRepository.findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId(), false))
                 .thenReturn(List.of());
         lenient().when(chatSessionRepository.findById(session.getSessionId())).thenReturn(Optional.of(session));
         lenient().when(messageRepository.save(any(Message.class))).thenAnswer(inv -> {
@@ -102,6 +103,35 @@ class MessageServiceImplFailureTest {
             }
             return message;
         });
+    }
+
+    @Test
+    void obsceneMessageIsRejectedBeforeAnythingIsSavedOrSentToAi() {
+        ReflectionTestUtils.setField(request, "content", "địt mẹ");
+
+        assertThatThrownBy(() -> service.sendMessage(userId.toString(), request))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageStartingWith("INAPPROPRIATE_CONTENT: ");
+        assertThatThrownBy(() -> service.sendMessageStream(userId.toString(), request))
+                .isInstanceOf(InvalidRequestException.class);
+
+        verify(messageRepository, never()).save(any(Message.class));
+        verify(aiServiceClient, never()).chat(any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(aiServiceClient, never()).streamChat(any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
+        verify(examSessionService, never()).submitAnswer(any(), any());
+        verify(userRepository, never()).deductTokens(any(), anyInt());
+    }
+
+    @Test
+    void checkOnlyValidatesTheContent() {
+        assertThatThrownBy(() -> service.checkMessageContent("địt mẹ"))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageStartingWith("INAPPROPRIATE_CONTENT: ");
+
+        service.checkMessageContent("Trận Bạch Đằng diễn ra năm nào?");
+
+        verify(messageRepository, never()).save(any(Message.class));
+        verify(aiServiceClient, never()).chat(any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test

@@ -9,4 +9,6 @@ public interface MessageService {
     GetMessagesResponse getMessages(String sessionId, String userId);
     SendMessageResponse sendMessage(String userId, SendMessageRequest request);
     SseEmitter sendMessageStream(String userId, SendMessageRequest request);
+
+    void checkMessageContent(String content);
 }

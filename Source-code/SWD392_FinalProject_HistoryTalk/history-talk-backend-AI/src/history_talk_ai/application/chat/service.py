@@ -4,6 +4,7 @@ import logging
 import asyncio
 import re
 import time
+import unicodedata
 from typing import List
 import httpx
 from supabase import create_client, Client
@@ -23,6 +24,13 @@ logger = logging.getLogger(__name__)
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 # ── Ollama HTTP Client ────────────────────────────────────────────────────────
+# Compared without diacritics, so "tóm tắt" and "tom tat" both match
+_BROAD_QUESTION_KEYWORDS = (
+    "tom tat", "tong quan", "tong hop", "toan bo", "toan canh", "toan dien",
+    "ke lai", "dien bien", "trinh bay", "phan tich", "so sanh", "ca tran", "ca cuoc",
+)
+
+
 class RagUnavailableError(Exception):
     """Documents could not be searched, so an answer would not be grounded in them."""
 
@@ -211,6 +219,13 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
+def _is_broad_question(question: str) -> bool:
+    """A question about a whole event needs more chunks than a question about one fact."""
+    decomposed = unicodedata.normalize("NFD", question.lower().replace("đ", "d"))
+    plain = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+    return any(keyword in plain for keyword in _BROAD_QUESTION_KEYWORDS)
+
+
 def _contains_cjk(text: str) -> bool:
     return _CJK_PATTERN.search(text) is not None
 
@@ -314,7 +329,12 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
                 auth=auth,
             )
             rerank_res.raise_for_status()
-            top_docs = rerank_res.json().get("top_docs", [])[:settings.RAG_TOP_K]
+            is_broad = _is_broad_question(user_question)
+            top_k = settings.RAG_TOP_K_BROAD if is_broad else settings.RAG_TOP_K
+            top_docs = rerank_res.json().get("top_docs", [])[:top_k]
+            # A general question scores low against every specific chunk, which does not make them irrelevant.
+            if is_broad and not top_docs:
+                top_docs = texts[:top_k]
         except Exception as e:
             logger.error(f"Rerank API failed: {e}. Fallback to top 2.")
             top_docs = texts[:2]
@@ -335,13 +355,19 @@ def _build_final_user_content(user_message: str, rag_context: str) -> str:
             "Nếu được hỏi về sự kiện, con số, tên người hay địa danh không có ở đó, BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không tự suy diễn.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
+    broad_rule = (
+        "5. Câu này cần tổng hợp nhiều sự việc: được trả lời tối đa 200 từ, kể theo trình tự thời gian.\n"
+        if _is_broad_question(user_message)
+        else ""
+    )
     return (
         f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
         "LỆNH RAG:\n"
         "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
         "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
         "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
-        "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n\n"
+        "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n"
+        f"{broad_rule}\n"
         f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
     )
 

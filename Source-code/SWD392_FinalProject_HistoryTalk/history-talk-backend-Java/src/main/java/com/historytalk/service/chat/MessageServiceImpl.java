@@ -90,6 +90,13 @@ public class MessageServiceImpl implements MessageService {
                 .build();
     }
 
+    // ── POST /chat/messages/check ──────────────────────────────────────────
+
+    @Override
+    public void checkMessageContent(String content) {
+        ChatContentPolicy.requireAppropriate(content);
+    }
+
     // ── POST /chat/messages ────────────────────────────────────────────────
     // LLM calls take seconds and the connection pool is small, so no transaction stays open across them:
     // each turn is prepared in one short transaction, calls the LLM, then is saved in another.
@@ -293,6 +300,8 @@ public class MessageServiceImpl implements MessageService {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private PreparedTurn prepareTurn(String userId, SendMessageRequest request) {
+        ChatContentPolicy.requireAppropriate(request.getContent());
+
         ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(request.getSessionId()), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(

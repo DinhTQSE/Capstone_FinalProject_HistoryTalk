@@ -283,3 +283,70 @@ def test_stream_stops_with_an_error_when_documents_cannot_be_searched(monkeypatc
 
     with pytest.raises(service.RagUnavailableError):
         asyncio.run(collect())
+
+
+def _stub_rerank(monkeypatch, reranked):
+    async def fake_embedding(text):
+        return [0.1]
+
+    async def fake_post(url, json, auth):
+        return FakeResponse({"top_docs": reranked})
+
+    fake_rpc = lambda name, params: SimpleNamespace(
+        execute=lambda: SimpleNamespace(data=[{"content": f"Đoạn {i}"} for i in range(1, 11)])
+    )
+    monkeypatch.setattr(service, "get_embedding_from_ollama", fake_embedding)
+    monkeypatch.setattr(service, "supabase", SimpleNamespace(schema=lambda name: SimpleNamespace(rpc=fake_rpc)))
+    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+    monkeypatch.setattr(service.settings, "RAG_TOP_K", 3)
+    monkeypatch.setattr(service.settings, "RAG_TOP_K_BROAD", 5)
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["Tóm tắt cả trận đánh cho tôi", "tom tat tran bach dang", "Kể lại diễn biến trận này", "Trình bày toàn bộ cuộc kháng chiến"],
+)
+def test_broad_questions_are_recognized(question):
+    assert service._is_broad_question(question)
+
+
+@pytest.mark.parametrize("question", ["Tướng địch là ai?", "Trận này diễn ra năm nào?", "Ngài dùng kế gì?"])
+def test_fact_questions_are_not_broad(question):
+    assert not service._is_broad_question(question)
+
+
+def test_broad_question_gets_more_chunks(monkeypatch):
+    _stub_rerank(monkeypatch, ["Đoạn 1", "Đoạn 2", "Đoạn 3", "Đoạn 4", "Đoạn 5"])
+
+    _, top_docs = asyncio.run(service.retrieve_history_context("Tóm tắt cả trận đánh", ["char-1"]))
+
+    assert len(top_docs) == 5
+
+
+def test_fact_question_keeps_fewer_chunks(monkeypatch):
+    _stub_rerank(monkeypatch, ["Đoạn 1", "Đoạn 2", "Đoạn 3", "Đoạn 4", "Đoạn 5"])
+
+    _, top_docs = asyncio.run(service.retrieve_history_context("Tướng địch là ai?", ["char-1"]))
+
+    assert len(top_docs) == 3
+
+
+def test_broad_question_falls_back_to_vector_search_when_reranker_keeps_nothing(monkeypatch):
+    _stub_rerank(monkeypatch, [])
+
+    _, top_docs = asyncio.run(service.retrieve_history_context("Tóm tắt cả trận đánh", ["char-1"]))
+
+    assert top_docs == ["Đoạn 1", "Đoạn 2", "Đoạn 3", "Đoạn 4", "Đoạn 5"]
+
+
+def test_fact_question_stays_empty_when_reranker_keeps_nothing(monkeypatch):
+    _stub_rerank(monkeypatch, [])
+
+    _, top_docs = asyncio.run(service.retrieve_history_context("Tướng địch là ai?", ["char-1"]))
+
+    assert top_docs == []
+
+
+def test_broad_question_may_answer_longer():
+    assert "200 từ" in service._build_final_user_content("Tóm tắt cả trận đánh", "Tư liệu")
+    assert "200 từ" not in service._build_final_user_content("Tướng địch là ai?", "Tư liệu")
