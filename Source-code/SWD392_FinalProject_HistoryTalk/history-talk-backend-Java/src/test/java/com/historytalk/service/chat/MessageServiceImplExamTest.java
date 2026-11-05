@@ -21,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -29,6 +31,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +68,9 @@ class MessageServiceImplExamTest {
     @BeforeEach
     void setUp() {
         service = new MessageServiceImpl(messageRepository, chatSessionRepository, aiServiceClient, objectMapper,
-                userRepository, gamificationService, dailyTokenAllowanceService, examSessionService);
+                userRepository, gamificationService, dailyTokenAllowanceService, examSessionService,
+                new ChatTokenCharger(userRepository, dailyTokenAllowanceService),
+                new TransactionTemplate(mock(PlatformTransactionManager.class)));
 
         session = ChatSession.builder()
                 .sessionId(UUID.randomUUID())
@@ -83,7 +88,7 @@ class MessageServiceImplExamTest {
 
     @Test
     void sendMessageReturnsVerdictAndProgressWithoutLeakingTheNextAnswerKey() throws Exception {
-        when(examSessionService.submitAnswer(session, request)).thenReturn(examTurn());
+        when(examSessionService.submitAnswer(session.getSessionId(), request)).thenReturn(examTurn());
 
         SendMessageResponse response = service.sendMessage(userId.toString(), request);
 
@@ -97,7 +102,7 @@ class MessageServiceImplExamTest {
 
     @Test
     void sendMessageStreamAnswersExamTurnsWithoutTheChatStream() {
-        when(examSessionService.submitAnswer(session, request)).thenReturn(examTurn());
+        when(examSessionService.submitAnswer(session.getSessionId(), request)).thenReturn(examTurn());
 
         SseEmitter emitter = service.sendMessageStream(userId.toString(), request);
 

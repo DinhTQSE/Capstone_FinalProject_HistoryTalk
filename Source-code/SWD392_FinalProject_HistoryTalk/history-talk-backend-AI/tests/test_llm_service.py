@@ -109,6 +109,27 @@ def test_rerank_goes_through_the_authenticated_gateway(monkeypatch):
     assert context == "Đoạn 1"
 
 
+def test_only_the_best_reranked_chunks_reach_the_prompt(monkeypatch):
+    async def fake_embedding(text):
+        return [0.1]
+
+    async def fake_post(url, json, auth):
+        return FakeResponse({"top_docs": ["Đoạn 1", "Đoạn 2", "Đoạn 3", "Đoạn 4", "Đoạn 5"]})
+
+    fake_rpc = lambda name, params: SimpleNamespace(
+        execute=lambda: SimpleNamespace(data=[{"content": f"Đoạn {i}"} for i in range(1, 11)])
+    )
+    monkeypatch.setattr(service, "get_embedding_from_ollama", fake_embedding)
+    monkeypatch.setattr(service, "supabase", SimpleNamespace(schema=lambda name: SimpleNamespace(rpc=fake_rpc)))
+    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+    monkeypatch.setattr(service.settings, "RAG_TOP_K", 3)
+
+    context, top_docs = asyncio.run(service.retrieve_history_context("Hỏi", ["char-1"]))
+
+    assert top_docs == ["Đoạn 1", "Đoạn 2", "Đoạn 3"]
+    assert "Đoạn 4" not in context
+
+
 def test_chat_prompt_is_sent_as_a_system_message(monkeypatch):
     captured = {}
 
@@ -127,7 +148,8 @@ def test_chat_prompt_is_sent_as_a_system_message(monkeypatch):
 
     assert captured["messages"][0]["role"] == "system"
     assert "Ngô Quyền" in captured["messages"][0]["content"]
-    assert captured["messages"][-1] == {"role": "user", "content": "Ngươi là ai?"}
+    assert captured["messages"][-1]["role"] == "user"
+    assert captured["messages"][-1]["content"].endswith("CÂU HỎI CỦA NGƯỜI DÙNG: Ngươi là ai?")
 
 
 def test_stream_forwards_chunks_without_artificial_delay(monkeypatch):
@@ -157,3 +179,107 @@ def test_stream_forwards_chunks_without_artificial_delay(monkeypatch):
 
     assert chunks[:2] == ["Ta là ", "Ngô Quyền."]
     assert chunks[2]["promptTokens"] == 10
+
+
+def _character():
+    return CharacterData(characterId="char-1", name="Ngô Quyền", background="Tiểu sử")
+
+
+def test_answer_without_documents_is_still_told_not_to_invent(monkeypatch):
+    captured = {}
+
+    async def fake_retrieve(question, entity_ids):
+        return "", []
+
+    async def fake_llm(messages, expect_json=True, temperature=None):
+        captured["last"] = messages[-1]["content"]
+        return "Sử sách không ghi chép rõ.", 10, 5
+
+    monkeypatch.setattr(service, "retrieve_history_context", fake_retrieve)
+    monkeypatch.setattr(service, "_call_llm", fake_llm)
+
+    asyncio.run(service.generate_reply(_character(), None, "Năm nào?", [], skip_suggestions=True))
+
+    assert "Sử sách không ghi chép rõ" in captured["last"]
+
+
+def test_failed_embedding_is_reported_instead_of_treated_as_no_documents(monkeypatch):
+    async def fake_embedding(text):
+        return []
+
+    monkeypatch.setattr(service, "get_embedding_from_ollama", fake_embedding)
+
+    with pytest.raises(service.RagUnavailableError):
+        asyncio.run(service.retrieve_history_context("Hỏi", ["char-1"]))
+
+
+def test_failed_search_is_reported_instead_of_treated_as_no_documents(monkeypatch):
+    async def fake_embedding(text):
+        return [0.1]
+
+    def failing_rpc(name, params):
+        raise RuntimeError("function does not exist")
+
+    monkeypatch.setattr(service, "get_embedding_from_ollama", fake_embedding)
+    monkeypatch.setattr(service, "supabase", SimpleNamespace(schema=lambda name: SimpleNamespace(rpc=failing_rpc)))
+
+    with pytest.raises(service.RagUnavailableError):
+        asyncio.run(service.retrieve_history_context("Hỏi", ["char-1"]))
+
+
+def test_unreachable_llm_server_is_not_retried(monkeypatch):
+    calls = []
+
+    async def fake_post(url, json, auth):
+        calls.append(url)
+        raise service.httpx.ConnectTimeout("server is off")
+
+    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+
+    assert asyncio.run(service.get_embedding_from_ollama("Hỏi")) == []
+    assert len(calls) == 1
+
+
+def test_reply_survives_when_suggestions_fail(monkeypatch):
+    async def fake_retrieve(question, entity_ids):
+        return "", []
+
+    async def fake_llm(messages, expect_json=True, temperature=None):
+        if "gợi ý 3 câu hỏi" in messages[-1]["content"]:
+            raise ValueError("LLM reply still contains Chinese characters")
+        return "Ta là Ngô Quyền.", 10, 5
+
+    monkeypatch.setattr(service, "retrieve_history_context", fake_retrieve)
+    monkeypatch.setattr(service, "_call_llm", fake_llm)
+
+    reply, suggestions, prompt_tokens, completion_tokens, _ = asyncio.run(
+        service.generate_reply(_character(), None, "Ngươi là ai?", [])
+    )
+
+    assert reply == "Ta là Ngô Quyền."
+    assert suggestions == []
+    assert (prompt_tokens, completion_tokens) == (10, 5)
+
+
+def test_suggestions_are_cleaned_of_numbering(monkeypatch):
+    async def fake_llm(messages, expect_json=True, temperature=None):
+        return '1. Ngài sinh năm nào?\n- "Ngài có con không?"\nok', 10, 5
+
+    monkeypatch.setattr(service, "_call_llm", fake_llm)
+
+    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời"))
+
+    assert questions == ["Ngài sinh năm nào?", "Ngài có con không?"]
+
+
+def test_stream_stops_with_an_error_when_documents_cannot_be_searched(monkeypatch):
+    async def fake_retrieve(question, entity_ids):
+        raise service.RagUnavailableError("Không tra cứu được tư liệu")
+
+    monkeypatch.setattr(service, "retrieve_history_context", fake_retrieve)
+
+    async def collect():
+        return [chunk async for chunk in service.generate_reply_stream(_character(), None, "Hỏi", [])]
+
+    with pytest.raises(service.RagUnavailableError):
+        asyncio.run(collect())

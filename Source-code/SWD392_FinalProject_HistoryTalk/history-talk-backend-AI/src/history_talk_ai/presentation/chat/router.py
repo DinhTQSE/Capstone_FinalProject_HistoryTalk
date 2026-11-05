@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
@@ -26,6 +27,8 @@ from history_talk_ai.dataaccess.java_backend.historical_context_schema import Hi
 from history_talk_ai.dataaccess.java_backend import client as java_client
 from history_talk_ai.application.chat import exam_service, service as llm_service
 from history_talk_ai.dataaccess.java_backend.client import JavaClientNotFoundError, JavaBackendError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/ai", tags=["AI Chat"])
 
@@ -110,6 +113,8 @@ async def chat(body: ChatRequest) -> ChatResponse:
             message_history=body.messageHistory,
             skip_suggestions=body.skipSuggestions,
         )
+    except llm_service.RagUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -161,8 +166,12 @@ async def chat_stream(body: ChatRequest):
                 else:
                     # Text chunk
                     yield f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
-        except Exception as exc:
+        except llm_service.RagUnavailableError as exc:
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        except Exception as exc:
+            # Raw errors can contain internal URLs, so the client only gets a generic message.
+            logger.error(f"Chat stream failed: {exc}")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Dịch vụ AI đang gặp sự cố. Vui lòng thử lại sau.'})}\n\n"
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

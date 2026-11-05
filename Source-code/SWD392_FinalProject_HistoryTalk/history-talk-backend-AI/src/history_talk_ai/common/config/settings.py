@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE: float = 0.7
     # Max tokens for character response (not counting the structured wrapper)
     LLM_MAX_TOKENS: int = 1024
+    # Reranked chunks put into the prompt. Each one adds noticeably to the time to first token.
+    RAG_TOP_K: int = 3
 
     # ── Supabase ──────────────────────────────────────────────────────────────
     SUPABASE_URL: str

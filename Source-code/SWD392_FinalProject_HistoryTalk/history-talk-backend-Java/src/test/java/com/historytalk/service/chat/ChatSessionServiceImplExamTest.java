@@ -8,6 +8,7 @@ import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 import com.historytalk.entity.enums.ChatSessionMode;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.HistoricalContextRepository;
@@ -19,18 +20,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +60,9 @@ class ChatSessionServiceImplExamTest {
     private ObjectMapper objectMapper;
     @Mock
     private ExamSessionService examSessionService;
+
+    @Spy
+    private TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class));
 
     @InjectMocks
     private ChatSessionServiceImpl chatSessionService;
@@ -87,7 +96,7 @@ class ChatSessionServiceImplExamTest {
     @Test
     void examSessionOpensWithItsFirstQuestionInsteadOfAGreeting() {
         ReflectionTestUtils.setField(request, "mode", ChatSessionMode.EXAM);
-        when(examSessionService.startExam(any(ChatSession.class)))
+        when(examSessionService.startExam(any(UUID.class)))
                 .thenReturn(Message.builder().content("Mở đầu\n---\nCâu hỏi 1?").build());
 
         ChatSessionResponse response = chatSessionService.createSession(userId.toString(), "USER", request);
@@ -103,13 +112,13 @@ class ChatSessionServiceImplExamTest {
     void examSessionKeepsTheRequestedQuestionCount() {
         ReflectionTestUtils.setField(request, "mode", ChatSessionMode.EXAM);
         ReflectionTestUtils.setField(request, "examQuestionCount", 8);
-        when(examSessionService.startExam(any(ChatSession.class)))
+        when(examSessionService.startExam(any(UUID.class)))
                 .thenReturn(Message.builder().content("Câu hỏi 1?").build());
 
         chatSessionService.createSession(userId.toString(), "USER", request);
 
         ArgumentCaptor<ChatSession> saved = ArgumentCaptor.forClass(ChatSession.class);
-        verify(examSessionService).startExam(saved.capture());
+        verify(chatSessionRepository).save(saved.capture());
         assertThat(saved.getValue().getExamQuestionCount()).isEqualTo(8);
     }
 
@@ -123,5 +132,16 @@ class ChatSessionServiceImplExamTest {
         assertThat(response.getMode()).isEqualTo("CHAT");
         assertThat(response.getExamQuestionCount()).isNull();
         verify(examSessionService, never()).startExam(any());
+    }
+
+    @Test
+    void examSessionIsRemovedWhenTheFirstQuestionCannotBeGenerated() {
+        ReflectionTestUtils.setField(request, "mode", ChatSessionMode.EXAM);
+        when(examSessionService.startExam(any(UUID.class))).thenThrow(new InvalidRequestException("Chưa có tư liệu"));
+
+        assertThatThrownBy(() -> chatSessionService.createSession(userId.toString(), "USER", request))
+                .isInstanceOf(InvalidRequestException.class);
+
+        verify(chatSessionRepository).deleteById(any(UUID.class));
     }
 }

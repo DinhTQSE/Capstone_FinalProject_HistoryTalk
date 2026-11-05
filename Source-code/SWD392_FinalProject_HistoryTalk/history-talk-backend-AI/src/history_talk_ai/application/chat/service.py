@@ -23,10 +23,16 @@ logger = logging.getLogger(__name__)
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 # ── Ollama HTTP Client ────────────────────────────────────────────────────────
+class RagUnavailableError(Exception):
+    """Documents could not be searched, so an answer would not be grounded in them."""
+
+
 _CJK_PATTERN = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
 
 # Use a global client to reuse connections (Connection Pooling) for faster requests
-ollama_client = httpx.AsyncClient(timeout=120.0, follow_redirects=True)
+# A short connect timeout makes a stopped GPU server fail in seconds instead of minutes
+_LLM_TIMEOUT = httpx.Timeout(120.0, connect=5.0)
+ollama_client = httpx.AsyncClient(timeout=_LLM_TIMEOUT, follow_redirects=True)
 
 
 def _ollama_url(path: str) -> str:
@@ -95,7 +101,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
             _ollama_url("/api/chat"),
             json=payload,
             auth=auth,
-            timeout=120.0
+            timeout=_LLM_TIMEOUT
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -175,7 +181,7 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
             f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
             json=payload,
             headers=headers,
-            timeout=120.0
+            timeout=_LLM_TIMEOUT
         ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -267,6 +273,9 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
                 embedding = data.get("embedding", [])
                 if embedding:
                     return embedding
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            logger.error(f"Cannot reach the LLM server for embedding: {e}")
+            return []
         except Exception as e:
             logger.warning(f"Ollama embedding attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
@@ -279,8 +288,8 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
     """Retrieve history context from Supabase VectorChunk and rerank via the LLM server."""
     query_vector = await get_embedding_from_ollama(user_question)
     if not query_vector:
-        return "", []
-        
+        raise RagUnavailableError("Không kết nối được máy chủ AI để tra cứu tư liệu. Vui lòng thử lại sau.")
+
     try:
         response = supabase.schema(settings.SUPABASE_SCHEMA).rpc(
             "match_history_chunks",
@@ -305,7 +314,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
                 auth=auth,
             )
             rerank_res.raise_for_status()
-            top_docs = rerank_res.json().get("top_docs", [])
+            top_docs = rerank_res.json().get("top_docs", [])[:settings.RAG_TOP_K]
         except Exception as e:
             logger.error(f"Rerank API failed: {e}. Fallback to top 2.")
             top_docs = texts[:2]
@@ -314,7 +323,54 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         return context_str, top_docs
     except Exception as e:
         logger.error(f"Supabase RPC error: {e}")
-        return "", []
+        raise RagUnavailableError("Không tra cứu được tư liệu lịch sử. Vui lòng thử lại sau.") from e
+
+
+def _build_final_user_content(user_message: str, rag_context: str) -> str:
+    """Put the grounding rules next to the question, where the model follows them most closely."""
+    if not rag_context:
+        return (
+            "[KHÔNG TÌM THẤY TƯ LIỆU CHO CÂU NÀY]\n"
+            "LỆNH: Chỉ được dùng thông tin trong phần THÔNG TIN LỊCH SỬ CỦA BẠN. Chào hỏi hoặc chuyện sinh hoạt thường ngày thì trả lời tự nhiên. "
+            "Nếu được hỏi về sự kiện, con số, tên người hay địa danh không có ở đó, BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không tự suy diễn.\n\n"
+            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
+        )
+    return (
+        f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
+        "LỆNH RAG:\n"
+        "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
+        "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
+        "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
+        "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n\n"
+        f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
+    )
+
+
+async def _generate_suggested_questions(messages: list[dict], reply: str) -> tuple[List[str], int, int]:
+    """Suggestions are optional, so failing to generate them must never fail the reply itself."""
+    sq_prompt = (
+        "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
+        "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
+        "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
+        "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
+    )
+    sq_messages = messages + [
+        {"role": "assistant", "content": reply},
+        {"role": "user", "content": sq_prompt},
+    ]
+    try:
+        sq_text, prompt_tokens, completion_tokens = await _call_llm(sq_messages, expect_json=False)
+    except Exception as e:
+        logger.warning(f"Failed to generate suggested questions: {e}")
+        return [], 0, 0
+
+    questions = []
+    for line in sq_text.strip().split("\n"):
+        clean_line = re.sub(r"^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*", "", line.strip()).strip()
+        clean_line = clean_line.strip('"').strip("'")
+        if len(clean_line) > 5:
+            questions.append(clean_line)
+    return questions[:3], prompt_tokens, completion_tokens
 
 
 # ── Public service functions ──────────────────────────────────────────────────
@@ -361,19 +417,8 @@ async def generate_reply(
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = user_message
-    if rag_context:
-        print(f"--- RAG CONTEXT INJECTED ---\n{rag_context}\n----------------------------")
-        final_user_content = (
-            f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
-            "LỆNH RAG:\n"
-            "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
-            "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
-            "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n\n"
-            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
-        )
-        
+    final_user_content = _build_final_user_content(user_message, rag_context)
+
     messages.append({"role": "user", "content": final_user_content})
 
     response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
@@ -383,29 +428,7 @@ async def generate_reply(
     sq_ct = 0
     
     if not skip_suggestions:
-        sq_prompt = (
-            "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
-            "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
-            "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
-        )
-        sq_messages = messages + [
-            {"role": "assistant", "content": response_text},
-            {"role": "user", "content": sq_prompt}
-        ]
-        
-        sq_text, sq_pt, sq_ct = await _call_llm(sq_messages, expect_json=False)
-        try:
-            import re
-            lines = sq_text.strip().split('\n')
-            for line in lines:
-                clean_line = re.sub(r'^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
-                clean_line = clean_line.strip('"').strip("'")
-                if clean_line and len(clean_line) > 5:
-                    suggested_questions.append(clean_line)
-            suggested_questions = suggested_questions[:3]
-        except Exception as e:
-            logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, response_text)
 
     return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct, quotes_used
 
@@ -447,18 +470,8 @@ async def generate_reply_stream(
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = user_message
-    if rag_context:
-        final_user_content = (
-            f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
-            "LỆNH RAG:\n"
-            "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-            "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
-            "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
-            "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại.\n\n"
-            f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
-        )
-        
+    final_user_content = _build_final_user_content(user_message, rag_context)
+
     messages.append({"role": "user", "content": final_user_content})
 
     full_message = ""
@@ -485,31 +498,7 @@ async def generate_reply_stream(
     sq_ct = 0
 
     if not skip_suggestions:
-        # Now that the message is done, generate suggested questions synchronously but fast
-        # By asking specifically for 3 suggested questions based on the last reply.
-        sq_prompt = (
-            "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
-            "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
-            "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
-            "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
-        )
-        sq_messages = messages + [
-            {"role": "assistant", "content": full_message},
-            {"role": "user", "content": sq_prompt}
-        ]
-        
-        sq_text, sq_pt, sq_ct = await _call_llm(sq_messages, expect_json=False)
-        try:
-            import re
-            lines = sq_text.strip().split('\n')
-            for line in lines:
-                clean_line = re.sub(r'^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*', '', line.strip()).strip()
-                clean_line = clean_line.strip('"').strip("'")
-                if clean_line and len(clean_line) > 5:
-                    suggested_questions.append(clean_line)
-            suggested_questions = suggested_questions[:3]
-        except Exception as e:
-            logger.error(f"Failed to parse suggested questions: {sq_text}. Error: {e}")
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, full_message)
 
     yield {
         "suggestedQuestions": suggested_questions,

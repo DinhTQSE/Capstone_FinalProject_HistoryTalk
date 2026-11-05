@@ -27,9 +27,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +42,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,8 +72,10 @@ class ExamSessionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new ExamSessionServiceImpl(messageRepository, chatSessionRepository, userRepository,
-                aiServiceClient, new ObjectMapper(), gamificationService, dailyTokenAllowanceService);
+        service = new ExamSessionServiceImpl(messageRepository, chatSessionRepository,
+                new ChatTokenCharger(userRepository, dailyTokenAllowanceService),
+                aiServiceClient, new ObjectMapper(), gamificationService,
+                new TransactionTemplate(mock(PlatformTransactionManager.class)));
 
         user = new User();
         user.setUid(UUID.randomUUID());
@@ -89,6 +95,7 @@ class ExamSessionServiceImplTest {
                 .build();
 
         lenient().when(messageRepository.save(any(Message.class))).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(chatSessionRepository.findById(session.getSessionId())).thenReturn(Optional.of(session));
     }
 
     @Test
@@ -96,7 +103,7 @@ class ExamSessionServiceImplTest {
         when(aiServiceClient.generateExamQuestion(anyString(), anyString(), any(), any(), any(), any()))
                 .thenReturn(new ExamQuestionResult("Ta dùng kế gì?", "Cọc gỗ", "Tư liệu 1", USAGE));
 
-        Message message = service.startExam(session);
+        Message message = service.startExam(session.getSessionId());
 
         assertThat(message.getContent()).contains("2 câu").endsWith("\n---\nTa dùng kế gì?");
         assertThat(message.getContent()).doesNotContain("Cọc gỗ", "Tư liệu 1");
@@ -117,7 +124,7 @@ class ExamSessionServiceImplTest {
                 eq(List.of("Ta dùng kế gì?")), eq(List.of("Tư liệu 1"))))
                 .thenReturn(new ExamQuestionResult("Ta đóng đô ở đâu?", "Cổ Loa", "Tư liệu 2", USAGE));
 
-        ExamTurnResult turn = service.submitAnswer(session, request("Cắm cọc"));
+        ExamTurnResult turn = service.submitAnswer(session.getSessionId(), request("Cắm cọc"));
 
         Message assistant = turn.assistantMessage();
         assertThat(assistant.getContent()).isEqualTo("Đúng vậy.\n---\nTa đóng đô ở đâu?");
@@ -143,7 +150,7 @@ class ExamSessionServiceImplTest {
                 anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new ExamGradeResult("PARTIAL", "Còn thiếu ý.", USAGE));
 
-        ExamTurnResult turn = service.submitAnswer(session, request("Trả lời"));
+        ExamTurnResult turn = service.submitAnswer(session.getSessionId(), request("Trả lời"));
 
         assertThat(turn.progress().isFinished()).isTrue();
         assertThat(turn.progress().getScore()).isEqualTo(7.5);
@@ -158,7 +165,7 @@ class ExamSessionServiceImplTest {
         when(messageRepository.findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId(), false))
                 .thenReturn(List.of(closing));
 
-        assertThatThrownBy(() -> service.submitAnswer(session, request("Trả lời")))
+        assertThatThrownBy(() -> service.submitAnswer(session.getSessionId(), request("Trả lời")))
                 .isInstanceOf(InvalidRequestException.class);
 
         verify(messageRepository, never()).save(any());
@@ -172,10 +179,11 @@ class ExamSessionServiceImplTest {
         when(aiServiceClient.gradeExamAnswer(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new ExamGradeResult("MAYBE", "Không rõ.", USAGE));
 
-        assertThatThrownBy(() -> service.submitAnswer(session, request("Trả lời")))
+        assertThatThrownBy(() -> service.submitAnswer(session.getSessionId(), request("Trả lời")))
                 .isInstanceOf(SystemException.class);
 
         verify(userRepository, never()).deductTokens(any(), anyInt());
+        verify(messageRepository).delete(any(Message.class));
     }
 
     @Test
