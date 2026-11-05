@@ -24,6 +24,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.function.BiConsumer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -57,6 +58,11 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     @Override
     public PdfExtractionResponse extractText(MultipartFile file, Integer startPage, Integer endPage) throws IOException {
+        return extractText(file, startPage, endPage, null);
+    }
+
+    @Override
+    public PdfExtractionResponse extractText(MultipartFile file, Integer startPage, Integer endPage, BiConsumer<Integer, Integer> onProgress) throws IOException {
         validatePdfFile(file);
         
         Path tempFile = null;
@@ -64,7 +70,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             tempFile = Files.createTempFile("pdf-extraction-", ".pdf");
             file.transferTo(tempFile.toFile());
             
-            return extractTextFromFile(tempFile.toFile(), startPage, endPage);
+            return extractTextFromFile(tempFile.toFile(), startPage, endPage, onProgress);
         } finally {
             if (tempFile != null) {
                 try {
@@ -83,6 +89,11 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     @Override
     public PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage) throws IOException {
+        return extractTextFromBytes(pdfBytes, startPage, endPage, null);
+    }
+
+    @Override
+    public PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage, BiConsumer<Integer, Integer> onProgress) throws IOException {
         if (pdfBytes == null || pdfBytes.length == 0) {
             throw new InvalidRequestException("PDF bytes cannot be empty");
         }
@@ -96,7 +107,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             tempFile = Files.createTempFile("pdf-extraction-", ".pdf");
             Files.write(tempFile, pdfBytes);
             
-            return extractTextFromFile(tempFile.toFile(), startPage, endPage);
+            return extractTextFromFile(tempFile.toFile(), startPage, endPage, onProgress);
         } finally {
             if (tempFile != null) {
                 try {
@@ -108,7 +119,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
         }
     }
 
-    private PdfExtractionResponse extractTextFromFile(File pdfFile, Integer reqStartPage, Integer reqEndPage) throws IOException {
+    private PdfExtractionResponse extractTextFromFile(File pdfFile, Integer reqStartPage, Integer reqEndPage, BiConsumer<Integer, Integer> onProgress) throws IOException {
         log.info("=== PDF Extraction Started (Production In-Place Pipeline) ===");
         log.info("File: {}, reqStartPage: {}, reqEndPage: {}", pdfFile.getName(), reqStartPage, reqEndPage);
         
@@ -146,7 +157,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             if (pdfType == PdfType.SCANNED_IMAGE) {
                 log.info("=== Routing Decision: OCR PROCESSING ===");
                 try {
-                    String rawOcr = ocrService.extractTextFromPdf(pdfFile);
+                    String rawOcr = ocrService.extractTextFromPdf(pdfFile, onProgress);
                     if (rawOcr == null || rawOcr.isBlank()) {
                         throw new InvalidRequestException("Không thể nhận diện ký tự từ tài liệu scan");
                     }
@@ -197,6 +208,13 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
                     if (pageText != null && !pageText.isBlank()) {
                         fullDocumentBuilder.append(pageText.trim()).append("\n\n");
+                    }
+
+                    if (onProgress != null) {
+                        try {
+                            onProgress.accept(p - startPage + 1, pageCount);
+                        } catch (Exception ignored) {
+                        }
                     }
 
                     // Nếu trang này có ảnh tư liệu / lược đồ, ghim trực tiếp vào ngay sau nội dung trang đó
