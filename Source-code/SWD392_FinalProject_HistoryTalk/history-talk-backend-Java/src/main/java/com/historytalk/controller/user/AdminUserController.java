@@ -41,7 +41,7 @@ public class AdminUserController {
     @GetMapping
     @Operation(summary = "List users")
     public ResponseEntity<ApiResponse<PaginatedResponse<UserProfileResponse>>> listUsers(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         log.info("GET /api/v1/admin/users - page: {}, size: {}", page, size);
         return ResponseEntity.ok(ApiResponse.success(

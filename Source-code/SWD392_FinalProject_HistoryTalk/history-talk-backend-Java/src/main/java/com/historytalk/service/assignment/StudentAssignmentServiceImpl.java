@@ -78,7 +78,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
         return PaginatedResponse.<StudentAssignmentResponse>builder()
                 .content(responses)
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -94,7 +94,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
         UUID studentUid = UUID.fromString(userPrincipal.getUid());
 
         AssignmentSubmission submission = assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bài tập hoặc bạn chưa được giao bài tập này"));
+                .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bÃ i táº­p hoáº·c báº¡n chÆ°a Ä‘Æ°á»£c giao bÃ i táº­p nÃ y"));
 
         return mapToStudentAssignmentResponse(submission);
     }
@@ -106,11 +106,11 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
         UUID studentUid = UUID.fromString(userPrincipal.getUid());
 
         AssignmentSubmission submission = assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin nộp bài của bạn cho bài tập này"));
+                .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin ná»™p bÃ i cá»§a báº¡n cho bÃ i táº­p nÃ y"));
 
         Assignment assignment = submission.getAssignment();
         if (assignment.getStatus() != AssignmentStatus.ACTIVE || assignment.getDeletedAt() != null) {
-            throw new InvalidRequestException("Bài tập này hiện không còn khả dụng");
+            throw new InvalidRequestException("BÃ i táº­p nÃ y hiá»‡n khÃ´ng cÃ²n kháº£ dá»¥ng");
         }
 
         if (submission.getStatus() == SubmissionStatus.NOT_STARTED) {
@@ -130,15 +130,15 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
         UUID studentUid = UUID.fromString(userPrincipal.getUid());
 
         AssignmentSubmission submission = assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin nộp bài của bạn cho bài tập này"));
+                .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin ná»™p bÃ i cá»§a báº¡n cho bÃ i táº­p nÃ y"));
 
         Assignment assignment = submission.getAssignment();
         if (assignment.getStatus() != AssignmentStatus.ACTIVE || assignment.getDeletedAt() != null) {
-            throw new InvalidRequestException("Bài tập này hiện không còn khả dụng để nộp");
+            throw new InvalidRequestException("BÃ i táº­p nÃ y hiá»‡n khÃ´ng cÃ²n kháº£ dá»¥ng Ä‘á»ƒ ná»™p");
         }
 
         if (submission.getStatus() == SubmissionStatus.SUBMITTED || submission.getStatus() == SubmissionStatus.LATE_SUBMITTED) {
-            throw new InvalidRequestException("Bạn đã nộp bài tập này rồi, không thể nộp lại");
+            throw new InvalidRequestException("Báº¡n Ä‘Ã£ ná»™p bÃ i táº­p nÃ y rá»“i, khÃ´ng thá»ƒ ná»™p láº¡i");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -154,15 +154,15 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 ChatSession chatSession;
                 if (request != null && request.getChatSessionId() != null) {
                     chatSession = chatSessionRepository.findActiveBySessionIdAndUserUid(request.getChatSessionId(), studentUid)
-                            .orElseThrow(() -> new InvalidRequestException("Phiên chat không tồn tại hoặc không thuộc quyền sở hữu của bạn"));
+                            .orElseThrow(() -> new InvalidRequestException("PhiÃªn chat khÃ´ng tá»“n táº¡i hoáº·c khÃ´ng thuá»™c quyá»n sá»Ÿ há»¯u cá»§a báº¡n"));
 
                     if (chatSession.getCharacter() != null && !chatSession.getCharacter().getCharacterId().equals(assignment.getTargetId())) {
-                        throw new InvalidRequestException("Phiên chat không phải với nhân vật lịch sử được yêu cầu trong bài tập");
+                        throw new InvalidRequestException("PhiÃªn chat khÃ´ng pháº£i vá»›i nhÃ¢n váº­t lá»‹ch sá»­ Ä‘Æ°á»£c yÃªu cáº§u trong bÃ i táº­p");
                     }
                 } else {
                     List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacter(studentUid, assignment.getTargetId());
                     if (sessions.isEmpty()) {
-                        throw new InvalidRequestException("Bạn chưa có phiên trò chuyện nào với nhân vật lịch sử được yêu cầu trong bài tập");
+                        throw new InvalidRequestException("Báº¡n chÆ°a cÃ³ phiÃªn trÃ² chuyá»‡n nÃ o vá»›i nhÃ¢n váº­t lá»‹ch sá»­ Ä‘Æ°á»£c yÃªu cáº§u trong bÃ i táº­p");
                     }
                     chatSession = sessions.get(0);
                 }
@@ -180,23 +180,23 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 QuizSession quizSession;
                 if (request != null && request.getQuizSessionId() != null) {
                     quizSession = quizSessionRepository.findBySessionId(request.getQuizSessionId())
-                            .orElseThrow(() -> new InvalidRequestException("Phiên làm bài Quiz không tồn tại"));
+                            .orElseThrow(() -> new InvalidRequestException("PhiÃªn lÃ m bÃ i Quiz khÃ´ng tá»“n táº¡i"));
 
                     if (quizSession.getUser() == null || !quizSession.getUser().getUid().equals(studentUid)) {
-                        throw new AccessDeniedException("Phiên làm bài Quiz không thuộc quyền sở hữu của bạn");
+                        throw new AccessDeniedException("PhiÃªn lÃ m bÃ i Quiz khÃ´ng thuá»™c quyá»n sá»Ÿ há»¯u cá»§a báº¡n");
                     }
 
                     if (quizSession.getQuiz() == null || !quizSession.getQuiz().getQuizId().equals(assignment.getTargetId())) {
-                        throw new InvalidRequestException("Phiên làm bài Quiz không khớp với bài quiz được giao trong bài tập");
+                        throw new InvalidRequestException("PhiÃªn lÃ m bÃ i Quiz khÃ´ng khá»›p vá»›i bÃ i quiz Ä‘Æ°á»£c giao trong bÃ i táº­p");
                     }
 
                     if (quizSession.getEndTime() == null) {
-                        throw new InvalidRequestException("Phiên làm bài Quiz này chưa hoàn thành nộp bài");
+                        throw new InvalidRequestException("PhiÃªn lÃ m bÃ i Quiz nÃ y chÆ°a hoÃ n thÃ nh ná»™p bÃ i");
                     }
                 } else {
                     List<QuizSession> completedSessions = quizSessionRepository.findCompletedByQuizAndUser(assignment.getTargetId(), studentUid);
                     if (completedSessions.isEmpty()) {
-                        throw new InvalidRequestException("Bạn chưa hoàn thành bài làm trắc nghiệm nào cho bộ câu hỏi được giao");
+                        throw new InvalidRequestException("Báº¡n chÆ°a hoÃ n thÃ nh bÃ i lÃ m tráº¯c nghiá»‡m nÃ o cho bá»™ cÃ¢u há»i Ä‘Æ°á»£c giao");
                     }
                     quizSession = completedSessions.get(0);
                 }
@@ -352,10 +352,10 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new AccessDeniedException("Chưa xác thực hoặc token không hợp lệ");
+            throw new AccessDeniedException("ChÆ°a xÃ¡c thá»±c hoáº·c token khÃ´ng há»£p lá»‡");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new AccessDeniedException("Không tìm thấy thông tin tài khoản người dùng"));
+                .orElseThrow(() -> new AccessDeniedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
         return new UserPrincipal(user);
     }
 }

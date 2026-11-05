@@ -181,7 +181,7 @@ public class PaymentService {
                 .content(content)
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .hasNext(page.hasNext())
                 .hasPrevious(page.hasPrevious())

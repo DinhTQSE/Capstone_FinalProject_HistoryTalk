@@ -101,10 +101,10 @@ public class UserServiceImpl implements UserService {
     public void changeMyPassword(String userId, ChangePasswordRequest request) {
         User user = loadActiveUser(userId);
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            throw new InvalidRequestException("Mật khẩu hiện tại không chính xác");
+            throw new InvalidRequestException("Máº­t kháº©u hiá»‡n táº¡i khÃ´ng chÃ­nh xÃ¡c");
         }
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new InvalidRequestException("Mật khẩu mới và mật khẩu xác nhận không khớp");
+            throw new InvalidRequestException("Máº­t kháº©u má»›i vÃ  máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
@@ -113,7 +113,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<UserProfileResponse> listUsers(int page, int size) {
-        int safePage = Math.max(page, 0);
+        int safePage = Math.max(page - 1, 0);
         int safeSize = size <= 0 ? 10 : size;
         Pageable pageable = PageRequest.of(safePage, safeSize);
         var users = userRepository.findAll(pageable);
@@ -123,7 +123,7 @@ public class UserServiceImpl implements UserService {
                         .toList())
                 .totalElements(users.getTotalElements())
                 .totalPages(users.getTotalPages())
-                .currentPage(users.getNumber())
+                .currentPage(users.getNumber() + 1)
                 .pageSize(users.getSize())
                 .hasNext(users.hasNext())
                 .hasPrevious(users.hasPrevious())
@@ -316,7 +316,7 @@ public class UserServiceImpl implements UserService {
     private User loadActiveUser(String userId) {
         User user = loadUser(userId);
         if (user.getDeletedAt() != null) {
-            throw new InvalidRequestException("Tài khoản người dùng đã bị vô hiệu hóa");
+            throw new InvalidRequestException("TÃ i khoáº£n ngÆ°á»i dÃ¹ng Ä‘Ã£ bá»‹ vÃ´ hiá»‡u hÃ³a");
         }
         return user;
     }
@@ -331,7 +331,7 @@ public class UserServiceImpl implements UserService {
                                     String address, String avatarUrl) {
         if (StringUtils.hasText(userName) && !userName.equalsIgnoreCase(user.getUserName())) {
             if (userRepository.existsByUserNameIgnoreCase(userName)) {
-                throw new InvalidRequestException("Tên đăng nhập đã tồn tại");
+                throw new InvalidRequestException("TÃªn Ä‘Äƒng nháº­p Ä‘Ã£ tá»“n táº¡i");
             }
             user.setUserName(userName.trim());
         }

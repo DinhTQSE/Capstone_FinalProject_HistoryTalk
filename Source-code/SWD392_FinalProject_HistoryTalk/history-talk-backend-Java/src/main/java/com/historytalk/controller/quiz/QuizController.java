@@ -32,7 +32,7 @@ public class QuizController {
 
     /**
      * GET /quizzes
-     * Public endpoint — returns array (not paginated).
+     * Public endpoint â€” returns array (not paginated).
      * playCount is per-user if authenticated, 0 if not.
      */
     @GetMapping
@@ -49,7 +49,7 @@ public class QuizController {
 
     /**
      * GET /quizzes/:quizId
-     * Public endpoint — returns QuizSet shape.
+     * Public endpoint â€” returns QuizSet shape.
      */
     @GetMapping("/{quizId}")
     @Operation(summary = "Get quiz details", description = "Retrieve quiz detail. playCount reflects this user's completions (0 if unauthenticated).")
@@ -106,14 +106,14 @@ public class QuizController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get my quiz history", description = "Paginated list of completed quiz sessions for the current user.")
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizHistoryResponse>>> getMyQuizHistory(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             // The quiz detail page asks for one quiz's attempts; without this filter it received every attempt.
             @RequestParam(required = false) UUID quizId) {
 
         log.info("GET /api/v1/quizzes/results/me page={} size={} quizId={}", page, size, quizId);
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         PaginatedResponse<QuizHistoryResponse> data = quizService.getQuizHistory(userId, quizId, pageable);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz history retrieved successfully"));
     }

@@ -29,7 +29,7 @@ public class PaymentController {
 
     /**
      * Creates a PayOS payment link for the given tier.
-     * Requires authentication — the user's uid is read from the JWT via
+     * Requires authentication â€” the user's uid is read from the JWT via
      * SecurityUtils.
      */
     @PostMapping("/checkout")
@@ -62,16 +62,16 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<PaginatedResponse<AdminPaymentHistoryResponse>>> getAllPaymentHistory(
             @RequestParam(required = false) PaymentOrderStatus status,
             @RequestParam(required = false) UUID userId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        var pageable = PageRequest.of(page, size);
+        var pageable = PageRequest.of(Math.max(0, page - 1), size);
         var data = paymentService.getAllPaymentHistory(status, userId, pageable);
         return ResponseEntity.ok(ApiResponse.success(data, "Payment history retrieved successfully"));
     }
 
     /**
      * Lists all active tiers available for purchase.
-     * Public — no authentication required.
+     * Public â€” no authentication required.
      */
     @GetMapping("/tiers")
     public ResponseEntity<ApiResponse<List<TierResponse>>> listTiers() {
@@ -87,7 +87,7 @@ public class PaymentController {
      * must POST them here so the backend can update the order status for the UI
      * without waiting for the async webhook.
      *
-     * Requires authentication — the order ownership is validated against the
+     * Requires authentication â€” the order ownership is validated against the
      * authenticated user's uid so that users cannot update each other's orders.
      *
      * This endpoint does NOT upgrade the user's tier; that remains exclusively
