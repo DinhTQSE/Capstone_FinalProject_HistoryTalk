@@ -73,7 +73,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             resolvedSchoolId = resolvedPrincipal.getSchoolId();
         }
         if (resolvedSchoolId == null) {
-            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
+            throw new InvalidRequestException("TÃ i khoáº£n Quáº£n trá»‹ viÃªn chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i trÆ°á»ng há»c nÃ o.");
         }
 
         UUID finalSchoolId = resolvedSchoolId;
@@ -189,7 +189,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with id: " + classId));
 
         if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
-            throw new AccessDeniedException("Bạn không có quyền xem dữ liệu của lớp học này!");
+            throw new AccessDeniedException("Báº¡n khÃ´ng cÃ³ quyá»n xem dá»¯ liá»‡u cá»§a lá»›p há»c nÃ y!");
         }
 
         School school = classroom.getSchool();
@@ -206,7 +206,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 ? tokenBoostRequestRepository.countByClassroom_IdAndStatus(classId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
                 : 0L;
 
-        // Lấy danh sách học sinh thuộc lớp
+        // Láº¥y danh sÃ¡ch há»c sinh thuá»™c lá»›p
         List<UUID> studentUids = classStudentRepository.findEnrolledStudentUids(classId);
         long studentCount = studentUids.size();
 
@@ -556,10 +556,10 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null || userId.isBlank()) {
-            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
+            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p Ä‘á»ƒ thá»±c hiá»‡n thao tÃ¡c");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
         return new UserPrincipal(user);
     }
 
@@ -617,7 +617,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             resolvedSchoolId = resolvedPrincipal.getSchoolId();
         }
         if (resolvedSchoolId == null) {
-            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
+            throw new InvalidRequestException("TÃ i khoáº£n Quáº£n trá»‹ viÃªn chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i trÆ°á»ng há»c nÃ o.");
         }
         if (!schoolRepository.existsById(resolvedSchoolId)) {
             throw new ResourceNotFoundException("School not found with id: " + resolvedSchoolId);
@@ -658,7 +658,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .content(content)
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .hasNext(page.hasNext())
                 .hasPrevious(page.hasPrevious())
@@ -678,7 +678,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         if (resolved.getRole() == UserRole.TEACHER) {
             UUID teacherUid = UUID.fromString(resolved.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
-                throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
+                throw new AccessDeniedException("Báº¡n khÃ´ng Ä‘Æ°á»£c phÃ¢n cÃ´ng phá»¥ trÃ¡ch lá»›p há»c nÃ y!");
             }
         }
 
@@ -730,7 +730,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .content(content)
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .hasNext(page.hasNext())
                 .hasPrevious(page.hasPrevious())

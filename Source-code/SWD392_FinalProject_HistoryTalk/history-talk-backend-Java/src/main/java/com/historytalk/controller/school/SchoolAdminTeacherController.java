@@ -60,8 +60,8 @@ public class SchoolAdminTeacherController {
             @RequestParam(required = false, defaultValue = "") String search,
             @Parameter(description = "Filter by active status (true: active, false: inactive)")
             @RequestParam(required = false) Boolean active,
-            @Parameter(description = "Page number (0-indexed, default: 0)")
-            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page number (1-indexed, default: 1)")
+            @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Number of items per page (default: 10)")
             @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "Field to sort by: createdAt, fullName, userName, email (default: createdAt)")
@@ -76,7 +76,7 @@ public class SchoolAdminTeacherController {
             case "fullName", "userName", "email", "createdAt" -> sortBy;
             default -> "createdAt";
         };
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(direction, safeSortBy));
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page - 1), Math.max(1, size), Sort.by(direction, safeSortBy));
 
         PaginatedResponse<TeacherResponse> response = teacherManagementService.getTeachers(
                 schoolId, search, active, pageable);
@@ -143,12 +143,12 @@ public class SchoolAdminTeacherController {
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new UnauthorizedException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
+            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p vá»›i tÃ i khoáº£n Quáº£n trá»‹ viÃªn TrÆ°á»ng");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
         if (user.getSchool() == null) {
-            throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");
+            throw new InvalidRequestException("TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i báº¥t ká»³ trÆ°á»ng há»c nÃ o");
         }
         return user.getSchool().getId();
     }

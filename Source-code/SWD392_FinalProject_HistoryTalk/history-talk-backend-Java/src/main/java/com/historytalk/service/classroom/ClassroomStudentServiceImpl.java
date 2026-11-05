@@ -63,24 +63,24 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
                     .orElse(null);
 
             if (student == null || student.getDeletedAt() != null) {
-                notes.add(String.format("Học sinh ID %s không tồn tại hoặc đã bị xóa", studentId));
+                notes.add(String.format("Há»c sinh ID %s khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a", studentId));
                 continue;
             }
 
             if (student.getSchool() == null || !schoolId.equals(student.getSchool().getId())) {
-                notes.add(String.format("Học sinh %s không thuộc trường của lớp học này", student.getFullName()));
+                notes.add(String.format("Há»c sinh %s khÃ´ng thuá»™c trÆ°á»ng cá»§a lá»›p há»c nÃ y", student.getFullName()));
                 continue;
             }
 
             if (student.getRole() != UserRole.SCHOOL_STUDENT) {
-                notes.add(String.format("Người dùng %s không phải là Học sinh", student.getFullName()));
+                notes.add(String.format("NgÆ°á»i dÃ¹ng %s khÃ´ng pháº£i lÃ  Há»c sinh", student.getFullName()));
                 continue;
             }
 
             Optional<ClassStudent> existingOpt = classStudentRepository.findByClassroomIdAndStudentUid(classroomId, studentId);
             if (existingOpt.isPresent() && "ACTIVE".equals(existingOpt.get().getStatus())) {
                 alreadyEnrolledCount++;
-                notes.add(String.format("Học sinh %s (%s) đã có trong lớp", student.getFullName(), student.getStudentCode()));
+                notes.add(String.format("Há»c sinh %s (%s) Ä‘Ã£ cÃ³ trong lá»›p", student.getFullName(), student.getStudentCode()));
                 continue;
             }
 
@@ -92,7 +92,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
                 Classroom otherClass = otherActiveClassOpt.get();
                 alreadyEnrolledCount++;
                 notes.add(String.format(
-                        "Học sinh %s (%s) đang học ở lớp %s (mỗi học sinh chỉ được ở 1 lớp đang hoạt động, vui lòng dùng tính năng Chuyển lớp)",
+                        "Há»c sinh %s (%s) Ä‘ang há»c á»Ÿ lá»›p %s (má»—i há»c sinh chá»‰ Ä‘Æ°á»£c á»Ÿ 1 lá»›p Ä‘ang hoáº¡t Ä‘á»™ng, vui lÃ²ng dÃ¹ng tÃ­nh nÄƒng Chuyá»ƒn lá»›p)",
                         student.getFullName(), student.getStudentCode(), otherClass.getClassName()));
                 continue;
             }
@@ -139,7 +139,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         validateAndGetClassroom(classroomId, schoolId, userPrincipal);
 
         ClassStudent classStudent = classStudentRepository.findByClassroomIdAndStudentUid(classroomId, studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Học sinh không có trong lớp học này"));
+                .orElseThrow(() -> new ResourceNotFoundException("Há»c sinh khÃ´ng cÃ³ trong lá»›p há»c nÃ y"));
 
         classStudent.setStatus("INACTIVE");
         classStudentRepository.save(classStudent);
@@ -171,7 +171,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
 
         return PaginatedResponse.<ClassroomStudentResponse>builder()
                 .content(content)
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -205,7 +205,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
 
         return PaginatedResponse.<StudentResponse>builder()
                 .content(content)
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -222,7 +222,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         Classroom fromClass = validateAndGetClassroom(fromClassroomId, schoolId, userPrincipal);
 
         if (fromClassroomId.equals(request.getTargetClassroomId())) {
-            throw new InvalidRequestException("Lớp học đích không được trùng với lớp học hiện tại");
+            throw new InvalidRequestException("Lá»›p há»c Ä‘Ã­ch khÃ´ng Ä‘Æ°á»£c trÃ¹ng vá»›i lá»›p há»c hiá»‡n táº¡i");
         }
 
         Classroom targetClass = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(request.getTargetClassroomId(), schoolId)
@@ -236,7 +236,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
                     .orElse(null);
 
             if (enrollment == null) {
-                notes.add(String.format("Học sinh ID %s không có trong lớp %s", studentId, fromClass.getClassName()));
+                notes.add(String.format("Há»c sinh ID %s khÃ´ng cÃ³ trong lá»›p %s", studentId, fromClass.getClassName()));
                 continue;
             }
 
@@ -292,7 +292,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         if (principal.getRole() == UserRole.TEACHER) {
             UUID currentTeacherUid = UUID.fromString(principal.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(currentTeacherUid)) {
-                throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
+                throw new AccessDeniedException("Báº¡n khÃ´ng Ä‘Æ°á»£c phÃ¢n cÃ´ng phá»¥ trÃ¡ch lá»›p há»c nÃ y!");
             }
         }
 
@@ -305,10 +305,10 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
+            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p Ä‘á»ƒ thá»±c hiá»‡n thao tÃ¡c");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
+                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
         return new UserPrincipal(user);
     }
 

@@ -58,19 +58,19 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("Tài khoản không thuộc bất kỳ trường học nào");
+            throw new AccessDeniedException("TÃ i khoáº£n khÃ´ng thuá»™c báº¥t ká»³ trÆ°á»ng há»c nÃ o");
         }
         UUID teacherUid = UUID.fromString(userPrincipal.getUid());
 
-        // 1. Validate Teacher sở hữu lớp học
+        // 1. Validate Teacher sá»Ÿ há»¯u lá»›p há»c
         Classroom classroom = validateAndGetClassroomForTeacher(request.getClassId(), schoolId, teacherUid);
 
-        // 2. Validate Target ID theo loại bài tập & lấy Title
+        // 2. Validate Target ID theo loáº¡i bÃ i táº­p & láº¥y Title
         String targetTitle = validateAndGetTargetTitle(request.getAssignmentType(), request.getTargetId(), schoolId);
 
         // 3. Validate Deadline
         if (!request.getDeadline().isAfter(LocalDateTime.now())) {
-            throw new InvalidRequestException("Hạn nộp bài phải ở thời điểm tương lai");
+            throw new InvalidRequestException("Háº¡n ná»™p bÃ i pháº£i á»Ÿ thá»i Ä‘iá»ƒm tÆ°Æ¡ng lai");
         }
 
         int minRequirement = request.getMinRequirement() != null && request.getMinRequirement() > 0
@@ -82,9 +82,9 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                 };
 
         User teacher = userRepository.findById(teacherUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin Giáo viên"));
+                .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin GiÃ¡o viÃªn"));
 
-        // 4. Lưu Assignment
+        // 4. LÆ°u Assignment
         Assignment assignment = Assignment.builder()
                 .classroom(classroom)
                 .teacher(teacher)
@@ -99,7 +99,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
 
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        // 5. Eager Initialization: Khởi tạo Submission NOT_STARTED cho toàn bộ học sinh ACTIVE trong lớp
+        // 5. Eager Initialization: Khá»Ÿi táº¡o Submission NOT_STARTED cho toÃ n bá»™ há»c sinh ACTIVE trong lá»›p
         List<UUID> activeStudentUids = classStudentRepository.findEnrolledStudentUids(classroom.getId());
         List<User> students = userRepository.findAllById(activeStudentUids);
 
@@ -197,7 +197,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                 long inProgress = stats != null && stats.getInProgressCount() != null ? stats.getInProgressCount() : 0L;
                 long notStarted = stats != null && stats.getNotStartedCount() != null ? stats.getNotStartedCount() : 0L;
 
-                String targetTitle = "Nội dung bài tập";
+                String targetTitle = "Ná»™i dung bÃ i táº­p";
                 if (a.getAssignmentType() != null && a.getTargetId() != null) {
                     switch (a.getAssignmentType()) {
                         case CONTEXT_READING -> targetTitle = contextMap.getOrDefault(a.getTargetId(), "Unknown Context");
@@ -232,7 +232,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
 
         return PaginatedResponse.<TeacherAssignmentResponse>builder()
                 .content(content)
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -249,7 +249,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         UUID teacherUid = UUID.fromString(userPrincipal.getUid());
 
         Assignment assignment = assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Bài tập không tồn tại hoặc đã bị xóa"));
+                .orElseThrow(() -> new ResourceNotFoundException("BÃ i táº­p khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a"));
 
         Classroom classroom = validateAndGetClassroomForTeacher(assignment.getClassroom().getId(), schoolId, teacherUid);
         String targetTitle = getTargetTitleSafely(assignment.getAssignmentType(), assignment.getTargetId());
@@ -303,7 +303,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         UUID teacherUid = UUID.fromString(userPrincipal.getUid());
 
         Assignment assignment = assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Bài tập không tồn tại hoặc đã bị xóa"));
+                .orElseThrow(() -> new ResourceNotFoundException("BÃ i táº­p khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a"));
 
         validateAndGetClassroomForTeacher(assignment.getClassroom().getId(), schoolId, teacherUid);
 
@@ -320,12 +320,12 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
             assignment.setStatus(request.getStatus());
         }
 
-        // Gia hạn Deadline & Auto-Revert LATE_SUBMITTED sang SUBMITTED
+        // Gia háº¡n Deadline & Auto-Revert LATE_SUBMITTED sang SUBMITTED
         if (request.getDeadline() != null) {
             LocalDateTime oldDeadline = assignment.getDeadline();
             LocalDateTime newDeadline = request.getDeadline();
             if (!newDeadline.isAfter(LocalDateTime.now())) {
-                throw new InvalidRequestException("Hạn nộp mới phải ở tương lai");
+                throw new InvalidRequestException("Háº¡n ná»™p má»›i pháº£i á»Ÿ tÆ°Æ¡ng lai");
             }
             assignment.setDeadline(newDeadline);
 
@@ -353,7 +353,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         UUID teacherUid = UUID.fromString(userPrincipal.getUid());
 
         Assignment assignment = assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Bài tập không tồn tại hoặc đã bị xóa"));
+                .orElseThrow(() -> new ResourceNotFoundException("BÃ i táº­p khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a"));
 
         validateAndGetClassroomForTeacher(assignment.getClassroom().getId(), schoolId, teacherUid);
 
@@ -367,10 +367,10 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
     // Helper methods
     private Classroom validateAndGetClassroomForTeacher(UUID classroomId, UUID schoolId, UUID teacherUid) {
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Lớp học không tồn tại hoặc đã bị xóa"));
+                .orElseThrow(() -> new ResourceNotFoundException("Lá»›p há»c khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a"));
 
         if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
-            throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
+            throw new AccessDeniedException("Báº¡n khÃ´ng Ä‘Æ°á»£c phÃ¢n cÃ´ng phá»¥ trÃ¡ch lá»›p há»c nÃ y!");
         }
         return classroom;
     }
@@ -379,51 +379,51 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         switch (type) {
             case CONTEXT_READING -> {
                 HistoricalContext context = historicalContextRepository.findById(targetId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Bối cảnh lịch sử không tồn tại với ID: " + targetId));
+                        .orElseThrow(() -> new ResourceNotFoundException("Bá»‘i cáº£nh lá»‹ch sá»­ khÃ´ng tá»“n táº¡i vá»›i ID: " + targetId));
                 if (context.getSchool() != null) {
                     if (!context.getSchool().getId().equals(schoolId)) {
-                        throw new AccessDeniedException("Bối cảnh địa phương này không thuộc trường của bạn");
+                        throw new AccessDeniedException("Bá»‘i cáº£nh Ä‘á»‹a phÆ°Æ¡ng nÃ y khÃ´ng thuá»™c trÆ°á»ng cá»§a báº¡n");
                     }
                     if (!Boolean.TRUE.equals(context.getIsPublished())) {
-                        throw new InvalidRequestException("Bối cảnh địa phương chưa được School Admin phê duyệt");
+                        throw new InvalidRequestException("Bá»‘i cáº£nh Ä‘á»‹a phÆ°Æ¡ng chÆ°a Ä‘Æ°á»£c School Admin phÃª duyá»‡t");
                     }
                 }
                 return context.getName();
             }
             case AI_CHAT_ROLEPLAY -> {
                 Character character = characterRepository.findById(targetId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Nhân vật lịch sử không tồn tại với ID: " + targetId));
+                        .orElseThrow(() -> new ResourceNotFoundException("NhÃ¢n váº­t lá»‹ch sá»­ khÃ´ng tá»“n táº¡i vá»›i ID: " + targetId));
                 if (character.getSchool() != null) {
                     if (!character.getSchool().getId().equals(schoolId)) {
-                        throw new AccessDeniedException("Nhân vật địa phương này không thuộc trường của bạn");
+                        throw new AccessDeniedException("NhÃ¢n váº­t Ä‘á»‹a phÆ°Æ¡ng nÃ y khÃ´ng thuá»™c trÆ°á»ng cá»§a báº¡n");
                     }
                     if (!Boolean.TRUE.equals(character.getIsPublished())) {
-                        throw new InvalidRequestException("Nhân vật địa phương chưa được School Admin phê duyệt");
+                        throw new InvalidRequestException("NhÃ¢n váº­t Ä‘á»‹a phÆ°Æ¡ng chÆ°a Ä‘Æ°á»£c School Admin phÃª duyá»‡t");
                     }
                 }
                 return character.getName();
             }
             case QUIZ_TEST -> {
                 Quiz quiz = quizRepository.findById(targetId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Bộ câu hỏi Quiz không tồn tại với ID: " + targetId));
+                        .orElseThrow(() -> new ResourceNotFoundException("Bá»™ cÃ¢u há»i Quiz khÃ´ng tá»“n táº¡i vá»›i ID: " + targetId));
                 if (quiz.getDeletedAt() != null) {
-                    throw new ResourceNotFoundException("Bộ câu hỏi Quiz đã bị xóa với ID: " + targetId);
+                    throw new ResourceNotFoundException("Bá»™ cÃ¢u há»i Quiz Ä‘Ã£ bá»‹ xÃ³a vá»›i ID: " + targetId);
                 }
                 if (!Boolean.TRUE.equals(quiz.getIsPublished())) {
-                    throw new InvalidRequestException("Bộ câu hỏi Quiz chưa được công bố/phê duyệt");
+                    throw new InvalidRequestException("Bá»™ cÃ¢u há»i Quiz chÆ°a Ä‘Æ°á»£c cÃ´ng bá»‘/phÃª duyá»‡t");
                 }
                 if (quiz.getHistoricalContext() != null && quiz.getHistoricalContext().getSchool() != null) {
                     if (!quiz.getHistoricalContext().getSchool().getId().equals(schoolId)) {
-                        throw new AccessDeniedException("Bộ câu hỏi Quiz này thuộc bối cảnh địa phương của trường khác");
+                        throw new AccessDeniedException("Bá»™ cÃ¢u há»i Quiz nÃ y thuá»™c bá»‘i cáº£nh Ä‘á»‹a phÆ°Æ¡ng cá»§a trÆ°á»ng khÃ¡c");
                     }
                 } else if (quiz.getCreatedBy() != null && quiz.getCreatedBy().getSchool() != null) {
                     if (!quiz.getCreatedBy().getSchool().getId().equals(schoolId)) {
-                        throw new AccessDeniedException("Bộ câu hỏi Quiz này không thuộc trường của bạn");
+                        throw new AccessDeniedException("Bá»™ cÃ¢u há»i Quiz nÃ y khÃ´ng thuá»™c trÆ°á»ng cá»§a báº¡n");
                     }
                 }
                 return quiz.getTitle();
             }
-            default -> throw new InvalidRequestException("Loại bài tập không hợp lệ: " + type);
+            default -> throw new InvalidRequestException("Loáº¡i bÃ i táº­p khÃ´ng há»£p lá»‡: " + type);
         }
     }
 
@@ -443,7 +443,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         } catch (Exception e) {
             log.warn("Could not resolve target title for type {} id {}", type, targetId, e);
         }
-        return "Nội dung bài tập";
+        return "Ná»™i dung bÃ i táº­p";
     }
 
     private TeacherAssignmentResponse mapToTeacherAssignmentResponse(Assignment a, String className) {
@@ -480,10 +480,10 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new AccessDeniedException("Chưa xác thực hoặc token không hợp lệ");
+            throw new AccessDeniedException("ChÆ°a xÃ¡c thá»±c hoáº·c token khÃ´ng há»£p lá»‡");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new AccessDeniedException("Không tìm thấy thông tin tài khoản người dùng"));
+                .orElseThrow(() -> new AccessDeniedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
         return new UserPrincipal(user);
     }
 }

@@ -99,7 +99,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .content(content)
                 .totalElements(teacherPage.getTotalElements())
                 .totalPages(teacherPage.getTotalPages())
-                .currentPage(teacherPage.getNumber())
+                .currentPage(teacherPage.getNumber() + 1)
                 .pageSize(teacherPage.getSize())
                 .hasNext(teacherPage.hasNext())
                 .hasPrevious(teacherPage.hasPrevious())

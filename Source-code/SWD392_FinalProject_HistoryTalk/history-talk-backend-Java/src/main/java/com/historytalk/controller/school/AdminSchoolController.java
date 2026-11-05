@@ -49,8 +49,8 @@ public class AdminSchoolController {
     public ResponseEntity<com.historytalk.dto.PaginatedApiResponse<SchoolResponse>> getSchools(
             @io.swagger.v3.oas.annotations.Parameter(description = "Keyword to search by school name, school code, or contact email")
             @RequestParam(required = false, defaultValue = "") String search,
-            @io.swagger.v3.oas.annotations.Parameter(description = "Page number (0-indexed, default: 0)")
-            @RequestParam(defaultValue = "0") int page,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Page number (1-indexed, default: 1)")
+            @RequestParam(defaultValue = "1") int page,
             @io.swagger.v3.oas.annotations.Parameter(description = "Number of items per page (default: 10)")
             @RequestParam(defaultValue = "10") int size,
             @io.swagger.v3.oas.annotations.Parameter(description = "Field to sort by: createdAt, name, schoolCode, totalSchoolTokenQuota (default: createdAt)")
@@ -63,7 +63,7 @@ public class AdminSchoolController {
             case "name", "schoolCode", "createdAt", "totalSchoolTokenQuota" -> sortBy;
             default -> "createdAt";
         };
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(direction, safeSortBy));
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page - 1), Math.max(1, size), Sort.by(direction, safeSortBy));
 
         PaginatedResponse<SchoolResponse> response = schoolManagementService.getSchools(search, pageable);
         return ResponseEntity.ok(com.historytalk.dto.PaginatedApiResponse.of(response, "Schools retrieved successfully"));
@@ -93,7 +93,7 @@ public class AdminSchoolController {
             @PathVariable UUID schoolId,
             @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) Boolean active,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDirection) {
@@ -103,7 +103,7 @@ public class AdminSchoolController {
             case "fullName", "userName", "email", "createdAt" -> sortBy;
             default -> "createdAt";
         };
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(direction, safeSortBy));
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page - 1), Math.max(1, size), Sort.by(direction, safeSortBy));
 
         PaginatedResponse<SchoolAdminResponse> response = schoolManagementService.getSchoolAdmins(schoolId, search, active, pageable);
         return ResponseEntity.ok(PaginatedApiResponse.of(response, "School Admins retrieved successfully"));

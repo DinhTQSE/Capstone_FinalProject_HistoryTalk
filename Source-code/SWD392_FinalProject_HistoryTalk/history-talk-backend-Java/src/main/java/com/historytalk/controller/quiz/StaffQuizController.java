@@ -45,11 +45,11 @@ public class StaffQuizController {
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizStaffResponse>>> getAllQuizzes(
             @RequestParam(required = false, defaultValue = "") String search,
             @RequestParam(required = false) String era,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         log.info("GET /api/v1/staff/quizzes search={} era={} page={} size={}", search, era, page, size);
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         String role = SecurityUtils.getRoleName();
         PaginatedResponse<QuizStaffResponse> data = quizService.getAllQuizzesForStaff(search, era, pageable, role);
         return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
@@ -144,7 +144,7 @@ public class StaffQuizController {
 
     /**
      * PUT /staff/quizzes/:quizId/questions/:questionId
-     * Partial update — all fields optional.
+     * Partial update â€” all fields optional.
      */
     @PutMapping("/{quizId}/questions/{questionId}")
     @Operation(summary = "Update question", description = "Partially update a question. All fields are optional.")
@@ -227,8 +227,8 @@ public class StaffQuizController {
 
     /**
      * GET /staff/quizzes/sessions[?userId=...]
-     * Without userId  → returns all users' completed sessions (paginated).
-     * With    userId  → returns that specific user's completed sessions (paginated).
+     * Without userId  â†’ returns all users' completed sessions (paginated).
+     * With    userId  â†’ returns that specific user's completed sessions (paginated).
      */
     @GetMapping("/sessions")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
@@ -239,11 +239,11 @@ public class StaffQuizController {
     )
     public ResponseEntity<ApiResponse<PaginatedResponse<QuizHistoryResponse>>> getSessionHistory(
             @RequestParam(required = false) String userId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         log.info("GET /api/v1/staff/quizzes/sessions userId={} page={} size={}", userId, page, size);
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         PaginatedResponse<QuizHistoryResponse> data = userId != null
                 ? quizService.getQuizHistoryByUserId(userId, pageable)
                 : quizService.getAllUsersQuizHistory(pageable);
@@ -264,7 +264,7 @@ public class StaffQuizController {
             @PathVariable String sessionId) {
 
         log.info("GET /api/v1/staff/quizzes/sessions/{}", sessionId);
-        // userId = null → admin mode, skip ownership check
+        // userId = null â†’ admin mode, skip ownership check
         QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, null);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
     }

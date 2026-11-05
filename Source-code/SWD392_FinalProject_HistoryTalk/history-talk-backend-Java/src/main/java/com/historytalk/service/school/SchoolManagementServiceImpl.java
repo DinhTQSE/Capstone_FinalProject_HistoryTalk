@@ -188,7 +188,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .content(content)
                 .totalElements(schoolPage.getTotalElements())
                 .totalPages(schoolPage.getTotalPages())
-                .currentPage(schoolPage.getNumber())
+                .currentPage(schoolPage.getNumber() + 1)
                 .pageSize(schoolPage.getSize())
                 .hasNext(schoolPage.hasNext())
                 .hasPrevious(schoolPage.hasPrevious())
@@ -254,7 +254,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .content(content)
                 .totalElements(adminPage.getTotalElements())
                 .totalPages(adminPage.getTotalPages())
-                .currentPage(adminPage.getNumber())
+                .currentPage(adminPage.getNumber() + 1)
                 .pageSize(adminPage.getSize())
                 .hasNext(adminPage.hasNext())
                 .hasPrevious(adminPage.hasPrevious())
@@ -450,7 +450,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         }
         String normalized = Normalizer.normalize(address, Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                .replace("đ", "d").replace("Đ", "D")
+                .replace("Ä‘", "d").replace("Ä", "D")
                 .toUpperCase();
 
         String targetSegment = normalized;
@@ -504,7 +504,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         }
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                .replace("đ", "d").replace("Đ", "D");
+                .replace("Ä‘", "d").replace("Ä", "D");
 
         String[] tokens = normalized.toUpperCase().split("[^A-Z0-9]+");
         StringBuilder acronymBuilder = new StringBuilder();

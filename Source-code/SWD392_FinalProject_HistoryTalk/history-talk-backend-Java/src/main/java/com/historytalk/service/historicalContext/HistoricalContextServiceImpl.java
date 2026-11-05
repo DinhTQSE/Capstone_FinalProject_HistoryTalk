@@ -88,11 +88,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         log.info("Fetching historical context with ID: {}", contextId);
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: "+contextId));
+                .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: "+contextId));
 
         if (!isStaffOrAdmin(role)
                 && (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
-            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+            throw new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: " + contextId);
         }
 
         // School-owned isolation check: local content cannot be viewed by outsiders
@@ -110,7 +110,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 }
             }
             if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
-                throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+                throw new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: " + contextId);
             }
         }
         
@@ -128,7 +128,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         // Check for duplicate name
         if (contextRepository.findByNameIgnoreCase(request.getName()).isPresent()) {
-            throw new InvalidRequestException("Bối cảnh lịch sử đã tồn tại");
+            throw new InvalidRequestException("Bá»‘i cáº£nh lá»‹ch sá»­ Ä‘Ã£ tá»“n táº¡i");
         }
 
         User user = userRepository.findById(UUID.fromString(userId))
@@ -169,13 +169,13 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Không tìm thấy bối cảnh lịch sử với ID: "+contextId
+                        "KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: "+contextId
                 ));
         
         // Check if user has permission to update (staff/admin)
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "Bạn không có quyền cập nhật bối cảnh lịch sử này"
+                    "Báº¡n khÃ´ng cÃ³ quyá»n cáº­p nháº­t bá»‘i cáº£nh lá»‹ch sá»­ nÃ y"
             );
         }
         
@@ -183,7 +183,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getName() != null && 
             !request.getName().equalsIgnoreCase(context.getName()) &&
             contextRepository.existsByNameIgnoreCaseAndContextIdNot(request.getName(), UUID.fromString(contextId))) {
-            throw new InvalidRequestException("Bối cảnh lịch sử \"" + request.getName() + "\" đã tồn tại");
+            throw new InvalidRequestException("Bá»‘i cáº£nh lá»‹ch sá»­ \"" + request.getName() + "\" Ä‘Ã£ tá»“n táº¡i");
         }
         
         // Update fields
@@ -223,7 +223,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getIsPublished() != null) {
             context.setIsPublished(request.getIsPublished());
         }
-        // battleMap: use a special sentinel check — only update when the key is
+        // battleMap: use a special sentinel check â€” only update when the key is
         // explicitly present in the request (non-absent). Since Jackson maps
         // absent JSON keys to null, we treat null as "do not change" here.
         // To explicitly clear the battle map, the client sends {"battleMap": null}
@@ -254,7 +254,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         // Check if user has permission to delete (staff/admin)
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "Bạn không có quyền xóa bối cảnh lịch sử này"
+                    "Báº¡n khÃ´ng cÃ³ quyá»n xÃ³a bá»‘i cáº£nh lá»‹ch sá»­ nÃ y"
             );
         }
         
@@ -276,7 +276,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         if (!isStaffOrAdmin(userRole)) {
             throw new InvalidRequestException(
-                    "Bạn không có quyền xóa mềm bối cảnh lịch sử này"
+                    "Báº¡n khÃ´ng cÃ³ quyá»n xÃ³a má»m bá»‘i cáº£nh lá»‹ch sá»­ nÃ y"
             );
         }
         
@@ -327,7 +327,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     public void restoreContext(String contextId) {
         int updated = contextRepository.restoreById(UUID.fromString(contextId));
         if (updated == 0) {
-            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+            throw new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: " + contextId);
         }
     }
 
@@ -389,7 +389,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         .toList())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
-                .currentPage(page.getNumber())
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .hasNext(page.hasNext())
                 .hasPrevious(page.hasPrevious())
@@ -419,9 +419,9 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             return ContentStatus.ACTIVE;
         }
 
-    // ────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // battleMap JSON helpers
-    // ────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private static final Set<String> VALID_BATTLE_MAP_MODES = Set.of("custom", "image");
 
@@ -454,26 +454,26 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             // version must be 1
             Object version = map.get("version");
             if (!Integer.valueOf(1).equals(version) && !"1".equals(String.valueOf(version))) {
-                throw new InvalidRequestException("battleMap.version phải là 1");
+                throw new InvalidRequestException("battleMap.version pháº£i lÃ  1");
             }
 
             // mode must be 'custom' or 'image'
             Object mode = map.get("mode");
             if (mode == null || !VALID_BATTLE_MAP_MODES.contains(mode.toString())) {
                 throw new InvalidRequestException(
-                        "battleMap.mode phải là 'custom' hoặc 'image'. Nhận: " + mode);
+                        "battleMap.mode pháº£i lÃ  'custom' hoáº·c 'image'. Nháº­n: " + mode);
             }
 
             // imageUrl must be a non-blank string
             Object imageUrl = map.get("imageUrl");
             if (imageUrl == null || imageUrl.toString().isBlank()) {
-                throw new InvalidRequestException("battleMap.imageUrl không được để trống");
+                throw new InvalidRequestException("battleMap.imageUrl khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng");
             }
 
             // imageSource max 500 chars
             Object imageSource = map.get("imageSource");
             if (imageSource != null && imageSource.toString().length() > 500) {
-                throw new InvalidRequestException("battleMap.imageSource tối đa 500 ký tự");
+                throw new InvalidRequestException("battleMap.imageSource tá»‘i Ä‘a 500 kÃ½ tá»±");
             }
 
             // Validate symbols if present
@@ -484,7 +484,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                         Object symType = symMap.get("type");
                         if (symType != null && !VALID_SYMBOL_TYPES.contains(symType.toString())) {
                             throw new InvalidRequestException(
-                                    "battleMap.symbols[].type không hợp lệ: " + symType);
+                                    "battleMap.symbols[].type khÃ´ng há»£p lá»‡: " + symType);
                         }
                     }
                 }
@@ -492,7 +492,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
             return json;
         } catch (JsonProcessingException ex) {
-            throw new InvalidRequestException("battleMap không phải JSON hợp lệ: " + ex.getMessage());
+            throw new InvalidRequestException("battleMap khÃ´ng pháº£i JSON há»£p lá»‡: " + ex.getMessage());
         }
     }
 
@@ -507,7 +507,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         try {
             return objectMapper.readValue(json, new TypeReference<Object>() {});
         } catch (JsonProcessingException ex) {
-            log.warn("Could not deserialize battleMap — returning raw string: {}", ex.getMessage());
+            log.warn("Could not deserialize battleMap â€” returning raw string: {}", ex.getMessage());
             return json;
         }
     }

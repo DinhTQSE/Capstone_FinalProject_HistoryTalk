@@ -54,7 +54,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
                 .content(content)
                 .totalElements(studentPage.getTotalElements())
                 .totalPages(studentPage.getTotalPages())
-                .currentPage(studentPage.getNumber())
+                .currentPage(studentPage.getNumber() + 1)
                 .pageSize(studentPage.getSize())
                 .hasNext(studentPage.hasNext())
                 .hasPrevious(studentPage.hasPrevious())
