@@ -3,6 +3,9 @@ historytalk.app {
         reverse_proxy historytalk-java:8080 {
             header_up X-Forwarded-Proto https
             header_up X-Forwarded-Port 443
+            transport http {
+                response_header_timeout 600s
+            }
         }
     }
     handle /v1/* {
@@ -18,6 +21,9 @@ historytalk.app {
         reverse_proxy http://historytalk-grafana:3000 {
             header_up X-Forwarded-Proto https
             header_up X-Forwarded-Port 443
+            transport http {
+                response_header_timeout 600s
+            }
         }
     }
 
@@ -25,6 +31,9 @@ historytalk.app {
         reverse_proxy http://historytalk-express:5000 {
             header_up X-Forwarded-Proto https
             header_up X-Forwarded-Port 443
+            transport http {
+                response_header_timeout 600s
+            }
         }
     }
 }
