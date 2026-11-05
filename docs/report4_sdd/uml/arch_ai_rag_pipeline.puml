@@ -12,13 +12,13 @@ package "Phase 1: Document Ingestion & Semantic Indexing Pipeline" #EBF5FB {
     [1. Document Upload\n(PDF / Markdown / Text)] as Step1
     [2. PDF Type Classifier & Extractor\n(Apache PDFBox + Tess4J Vietnamese OCR)] as Step2
     [3. Dynamic Semantic Chunking\n(Sentence Splitting + 80th Percentile Cosine Distance)] as Step3
-    [4. Dense Vector Embedding\n(Ollama BAAI/bge-m3 - 768 Dimensions)] as Step4
+    [4. Dense Vector Embedding\n(Ollama BAAI/bge-m3 - 1024 Dimensions)] as Step4
     database "5. Supabase PgVector Store\n(vector_chunk Table - HNSW Cosine Index)" as VecStore
 }
 
 package "Phase 2: Retrieval, Reranking & Grounded Persona Generation" #FEF9E7 {
     [A. User Question & Session Context\n(characterId, contextId, message_history)] as QueryIn
-    [B. Query Embedding Generation\n(BAAI/bge-m3 768-D Vector)] as QueryEmbed
+    [B. Query Embedding Generation\n(BAAI/bge-m3 1024-D Vector)] as QueryEmbed
     [C. Vector Similarity Search\n(PgVector Cosine Similarity Query\nfiltered by entity_ids)] as VecSearch
     [D. Cross-Encoder Reranking\n(Kaggle Rerank API /api/rerank\nFallback: Top Cosine Chunks)] as Rerank
     [E. Grounded Persona Prompt Builder\n(First-Person Roleplay Rules + Anti-Hallucination Guardrail\n+ Socratic Reverse-Questioning)] as PromptBuild
@@ -31,7 +31,7 @@ Step3 -down-> Step4 : Semantic Text Chunks
 Step4 -down-> VecStore : Batch Upsert
 
 QueryIn -down-> QueryEmbed : User Prompt
-QueryEmbed -down-> VecSearch : 768-D Query Vector
+QueryEmbed -down-> VecSearch : 1024-D Query Vector
 VecStore .right.> VecSearch : Cosine Similarity Search
 VecSearch -down-> Rerank : Candidate Chunks
 Rerank -down-> PromptBuild : Top Reranked Historical Passages

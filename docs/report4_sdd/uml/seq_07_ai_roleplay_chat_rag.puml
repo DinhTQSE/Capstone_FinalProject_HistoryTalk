@@ -23,7 +23,7 @@ MsgSvc -> DB : INSERT user Message (is_from_ai = false)
 MsgSvc -> FastAPI : POST /v1/chat/generate-reply-stream (character, context, message, history)
 
 FastAPI -> Rerank : get_embedding_from_ollama(userMessage, model="bge-m3")
-Rerank --> FastAPI : 768-D query_embedding
+Rerank --> FastAPI : 1024-D query_embedding
 FastAPI -> VecDB : match_history_chunks similarity search(query_embedding, match_limit=10, filter_entity_ids)
 VecDB --> FastAPI : Top-10 candidate chunks
 FastAPI -> Rerank : POST /api/rerank (query, Top-10 chunks)

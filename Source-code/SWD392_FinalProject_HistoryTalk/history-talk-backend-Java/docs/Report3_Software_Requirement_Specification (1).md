@@ -605,7 +605,7 @@ erDiagram
 | **6** | `historical_contexts`| `id` (UUID) | `school_id` (nullable) | Global or localized historical event / period summary. |
 | **7** | `characters` | `id` (UUID) | `context_id`, `school_id` | Historical figure profile storing biographical data, system persona prompt, and avatar URL. |
 | **8** | `documents` | `id` (UUID) | `context_id`, `character_id` | Curated source text or PDF reference used as grounding data for RAG. |
-| **9** | `vector_chunks` | `id` (UUID) | `document_id` | Text chunk and its dense 768/1536-dimensional vector embedding stored in Supabase PgVector. |
+| **9** | `vector_chunks` | `id` (UUID) | `document_id` | Text chunk and its dense 1024-dimensional vector embedding stored in Supabase PgVector. |
 | **10**| `chat_sessions` | `id` (UUID) | `user_id`, `character_id` | AI conversation session representing dialogue between a user and a historical persona. |
 | **11**| `chat_messages` | `id` (UUID) | `session_id` | Message log holding role (`USER`/`ASSISTANT`), content, token count, and suggested follow-ups. |
 | **12**| `quizzes` | `id` (UUID) | `context_id`, `school_id` | Assessment test entity defining duration, passing score, and question configuration. |
@@ -1128,7 +1128,7 @@ erDiagram
 [Plaintext Document] ──▶ [Recursive Character Text Splitter (500 tokens, 10% overlap)] ──▶ [FastAPI Embedding API] ──▶ [Insert into vector_chunks (pgvector)]
 ```
 * **Function Details:**
-  * **Validation Rules:** Chunk length bounded between 100 and 600 tokens; vector dimension strictly matches configured model (e.g. 768 or 1536 float values).
+  * **Validation Rules:** Chunk length bounded between 100 and 600 tokens; vector dimension strictly matches configured model (1024 float values for bge-m3).
   * **Normal Flow:**
     1. Slices text into overlapping windows.
     2. Calls embedding service in batches of 16 chunks.
@@ -1317,5 +1317,5 @@ Every application message is uniquely identified by an unambiguous message code:
 
 ### 5.4 Other Technical & Operational Requirements
 * **OCR Quality Baseline:** Scanned documents processed by Tess4J must achieve a minimum character accuracy of 85% on clear Vietnamese print scans.
-* **Vector Dimension Uniformity:** All document chunk embeddings must adhere to a fixed dimension size (768 or 1536 float values) matching the configured embedding model.
+* **Vector Dimension Uniformity:** All document chunk embeddings must adhere to a fixed dimension size (1024 float values for bge-m3) matching the configured embedding model.
 * **Container Health Checks:** All Docker microservices must implement `/actuator/health` or `/healthz` endpoints responding within 200ms.

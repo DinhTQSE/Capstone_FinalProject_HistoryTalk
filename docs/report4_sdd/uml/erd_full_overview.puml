@@ -137,7 +137,7 @@ package "2. Historical Content, RAG & Map" #E8F8F5 {
         --
         doc_id : UUID <<FK>>
         entity_id : UUID
-        embedding : vector(768)
+        embedding : vector(1024)
         sequence_number : INT
     }
 

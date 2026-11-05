@@ -19,7 +19,7 @@ else (No)
 endif
 :Save Document (status = ACTIVE) in PostgreSQL;
 :Send extracted content to FastAPI AI Service;
-:Execute dynamic 80th-percentile Semantic Chunking\nand generate 768-D BGE-M3 embeddings;
+:Execute dynamic 80th-percentile Semantic Chunking\nand generate 1024-D BGE-M3 embeddings;
 :Batch insert vectors into Supabase PgVector (vector_chunk);
 
 |Teacher / Content Admin|
