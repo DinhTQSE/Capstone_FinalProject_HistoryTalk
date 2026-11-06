@@ -32,6 +32,7 @@ import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.chat.AiServiceClient;
 import com.historytalk.utils.SecurityUtils;
+import com.historytalk.service.character.CharacterPronouns;
 import com.historytalk.service.speech.CharacterVoices;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -236,6 +237,8 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .background(req.getBackground())
                 .personality(req.getPersonality())
                 .voiceId(CharacterVoices.requireSupported(req.getVoiceId()))
+                .selfPronoun(CharacterPronouns.normalize(req.getSelfPronoun()))
+                .addressPronoun(CharacterPronouns.normalize(req.getAddressPronoun()))
                 .imageUrl(req.getImageUrl())
                 .modelUrl(req.getModelUrl())
                 .bornYear(req.getBornYear())
@@ -281,6 +284,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (StringUtils.hasText(req.getTitle()))       character.setTitle(req.getTitle());
         if (StringUtils.hasText(req.getPersonality())) character.setPersonality(req.getPersonality());
         if (req.getVoiceId() != null) character.setVoiceId(CharacterVoices.requireSupported(req.getVoiceId()));
+        if (req.getSelfPronoun() != null) character.setSelfPronoun(CharacterPronouns.normalize(req.getSelfPronoun()));
+        if (req.getAddressPronoun() != null) character.setAddressPronoun(CharacterPronouns.normalize(req.getAddressPronoun()));
         if (StringUtils.hasText(req.getImageUrl()))    character.setImageUrl(req.getImageUrl());
         if (StringUtils.hasText(req.getModelUrl()))    character.setModelUrl(req.getModelUrl());
         if (req.getBornYear() != null)                 character.setBornYear(req.getBornYear());
@@ -973,6 +978,8 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .title(c.getTitle())
                 .personality(c.getPersonality())
                 .voiceId(c.getVoiceId())
+                .selfPronoun(c.getSelfPronoun())
+                .addressPronoun(c.getAddressPronoun())
                 .modelUrl(c.getModelUrl())
                 .bornYear(c.getBornYear())
                 .bornMonth(c.getBornMonth())

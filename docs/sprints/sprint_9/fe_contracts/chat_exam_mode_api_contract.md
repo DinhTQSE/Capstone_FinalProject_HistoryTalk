@@ -4,7 +4,7 @@
 > **Base URL:** `/Historical-tell/api/v1`  
 > **Authentication:** Bearer Token (`Authorization: Bearer <jwt_access_token>`)  
 > **Trạng thái BE:** Mọi API trong tài liệu này đã deploy production (cập nhật 06/11/2026). FE chưa tích hợp.  
-> **Mục lục cho FE:** Vấn đáp ở mục 1–3 · Lọc ngôn từ ở mục 2.6 · Giọng đọc và chọn giọng nhân vật ở mục 6 · Thay đổi quyền ở mục 7
+> **Mục lục cho FE:** Vấn đáp ở mục 1–3 · Lọc ngôn từ ở mục 2.6 · Giọng đọc và chọn giọng nhân vật ở mục 6 · Thay đổi quyền ở mục 7 · Cách xưng hô của nhân vật ở mục 8
 
 ---
 
@@ -375,3 +375,42 @@ Từ sprint 9, `SYSTEM_ADMIN` và `SCHOOL_ADMIN` **không còn** tạo hoặc s�
 * Các API `/teacher/local-contents/*` vẫn chỉ dành cho teacher.
 
 **FE cần làm:** ẩn các nút tạo, sửa, xóa, upload và chọn giọng với `SYSTEM_ADMIN` và `SCHOOL_ADMIN`, và xử lý `403` nếu vẫn gọi.
+
+---
+
+## 8. Cách xưng hô của nhân vật
+
+Mặc định mọi nhân vật **xưng "tôi" và gọi người học là "bạn"**. Content admin và teacher có thể đặt cách xưng hô riêng khi tạo hoặc sửa nhân vật, ví dụ vua thời phong kiến xưng "ta" và gọi "ngươi". Cách xưng hô áp dụng cho chat, vấn đáp (câu mở đầu, câu hỏi, nhận xét, lời tổng kết) và lời chào dự phòng.
+
+### 8.1. Trường mới
+Thêm vào request tạo và sửa nhân vật, ở cả API nhân vật hệ thống (`/characters`, content admin) và nhân vật địa phương (`/teacher/local-contents/characters`, teacher). Response trả lại đúng 2 trường này.
+
+```json
+{
+  "name": "Ngô Quyền",
+  "voiceId": "Thiện Minh",
+  "selfPronoun": "ta",
+  "addressPronoun": "ngươi"
+}
+```
+
+| Trường | Ý nghĩa | Mặc định khi trống |
+|---|---|---|
+| `selfPronoun` | Nhân vật tự xưng, ví dụ `ta`, `trẫm`, `bản tướng` | `tôi` |
+| `addressPronoun` | Nhân vật gọi người học, ví dụ `ngươi`, `cháu`, `các em` | `bạn` |
+
+* **Ràng buộc:** chỉ gồm chữ cái và dấu cách, tối đa 30 ký tự. Sai thì `400` với message `Cách xưng hô chỉ gồm chữ cái, tối đa 30 ký tự`.
+* **Khi tạo:** không gửi hoặc gửi `""` thì dùng mặc định.
+* **Khi sửa:** không gửi trường nào thì giữ nguyên, gửi `""` thì về mặc định.
+* **Response:** `null` nghĩa là đang dùng mặc định.
+
+### 8.2. Gợi ý màn hình
+* Đặt cạnh ô chọn giọng: 2 ô nhập "Nhân vật tự xưng" và "Gọi người học", placeholder là `tôi` và `bạn`.
+* Có thể gợi ý nhanh theo thời đại: phong kiến `ta` / `ngươi`, cận đại và hiện đại `tôi` / `bạn` hoặc `tôi` / `cháu`.
+* **Nhân vật hiện có chưa được đặt** nên đang nói "tôi" và "bạn". Nếu muốn giữ phong cách cũ "ta" và "ngươi" cho nhân vật phong kiến, content admin cần sửa từng nhân vật.
+
+### 8.3. Việc Frontend cần làm
+- [ ] Thêm 2 ô `selfPronoun`, `addressPronoun` vào form tạo và sửa nhân vật cho content admin và teacher.
+- [ ] Hiện lỗi `400` dưới ô nhập khi sai định dạng.
+
+**Migration:** `V20261106143000__add_character_pronouns.sql` thêm 2 cột `self_pronoun`, `address_pronoun` (`VARCHAR(30)`) vào bảng `character`.

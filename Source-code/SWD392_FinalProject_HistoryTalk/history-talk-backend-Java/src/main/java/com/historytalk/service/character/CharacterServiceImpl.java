@@ -174,6 +174,8 @@ public class CharacterServiceImpl implements CharacterService {
                 .modelUrl(request.getModelUrl())
                 .personality(request.getPersonality())
                 .voiceId(CharacterVoices.requireSupported(request.getVoiceId()))
+                .selfPronoun(CharacterPronouns.normalize(request.getSelfPronoun()))
+                .addressPronoun(CharacterPronouns.normalize(request.getAddressPronoun()))
                 .bornYear(request.getBornYear())
                 .bornMonth(request.getBornMonth())
                 .bornDay(request.getBornDay())
@@ -229,6 +231,12 @@ public class CharacterServiceImpl implements CharacterService {
         }
         if (request.getVoiceId() != null) {
             character.setVoiceId(CharacterVoices.requireSupported(request.getVoiceId()));
+        }
+        if (request.getSelfPronoun() != null) {
+            character.setSelfPronoun(CharacterPronouns.normalize(request.getSelfPronoun()));
+        }
+        if (request.getAddressPronoun() != null) {
+            character.setAddressPronoun(CharacterPronouns.normalize(request.getAddressPronoun()));
         }
         if (request.getBornYear() != null) character.setBornYear(request.getBornYear());
         if (request.getBornMonth() != null) character.setBornMonth(request.getBornMonth());
@@ -440,6 +448,8 @@ public class CharacterServiceImpl implements CharacterService {
                 .modelUrl(character.getModelUrl())
                 .personality(character.getPersonality())
                 .voiceId(character.getVoiceId())
+                .selfPronoun(character.getSelfPronoun())
+                .addressPronoun(character.getAddressPronoun())
                 .bornYear(character.getBornYear())
                 .bornMonth(character.getBornMonth())
                 .bornDay(character.getBornDay())

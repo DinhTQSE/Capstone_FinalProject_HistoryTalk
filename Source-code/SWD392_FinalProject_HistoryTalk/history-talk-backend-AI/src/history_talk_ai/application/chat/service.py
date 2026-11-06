@@ -18,6 +18,8 @@ from history_talk_ai.dataaccess.java_backend.historical_context_schema import Hi
 from history_talk_ai.presentation.chat.schemas import MessageHistoryItem, ProcessDocumentRequest
 from history_talk_ai.application.prompting.prompt_builder import (
     build_chat_system_prompt,
+    build_suggestion_prompt,
+    character_pronouns,
     build_title_system_prompt,
 )
 
@@ -436,27 +438,27 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         raise RagUnavailableError("Không tra cứu được tư liệu lịch sử. Vui lòng thử lại sau.") from e
 
 
-def _build_final_user_content(user_message: str, rag_context: str) -> str:
+def _build_final_user_content(user_message: str, rag_context: str, self_pronoun: str = "tôi") -> str:
     """Put the grounding rules next to the question, where the model follows them most closely."""
     if not rag_context:
         return (
             "[KHÔNG TÌM THẤY TƯ LIỆU CHO CÂU NÀY]\n"
-            "LỆNH: Chỉ được dùng thông tin trong phần THÔNG TIN LỊCH SỬ CỦA BẠN. Chào hỏi hoặc chuyện sinh hoạt thường ngày thì trả lời tự nhiên. "
-            "Nếu được hỏi về sự kiện, con số, tên người hay địa danh không có ở đó, BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không tự suy diễn.\n\n"
+            "LỆNH: Chỉ dùng THÔNG TIN LỊCH SỬ CỦA BẠN. Chào hỏi hoặc chuyện thường ngày thì trả lời tự nhiên. "
+            "Hỏi về sự kiện, con số, tên người hay địa danh không có ở đó thì BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không suy diễn.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
     broad_rule = (
-        "5. Câu này cần tổng hợp nhiều sự việc: được trả lời tối đa 200 từ, kể theo trình tự thời gian.\n"
+        "4. Câu này cần tổng hợp nhiều sự việc: được trả lời tối đa 200 từ, kể theo trình tự thời gian.\n"
         if _is_broad_question(user_message)
         else ""
     )
     return (
         f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
-        "LỆNH RAG:\n"
-        "1. Lấy thông tin từ DỮ LIỆU THAM KHẢO, nhưng BẮT BUỘC phải chuyển thành lời nói của chính bạn (ngôi thứ nhất: Ta, Trẫm, Tôi). TUYỆT ĐỐI KHÔNG copy y nguyên cách gọi tên mình ở ngôi thứ 3 (ví dụ: không nói 'Ngô Quyền đã làm...' mà phải nói 'Ta đã làm...').\n"
-        "2. Bám sát sự kiện trong dữ liệu, KHÔNG tự suy diễn thêm. LOẠI BỎ CÁC SỐ CHÚ THÍCH TRONG NGOẶC như (1), [1] nếu có.\n"
-        "3. TUYỆT ĐỐI KHÔNG TỰ BỊA ĐẶT. Nếu dữ liệu RAG KHÔNG ĐỀ CẬP đến câu hỏi, BẮT BUỘC phải thừa nhận không biết, không nhớ, hoặc nói 'Sử sách không ghi chép'. Không tự sáng tác thơ, bài hát hay chi tiết lịch sử ngoài dữ liệu.\n"
-        "4. TUYỆT ĐỐI KHÔNG LẶP LẠI câu trả lời giống hệt tin nhắn ngay trước đó. Nếu đã trả lời rồi, hãy tóm tắt ngắn gọn lại hoặc thay đổi cách diễn đạt.\n"
+        "LỆNH:\n"
+        f"1. Chỉ dùng sự kiện có trong DỮ LIỆU THAM KHẢO, kể lại bằng lời của chính mình ở ngôi thứ nhất (\"{self_pronoun}\"), "
+        "không gọi tên mình ở ngôi thứ ba, bỏ các số chú thích như (1), [1].\n"
+        "2. KHÔNG bịa đặt hay sáng tác thêm. Dữ liệu không nhắc tới thì nói 'Sử sách không ghi chép rõ'.\n"
+        "3. Không lặp lại y hệt câu trả lời trước đó.\n"
         f"{broad_rule}\n"
         f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
     )
@@ -496,28 +498,18 @@ async def _has_supporting_document(question: str, entity_ids: List[str]) -> bool
 
 
 async def _generate_suggested_questions(
-    messages: list[dict], reply: str, entity_ids: List[str]
+    character: CharacterData, rag_context: str, reply: str, entity_ids: List[str]
 ) -> tuple[List[str], int, int]:
     """
     Suggest questions the character can actually answer: the prompt asks for questions answered by the
     documents, then each candidate is checked against the documents and dropped when none supports it.
     Suggestions are optional, so failing to generate them must never fail the reply itself.
     """
-    sq_prompt = (
-        f"Đóng vai người dùng, hãy gợi ý {_SUGGESTION_CANDIDATES} câu hỏi ngắn (dưới 12 từ) để hỏi tiếp nhân vật này.\n"
-        "CHỈ gợi ý câu hỏi mà câu trả lời CÓ TRONG [DỮ LIỆU THAM KHẢO] ở trên, hoặc trong THÔNG TIN LỊCH SỬ của nhân vật. "
-        "Ưu tiên sự kiện, nhân vật, địa danh, nguyên nhân và kết quả được nhắc tới trong tư liệu. "
-        "KHÔNG hỏi về đời tư, sở thích, cảm xúc hay chi tiết mà tư liệu không nhắc tới.\n"
-        "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
-        "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
-        f"Chỉ liệt kê {_SUGGESTION_CANDIDATES} câu hỏi trần trụi trên {_SUGGESTION_CANDIDATES} dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
-    )
-    sq_messages = messages + [
-        {"role": "assistant", "content": reply},
-        {"role": "user", "content": sq_prompt},
-    ]
+    prompt = build_suggestion_prompt(character, rag_context, reply, _SUGGESTION_CANDIDATES)
     try:
-        sq_text, prompt_tokens, completion_tokens = await _call_llm(sq_messages, expect_json=False)
+        sq_text, prompt_tokens, completion_tokens = await _call_llm(
+            [{"role": "user", "content": prompt}], expect_json=False
+        )
     except Exception as e:
         logger.warning(f"Failed to generate suggested questions: {e}")
         return [], 0, 0
@@ -580,7 +572,7 @@ async def generate_reply(
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = _build_final_user_content(user_message, rag_context)
+    final_user_content = _build_final_user_content(user_message, rag_context, character_pronouns(character)[0])
 
     messages.append({"role": "user", "content": final_user_content})
 
@@ -591,7 +583,7 @@ async def generate_reply(
     sq_ct = 0
     
     if not skip_suggestions:
-        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, response_text, entity_ids)
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(character, rag_context, response_text, entity_ids)
 
     return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct, quotes_used
 
@@ -633,7 +625,7 @@ async def generate_reply_stream(
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = _build_final_user_content(user_message, rag_context)
+    final_user_content = _build_final_user_content(user_message, rag_context, character_pronouns(character)[0])
 
     messages.append({"role": "user", "content": final_user_content})
 
@@ -661,7 +653,7 @@ async def generate_reply_stream(
     sq_ct = 0
 
     if not skip_suggestions:
-        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, full_message, entity_ids)
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(character, rag_context, full_message, entity_ids)
 
     yield {
         "suggestedQuestions": suggested_questions,

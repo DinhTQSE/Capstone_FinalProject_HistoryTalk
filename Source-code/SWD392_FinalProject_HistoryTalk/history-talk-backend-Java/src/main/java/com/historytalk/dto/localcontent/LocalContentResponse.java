@@ -99,6 +99,14 @@ public class LocalContentResponse {
     @JsonProperty("voiceId")
     private String voiceId;
 
+    /** Null means the default "tôi". */
+    @JsonProperty("selfPronoun")
+    private String selfPronoun;
+
+    /** Null means the default "bạn". */
+    @JsonProperty("addressPronoun")
+    private String addressPronoun;
+
     @JsonProperty("modelUrl")
     private String modelUrl;
 

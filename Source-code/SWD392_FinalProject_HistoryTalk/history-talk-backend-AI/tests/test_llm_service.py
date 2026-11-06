@@ -246,7 +246,7 @@ def test_reply_survives_when_suggestions_fail(monkeypatch):
         return "", []
 
     async def fake_llm(messages, expect_json=True, temperature=None):
-        if "Đóng vai người dùng" in messages[-1]["content"]:
+        if "Đóng vai người học" in messages[-1]["content"]:
             raise ValueError("LLM reply still contains Chinese characters")
         return "Ta là Ngô Quyền.", 10, 5
 
@@ -276,7 +276,7 @@ def test_suggestions_are_cleaned_of_numbering(monkeypatch):
     monkeypatch.setattr(service, "_call_llm", fake_llm)
     _stub_support(monkeypatch, {})
 
-    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời", ["char-1"]))
+    questions, _, _ = asyncio.run(service._generate_suggested_questions(_character(), "Tư liệu", "Trả lời", ["char-1"]))
 
     assert questions == ["Ngài sinh năm nào?", "Ngài có con không?"]
 
@@ -464,13 +464,14 @@ def test_empty_audio_is_reported(monkeypatch):
 def test_suggestions_without_supporting_documents_are_dropped(monkeypatch):
     async def fake_llm(messages, expect_json=True, temperature=None):
         assert "CHỈ gợi ý câu hỏi mà câu trả lời CÓ TRONG" in messages[-1]["content"]
+        assert len(messages) == 1 and "Tư liệu" in messages[0]["content"]
         return ("Ngài dùng kế gì ở Bạch Đằng?\nNgài có uống rượu không?\nTướng giặc là ai?\n"
                 "Ngài có vợ con không?\nSau trận ngài làm gì?"), 10, 5
 
     monkeypatch.setattr(service, "_call_llm", fake_llm)
     _stub_support(monkeypatch, {"Ngài có uống rượu không?": False, "Ngài có vợ con không?": False})
 
-    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời", ["char-1"]))
+    questions, _, _ = asyncio.run(service._generate_suggested_questions(_character(), "Tư liệu", "Trả lời", ["char-1"]))
 
     assert questions == ["Ngài dùng kế gì ở Bạch Đằng?", "Tướng giặc là ai?", "Sau trận ngài làm gì?"]
 
@@ -482,7 +483,7 @@ def test_suggestions_that_could_not_be_checked_are_kept(monkeypatch):
     monkeypatch.setattr(service, "_call_llm", fake_llm)
     _stub_support(monkeypatch, {"Ngài dùng kế gì?": None, "Tướng giặc là ai?": False})
 
-    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời", ["char-1"]))
+    questions, _, _ = asyncio.run(service._generate_suggested_questions(_character(), "Tư liệu", "Trả lời", ["char-1"]))
 
     assert questions == ["Ngài dùng kế gì?"]
 
@@ -502,3 +503,17 @@ def test_question_check_reports_unknown_when_embedding_fails(monkeypatch):
     monkeypatch.setattr(service, "get_embedding_from_ollama", fake_embedding)
 
     assert asyncio.run(service._has_supporting_document("Hỏi", ["char-1"])) is None
+
+
+def test_suggestions_use_the_background_when_no_document_was_found():
+    prompt = service.build_suggestion_prompt(_character(), "", "Trả lời", 5)
+
+    assert "Tiểu sử" in prompt
+    assert "Trả lời" in prompt
+
+
+def test_rag_rules_use_the_character_pronoun():
+    content = service._build_final_user_content("Ngài dùng kế gì?", "Tư liệu", "ta")
+
+    assert '"ta"' in content
+    assert "CÂU HỎI CỦA NGƯỜI DÙNG: Ngài dùng kế gì?" in content

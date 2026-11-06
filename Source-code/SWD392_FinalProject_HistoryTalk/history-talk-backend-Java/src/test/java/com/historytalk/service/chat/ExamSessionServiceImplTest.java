@@ -105,7 +105,8 @@ class ExamSessionServiceImplTest {
 
         Message message = service.startExam(session.getSessionId());
 
-        assertThat(message.getContent()).contains("2 câu").endsWith("\n---\nTa dùng kế gì?");
+        assertThat(message.getContent()).startsWith("Tôi là Ngô Quyền. Hôm nay tôi sẽ hỏi bạn 2 câu.")
+                .endsWith("\n---\nTa dùng kế gì?");
         assertThat(message.getContent()).doesNotContain("Cọc gỗ", "Tư liệu 1");
         assertThat(message.getExamExpectedAnswer()).isEqualTo("Cọc gỗ");
         assertThat(message.getExamSource()).isEqualTo("Tư liệu 1");
@@ -155,7 +156,7 @@ class ExamSessionServiceImplTest {
         assertThat(turn.progress().isFinished()).isTrue();
         assertThat(turn.progress().getScore()).isEqualTo(7.5);
         assertThat(turn.assistantMessage().getExamQuestion()).isNull();
-        assertThat(turn.assistantMessage().getContent()).contains("Còn thiếu ý.", "7.5/10");
+        assertThat(turn.assistantMessage().getContent()).contains("Còn thiếu ý.", "Bạn trả lời đúng", "Điểm của bạn: 7.5/10");
         verify(aiServiceClient, never()).generateExamQuestion(any(), any(), any(), any(), any(), any());
     }
 

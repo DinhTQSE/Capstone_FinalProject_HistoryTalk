@@ -41,6 +41,14 @@ public class CharacterResponse {
     @JsonProperty("voiceId")
     private String voiceId;
 
+    /** Null means the default "tôi". */
+    @JsonProperty("selfPronoun")
+    private String selfPronoun;
+
+    /** Null means the default "bạn". */
+    @JsonProperty("addressPronoun")
+    private String addressPronoun;
+
     @JsonProperty("bornYear")
     private Integer bornYear;
 

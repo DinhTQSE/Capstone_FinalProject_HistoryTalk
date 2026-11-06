@@ -92,8 +92,13 @@ public class AiServiceClient {
                         @JsonProperty("background") String background,
                         @JsonProperty("personality") String personality,
                         @JsonProperty("lifespan") String lifespan,
-                        @JsonProperty("contexts") List<ContextSummaryPayload> contexts) {
+                        @JsonProperty("contexts") List<ContextSummaryPayload> contexts,
+                        @JsonProperty("selfPronoun") String selfPronoun,
+                        @JsonProperty("addressPronoun") String addressPronoun) {
         }
+
+        /** Each context only needs a short reminder; the documents carry the details. */
+        private static final int MAX_CONTEXT_DESCRIPTION_CHARS = 200;
 
         public record ContextPayload(
                         @JsonProperty("contextId") String contextId,
@@ -636,7 +641,11 @@ public class AiServiceClient {
                         enhancedBackground += "\n\nCác sự kiện/bối cảnh lịch sử đã tham gia:\n";
                         contexts = new java.util.ArrayList<>();
                         for (com.historytalk.entity.historicalContext.HistoricalContext ctx : c.getHistoricalContexts()) {
-                                enhancedBackground += "- " + ctx.getName() + ": " + (ctx.getDescription() != null ? ctx.getDescription() : "") + "\n";
+                                String description = ctx.getDescription() != null ? ctx.getDescription().strip() : "";
+                                if (description.length() > MAX_CONTEXT_DESCRIPTION_CHARS) {
+                                        description = description.substring(0, MAX_CONTEXT_DESCRIPTION_CHARS) + "...";
+                                }
+                                enhancedBackground += "- " + ctx.getName() + ": " + description + "\n";
                                 contexts.add(new ContextSummaryPayload(ctx.getContextId().toString(), ctx.getName()));
                         }
                 }
@@ -648,7 +657,9 @@ public class AiServiceClient {
                                 enhancedBackground,
                                 c.getPersonality(),
                                 lifespan,
-                                contexts);
+                                contexts,
+                                com.historytalk.service.character.CharacterPronouns.selfOf(c),
+                                com.historytalk.service.character.CharacterPronouns.addressOf(c));
         }
 
         /**

@@ -13,6 +13,7 @@ import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.MessageRepository;
+import com.historytalk.service.character.CharacterPronouns;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
 import com.historytalk.service.chat.AiServiceClient.ContextPayload;
 import com.historytalk.service.chat.AiServiceClient.ExamGradeResult;
@@ -56,7 +57,9 @@ public class ExamSessionServiceImpl implements ExamSessionService {
             String contextId,
             CharacterPayload characterData,
             ContextPayload contextData,
-            int totalQuestions) {
+            int totalQuestions,
+            String selfPronoun,
+            String addressPronoun) {
     }
 
     private record PreparedAnswer(
@@ -73,8 +76,9 @@ public class ExamSessionServiceImpl implements ExamSessionService {
 
         ExamQuestionResult first = askQuestion(context, List.of());
 
-        String opening = "Ta là " + context.characterName() + ". Hôm nay ta sẽ hỏi ngươi "
-                + context.totalQuestions() + " câu. Hãy trả lời theo hiểu biết của ngươi.";
+        String opening = CharacterPronouns.capitalize(context.selfPronoun()) + " là " + context.characterName()
+                + ". Hôm nay " + context.selfPronoun() + " sẽ hỏi " + context.addressPronoun() + " "
+                + context.totalQuestions() + " câu. Hãy trả lời theo hiểu biết của " + context.addressPronoun() + ".";
 
         return transactionTemplate.execute(status -> {
             ChatSession session = loadSession(sessionId);
@@ -131,7 +135,8 @@ public class ExamSessionServiceImpl implements ExamSessionService {
 
         // The excerpt held the answer, so it only becomes a visible citation once the question is graded.
         Message assistantMessage = Message.builder()
-                .content(grade.feedback() + BUBBLE_SEPARATOR + (next != null ? next.question() : closingText(progress)))
+                .content(grade.feedback() + BUBBLE_SEPARATOR
+                        + (next != null ? next.question() : closingText(progress, prepared.context().addressPronoun())))
                 .isFromAi(true)
                 .messageType(prepared.messageType())
                 .examVerdict(verdict)
@@ -207,7 +212,9 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                 session.getHistoricalContext() != null
                         ? AiServiceClient.buildContextPayload(session.getHistoricalContext())
                         : null,
-                session.getExamQuestionCount() != null ? session.getExamQuestionCount() : 0);
+                session.getExamQuestionCount() != null ? session.getExamQuestionCount() : 0,
+                CharacterPronouns.selfOf(session.getCharacter()),
+                CharacterPronouns.addressOf(session.getCharacter()));
     }
 
     private ChatSession loadSession(UUID sessionId) {
@@ -299,11 +306,12 @@ public class ExamSessionServiceImpl implements ExamSessionService {
         }
     }
 
-    private String closingText(ExamProgressResponse progress) {
-        return "Buổi vấn đáp đã kết thúc. Ngươi trả lời đúng " + progress.getCorrectCount()
+    private String closingText(ExamProgressResponse progress, String addressPronoun) {
+        return "Buổi vấn đáp đã kết thúc. " + CharacterPronouns.capitalize(addressPronoun)
+                + " trả lời đúng " + progress.getCorrectCount()
                 + " câu, đúng một phần " + progress.getPartialCount()
                 + " câu, sai " + progress.getIncorrectCount()
                 + " câu trên tổng " + progress.getTotalQuestions()
-                + " câu. Điểm của ngươi: " + progress.getScore() + "/10.";
+                + " câu. Điểm của " + addressPronoun + ": " + progress.getScore() + "/10.";
     }
 }

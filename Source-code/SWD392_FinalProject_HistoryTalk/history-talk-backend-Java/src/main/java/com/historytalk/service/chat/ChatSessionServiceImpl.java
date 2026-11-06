@@ -9,6 +9,7 @@ import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 
 import com.historytalk.entity.enums.ChatSessionMode;
+import com.historytalk.service.character.CharacterPronouns;
 import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.enums.EventEra;
@@ -98,6 +99,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             ChatSession session,
             String characterId,
             String characterName,
+            String selfPronoun,
+            String addressPronoun,
             String contextId,
             CharacterPayload characterData,
             ContextPayload contextData) {
@@ -143,7 +146,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
         // Fallback greeting if AI fails or returns empty response
         if (greetingText == null || greetingText.isBlank()) {
-            greetingText = "Xin chào, ta là " + prepared.characterName() + ". Ngươi muốn biết điều gì về ta?";
+            greetingText = "Xin chào, " + prepared.selfPronoun() + " là " + prepared.characterName() + ". "
+                    + CharacterPronouns.capitalize(prepared.addressPronoun()) + " muốn biết điều gì?";
         }
 
         if (suggestedQuestionsList == null || suggestedQuestionsList.isEmpty()) {
@@ -252,6 +256,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 saved,
                 character.getCharacterId().toString(),
                 character.getName(),
+                CharacterPronouns.selfOf(character),
+                CharacterPronouns.addressOf(character),
                 context != null ? context.getContextId().toString() : "00000000-0000-0000-0000-000000000000",
                 AiServiceClient.buildCharacterPayload(character),
                 context != null ? AiServiceClient.buildContextPayload(context) : null);

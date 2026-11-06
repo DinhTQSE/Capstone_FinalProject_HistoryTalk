@@ -35,6 +35,16 @@ public class UpdateLocalCharacterRequest {
     @JsonProperty("voiceId")
     private String voiceId;
 
+    /** How the character refers to itself, e.g. "ta". Empty means "tôi". */
+    @Size(max = 30, message = "Cách xưng của nhân vật tối đa 30 ký tự")
+    @JsonProperty("selfPronoun")
+    private String selfPronoun;
+
+    /** How the character addresses the learner, e.g. "ngươi". Empty means "bạn". */
+    @Size(max = 30, message = "Cách gọi người học tối đa 30 ký tự")
+    @JsonProperty("addressPronoun")
+    private String addressPronoun;
+
     @Size(max = 500)
     @JsonProperty("imageUrl")
     private String imageUrl;
