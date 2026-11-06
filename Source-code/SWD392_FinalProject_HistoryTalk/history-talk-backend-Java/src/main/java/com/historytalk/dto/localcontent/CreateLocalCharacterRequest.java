@@ -32,6 +32,10 @@ public class CreateLocalCharacterRequest {
     @JsonProperty("personality")
     private String personality;
 
+    /** One of the voices from GET /api/v1/voices. Empty means the default voice. */
+    @JsonProperty("voiceId")
+    private String voiceId;
+
     @Size(max = 500, message = "URL hình ảnh tối đa 500 ký tự")
     @JsonProperty("imageUrl")
     private String imageUrl;

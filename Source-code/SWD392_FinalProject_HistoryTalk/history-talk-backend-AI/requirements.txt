@@ -12,3 +12,4 @@ python-dotenv>=1.0.0
 
 # Database & Vector RAG
 supabase>=2.3.0
+numpy>=1.26

@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     # ── Text to speech (VieNeu-TTS behind the same gateway as Ollama) ──────────
     TTS_MODEL: str = "vieneu-v3-turbo"
+    # The TTS server produces 48 kHz; halving it halves what crosses the network, which is plenty for speech
+    TTS_SOURCE_SAMPLE_RATE: int = 48000
+    TTS_OUTPUT_SAMPLE_RATE: int = 24000
 
     # ── Supabase ──────────────────────────────────────────────────────────────
     SUPABASE_URL: str = ""

@@ -16,6 +16,7 @@ import com.historytalk.entity.enums.EventEra;
 import com.historytalk.service.chat.ChatHistoryService;
 import com.historytalk.service.chat.ChatSessionService;
 import com.historytalk.service.chat.MessageService;
+import com.historytalk.service.chat.AiServiceClient.SpeechStream;
 import com.historytalk.service.speech.CharacterSpeechService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import java.io.InputStream;
 import java.util.List;
 
 @RestController
@@ -135,6 +139,32 @@ public class ChatController {
                 .contentType(MediaType.parseMediaType("audio/wav"))
                 .cacheControl(CacheControl.noStore())
                 .body(audio);
+    }
+
+    /**
+     * POST /v1/chat/tts/stream
+     * Same voice as /chat/tts, but sends raw PCM while it is being generated so playback starts sooner.
+     * The format is in the X-Audio-Format header, e.g. pcm_s16le;rate=24000;channels=1.
+     */
+    @PostMapping("/tts/stream")
+    public ResponseEntity<StreamingResponseBody> streamSpeech(@Valid @RequestBody SpeechRequest request) {
+        SpeechStream speech = characterSpeechService.openStream(request.getCharacterId(), request.getText());
+        StreamingResponseBody body = out -> {
+            try (InputStream audio = speech.body()) {
+                byte[] buffer = new byte[4096];
+                int read;
+                while ((read = audio.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
+                    out.flush();
+                }
+            }
+        };
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("X-Audio-Format", speech.format())
+                .header("X-Accel-Buffering", "no")
+                .cacheControl(CacheControl.noStore())
+                .body(body);
     }
 
     /**

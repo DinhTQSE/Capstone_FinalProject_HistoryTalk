@@ -2,11 +2,14 @@ import json
 import uuid
 import logging
 import asyncio
+import io
+import wave
 import re
 import time
 import unicodedata
 from typing import List
 import httpx
+import numpy as np
 from supabase import create_client, Client
 
 from history_talk_ai.common.config.settings import settings
@@ -269,23 +272,82 @@ async def _call_llm_stream(messages: list[dict]) -> tuple:
         async for chunk in _call_ollama_stream(messages):
             yield chunk
 
-async def synthesize_speech(text: str, voice: str) -> bytes:
-    """Return a WAV file from the VieNeu-TTS server, which sits behind the same gateway as Ollama."""
+class _PcmDownsampler:
+    """Averages every `factor` samples of 16-bit mono PCM, keeping partial samples between chunks."""
+
+    def __init__(self, factor: int):
+        self._frame = factor * 2
+        self._pending = b""
+
+    def feed(self, chunk: bytes) -> bytes:
+        data = self._pending + chunk
+        usable = len(data) - len(data) % self._frame
+        self._pending = data[usable:]
+        if not usable:
+            return b""
+        samples = np.frombuffer(data[:usable], dtype="<i2").reshape(-1, self._frame // 2)
+        return samples.mean(axis=1).round().astype("<i2").tobytes()
+
+
+def _downsample_factor() -> int:
+    factor = settings.TTS_SOURCE_SAMPLE_RATE // settings.TTS_OUTPUT_SAMPLE_RATE
+    return max(1, factor)
+
+
+async def open_speech_stream(text: str, voice: str) -> httpx.Response:
+    """Start streaming raw PCM from the TTS server. Fails before any audio is sent to the client."""
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+    request = ollama_client.build_request(
+        "POST",
+        _ollama_url("/v1/audio/speech"),
+        json={"model": settings.TTS_MODEL, "input": text, "voice": voice, "response_format": "pcm"},
+        auth=auth,
+    )
     try:
-        response = await ollama_client.post(
-            _ollama_url("/v1/audio/speech"),
-            json={"model": settings.TTS_MODEL, "input": text, "voice": voice, "response_format": "wav"},
-            auth=auth,
-        )
-        response.raise_for_status()
+        response = await ollama_client.send(request, stream=True)
     except Exception as e:
         logger.error(f"TTS request failed: {e}")
         raise SpeechUnavailableError("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.") from e
 
-    if not response.content:
+    if response.status_code >= 400:
+        await response.aread()
+        await response.aclose()
+        logger.error(f"TTS server returned {response.status_code}: {response.text[:200]}")
+        raise SpeechUnavailableError("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.")
+    return response
+
+
+async def iter_speech_pcm(response: httpx.Response):
+    """Yield 16-bit mono PCM at TTS_OUTPUT_SAMPLE_RATE as soon as the TTS server produces it."""
+    downsampler = _PcmDownsampler(_downsample_factor())
+    try:
+        async for chunk in response.aiter_bytes():
+            pcm = downsampler.feed(chunk)
+            if pcm:
+                yield pcm
+    finally:
+        await response.aclose()
+
+
+async def synthesize_speech(text: str, voice: str) -> bytes:
+    """Return the whole sentence as a WAV file at TTS_OUTPUT_SAMPLE_RATE."""
+    response = await open_speech_stream(text, voice)
+    try:
+        pcm = b"".join([chunk async for chunk in iter_speech_pcm(response)])
+    except Exception as e:
+        logger.error(f"TTS stream failed: {e}")
+        raise SpeechUnavailableError("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.") from e
+
+    if not pcm:
         raise SpeechUnavailableError("Dịch vụ giọng đọc không trả về âm thanh.")
-    return response.content
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(settings.TTS_OUTPUT_SAMPLE_RATE)
+        wav.writeframes(pcm)
+    return buffer.getvalue()
 
 
 async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[float]:

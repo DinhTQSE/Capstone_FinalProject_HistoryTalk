@@ -325,6 +325,23 @@ async def tts(body: SpeechRequest) -> Response:
     return Response(content=audio, media_type="audio/wav")
 
 
+@router.post(
+    "/tts/stream",
+    summary="Stream speech as raw 16-bit mono PCM while it is being generated",
+    description="The sample rate is in the X-Audio-Format header, e.g. pcm_s16le;rate=24000;channels=1.",
+)
+async def tts_stream(body: SpeechRequest) -> StreamingResponse:
+    try:
+        response = await llm_service.open_speech_stream(body.text, body.voice)
+    except llm_service.SpeechUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    return StreamingResponse(
+        llm_service.iter_speech_pcm(response),
+        media_type="application/octet-stream",
+        headers={"X-Audio-Format": f"pcm_s16le;rate={llm_service.settings.TTS_OUTPUT_SAMPLE_RATE};channels=1"},
+    )
+
+
 # ── POST /v1/ai/documents/process ───────────────────────────────────────────
 
 @router.post(

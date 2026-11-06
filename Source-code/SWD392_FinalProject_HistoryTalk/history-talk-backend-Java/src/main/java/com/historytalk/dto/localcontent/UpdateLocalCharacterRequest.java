@@ -31,6 +31,10 @@ public class UpdateLocalCharacterRequest {
     @JsonProperty("personality")
     private String personality;
 
+    /** One of the voices from GET /api/v1/voices. Empty means the default voice. */
+    @JsonProperty("voiceId")
+    private String voiceId;
+
     @Size(max = 500)
     @JsonProperty("imageUrl")
     private String imageUrl;

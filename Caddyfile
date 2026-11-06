@@ -1,6 +1,8 @@
 historytalk.app {
     handle /Historical-tell/* {
         reverse_proxy historytalk-java:8080 {
+            # Streamed chat replies and speech must reach the browser as they are produced
+            flush_interval -1
             header_up X-Forwarded-Proto https
             header_up X-Forwarded-Port 443
             transport http {

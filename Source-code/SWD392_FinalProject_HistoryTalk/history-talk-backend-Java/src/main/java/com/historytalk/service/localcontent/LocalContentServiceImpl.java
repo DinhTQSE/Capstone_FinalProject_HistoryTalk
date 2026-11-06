@@ -32,6 +32,7 @@ import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.chat.AiServiceClient;
 import com.historytalk.utils.SecurityUtils;
+import com.historytalk.service.speech.CharacterVoices;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -234,6 +235,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .title(req.getTitle())
                 .background(req.getBackground())
                 .personality(req.getPersonality())
+                .voiceId(CharacterVoices.requireSupported(req.getVoiceId()))
                 .imageUrl(req.getImageUrl())
                 .modelUrl(req.getModelUrl())
                 .bornYear(req.getBornYear())
@@ -278,6 +280,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (StringUtils.hasText(req.getBackground()))  character.setBackground(req.getBackground());
         if (StringUtils.hasText(req.getTitle()))       character.setTitle(req.getTitle());
         if (StringUtils.hasText(req.getPersonality())) character.setPersonality(req.getPersonality());
+        if (req.getVoiceId() != null) character.setVoiceId(CharacterVoices.requireSupported(req.getVoiceId()));
         if (StringUtils.hasText(req.getImageUrl()))    character.setImageUrl(req.getImageUrl());
         if (StringUtils.hasText(req.getModelUrl()))    character.setModelUrl(req.getModelUrl());
         if (req.getBornYear() != null)                 character.setBornYear(req.getBornYear());
@@ -969,6 +972,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .reviewNote(c.getReviewNote())
                 .title(c.getTitle())
                 .personality(c.getPersonality())
+                .voiceId(c.getVoiceId())
                 .modelUrl(c.getModelUrl())
                 .bornYear(c.getBornYear())
                 .bornMonth(c.getBornMonth())

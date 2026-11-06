@@ -259,44 +259,91 @@ Số đo trên production ngày 05/11/2026, với GPU `qwen3.8:27b`, đo từ m�
 
 ---
 
-## 6. Giọng đọc nhân vật: `POST /chat/tts`
+## 6. Giọng đọc nhân vật
 
-Giọng đọc do BE tạo bằng VieNeu-TTS tự host, nên **mọi thiết bị nghe cùng một giọng**, và mỗi nhân vật có giọng riêng. Không còn dùng Azure hay giọng của trình duyệt. Web đã chuyển sang API này. **Mobile vẫn đang gọi Azure trực tiếp**, cần chuyển.
+Giọng đọc do BE tạo bằng VieNeu-TTS tự host, nên **mọi thiết bị nghe cùng một giọng**, và mỗi nhân vật có giọng riêng. Không còn dùng Azure hay giọng của trình duyệt. **Web đã dùng các API này. Mobile vẫn đang gọi Azure trực tiếp**, cần chuyển.
+
+### 6.1. Đọc dạng stream (nên dùng): `POST /chat/tts/stream`
 
 #### Request Body
 ```json
 { "characterId": "55ae763f-2c8f-4918-bf31-b43566c3c355", "text": "Một câu hoặc một đoạn ngắn." }
 ```
-`text` tối đa 1000 ký tự.
+`text` tối đa 1000 ký tự. Mọi người dùng đã đăng nhập đều gọi được.
 
 #### Response `200`
-File `audio/wav` (48 kHz, mono). Phát được bằng `AudioContext.decodeAudioData` (web) hoặc `expo-av` (mobile).
+* `Content-Type: application/octet-stream`: **PCM 16-bit little-endian, mono, 24 kHz**, gửi dần trong lúc BE đang tạo.
+* Header `X-Audio-Format: pcm_s16le;rate=24000;channels=1`. Trình duyệt có thể không đọc được header này do CORS, nên mặc định 24000.
+* Phát được ngay khi nhận những byte đầu, không phải chờ cả câu.
 
-#### Lỗi
+Web đã làm sẵn, xem `src/lib/character-speech.ts`:
+* `openCharacterSpeechStream` mở luồng.
+* `createStreamingSpeechPlayer` nhận từng phần, chuyển sang `Float32`, lên lịch nối liền trên `AudioContext`. Câu đầu gom khoảng 0,3 giây trước khi phát để không bị ngắt.
+* `splitSpeechSegments(text, { earlyFirst: true })` tách câu, câu đầu ngắt sớm ở dấu phẩy.
+* Lúc stream chat, cụm đầu được đọc ngay khi có khoảng 35 ký tự và gặp dấu phẩy, không chờ dấu chấm.
+
+### 6.2. Đọc cả câu dạng WAV: `POST /chat/tts`
+Request giống 6.1, trả `audio/wav` 24 kHz mono của cả câu. Dùng khi không phát được dạng stream.
+
+#### Lỗi của 6.1 và 6.2
 | HTTP | Khi nào |
 |---|---|
 | `400` | Thiếu `characterId` hoặc `text`, hoặc `text` quá dài |
 | `404` | Nhân vật không tồn tại hoặc đã xóa |
 | `5xx` | Server giọng đọc tắt hoặc lỗi: `Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.` |
 
-#### Cách dùng để nghe nhanh
-1. **Tách câu trả lời thành từng câu** và bỏ dòng `---`.
-2. **Gọi API cho từng câu theo thứ tự.** Trong lúc câu trước đang phát thì tạo âm thanh cho câu sau.
-3. **Trong lúc stream chat,** đọc câu đầu ngay khi nhận đủ câu, không chờ hết câu trả lời.
+### 6.3. Danh sách giọng: `GET /voices`
+**Role:** `CONTENT_ADMIN`, `TEACHER`. Role khác nhận `403`.
 
-Web đã làm theo cách này, xem `src/lib/character-speech.ts` (`splitSpeechSegments`, `createSpeechQueue`).
+```json
+{
+  "success": true,
+  "data": [
+    { "id": "Thiện Minh", "gender": "MALE", "region": "NORTH", "style": "Kể chuyện", "recommended": true, "isDefault": true },
+    { "id": "Ngọc Linh", "gender": "FEMALE", "region": "NORTH", "style": "Kể chuyện", "recommended": false, "isDefault": false }
+  ]
+}
+```
+* 25 giọng: 14 nam, 11 nữ.
+* `gender`: `MALE` hoặc `FEMALE`. `region`: `NORTH`, `CENTRAL` hoặc `SOUTH`.
+* `id` chính là giá trị gửi vào `voiceId`.
 
-#### Giọng của từng nhân vật
-* `CharacterResponse` có thêm `voiceId`. `null` nghĩa là giọng mặc định **Thiện Minh** (nam, miền Bắc, kể chuyện).
-* Content admin đặt giọng qua `voiceId` trong API tạo và sửa nhân vật. Chỉ nhận 25 giọng có sẵn, giá trị khác bị từ chối `400`, chuỗi rỗng nghĩa là về giọng mặc định.
-* Danh sách giọng: Thiện Minh, Thiền Tâm Đức, Hải Đăng, Adam bựa, Quang Sơn, Minh Đức, Phạm Tuyên, Xuân Vĩnh, Quốc Tuấn, Thanh Bình, Thái Sơn, Minh Triết, Đức Trí, Adam (nam); Trúc Ly, Mai Anh, Ngọc Huyền, Thùy Dung, Ngọc Trân, Ngọc Linh, Đoan Trang, Quỳnh Anh, Thục Đoan, Mỹ Duyên, Kim Thanh (nữ).
-* **Nhân vật nữ phải được đặt giọng nữ**, vì giọng mặc định là giọng nam.
+### 6.4. Nghe thử giọng: `POST /voices/preview`
+**Role:** `CONTENT_ADMIN`, `TEACHER`.
 
-#### Việc Frontend còn lại
-- [ ] Mobile: thay `speakWithAzure` bằng `POST /chat/tts`, theo cách đọc từng câu như trên, và xóa `EXPO_PUBLIC_AZURE_SPEECH_KEY`.
-- [ ] Trang quản lý nhân vật: thêm ô chọn giọng `voiceId`.
+```json
+{ "voiceId": "Ngọc Linh", "text": "Ta là Trưng Trắc." }
+```
+* `text` không bắt buộc, tối đa 300 ký tự. Để trống thì đọc câu mẫu, câu mẫu được lưu sẵn nên lần sau phát ngay.
+* Trả `audio/wav` 24 kHz mono.
+* **Lỗi:**
+  * `400` khi `voiceId` không có trong danh sách.
+  * `400` với tiền tố `INAPPROPRIATE_CONTENT:` khi câu tự nhập có từ tục.
+  * `5xx` khi server giọng đọc tắt.
 
-#### Giới hạn
-* Âm thanh đầu tiên đến sau khoảng 2,6–2,9 giây kể từ lúc gửi câu hỏi (đo trên server, chưa tính mạng tới trình duyệt).
+### 6.5. Chọn giọng khi tạo và sửa nhân vật
+Thêm trường `voiceId` vào request, và response trả lại `voiceId`:
+
+| API | Ai dùng |
+|---|---|
+| Tạo, sửa nhân vật hệ thống (`/characters`) | Content admin |
+| Tạo, sửa nhân vật địa phương (local content) | Teacher |
+
+* `voiceId` phải là một `id` từ `GET /voices`, sai thì `400`.
+* Gửi chuỗi rỗng `""` để về giọng mặc định. Không gửi trường này khi sửa thì giữ nguyên giọng cũ.
+* `null` trong response nghĩa là giọng mặc định **Thiện Minh** (nam). **Nhân vật nữ phải chọn giọng nữ.**
+
+#### Gợi ý màn hình
+* Ô chọn giọng có lọc theo giới tính và vùng miền, hiện nhãn "Đề xuất" cho `recommended`.
+* Nút nghe thử cạnh mỗi giọng, có ô nhập câu tự chọn.
+* Ô chọn giọng để trống nghĩa là giọng mặc định.
+* Khi server giọng đọc tắt, nút nghe thử hiện thông báo lỗi, nhưng vẫn cho lưu nhân vật.
+
+### 6.6. Việc Frontend còn lại
+- [ ] Màn hình tạo và sửa nhân vật cho content admin và teacher: chọn giọng, nghe thử (6.3–6.5).
+- [ ] Mobile: thay `speakWithAzure` bằng `POST /chat/tts/stream` hoặc `/chat/tts`, và xóa `EXPO_PUBLIC_AZURE_SPEECH_KEY`.
+
+### 6.7. Giới hạn
 * Chỉ phục vụ tốt **một người dùng một lúc**. Nhiều người cùng đọc sẽ chậm.
-* Server GPU tắt thì không có giọng đọc, và web không còn dự phòng bằng giọng của trình duyệt.
+* Server GPU tắt thì không có giọng đọc, và web không dự phòng bằng giọng của trình duyệt.
+* Quyền tạo và sửa nhân vật hiện vẫn mở cho cả `SYSTEM_ADMIN` và `SCHOOL_ADMIN` như trước. Chỉ 2 API giọng mới bị giới hạn cho content admin và teacher.

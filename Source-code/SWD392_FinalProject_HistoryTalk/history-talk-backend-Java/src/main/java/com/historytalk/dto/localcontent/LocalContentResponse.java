@@ -96,6 +96,9 @@ public class LocalContentResponse {
     @JsonProperty("personality")
     private String personality;
 
+    @JsonProperty("voiceId")
+    private String voiceId;
+
     @JsonProperty("modelUrl")
     private String modelUrl;
 

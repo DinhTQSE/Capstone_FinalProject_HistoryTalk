@@ -352,52 +352,102 @@ def test_broad_question_may_answer_longer():
     assert "200 từ" not in service._build_final_user_content("Tướng địch là ai?", "Tư liệu")
 
 
-class FakeAudioResponse:
-    def __init__(self, content, error=None):
-        self.content = content
-        self.error = error
+class FakeStreamResponse:
+    def __init__(self, chunks, status_code=200):
+        self.chunks = chunks
+        self.status_code = status_code
+        self.text = ""
+        self.closed = False
 
-    def raise_for_status(self):
-        if self.error:
-            raise self.error
+    async def aiter_bytes(self):
+        for chunk in self.chunks:
+            yield chunk
+
+    async def aread(self):
+        return b""
+
+    async def aclose(self):
+        self.closed = True
 
 
-def test_speech_is_requested_as_wav_through_the_authenticated_gateway(monkeypatch):
+def _pcm(*samples):
+    return service.np.array(samples, dtype="<i2").tobytes()
+
+
+def _stub_tts(monkeypatch, response, captured=None):
+    def fake_build_request(method, url, json, auth):
+        if captured is not None:
+            captured.update(url=url, json=json, auth=auth)
+        return "request"
+
+    async def fake_send(request, stream):
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(service.ollama_client, "build_request", fake_build_request)
+    monkeypatch.setattr(service.ollama_client, "send", fake_send)
+
+
+def test_pcm_is_halved_to_24khz_across_chunk_boundaries():
+    downsampler = service._PcmDownsampler(2)
+
+    first = downsampler.feed(_pcm(100, 200, 300)[:5])
+    second = downsampler.feed(_pcm(100, 200, 300, 500)[5:])
+
+    assert service.np.frombuffer(first + second, dtype="<i2").tolist() == [150, 400]
+
+
+def test_speech_stream_requests_pcm_through_the_authenticated_gateway(monkeypatch):
     captured = {}
-
-    async def fake_post(url, json, auth):
-        captured.update(url=url, json=json, auth=auth)
-        return FakeAudioResponse(b"RIFF....WAVE")
-
-    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+    response = FakeStreamResponse([_pcm(0, 10, 20, 30)])
+    _stub_tts(monkeypatch, response, captured)
     monkeypatch.setattr(service.settings, "OLLAMA_BASE_URL", "https://llm.example")
     monkeypatch.setattr(service.settings, "OLLAMA_USERNAME", "historytalk")
     monkeypatch.setattr(service.settings, "OLLAMA_PASSWORD", "secret")
 
-    audio = asyncio.run(service.synthesize_speech("Ta là Ngô Quyền.", "Thiện Minh"))
+    async def collect():
+        opened = await service.open_speech_stream("Ta là Ngô Quyền.", "Thiện Minh")
+        return b"".join([chunk async for chunk in service.iter_speech_pcm(opened)])
 
-    assert audio == b"RIFF....WAVE"
+    pcm = asyncio.run(collect())
+
+    assert service.np.frombuffer(pcm, dtype="<i2").tolist() == [5, 25]
     assert captured["url"] == "https://llm.example/v1/audio/speech"
     assert captured["json"]["voice"] == "Thiện Minh"
-    assert captured["json"]["response_format"] == "wav"
+    assert captured["json"]["response_format"] == "pcm"
     assert captured["auth"] == ("historytalk", "secret")
+    assert response.closed
+
+
+def test_whole_sentence_is_returned_as_24khz_wav(monkeypatch):
+    _stub_tts(monkeypatch, FakeStreamResponse([_pcm(0, 10, 20, 30)]))
+
+    audio = asyncio.run(service.synthesize_speech("Xin chào", "Thiện Minh"))
+
+    with service.wave.open(service.io.BytesIO(audio)) as wav:
+        assert wav.getframerate() == 24000
+        assert wav.getnframes() == 2
 
 
 def test_unreachable_tts_server_is_reported(monkeypatch):
-    async def fake_post(url, json, auth):
-        raise service.httpx.ConnectTimeout("server is off")
-
-    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+    _stub_tts(monkeypatch, service.httpx.ConnectTimeout("server is off"))
 
     with pytest.raises(service.SpeechUnavailableError):
-        asyncio.run(service.synthesize_speech("Xin chào", "Thiện Minh"))
+        asyncio.run(service.open_speech_stream("Xin chào", "Thiện Minh"))
+
+
+def test_tts_server_error_is_reported_before_streaming(monkeypatch):
+    response = FakeStreamResponse([], status_code=500)
+    _stub_tts(monkeypatch, response)
+
+    with pytest.raises(service.SpeechUnavailableError):
+        asyncio.run(service.open_speech_stream("Xin chào", "Thiện Minh"))
+    assert response.closed
 
 
 def test_empty_audio_is_reported(monkeypatch):
-    async def fake_post(url, json, auth):
-        return FakeAudioResponse(b"")
-
-    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+    _stub_tts(monkeypatch, FakeStreamResponse([]))
 
     with pytest.raises(service.SpeechUnavailableError):
         asyncio.run(service.synthesize_speech("Xin chào", "Thiện Minh"))

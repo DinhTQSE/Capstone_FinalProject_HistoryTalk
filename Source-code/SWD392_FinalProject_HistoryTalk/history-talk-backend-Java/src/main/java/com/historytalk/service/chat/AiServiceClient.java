@@ -225,6 +225,10 @@ public class AiServiceClient {
                         @JsonProperty("data") ExamGradeResult data) {
         }
 
+        /** Raw 16-bit mono PCM; format looks like "pcm_s16le;rate=24000;channels=1". */
+        public record SpeechStream(java.io.InputStream body, String format) {
+        }
+
         record SpeechRequest(
                         @JsonProperty("text") String text,
                         @JsonProperty("voice") String voice) {
@@ -440,6 +444,43 @@ public class AiServiceClient {
                 } catch (RestClientException e) {
                         aiMetricsService.recordRequest("tts", "failure");
                         log.error("AI service /tts call failed: {}", e.getMessage());
+                        throw new SystemException("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.");
+                }
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/tts/stream. The caller must close the returned stream.
+         */
+        public SpeechStream openSpeechStream(String text, String voice) {
+                try {
+                        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                                        .uri(URI.create(this.aiServiceUrlStr + "/v1/ai/tts/stream"))
+                                        .timeout(java.time.Duration.ofSeconds(120))
+                                        .header("Content-Type", "application/json")
+                                        .POST(HttpRequest.BodyPublishers.ofString(
+                                                        objectMapper.writeValueAsString(new SpeechRequest(text, voice)),
+                                                        StandardCharsets.UTF_8));
+                        if (this.basicAuthHeader != null) {
+                                requestBuilder.header(HttpHeaders.AUTHORIZATION, this.basicAuthHeader);
+                        }
+
+                        HttpResponse<java.io.InputStream> response = javaHttpClient.send(
+                                        requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream());
+                        if (response.statusCode() >= 400) {
+                                response.body().close();
+                                throw new SystemException("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.");
+                        }
+
+                        aiMetricsService.recordRequest("tts_stream", "success");
+                        String format = response.headers().firstValue("X-Audio-Format")
+                                        .orElse("pcm_s16le;rate=24000;channels=1");
+                        return new SpeechStream(response.body(), format);
+                } catch (java.io.IOException e) {
+                        aiMetricsService.recordRequest("tts_stream", "failure");
+                        log.error("AI service /tts/stream call failed: {}", e.getMessage());
+                        throw new SystemException("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.");
+                } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                         throw new SystemException("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.");
                 }
         }

@@ -51,6 +51,8 @@
 * Java có `POST /api/v1/chat/tts`, AI service có `POST /v1/ai/tts` để chuyển tiếp sang server giọng đọc.
 * Mỗi nhân vật có cột `voice_id`. Migration: `V20261106100000__add_character_voice.sql`.
 * Web đã bỏ Azure và giọng của trình duyệt, đọc từng câu và tạo trước âm thanh câu sau.
+* Thêm `POST /chat/tts/stream` (PCM 24 kHz phát dần), `GET /voices` và `POST /voices/preview` (chỉ content admin và teacher), và `voiceId` cho nhân vật địa phương của teacher.
+* AI service hạ âm thanh từ 48 kHz xuống 24 kHz, Caddy trên EC2 không còn gom dữ liệu trước khi gửi (`flush_interval -1`).
 
 ---
 
