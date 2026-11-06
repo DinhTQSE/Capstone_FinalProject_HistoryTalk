@@ -462,13 +462,55 @@ def _build_final_user_content(user_message: str, rag_context: str) -> str:
     )
 
 
-async def _generate_suggested_questions(messages: list[dict], reply: str) -> tuple[List[str], int, int]:
-    """Suggestions are optional, so failing to generate them must never fail the reply itself."""
+_SUGGESTION_CANDIDATES = 5
+_MAX_SUGGESTIONS = 3
+
+
+async def _has_supporting_document(question: str, entity_ids: List[str]) -> bool | None:
+    """True when a document chunk passes the reranker for this question, None when it could not be checked."""
+    query_vector = await get_embedding_from_ollama(question)
+    if not query_vector:
+        return None
+    try:
+        response = await asyncio.to_thread(
+            lambda: supabase.schema(settings.SUPABASE_SCHEMA).rpc(
+                "match_history_chunks",
+                {"query_embedding": query_vector, "match_limit": 5, "filter_entity_ids": entity_ids},
+            ).execute()
+        )
+        texts = [chunk.get("content", "") for chunk in response.data or [] if chunk.get("content")]
+        if not texts:
+            return False
+
+        auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+        rerank_res = await ollama_client.post(
+            _ollama_url("/api/rerank"),
+            json={"query": question, "documents": texts},
+            auth=auth,
+        )
+        rerank_res.raise_for_status()
+        return bool(rerank_res.json().get("top_docs"))
+    except Exception as e:
+        logger.warning(f"Could not check a suggested question against the documents: {e}")
+        return None
+
+
+async def _generate_suggested_questions(
+    messages: list[dict], reply: str, entity_ids: List[str]
+) -> tuple[List[str], int, int]:
+    """
+    Suggest questions the character can actually answer: the prompt asks for questions answered by the
+    documents, then each candidate is checked against the documents and dropped when none supports it.
+    Suggestions are optional, so failing to generate them must never fail the reply itself.
+    """
     sq_prompt = (
-        "Đóng vai người dùng, hãy gợi ý 3 câu hỏi ngắn (dưới 10 từ) để hỏi tiếp nhân vật này.\n"
+        f"Đóng vai người dùng, hãy gợi ý {_SUGGESTION_CANDIDATES} câu hỏi ngắn (dưới 12 từ) để hỏi tiếp nhân vật này.\n"
+        "CHỈ gợi ý câu hỏi mà câu trả lời CÓ TRONG [DỮ LIỆU THAM KHẢO] ở trên, hoặc trong THÔNG TIN LỊCH SỬ của nhân vật. "
+        "Ưu tiên sự kiện, nhân vật, địa danh, nguyên nhân và kết quả được nhắc tới trong tư liệu. "
+        "KHÔNG hỏi về đời tư, sở thích, cảm xúc hay chi tiết mà tư liệu không nhắc tới.\n"
         "LƯU Ý QUAN TRỌNG: Phải xưng hô trực tiếp (dùng 'ông', 'ngài', 'bạn'), TUYỆT ĐỐI KHÔNG nhắc tên nhân vật ở ngôi thứ 3 (ví dụ không dùng 'Ngô Quyền').\n"
         "BẮT BUỘC 100% TIẾNG VIỆT. KHÔNG GIẢI THÍCH.\n"
-        "Chỉ liệt kê 3 câu hỏi trần trụi trên 3 dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
+        f"Chỉ liệt kê {_SUGGESTION_CANDIDATES} câu hỏi trần trụi trên {_SUGGESTION_CANDIDATES} dòng, KHÔNG dùng số thứ tự hay dấu gạch ngang ở đầu."
     )
     sq_messages = messages + [
         {"role": "assistant", "content": reply},
@@ -480,13 +522,18 @@ async def _generate_suggested_questions(messages: list[dict], reply: str) -> tup
         logger.warning(f"Failed to generate suggested questions: {e}")
         return [], 0, 0
 
-    questions = []
+    candidates = []
     for line in sq_text.strip().split("\n"):
         clean_line = re.sub(r"^[\-\*\•\—\–\+]\s*|^\d+[\.\)]\s*", "", line.strip()).strip()
         clean_line = clean_line.strip('"').strip("'")
-        if len(clean_line) > 5:
-            questions.append(clean_line)
-    return questions[:3], prompt_tokens, completion_tokens
+        if len(clean_line) > 5 and clean_line not in candidates:
+            candidates.append(clean_line)
+    candidates = candidates[:_SUGGESTION_CANDIDATES]
+
+    # A candidate that could not be checked is kept: the documents were reachable for the reply itself.
+    supported = await asyncio.gather(*[_has_supporting_document(q, entity_ids) for q in candidates])
+    questions = [q for q, ok in zip(candidates, supported) if ok is not False]
+    return questions[:_MAX_SUGGESTIONS], prompt_tokens, completion_tokens
 
 
 # ── Public service functions ──────────────────────────────────────────────────
@@ -544,7 +591,7 @@ async def generate_reply(
     sq_ct = 0
     
     if not skip_suggestions:
-        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, response_text)
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, response_text, entity_ids)
 
     return response_text.strip(), suggested_questions, prompt_tokens + sq_pt, completion_tokens + sq_ct, quotes_used
 
@@ -614,7 +661,7 @@ async def generate_reply_stream(
     sq_ct = 0
 
     if not skip_suggestions:
-        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, full_message)
+        suggested_questions, sq_pt, sq_ct = await _generate_suggested_questions(messages, full_message, entity_ids)
 
     yield {
         "suggestedQuestions": suggested_questions,

@@ -3,7 +3,8 @@
 > **Module:** AI Chat (`/chat/*`)  
 > **Base URL:** `/Historical-tell/api/v1`  
 > **Authentication:** Bearer Token (`Authorization: Bearer <jwt_access_token>`)  
-> **Trạng thái BE:** Chế độ vấn đáp đã deploy production (commit `1422df3`). Mục 2.6 (lọc ngôn từ) và số trích dẫn theo loại câu hỏi đang chờ deploy. FE chưa tích hợp.
+> **Trạng thái BE:** Mọi API trong tài liệu này đã deploy production (cập nhật 06/11/2026). FE chưa tích hợp.  
+> **Mục lục cho FE:** Vấn đáp ở mục 1–3 · Lọc ngôn từ ở mục 2.6 · Giọng đọc và chọn giọng nhân vật ở mục 6 · Thay đổi quyền ở mục 7
 
 ---
 
@@ -227,6 +228,7 @@ FE không bắt buộc phải sửa gì thêm ở đây, nhưng cần biết:
 
 | Thay đổi | Ảnh hưởng tới FE |
 |---|---|
+| Câu hỏi gợi ý chỉ còn câu có tư liệu trả lời | `suggestedQuestions` có thể ít hơn 3 câu, kể cả rỗng. FE ẩn khu vực gợi ý khi rỗng |
 | Bỏ việc nhân vật ngẫu nhiên hỏi ngược | Câu trả lời chat thường thường không còn phần sau `---` |
 | Số trích dẫn tùy loại câu hỏi | Hỏi một chi tiết: tối đa 3. Hỏi tổng hợp như "tóm tắt", "diễn biến": tối đa 5, câu trả lời có thể dài hơn và chậm hơn |
 | Bỏ độ trễ 50ms mỗi chunk trên server | Chữ về nhanh hơn. Web đang có hàng đợi hiển thị riêng |

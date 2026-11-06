@@ -39,7 +39,7 @@
 * Tự gọi lại một lần nếu câu trả lời lẫn chữ Trung (trừ stream).
 * RAG bỏ qua tài liệu đã xóa, `INACTIVE` và `PENDING_REVIEW`. Migration: `V20261105120000__rag_skips_unavailable_documents.sql`.
 
-### 4. Lọc ngôn từ không phù hợp (chờ deploy)
+### 4. Lọc ngôn từ không phù hợp
 * Thêm `POST /chat/messages/check` để FE kiểm tra ngay khi nhấn gửi. Bị chặn thì popup cảnh báo, tin không vào khung chat.
 * API gửi tin nhắn cũng kiểm tra lại: không lưu, không gọi AI, không trừ token, trả `400` với tiền tố `INAPPROPRIATE_CONTENT:`.
 * Danh sách từ nằm trong `ChatContentPolicy`. Giữ nguyên dấu tiếng Việt để không chặn nhầm "buổi", "các", "lớn". Từ lịch sử như "giết", "thảm sát" được phép.
@@ -57,6 +57,9 @@
 ### 6. Quyền nội dung
 * Chỉ `CONTENT_ADMIN` và `TEACHER` được tạo, sửa nhân vật, trận đánh, tài liệu, media, PDF, ghim bản đồ chính thức và chọn giọng. Chỉ `CONTENT_ADMIN` được xóa nội dung hệ thống.
 * `SYSTEM_ADMIN` và `SCHOOL_ADMIN` chỉ còn quyền xem. School admin vẫn duyệt nội dung địa phương. Chi tiết ở mục 7 của contract.
+
+### 7. Câu hỏi gợi ý bám tư liệu
+* Prompt chỉ cho gợi ý câu có câu trả lời trong tư liệu, sau đó từng câu được kiểm tra lại bằng tìm kiếm và reranker. Câu không có đoạn tư liệu nào đủ điểm bị bỏ, nên có thể ít hơn 3 câu.
 
 ---
 

@@ -246,7 +246,7 @@ def test_reply_survives_when_suggestions_fail(monkeypatch):
         return "", []
 
     async def fake_llm(messages, expect_json=True, temperature=None):
-        if "gợi ý 3 câu hỏi" in messages[-1]["content"]:
+        if "Đóng vai người dùng" in messages[-1]["content"]:
             raise ValueError("LLM reply still contains Chinese characters")
         return "Ta là Ngô Quyền.", 10, 5
 
@@ -262,13 +262,21 @@ def test_reply_survives_when_suggestions_fail(monkeypatch):
     assert (prompt_tokens, completion_tokens) == (10, 5)
 
 
+def _stub_support(monkeypatch, supported):
+    async def fake_check(question, entity_ids):
+        return supported.get(question, True)
+
+    monkeypatch.setattr(service, "_has_supporting_document", fake_check)
+
+
 def test_suggestions_are_cleaned_of_numbering(monkeypatch):
     async def fake_llm(messages, expect_json=True, temperature=None):
         return '1. Ngài sinh năm nào?\n- "Ngài có con không?"\nok', 10, 5
 
     monkeypatch.setattr(service, "_call_llm", fake_llm)
+    _stub_support(monkeypatch, {})
 
-    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời"))
+    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời", ["char-1"]))
 
     assert questions == ["Ngài sinh năm nào?", "Ngài có con không?"]
 
@@ -451,3 +459,46 @@ def test_empty_audio_is_reported(monkeypatch):
 
     with pytest.raises(service.SpeechUnavailableError):
         asyncio.run(service.synthesize_speech("Xin chào", "Thiện Minh"))
+
+
+def test_suggestions_without_supporting_documents_are_dropped(monkeypatch):
+    async def fake_llm(messages, expect_json=True, temperature=None):
+        assert "CHỈ gợi ý câu hỏi mà câu trả lời CÓ TRONG" in messages[-1]["content"]
+        return ("Ngài dùng kế gì ở Bạch Đằng?\nNgài có uống rượu không?\nTướng giặc là ai?\n"
+                "Ngài có vợ con không?\nSau trận ngài làm gì?"), 10, 5
+
+    monkeypatch.setattr(service, "_call_llm", fake_llm)
+    _stub_support(monkeypatch, {"Ngài có uống rượu không?": False, "Ngài có vợ con không?": False})
+
+    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời", ["char-1"]))
+
+    assert questions == ["Ngài dùng kế gì ở Bạch Đằng?", "Tướng giặc là ai?", "Sau trận ngài làm gì?"]
+
+
+def test_suggestions_that_could_not_be_checked_are_kept(monkeypatch):
+    async def fake_llm(messages, expect_json=True, temperature=None):
+        return "Ngài dùng kế gì?\nTướng giặc là ai?", 10, 5
+
+    monkeypatch.setattr(service, "_call_llm", fake_llm)
+    _stub_support(monkeypatch, {"Ngài dùng kế gì?": None, "Tướng giặc là ai?": False})
+
+    questions, _, _ = asyncio.run(service._generate_suggested_questions([], "Trả lời", ["char-1"]))
+
+    assert questions == ["Ngài dùng kế gì?"]
+
+
+def test_question_is_supported_only_when_the_reranker_keeps_a_chunk(monkeypatch):
+    _stub_rerank(monkeypatch, ["Đoạn 1"])
+    assert asyncio.run(service._has_supporting_document("Tướng giặc là ai?", ["char-1"])) is True
+
+    _stub_rerank(monkeypatch, [])
+    assert asyncio.run(service._has_supporting_document("Ngài có uống rượu không?", ["char-1"])) is False
+
+
+def test_question_check_reports_unknown_when_embedding_fails(monkeypatch):
+    async def fake_embedding(text):
+        return []
+
+    monkeypatch.setattr(service, "get_embedding_from_ollama", fake_embedding)
+
+    assert asyncio.run(service._has_supporting_document("Hỏi", ["char-1"])) is None
