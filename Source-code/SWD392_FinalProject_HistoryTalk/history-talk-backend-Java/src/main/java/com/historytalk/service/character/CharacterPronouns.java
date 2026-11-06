@@ -6,13 +6,13 @@ import com.historytalk.exception.InvalidRequestException;
 import java.util.regex.Pattern;
 
 /**
- * How a character refers to itself and to the learner, e.g. "ta" and "ngươi" for an ancient king.
- * Characters without a preference speak with "tôi" and "bạn".
+ * How a character refers to itself and to the learner, e.g. "tôi" and "bạn" for a modern figure.
+ * Characters without a preference speak with "ta" and "ngươi".
  */
 public final class CharacterPronouns {
 
-    public static final String DEFAULT_SELF = "tôi";
-    public static final String DEFAULT_ADDRESS = "bạn";
+    public static final String DEFAULT_SELF = "ta";
+    public static final String DEFAULT_ADDRESS = "ngươi";
     public static final int MAX_LENGTH = 30;
 
     private static final Pattern ALLOWED = Pattern.compile("[\\p{L} ]+");

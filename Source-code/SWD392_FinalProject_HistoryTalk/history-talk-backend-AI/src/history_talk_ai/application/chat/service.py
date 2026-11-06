@@ -438,7 +438,7 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         raise RagUnavailableError("Không tra cứu được tư liệu lịch sử. Vui lòng thử lại sau.") from e
 
 
-def _build_final_user_content(user_message: str, rag_context: str, self_pronoun: str = "tôi") -> str:
+def _build_final_user_content(user_message: str, rag_context: str, self_pronoun: str = "ta") -> str:
     """Put the grounding rules next to the question, where the model follows them most closely."""
     if not rag_context:
         return (

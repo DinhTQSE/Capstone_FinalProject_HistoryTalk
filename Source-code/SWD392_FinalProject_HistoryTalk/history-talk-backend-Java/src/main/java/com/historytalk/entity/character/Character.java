@@ -76,11 +76,11 @@ public class Character {
     @Column(name = "voice_id", length = 50)
     private String voiceId;
 
-    /** How the character refers to itself, null for "tôi". */
+    /** How the character refers to itself, null for "ta". */
     @Column(name = "self_pronoun", length = 30)
     private String selfPronoun;
 
-    /** How the character addresses the learner, null for "bạn". */
+    /** How the character addresses the learner, null for "ngươi". */
     @Column(name = "address_pronoun", length = 30)
     private String addressPronoun;
 

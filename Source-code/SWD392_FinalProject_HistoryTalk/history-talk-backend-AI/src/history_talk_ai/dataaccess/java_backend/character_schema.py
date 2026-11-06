@@ -31,7 +31,7 @@ class CharacterData(BaseModel):
     image: Optional[str] = None
     personality: Optional[str] = None
     lifespan: Optional[str] = None
-    # How the character refers to itself and to the learner; prompts default to "tôi" and "bạn"
+    # How the character refers to itself and to the learner; prompts default to "ta" and "ngươi"
     selfPronoun: Optional[str] = None
     addressPronoun: Optional[str] = None
 

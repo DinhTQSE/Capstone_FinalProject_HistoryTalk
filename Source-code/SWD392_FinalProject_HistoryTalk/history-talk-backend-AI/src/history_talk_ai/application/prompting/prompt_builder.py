@@ -3,8 +3,8 @@
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
 
-DEFAULT_SELF_PRONOUN = "tôi"
-DEFAULT_ADDRESS_PRONOUN = "bạn"
+DEFAULT_SELF_PRONOUN = "ta"
+DEFAULT_ADDRESS_PRONOUN = "ngươi"
 
 _CHAT_SYSTEM_TEMPLATE = """\
 [HƯỚNG DẪN NHẬP VAI]
@@ -97,7 +97,7 @@ _MAX_BACKGROUND_SOURCE_CHARS = 1500
 
 
 def character_pronouns(character: CharacterData) -> tuple[str, str]:
-    """The character's own pronoun and how it addresses the learner, defaulting to "tôi" and "bạn"."""
+    """The character's own pronoun and how it addresses the learner, defaulting to "ta" and "ngươi"."""
     self_pronoun = (character.selfPronoun or "").strip() or DEFAULT_SELF_PRONOUN
     address_pronoun = (character.addressPronoun or "").strip() or DEFAULT_ADDRESS_PRONOUN
     return self_pronoun, address_pronoun

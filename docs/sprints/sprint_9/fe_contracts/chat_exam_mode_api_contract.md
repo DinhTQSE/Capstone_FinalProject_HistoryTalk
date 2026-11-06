@@ -380,24 +380,24 @@ Từ sprint 9, `SYSTEM_ADMIN` và `SCHOOL_ADMIN` **không còn** tạo hoặc s�
 
 ## 8. Cách xưng hô của nhân vật
 
-Mặc định mọi nhân vật **xưng "tôi" và gọi người học là "bạn"**. Content admin và teacher có thể đặt cách xưng hô riêng khi tạo hoặc sửa nhân vật, ví dụ vua thời phong kiến xưng "ta" và gọi "ngươi". Cách xưng hô áp dụng cho chat, vấn đáp (câu mở đầu, câu hỏi, nhận xét, lời tổng kết) và lời chào dự phòng.
+Mặc định mọi nhân vật **xưng "ta" và gọi người học là "ngươi"**. Content admin và teacher có thể đặt cách xưng hô riêng khi tạo hoặc sửa nhân vật, ví dụ nhân vật hiện đại xưng "tôi" và gọi "bạn". Cách xưng hô áp dụng cho chat, vấn đáp (câu mở đầu, câu hỏi, nhận xét, lời tổng kết) và lời chào dự phòng.
 
 ### 8.1. Trường mới
 Thêm vào request tạo và sửa nhân vật, ở cả API nhân vật hệ thống (`/characters`, content admin) và nhân vật địa phương (`/teacher/local-contents/characters`, teacher). Response trả lại đúng 2 trường này.
 
 ```json
 {
-  "name": "Ngô Quyền",
+  "name": "Văn Tiến Dũng",
   "voiceId": "Thiện Minh",
-  "selfPronoun": "ta",
-  "addressPronoun": "ngươi"
+  "selfPronoun": "tôi",
+  "addressPronoun": "bạn"
 }
 ```
 
 | Trường | Ý nghĩa | Mặc định khi trống |
 |---|---|---|
-| `selfPronoun` | Nhân vật tự xưng, ví dụ `ta`, `trẫm`, `bản tướng` | `tôi` |
-| `addressPronoun` | Nhân vật gọi người học, ví dụ `ngươi`, `cháu`, `các em` | `bạn` |
+| `selfPronoun` | Nhân vật tự xưng, ví dụ `tôi`, `trẫm`, `bản tướng` | `ta` |
+| `addressPronoun` | Nhân vật gọi người học, ví dụ `bạn`, `cháu`, `các em` | `ngươi` |
 
 * **Ràng buộc:** chỉ gồm chữ cái và dấu cách, tối đa 30 ký tự. Sai thì `400` với message `Cách xưng hô chỉ gồm chữ cái, tối đa 30 ký tự`.
 * **Khi tạo:** không gửi hoặc gửi `""` thì dùng mặc định.
@@ -405,9 +405,9 @@ Thêm vào request tạo và sửa nhân vật, ở cả API nhân vật hệ th
 * **Response:** `null` nghĩa là đang dùng mặc định.
 
 ### 8.2. Gợi ý màn hình
-* Đặt cạnh ô chọn giọng: 2 ô nhập "Nhân vật tự xưng" và "Gọi người học", placeholder là `tôi` và `bạn`.
-* Có thể gợi ý nhanh theo thời đại: phong kiến `ta` / `ngươi`, cận đại và hiện đại `tôi` / `bạn` hoặc `tôi` / `cháu`.
-* **Nhân vật hiện có chưa được đặt** nên đang nói "tôi" và "bạn". Nếu muốn giữ phong cách cũ "ta" và "ngươi" cho nhân vật phong kiến, content admin cần sửa từng nhân vật.
+* Đặt cạnh ô chọn giọng: 2 ô nhập "Nhân vật tự xưng" và "Gọi người học", placeholder là `ta` và `ngươi`.
+* Có thể gợi ý nhanh theo thời đại: phong kiến `ta` / `ngươi` (mặc định), cận đại và hiện đại `tôi` / `bạn` hoặc `tôi` / `cháu`.
+* **Nhân vật hiện đại** (thế kỷ 20 trở đi) nên được đặt `tôi` / `bạn`, vì "ta" và "ngươi" nghe không hợp.
 
 ### 8.3. Việc Frontend cần làm
 - [ ] Thêm 2 ô `selfPronoun`, `addressPronoun` vào form tạo và sửa nhân vật cho content admin và teacher.

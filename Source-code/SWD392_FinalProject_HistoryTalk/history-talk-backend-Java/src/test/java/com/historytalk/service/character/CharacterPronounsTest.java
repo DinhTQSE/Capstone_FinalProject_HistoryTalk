@@ -10,19 +10,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CharacterPronounsTest {
 
     @Test
-    void charactersWithoutAPreferenceSayToiAndBan() {
-        Character character = Character.builder().name("Văn Tiến Dũng").build();
+    void charactersWithoutAPreferenceSayTaAndNguoi() {
+        Character character = Character.builder().name("Ngô Quyền").build();
 
-        assertThat(CharacterPronouns.selfOf(character)).isEqualTo("tôi");
-        assertThat(CharacterPronouns.addressOf(character)).isEqualTo("bạn");
+        assertThat(CharacterPronouns.selfOf(character)).isEqualTo("ta");
+        assertThat(CharacterPronouns.addressOf(character)).isEqualTo("ngươi");
     }
 
     @Test
     void preferredPronounsAreUsed() {
-        Character character = Character.builder().name("Ngô Quyền").selfPronoun("ta").addressPronoun("ngươi").build();
+        Character character = Character.builder().name("Văn Tiến Dũng").selfPronoun("tôi").addressPronoun("bạn").build();
 
-        assertThat(CharacterPronouns.selfOf(character)).isEqualTo("ta");
-        assertThat(CharacterPronouns.addressOf(character)).isEqualTo("ngươi");
+        assertThat(CharacterPronouns.selfOf(character)).isEqualTo("tôi");
+        assertThat(CharacterPronouns.addressOf(character)).isEqualTo("bạn");
     }
 
     @Test

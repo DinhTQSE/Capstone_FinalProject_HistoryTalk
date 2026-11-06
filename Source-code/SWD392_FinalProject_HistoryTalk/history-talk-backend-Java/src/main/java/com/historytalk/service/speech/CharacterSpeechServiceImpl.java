@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CharacterSpeechServiceImpl implements CharacterSpeechService {
 
     static final String SAMPLE_SENTENCE =
-            "Xin chào, tôi là nhân vật lịch sử. Hôm nay tôi sẽ kể cho bạn nghe về thời đại của mình.";
+            "Ta là nhân vật lịch sử. Hôm nay ta sẽ kể cho ngươi nghe về thời đại của ta.";
 
     private final CharacterRepository characterRepository;
     private final AiServiceClient aiServiceClient;

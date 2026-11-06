@@ -62,7 +62,7 @@
 * Prompt chỉ cho gợi ý câu có câu trả lời trong tư liệu, sau đó từng câu được kiểm tra lại bằng tìm kiếm và reranker. Câu không có đoạn tư liệu nào đủ điểm bị bỏ, nên có thể ít hơn 3 câu.
 
 ### 8. Prompt và cách xưng hô
-* Nhân vật mặc định xưng "tôi" và gọi "bạn". Content admin và teacher đặt cách xưng riêng qua `selfPronoun`, `addressPronoun`. Migration: `V20261106143000__add_character_pronouns.sql`.
+* Nhân vật mặc định xưng "ta" và gọi "ngươi". Content admin và teacher đặt cách xưng riêng qua `selfPronoun`, `addressPronoun`, ví dụ `tôi` / `bạn` cho nhân vật hiện đại. Migration: `V20261106143000__add_character_pronouns.sql`.
 * Luật thời đại dựa theo năm sinh và năm mất, nên nhân vật hiện đại không còn bị bắt từ chối điện thoại hay xe hơi.
 * Chấm vấn đáp khích lệ hơn, không trừ điểm khi nói thêm ý đúng. Câu hỏi vấn đáp không hỏi ý kiến, luôn ở ngôi thứ nhất.
 * Gợi ý câu hỏi chỉ gửi tư liệu và câu trả lời vừa rồi, không gửi lại cả cuộc hội thoại.

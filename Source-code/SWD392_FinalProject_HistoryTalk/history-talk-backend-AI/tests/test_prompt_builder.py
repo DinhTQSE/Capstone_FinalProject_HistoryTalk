@@ -14,23 +14,23 @@ def _character(**fields):
     return CharacterData(characterId="char-1", name="Văn Tiến Dũng", background="Đại tướng {chú thích}", **fields)
 
 
-def test_characters_say_toi_and_ban_by_default():
+def test_characters_say_ta_and_nguoi_by_default():
     prompt = prompt_builder.build_chat_system_prompt(_character(), None)
 
-    assert 'xưng "tôi"' in prompt
-    assert 'người đối diện là "bạn"' in prompt
+    assert 'xưng "ta"' in prompt
+    assert 'người đối diện là "ngươi"' in prompt
 
 
 def test_configured_pronouns_are_used_everywhere():
-    character = _character(selfPronoun="Ta", addressPronoun="ngươi")
+    character = _character(selfPronoun="tôi", addressPronoun="bạn")
 
-    assert 'xưng "Ta"' in prompt_builder.build_chat_system_prompt(character, None)
-    assert 'Xưng "Ta", gọi người học là "ngươi"' in prompt_builder.build_exam_question_prompt(character, None, "Tư liệu", [])
-    assert 'Xưng "Ta", gọi người học là "ngươi"' in prompt_builder.build_exam_grading_prompt(character, "Hỏi", "Đáp", "Tư liệu", "Trả lời")
+    assert 'xưng "tôi"' in prompt_builder.build_chat_system_prompt(character, None)
+    assert 'Xưng "tôi", gọi người học là "bạn"' in prompt_builder.build_exam_question_prompt(character, None, "Tư liệu", [])
+    assert 'Xưng "tôi", gọi người học là "bạn"' in prompt_builder.build_exam_grading_prompt(character, "Hỏi", "Đáp", "Tư liệu", "Trả lời")
 
 
 def test_blank_pronouns_fall_back_to_the_defaults():
-    assert prompt_builder.character_pronouns(_character(selfPronoun="  ", addressPronoun="")) == ("tôi", "bạn")
+    assert prompt_builder.character_pronouns(_character(selfPronoun="  ", addressPronoun="")) == ("ta", "ngươi")
 
 
 def test_era_rule_follows_the_lifespan_instead_of_assuming_ancient_times():

@@ -40,12 +40,12 @@ public class UpdateCharacterRequest {
     @JsonProperty("voiceId")
     private String voiceId;
 
-    /** How the character refers to itself, e.g. "ta". Empty means "tôi". */
+    /** How the character refers to itself, e.g. "tôi". Empty means "ta". */
     @Size(max = 30, message = "Cách xưng của nhân vật tối đa 30 ký tự")
     @JsonProperty("selfPronoun")
     private String selfPronoun;
 
-    /** How the character addresses the learner, e.g. "ngươi". Empty means "bạn". */
+    /** How the character addresses the learner, e.g. "bạn". Empty means "ngươi". */
     @Size(max = 30, message = "Cách gọi người học tối đa 30 ký tự")
     @JsonProperty("addressPronoun")
     private String addressPronoun;
