@@ -907,7 +907,7 @@ public class QuizServiceImpl implements QuizService {
     private <T> PaginatedResponse<T> toPaginatedResponse(Page<T> page) {
         return PaginatedResponse.<T>builder()
                 .content(page.getContent())
-                .currentPage(page.getNumber())          // 0-indexed per contract
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())

@@ -35,11 +35,11 @@ public class StaffQuestionBankController {
             @RequestParam(required = false) String questionType,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         log.info("GET /api/v1/staff/question-bank type={} difficulty={} search={}", questionType, difficulty, search);
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         PaginatedResponse<QuestionBankResponse> data = quizService.getQuestionBank(questionType, difficulty, search, pageable);
         return ResponseEntity.ok(ApiResponse.success(data, "Lấy danh sách câu hỏi thành công"));
     }
