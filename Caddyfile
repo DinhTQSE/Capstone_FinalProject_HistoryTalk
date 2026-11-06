@@ -10,13 +10,8 @@ historytalk.app {
             }
         }
     }
-    handle /v1/* {
-        reverse_proxy http://historytalk-ai:8001
-    }
-
-    handle /health {
-        reverse_proxy http://historytalk-ai:8001
-    }
+    # The AI service is not published: only Java calls it, over the internal Docker network
+    # (AI_SERVICE_URL=http://historytalk-ai:8001). A public route let anyone use the LLM and TTS without logging in.
 
     redir /grafana /grafana/
     handle /grafana/* {
