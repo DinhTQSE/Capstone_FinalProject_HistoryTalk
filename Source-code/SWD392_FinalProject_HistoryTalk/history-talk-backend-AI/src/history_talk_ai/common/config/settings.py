@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # Vision Model Provider ("google", "ollama")
     VISION_PROVIDER: str = "ollama"
     VISION_MODEL: str = "qwen2.5vl:7b"
+    # Dedicated Ollama server for Vision / VLM (to avoid overloading Chat LLM GPU)
+    # If left empty, falls back to OLLAMA_BASE_URL
+    VISION_OLLAMA_BASE_URL: str = ""
+    VISION_OLLAMA_USERNAME: str = ""
+    VISION_OLLAMA_PASSWORD: str = ""
     
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_USERNAME: str = ""
