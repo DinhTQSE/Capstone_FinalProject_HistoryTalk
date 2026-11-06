@@ -39,11 +39,11 @@ public class CharacterMediaController {
     private final MediaService mediaService;
 
     @PostMapping(value = "/upload-direct", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
         summary = "Upload media directly via multipart/form-data",
-        description = "Uploads media directly via multipart/form-data for a Character. Supports both 2D images (max 10MB) and 3D models (max 100MB). Single-step flow for direct binary upload. Re-uploading the same mediaType replaces the previous file. TEACHER may only upload onto local characters they created; SCHOOL_ADMIN onto local characters of their school."
+        description = "Uploads media directly via multipart/form-data for a Character. Supports both 2D images (max 10MB) and 3D models (max 100MB). Single-step flow for direct binary upload. Re-uploading the same mediaType replaces the previous file. TEACHER may only upload onto local characters they created."
     )
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadDirectBinary(
             @Parameter(description = "Character ID", required = true)
@@ -93,7 +93,7 @@ public class CharacterMediaController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete media from character",
             description = "mediaType=IMAGE_2D|MODEL_3D deletes only that media. Without mediaType every media of the character is deleted.")

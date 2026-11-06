@@ -39,11 +39,11 @@ public class HistoricalContextMediaController {
     private final MediaService mediaService;
 
     @PostMapping(value = "/upload-direct", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
         summary = "Upload media directly via multipart/form-data",
-        description = "Uploads media directly via multipart/form-data for a Historical Context. Supports 2D images (IMAGE_2D, max 10MB) and videos (VIDEO: MP4/WebM/Ogg/MOV, max 50MB). Re-uploading the same mediaType replaces the previous file. TEACHER may only upload onto local contexts they created; SCHOOL_ADMIN onto local contexts of their school."
+        description = "Uploads media directly via multipart/form-data for a Historical Context. Supports 2D images (IMAGE_2D, max 10MB) and videos (VIDEO: MP4/WebM/Ogg/MOV, max 50MB). Re-uploading the same mediaType replaces the previous file. TEACHER may only upload onto local contexts they created."
     )
     public ResponseEntity<ApiResponse<DocumentMediaMetadataResponse>> uploadDirectBinary(
             @Parameter(description = "Context ID", required = true)
@@ -93,7 +93,7 @@ public class HistoricalContextMediaController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete media from context",
             description = "mediaType=IMAGE_2D|VIDEO deletes only that media (and clears imageUrl/videoUrl even if it was entered manually). Without mediaType every media of the context is deleted.")

@@ -123,7 +123,7 @@ public class MapPinServiceImpl implements MapPinService {
         String pinOwnerType;
         String pinType;
 
-        if (isAdminRole(role) || isEducationalManager(role, callerId, context)) {
+        if (canManageOfficialPins(role, callerId, context)) {
             // Admin or school teacher/admin creates an educational ADMIN pin.
             // pinType classification (ALLIED_FORCE / ENEMY_FORCE) is not yet used by the FE;
             // stored as null until the frontend adopts it.
@@ -182,7 +182,7 @@ public class MapPinServiceImpl implements MapPinService {
             throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
         }
 
-        if (isAdminRole(role) || isEducationalManager(role, callerId, pin.getHistoricalContext())) {
+        if (canManageOfficialPins(role, callerId, pin.getHistoricalContext())) {
             // Admins or educational managers can only delete ADMIN pins, not user's personal pins
             if (!PIN_OWNER_ADMIN.equals(pin.getPinOwnerType())) {
                 throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
@@ -222,7 +222,7 @@ public class MapPinServiceImpl implements MapPinService {
         }
 
         // Ownership check — same 404-on-mismatch pattern as deletePin
-        if (isAdminRole(role) || isEducationalManager(role, callerId, pin.getHistoricalContext())) {
+        if (canManageOfficialPins(role, callerId, pin.getHistoricalContext())) {
             // Admins or educational managers can only update ADMIN pins
             if (!PIN_OWNER_ADMIN.equals(pin.getPinOwnerType())) {
                 throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
@@ -316,6 +316,15 @@ public class MapPinServiceImpl implements MapPinService {
                 || "STAFF".equalsIgnoreCase(role)
                 || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    /**
+     * Official pins are part of the battle content, which only content admins and teachers create or change.
+     * Teachers are limited to contexts of their own school.
+     */
+    private boolean canManageOfficialPins(String role, String callerId, HistoricalContext context) {
+        return "CONTENT_ADMIN".equalsIgnoreCase(role)
+                || ("TEACHER".equalsIgnoreCase(role) && isEducationalManager(role, callerId, context));
     }
 
     private boolean isEducationalManager(String role, String callerId, HistoricalContext context) {

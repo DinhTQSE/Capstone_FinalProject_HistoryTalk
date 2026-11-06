@@ -44,7 +44,7 @@ public class PdfExtractionController {
     private final ObjectMapper objectMapper;
 
     @PostMapping(value = "/extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Extract raw text from PDF file for frontend drafting (STATELESS - no DB persistence)")
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> extractText(
@@ -62,7 +62,7 @@ public class PdfExtractionController {
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE
     )
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Upload PDF and stream extraction progress via SSE directly on /upload-and-extract")
     public SseEmitter uploadAndExtract(
@@ -125,7 +125,7 @@ public class PdfExtractionController {
     }
 
     @PostMapping(value = "/save-content")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Save or update document content and status (Phase 1 stateless PDF upload -> edit -> save)")
     public ResponseEntity<ApiResponse<DocumentFileResponse>> saveDocumentContent(

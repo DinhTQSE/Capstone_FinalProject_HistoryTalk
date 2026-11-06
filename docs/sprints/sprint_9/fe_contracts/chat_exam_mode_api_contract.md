@@ -346,4 +346,30 @@ Thêm trường `voiceId` vào request, và response trả lại `voiceId`:
 ### 6.7. Giới hạn
 * Chỉ phục vụ tốt **một người dùng một lúc**. Nhiều người cùng đọc sẽ chậm.
 * Server GPU tắt thì không có giọng đọc, và web không dự phòng bằng giọng của trình duyệt.
-* Quyền tạo và sửa nhân vật hiện vẫn mở cho cả `SYSTEM_ADMIN` và `SCHOOL_ADMIN` như trước. Chỉ 2 API giọng mới bị giới hạn cho content admin và teacher.
+
+---
+
+## 7. Thay đổi quyền: chỉ content admin và teacher được tạo, sửa nhân vật và trận đánh
+
+Từ sprint 9, `SYSTEM_ADMIN` và `SCHOOL_ADMIN` **không còn** tạo hoặc sửa nhân vật, trận đánh và nội dung đi kèm. Gọi các API dưới đây sẽ nhận `403`.
+
+| API | Trước | Bây giờ |
+|---|---|---|
+| `POST`, `PUT /characters`, gắn và gỡ bối cảnh của nhân vật | 4 role | `CONTENT_ADMIN`, `TEACHER` |
+| `DELETE`, `PATCH .../soft-delete` nhân vật | `CONTENT_ADMIN`, `SYSTEM_ADMIN` | `CONTENT_ADMIN` |
+| `POST`, `PUT /historical-contexts` | 4 role | `CONTENT_ADMIN`, `TEACHER` |
+| `DELETE`, `PATCH .../soft-delete` trận đánh | `CONTENT_ADMIN`, `SYSTEM_ADMIN` | `CONTENT_ADMIN` |
+| Tài liệu nhân vật và trận đánh: `POST`, `PUT`, `DELETE` | 4 role | `CONTENT_ADMIN`, `TEACHER` |
+| Media nhân vật và trận đánh: upload, xóa | 4 role | `CONTENT_ADMIN`, `TEACHER` |
+| PDF: `/documents/{docId}/upload-pdf`, `/documents/pdf/*` | 4 role | `CONTENT_ADMIN`, `TEACHER` |
+| Ghim bản đồ chính thức của trận đánh | content admin, system admin, teacher, school admin | `CONTENT_ADMIN`, teacher của trường đó |
+| `GET /voices`, `POST /voices/preview` | mới | `CONTENT_ADMIN`, `TEACHER` |
+
+**Không đổi:**
+* Mọi API **xem** nhân vật, trận đánh, tài liệu.
+* `GET /documents/{docId}/pdf-url`.
+* **School admin vẫn duyệt** nội dung địa phương của teacher (`/school-admin/local-contents/.../status`).
+* Ghim bản đồ cá nhân của người học.
+* Các API `/teacher/local-contents/*` vẫn chỉ dành cho teacher.
+
+**FE cần làm:** ẩn các nút tạo, sửa, xóa, upload và chọn giọng với `SYSTEM_ADMIN` và `SCHOOL_ADMIN`, và xử lý `403` nếu vẫn gọi.

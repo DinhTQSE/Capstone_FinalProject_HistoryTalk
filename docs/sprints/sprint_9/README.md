@@ -54,6 +54,10 @@
 * Thêm `POST /chat/tts/stream` (PCM 24 kHz phát dần), `GET /voices` và `POST /voices/preview` (chỉ content admin và teacher), và `voiceId` cho nhân vật địa phương của teacher.
 * AI service hạ âm thanh từ 48 kHz xuống 24 kHz, Caddy trên EC2 không còn gom dữ liệu trước khi gửi (`flush_interval -1`).
 
+### 6. Quyền nội dung
+* Chỉ `CONTENT_ADMIN` và `TEACHER` được tạo, sửa nhân vật, trận đánh, tài liệu, media, PDF, ghim bản đồ chính thức và chọn giọng. Chỉ `CONTENT_ADMIN` được xóa nội dung hệ thống.
+* `SYSTEM_ADMIN` và `SCHOOL_ADMIN` chỉ còn quyền xem. School admin vẫn duyệt nội dung địa phương. Chi tiết ở mục 7 của contract.
+
 ---
 
 ## 🧪 KẾT QUẢ KIỂM THỬ TRÊN PRODUCTION (05/11/2026)

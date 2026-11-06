@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import sys
 from pathlib import Path
@@ -375,17 +376,15 @@ def _pcm(*samples):
 
 
 def _stub_tts(monkeypatch, response, captured=None):
-    def fake_build_request(method, url, json, auth):
-        if captured is not None:
-            captured.update(url=url, json=json, auth=auth)
-        return "request"
+    """Only the network call is faked; the request is built by the real httpx client."""
 
-    async def fake_send(request, stream):
+    async def fake_send(request, auth=None, stream=False):
+        if captured is not None:
+            captured.update(url=str(request.url), json=json.loads(request.content), auth=auth, stream=stream)
         if isinstance(response, Exception):
             raise response
         return response
 
-    monkeypatch.setattr(service.ollama_client, "build_request", fake_build_request)
     monkeypatch.setattr(service.ollama_client, "send", fake_send)
 
 
@@ -417,6 +416,7 @@ def test_speech_stream_requests_pcm_through_the_authenticated_gateway(monkeypatc
     assert captured["json"]["voice"] == "Thiện Minh"
     assert captured["json"]["response_format"] == "pcm"
     assert captured["auth"] == ("historytalk", "secret")
+    assert captured["stream"] is True
     assert response.closed
 
 

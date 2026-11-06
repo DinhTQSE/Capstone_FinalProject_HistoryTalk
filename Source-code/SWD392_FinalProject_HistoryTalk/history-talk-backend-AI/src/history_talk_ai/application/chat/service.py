@@ -301,10 +301,9 @@ async def open_speech_stream(text: str, voice: str) -> httpx.Response:
         "POST",
         _ollama_url("/v1/audio/speech"),
         json={"model": settings.TTS_MODEL, "input": text, "voice": voice, "response_format": "pcm"},
-        auth=auth,
     )
     try:
-        response = await ollama_client.send(request, stream=True)
+        response = await ollama_client.send(request, auth=auth, stream=True)
     except Exception as e:
         logger.error(f"TTS request failed: {e}")
         raise SpeechUnavailableError("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.") from e
