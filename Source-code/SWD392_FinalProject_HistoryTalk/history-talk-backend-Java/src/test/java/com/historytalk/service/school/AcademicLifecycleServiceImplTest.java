@@ -67,9 +67,9 @@ class AcademicLifecycleServiceImplTest {
                 .name("THPT Chuyên Lê Hồng Phong")
                 .schoolCode("LHP-HCM")
                 .packageType(EnterprisePackage.ENTERPRISE_SMALL)
-                .totalSchoolTokenQuota(5_000_000)
+                .totalSchoolTokenQuota(435_750_000)
                 .unallocatedTokenQuota(1_000_000)
-                .defaultDailyStudentQuota(1_000)
+                .defaultDailyStudentQuota(5_000)
                 .subscriptionStartDate(LocalDate.of(2025, 9, 1))
                 .subscriptionEndDate(LocalDate.of(2026, 5, 31))
                 .status(SchoolStatus.ACTIVE)
@@ -121,7 +121,7 @@ class AcademicLifecycleServiceImplTest {
     @DisplayName("US-SP7-14: Activating renewed subscription on Sep 1 rolls over 20% of unused pool and sets 01/09 - 31/05 cycle")
     void activateRenewedSubscription_Sep1_SuccessWith20PercentRollover() {
         school.setRenewedForNextYear(true);
-        school.setNextPackageType(EnterprisePackage.ENTERPRISE_SMALL); // 5,000,000
+        school.setNextPackageType(EnterprisePackage.ENTERPRISE_SMALL); // 435,750,000
         school.setUnallocatedTokenQuota(1_000_000); // 20% rollover = 200,000
 
         when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
@@ -130,8 +130,8 @@ class AcademicLifecycleServiceImplTest {
         SchoolResponse response = academicLifecycleService.activateRenewedSubscription(
                 school.getId(), LocalDate.of(2026, 9, 1));
 
-        assertEquals(5_200_000, response.getTotalSchoolTokenQuota());
-        assertEquals(5_200_000, response.getUnallocatedTokenQuota());
+        assertEquals(435_950_000, response.getTotalSchoolTokenQuota());
+        assertEquals(435_950_000, response.getUnallocatedTokenQuota());
         assertEquals(LocalDate.of(2026, 9, 1), response.getSubscriptionStartDate());
         assertEquals(LocalDate.of(2027, 5, 31), response.getSubscriptionEndDate());
         assertFalse(response.getRenewedForNextYear());
@@ -151,7 +151,7 @@ class AcademicLifecycleServiceImplTest {
 
         SchoolResponse response = academicLifecycleService.topUpSchoolTokens(school.getId(), request);
 
-        assertEquals(5_500_000, response.getTotalSchoolTokenQuota());
+        assertEquals(436_250_000, response.getTotalSchoolTokenQuota());
         assertEquals(1_500_000, response.getUnallocatedTokenQuota());
         assertEquals(LocalDate.of(2026, 5, 31), response.getSubscriptionEndDate());
     }

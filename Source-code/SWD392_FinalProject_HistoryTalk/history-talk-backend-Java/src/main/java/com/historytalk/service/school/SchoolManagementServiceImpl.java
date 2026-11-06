@@ -9,7 +9,6 @@ import com.historytalk.dto.school.SchoolResponse;
 import com.historytalk.dto.school.SchoolTokenQuotaResponse;
 import com.historytalk.dto.school.UpdateSchoolAdminRequest;
 import com.historytalk.entity.enums.EnterprisePackage;
-import com.historytalk.entity.enums.SchoolStatus;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
@@ -44,13 +43,13 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${historytalk.saas.package.small-tokens:5000000}")
+    @Value("${historytalk.saas.package.small-tokens:435750000}")
     private int packageSmallTokens;
 
-    @Value("${historytalk.saas.package.medium-tokens:20000000}")
+    @Value("${historytalk.saas.package.medium-tokens:1016750000}")
     private int packageMediumTokens;
 
-    @Value("${historytalk.saas.package.large-tokens:50000000}")
+    @Value("${historytalk.saas.package.large-tokens:1452500000}")
     private int packageLargeTokens;
 
     private static final Pattern SCHOOL_CODE_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{2,30}$");
@@ -135,7 +134,8 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
         java.time.LocalDate subStart = java.time.LocalDate.of(academicStartYear, 9, 1);
         java.time.LocalDate subEnd = java.time.LocalDate.of(academicStartYear + 1, 5, 31);
-        int defaultDailyQuota = request.getPackageType() != null ? request.getPackageType().getDefaultDailyQuota() : 1000;
+        int defaultDailyQuota = request.getPackageType() != null ? request.getPackageType().getDefaultDailyQuota() : 5000;
+        int defaultDailyTeacherQuota = request.getPackageType() != null ? request.getPackageType().getDefaultDailyTeacherQuota() : 5000;
 
         School school = School.builder()
                 .name(request.getName().trim())
@@ -150,6 +150,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .subscriptionEndDate(subEnd)
                 .renewedForNextYear(false)
                 .defaultDailyStudentQuota(defaultDailyQuota)
+                .defaultDailyTeacherQuota(defaultDailyTeacherQuota)
                 .localHistoryPolicyAccepted(true)
                 .build();
 
@@ -450,7 +451,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         }
         String normalized = Normalizer.normalize(address, Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                .replace("Ä‘", "d").replace("Ä", "D")
+                .replace("đ", "d").replace("Đ", "D")
                 .toUpperCase();
 
         String targetSegment = normalized;
@@ -504,7 +505,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         }
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
                 .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                .replace("Ä‘", "d").replace("Ä", "D");
+                .replace("đ", "d").replace("Đ", "D");
 
         String[] tokens = normalized.toUpperCase().split("[^A-Z0-9]+");
         StringBuilder acronymBuilder = new StringBuilder();
@@ -546,6 +547,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
             case ENTERPRISE_SMALL -> packageSmallTokens;
             case ENTERPRISE_MEDIUM -> packageMediumTokens;
             case ENTERPRISE_LARGE -> packageLargeTokens;
+            case ENTERPRISE_CUSTOM -> 0;
         };
     }
 }

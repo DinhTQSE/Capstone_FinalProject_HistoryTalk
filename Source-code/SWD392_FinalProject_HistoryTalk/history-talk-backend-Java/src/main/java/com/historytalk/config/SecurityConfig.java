@@ -119,6 +119,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/Historical-tell/api/v1/payments/payos/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/Historical-tell/api/v1/payments/payos/webhook").permitAll()
 
+                        // B2B Public Quote Calculator & Registration Flow
+                        .requestMatchers("/api/v1/b2b/**").permitAll()
+                        .requestMatchers("/Historical-tell/api/v1/b2b/**").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/v1/characters/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/character-documents/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/historical-contexts/**").permitAll()

@@ -9,6 +9,8 @@
 ## 📂 TÀI LIỆU
 
 * 📦 **[chat_exam_mode_api_contract.md](fe_contracts/chat_exam_mode_api_contract.md):** API, việc FE cần làm và các thay đổi hành vi của chat. **FE đọc file này để tích hợp.**
+* 📑 **[b2b_custom_plan_and_quote_flow_api_contract.md](fe_contracts/b2b_custom_plan_and_quote_flow_api_contract.md):** API Contract cho Bảng giá B2B Customize, Live Quote Calculator, Form Đăng ký Báo giá (Humy.ai style) và Cổng System Admin duyệt báo giá khởi tạo trường học.
+* 🏫 **[b2b_subscription_pricing_and_quote_specification.md](business_flows/b2b_subscription_pricing_and_quote_specification.md):** Đặc tả chi tiết Unit Economics, bảng giá toàn bộ gói B2C & B2B (đã nới lỏng quota Học sinh/Giáo viên), công thức tính giá Customize B2B Plan, luồng đăng ký `Request a Quote` (tham khảo Humy.ai) và kế hoạch Unit/Integration Test cho Report 5.
 
 ---
 

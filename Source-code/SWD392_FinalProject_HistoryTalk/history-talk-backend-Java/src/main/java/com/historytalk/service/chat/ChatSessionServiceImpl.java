@@ -24,7 +24,7 @@ import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.MessageRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.classroom.ClassStudentRepository;
-import com.historytalk.service.chat.AiServiceClient;
+import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.service.chat.AiServiceClient.AiChatResult;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
 import com.historytalk.service.chat.AiServiceClient.ContextPayload;
@@ -40,7 +40,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -50,6 +49,7 @@ import java.util.UUID;
 public class ChatSessionServiceImpl implements ChatSessionService {
 
     private static final int DEFAULT_EXAM_QUESTION_COUNT = 5;
+    private static final int FREE_B2C_EXAM_QUESTION_LIMIT = 2;
 
     private final ChatSessionRepository chatSessionRepository;
     private final UserRepository userRepository;
@@ -62,6 +62,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     private final ClassStudentRepository classStudentRepository;
     private final ExamSessionService examSessionService;
     private final TransactionTemplate transactionTemplate;
+    private final UserTierRepository userTierRepository;
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> getSessions(String userId, String characterId) {
@@ -242,7 +243,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .historicalContext(context)
                 .title(isExam ? "Vấn đáp với " + character.getName() : "")
                 .mode(isExam ? ChatSessionMode.EXAM : ChatSessionMode.CHAT)
-                .examQuestionCount(isExam ? resolveExamQuestionCount(request) : null)
+                .examQuestionCount(isExam ? resolveExamQuestionCount(user, request) : null)
                 .build();
 
         ChatSession saved = chatSessionRepository.save(session);
@@ -314,8 +315,24 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .build();
     }
 
-    private int resolveExamQuestionCount(CreateChatSessionRequest request) {
-        return request.getExamQuestionCount() != null ? request.getExamQuestionCount() : DEFAULT_EXAM_QUESTION_COUNT;
+    /**
+     * Free B2C tier customers are limited to 2 Exam Mode questions per session.
+     * Paid B2C tiers (Plus & Pro) and B2B school users have no Free-tier cap.
+     */
+    private int resolveExamQuestionCount(User user, CreateChatSessionRequest request) {
+        int requested = request.getExamQuestionCount() != null
+                ? request.getExamQuestionCount()
+                : DEFAULT_EXAM_QUESTION_COUNT;
+        if (user != null && user.getRole() == UserRole.CUSTOMER && userTierRepository != null) {
+            boolean hasPaidTier = userTierRepository
+                    .findCurrentActiveByUid(user.getUid(), LocalDateTime.now())
+                    .map(ut -> ut.getTier() != null && ut.getTier().getAmount() != null && ut.getTier().getAmount() > 0)
+                    .orElse(false);
+            if (!hasPaidTier) {
+                return Math.min(requested, FREE_B2C_EXAM_QUESTION_LIMIT);
+            }
+        }
+        return requested;
     }
 
     private String safeGetCharacterId(ChatSession session) {
