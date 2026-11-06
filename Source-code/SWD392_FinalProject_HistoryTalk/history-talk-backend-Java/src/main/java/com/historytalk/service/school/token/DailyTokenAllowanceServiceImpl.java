@@ -24,8 +24,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceService {
 
-    private static final int DEFAULT_DAILY_STUDENT_QUOTA = 1000;
-    private static final int DEFAULT_DAILY_TEACHER_QUOTA = 10000;
+    private static final int DEFAULT_DAILY_STUDENT_QUOTA = 5000;
+    private static final int DEFAULT_DAILY_TEACHER_QUOTA = 5000;
 
     private final SchoolRepository schoolRepository;
     private final UserRepository userRepository;
