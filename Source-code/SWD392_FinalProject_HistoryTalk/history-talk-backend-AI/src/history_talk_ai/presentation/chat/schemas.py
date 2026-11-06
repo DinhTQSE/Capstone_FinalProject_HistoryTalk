@@ -83,6 +83,11 @@ class ExamGradeRequest(BaseModel):
     answer: str = Field(..., min_length=1, max_length=4000)
 
 
+class SpeechRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
+    voice: str = Field(..., min_length=1, max_length=50)
+
+
 # ── Response ──────────────────────────────────────────────────────────────────
 
 class TokenUsage(BaseModel):

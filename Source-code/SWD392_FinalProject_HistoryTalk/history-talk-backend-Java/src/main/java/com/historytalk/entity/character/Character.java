@@ -72,6 +72,10 @@ public class Character {
     @Column(name = "personality", length = 500)
     private String personality;
 
+    /** Preset voice of the TTS server, null for the default voice. */
+    @Column(name = "voice_id", length = 50)
+    private String voiceId;
+
     @Column(name = "born_year")
     private Integer bornYear;
 

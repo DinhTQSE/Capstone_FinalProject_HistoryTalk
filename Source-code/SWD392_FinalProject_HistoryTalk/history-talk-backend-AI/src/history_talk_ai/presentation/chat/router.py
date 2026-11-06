@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from history_talk_ai.presentation.chat.schemas import (
     ChatRequest,
@@ -20,6 +20,7 @@ from history_talk_ai.presentation.chat.schemas import (
     GenerateTitleResponse,
     GenerateTitleResponseData,
     ProcessDocumentRequest,
+    SpeechRequest,
     TokenUsage,
     DescribeImagesRequest,
     DescribeImagesResponse,
@@ -307,6 +308,21 @@ async def exam_grade(body: ExamGradeRequest) -> ExamGradeResponse:
             ),
         )
     )
+
+
+# ── POST /v1/ai/tts ───────────────────────────────────────────────────────────
+
+@router.post(
+    "/tts",
+    summary="Read text aloud with a preset voice of the self-hosted TTS server",
+    response_class=Response,
+)
+async def tts(body: SpeechRequest) -> Response:
+    try:
+        audio = await llm_service.synthesize_speech(body.text, body.voice)
+    except llm_service.SpeechUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    return Response(content=audio, media_type="audio/wav")
 
 
 # ── POST /v1/ai/documents/process ───────────────────────────────────────────

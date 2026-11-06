@@ -38,6 +38,9 @@ public class CharacterResponse {
     @JsonProperty("personality")
     private String personality;
 
+    @JsonProperty("voiceId")
+    private String voiceId;
+
     @JsonProperty("bornYear")
     private Integer bornYear;
 

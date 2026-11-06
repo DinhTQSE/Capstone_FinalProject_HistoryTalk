@@ -350,3 +350,54 @@ def test_fact_question_stays_empty_when_reranker_keeps_nothing(monkeypatch):
 def test_broad_question_may_answer_longer():
     assert "200 từ" in service._build_final_user_content("Tóm tắt cả trận đánh", "Tư liệu")
     assert "200 từ" not in service._build_final_user_content("Tướng địch là ai?", "Tư liệu")
+
+
+class FakeAudioResponse:
+    def __init__(self, content, error=None):
+        self.content = content
+        self.error = error
+
+    def raise_for_status(self):
+        if self.error:
+            raise self.error
+
+
+def test_speech_is_requested_as_wav_through_the_authenticated_gateway(monkeypatch):
+    captured = {}
+
+    async def fake_post(url, json, auth):
+        captured.update(url=url, json=json, auth=auth)
+        return FakeAudioResponse(b"RIFF....WAVE")
+
+    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+    monkeypatch.setattr(service.settings, "OLLAMA_BASE_URL", "https://llm.example")
+    monkeypatch.setattr(service.settings, "OLLAMA_USERNAME", "historytalk")
+    monkeypatch.setattr(service.settings, "OLLAMA_PASSWORD", "secret")
+
+    audio = asyncio.run(service.synthesize_speech("Ta là Ngô Quyền.", "Thiện Minh"))
+
+    assert audio == b"RIFF....WAVE"
+    assert captured["url"] == "https://llm.example/v1/audio/speech"
+    assert captured["json"]["voice"] == "Thiện Minh"
+    assert captured["json"]["response_format"] == "wav"
+    assert captured["auth"] == ("historytalk", "secret")
+
+
+def test_unreachable_tts_server_is_reported(monkeypatch):
+    async def fake_post(url, json, auth):
+        raise service.httpx.ConnectTimeout("server is off")
+
+    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+
+    with pytest.raises(service.SpeechUnavailableError):
+        asyncio.run(service.synthesize_speech("Xin chào", "Thiện Minh"))
+
+
+def test_empty_audio_is_reported(monkeypatch):
+    async def fake_post(url, json, auth):
+        return FakeAudioResponse(b"")
+
+    monkeypatch.setattr(service.ollama_client, "post", fake_post)
+
+    with pytest.raises(service.SpeechUnavailableError):
+        asyncio.run(service.synthesize_speech("Xin chào", "Thiện Minh"))

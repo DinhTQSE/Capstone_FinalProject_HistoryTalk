@@ -225,6 +225,11 @@ public class AiServiceClient {
                         @JsonProperty("data") ExamGradeResult data) {
         }
 
+        record SpeechRequest(
+                        @JsonProperty("text") String text,
+                        @JsonProperty("voice") String voice) {
+        }
+
         record ProcessDocumentRequest(
                         @JsonProperty("doc_id") String docId,
                         @JsonProperty("entity_id") String entityId,
@@ -411,6 +416,31 @@ public class AiServiceClient {
                         aiMetricsService.recordRequest("exam_grade", "failure");
                         log.error("AI service /exam/grade call failed: {}", e.getMessage());
                         throw new SystemException("Dịch vụ AI không khả dụng: " + e.getMessage());
+                }
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/tts and returns a WAV file.
+         */
+        public byte[] synthesizeSpeech(String text, String voice) {
+                try {
+                        byte[] audio = restClient.post()
+                                        .uri("/v1/ai/tts")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(new SpeechRequest(text, voice))
+                                        .retrieve()
+                                        .body(byte[].class);
+
+                        if (audio == null || audio.length == 0) {
+                                throw new SystemException("Dịch vụ giọng đọc không trả về âm thanh");
+                        }
+
+                        aiMetricsService.recordRequest("tts", "success");
+                        return audio;
+                } catch (RestClientException e) {
+                        aiMetricsService.recordRequest("tts", "failure");
+                        log.error("AI service /tts call failed: {}", e.getMessage());
+                        throw new SystemException("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.");
                 }
         }
 

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Used for questions such as "tóm tắt cả trận đánh". The reranker on the LLM server returns at most 5.
     RAG_TOP_K_BROAD: int = 5
 
+    # ── Text to speech (VieNeu-TTS behind the same gateway as Ollama) ──────────
+    TTS_MODEL: str = "vieneu-v3-turbo"
+
     # ── Supabase ──────────────────────────────────────────────────────────────
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""

@@ -11,10 +11,12 @@ import com.historytalk.dto.chat.CreateChatSessionRequest;
 import com.historytalk.dto.chat.GetMessagesResponse;
 import com.historytalk.dto.chat.SendMessageRequest;
 import com.historytalk.dto.chat.SendMessageResponse;
+import com.historytalk.dto.chat.SpeechRequest;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.service.chat.ChatHistoryService;
 import com.historytalk.service.chat.ChatSessionService;
 import com.historytalk.service.chat.MessageService;
+import com.historytalk.service.speech.CharacterSpeechService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +25,9 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -38,6 +42,7 @@ public class ChatController {
     private final ChatSessionService chatSessionService;
     private final MessageService messageService;
     private final ChatHistoryService chatHistoryService;
+    private final CharacterSpeechService characterSpeechService;
 
     /**
      * GET /api/v1/chat/scenarios
@@ -117,6 +122,19 @@ public class ChatController {
         String userId = SecurityUtils.getUserId();
         GetMessagesResponse result = messageService.getMessages(id, userId);
         return ResponseEntity.ok(ApiResponse.success(result, "Messages retrieved successfully"));
+    }
+
+    /**
+     * POST /v1/chat/tts
+     * Reads text aloud in the character's own voice, so every device hears the same voice.
+     */
+    @PostMapping("/tts")
+    public ResponseEntity<byte[]> synthesizeSpeech(@Valid @RequestBody SpeechRequest request) {
+        byte[] audio = characterSpeechService.synthesize(request.getCharacterId(), request.getText());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("audio/wav"))
+                .cacheControl(CacheControl.noStore())
+                .body(audio);
     }
 
     /**

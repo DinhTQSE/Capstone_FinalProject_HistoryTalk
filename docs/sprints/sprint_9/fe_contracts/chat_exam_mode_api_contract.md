@@ -256,3 +256,47 @@ Số đo trên production ngày 05/11/2026, với GPU `qwen3.8:27b`, đo từ m�
 * **Chưa kiểm chứng `CORRECT` trên production:** cả 2 buổi test đều chưa có câu được `CORRECT`, nên FE vẫn phải xử lý đủ 3 giá trị.
 * **Mỗi câu chỉ được trả lời một lần.** Trả lời xong là chấm và sang câu mới.
 * **Cần GPU server đang bật** khi test. Máy tắt thì các API này báo lỗi.
+
+---
+
+## 6. Giọng đọc nhân vật: `POST /chat/tts`
+
+Giọng đọc do BE tạo bằng VieNeu-TTS tự host, nên **mọi thiết bị nghe cùng một giọng**, và mỗi nhân vật có giọng riêng. Không còn dùng Azure hay giọng của trình duyệt. Web đã chuyển sang API này. **Mobile vẫn đang gọi Azure trực tiếp**, cần chuyển.
+
+#### Request Body
+```json
+{ "characterId": "55ae763f-2c8f-4918-bf31-b43566c3c355", "text": "Một câu hoặc một đoạn ngắn." }
+```
+`text` tối đa 1000 ký tự.
+
+#### Response `200`
+File `audio/wav` (48 kHz, mono). Phát được bằng `AudioContext.decodeAudioData` (web) hoặc `expo-av` (mobile).
+
+#### Lỗi
+| HTTP | Khi nào |
+|---|---|
+| `400` | Thiếu `characterId` hoặc `text`, hoặc `text` quá dài |
+| `404` | Nhân vật không tồn tại hoặc đã xóa |
+| `5xx` | Server giọng đọc tắt hoặc lỗi: `Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.` |
+
+#### Cách dùng để nghe nhanh
+1. **Tách câu trả lời thành từng câu** và bỏ dòng `---`.
+2. **Gọi API cho từng câu theo thứ tự.** Trong lúc câu trước đang phát thì tạo âm thanh cho câu sau.
+3. **Trong lúc stream chat,** đọc câu đầu ngay khi nhận đủ câu, không chờ hết câu trả lời.
+
+Web đã làm theo cách này, xem `src/lib/character-speech.ts` (`splitSpeechSegments`, `createSpeechQueue`).
+
+#### Giọng của từng nhân vật
+* `CharacterResponse` có thêm `voiceId`. `null` nghĩa là giọng mặc định **Thiện Minh** (nam, miền Bắc, kể chuyện).
+* Content admin đặt giọng qua `voiceId` trong API tạo và sửa nhân vật. Chỉ nhận 25 giọng có sẵn, giá trị khác bị từ chối `400`, chuỗi rỗng nghĩa là về giọng mặc định.
+* Danh sách giọng: Thiện Minh, Thiền Tâm Đức, Hải Đăng, Adam bựa, Quang Sơn, Minh Đức, Phạm Tuyên, Xuân Vĩnh, Quốc Tuấn, Thanh Bình, Thái Sơn, Minh Triết, Đức Trí, Adam (nam); Trúc Ly, Mai Anh, Ngọc Huyền, Thùy Dung, Ngọc Trân, Ngọc Linh, Đoan Trang, Quỳnh Anh, Thục Đoan, Mỹ Duyên, Kim Thanh (nữ).
+* **Nhân vật nữ phải được đặt giọng nữ**, vì giọng mặc định là giọng nam.
+
+#### Việc Frontend còn lại
+- [ ] Mobile: thay `speakWithAzure` bằng `POST /chat/tts`, theo cách đọc từng câu như trên, và xóa `EXPO_PUBLIC_AZURE_SPEECH_KEY`.
+- [ ] Trang quản lý nhân vật: thêm ô chọn giọng `voiceId`.
+
+#### Giới hạn
+* Âm thanh đầu tiên đến sau khoảng 2,6–2,9 giây kể từ lúc gửi câu hỏi (đo trên server, chưa tính mạng tới trình duyệt).
+* Chỉ phục vụ tốt **một người dùng một lúc**. Nhiều người cùng đọc sẽ chậm.
+* Server GPU tắt thì không có giọng đọc, và web không còn dự phòng bằng giọng của trình duyệt.

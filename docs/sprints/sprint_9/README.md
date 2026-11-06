@@ -46,6 +46,12 @@
 * Chỉ từ chối tin nhắn đó, không khóa session.
 * Đây là lọc theo danh sách từ, nên chưa bắt được từ viết né kiểu lạ, câu xúc phạm không dùng từ tục, hay nội dung nhạy cảm và lạc đề.
 
+### 5. Giọng đọc nhân vật tự host
+* VieNeu-TTS v3 Turbo (Apache-2.0) chạy bằng CPU trên server GPU, sau Caddy ở `/v1/audio/*`.
+* Java có `POST /api/v1/chat/tts`, AI service có `POST /v1/ai/tts` để chuyển tiếp sang server giọng đọc.
+* Mỗi nhân vật có cột `voice_id`. Migration: `V20261106100000__add_character_voice.sql`.
+* Web đã bỏ Azure và giọng của trình duyệt, đọc từng câu và tạo trước âm thanh câu sau.
+
 ---
 
 ## 🧪 KẾT QUẢ KIỂM THỬ TRÊN PRODUCTION (05/11/2026)
@@ -68,6 +74,7 @@
 ## ⚠️ VIỆC CÒN LẠI
 
 * [ ] FE web và mobile tích hợp vấn đáp và xử lý lỗi `INAPPROPRIATE_CONTENT`.
+* [ ] Mobile chuyển giọng đọc sang `POST /chat/tts`, trang quản lý nhân vật thêm chọn giọng, và đặt giọng nữ cho nhân vật nữ.
 * [ ] Giảm thời gian tới chữ đầu tiên: rút ngắn prompt, đo log `Chat stream timing`.
 * [ ] Giảm thời gian mỗi lượt vấn đáp: sinh sẵn câu hỏi khi tạo session.
 * [ ] Chỉnh prompt chấm: bớt khắt khe, giọng khích lệ, không hỏi kiểu "Theo ngươi".

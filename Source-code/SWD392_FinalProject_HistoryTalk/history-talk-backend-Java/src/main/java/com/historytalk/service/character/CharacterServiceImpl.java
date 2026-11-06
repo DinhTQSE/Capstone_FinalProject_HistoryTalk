@@ -18,6 +18,7 @@ import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.utils.SecurityUtils;
+import com.historytalk.service.speech.CharacterVoices;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -172,6 +173,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .imageUrl(request.getImageUrl())
                 .modelUrl(request.getModelUrl())
                 .personality(request.getPersonality())
+                .voiceId(CharacterVoices.requireSupported(request.getVoiceId()))
                 .bornYear(request.getBornYear())
                 .bornMonth(request.getBornMonth())
                 .bornDay(request.getBornDay())
@@ -224,6 +226,9 @@ public class CharacterServiceImpl implements CharacterService {
         }
         if (request.getPersonality() != null) {
             character.setPersonality(request.getPersonality());
+        }
+        if (request.getVoiceId() != null) {
+            character.setVoiceId(CharacterVoices.requireSupported(request.getVoiceId()));
         }
         if (request.getBornYear() != null) character.setBornYear(request.getBornYear());
         if (request.getBornMonth() != null) character.setBornMonth(request.getBornMonth());
@@ -434,6 +439,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .imageUrl(character.getImageUrl())
                 .modelUrl(character.getModelUrl())
                 .personality(character.getPersonality())
+                .voiceId(character.getVoiceId())
                 .bornYear(character.getBornYear())
                 .bornMonth(character.getBornMonth())
                 .bornDay(character.getBornDay())

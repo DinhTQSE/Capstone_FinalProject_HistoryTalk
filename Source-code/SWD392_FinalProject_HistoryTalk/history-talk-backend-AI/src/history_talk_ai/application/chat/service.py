@@ -31,6 +31,10 @@ _BROAD_QUESTION_KEYWORDS = (
 )
 
 
+class SpeechUnavailableError(Exception):
+    """The TTS server could not produce audio."""
+
+
 class RagUnavailableError(Exception):
     """Documents could not be searched, so an answer would not be grounded in them."""
 
@@ -264,6 +268,25 @@ async def _call_llm_stream(messages: list[dict]) -> tuple:
     else:
         async for chunk in _call_ollama_stream(messages):
             yield chunk
+
+async def synthesize_speech(text: str, voice: str) -> bytes:
+    """Return a WAV file from the VieNeu-TTS server, which sits behind the same gateway as Ollama."""
+    auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+    try:
+        response = await ollama_client.post(
+            _ollama_url("/v1/audio/speech"),
+            json={"model": settings.TTS_MODEL, "input": text, "voice": voice, "response_format": "wav"},
+            auth=auth,
+        )
+        response.raise_for_status()
+    except Exception as e:
+        logger.error(f"TTS request failed: {e}")
+        raise SpeechUnavailableError("Dịch vụ giọng đọc đang không khả dụng. Vui lòng thử lại sau.") from e
+
+    if not response.content:
+        raise SpeechUnavailableError("Dịch vụ giọng đọc không trả về âm thanh.")
+    return response.content
+
 
 async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[float]:
     """Get embedding vector for a given text from Ollama with retries."""

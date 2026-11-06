@@ -42,6 +42,10 @@ public class CreateCharacterRequest {
     @Size(max = 500, message = "Tính cách không được vượt quá 500 ký tự")
     private String personality;
 
+    /** One of CharacterVoices.SUPPORTED. Empty means the default voice. */
+    @JsonProperty("voiceId")
+    private String voiceId;
+
     @JsonProperty("bornYear")
     private Integer bornYear;
 
