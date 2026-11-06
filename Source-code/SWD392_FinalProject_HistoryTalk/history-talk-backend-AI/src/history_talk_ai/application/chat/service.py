@@ -59,6 +59,11 @@ ollama_client = httpx.AsyncClient(
 def _ollama_url(path: str) -> str:
     return f"{settings.OLLAMA_BASE_URL.rstrip('/')}{path}"
 
+
+def _vision_ollama_url(path: str) -> str:
+    base_url = settings.VISION_OLLAMA_BASE_URL.strip() if settings.VISION_OLLAMA_BASE_URL else settings.OLLAMA_BASE_URL.strip()
+    return f"{base_url.rstrip('/')}{path}"
+
 async def _call_ollama(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
     """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
     payload = {
@@ -926,9 +931,11 @@ async def describe_historical_image(image_base64: str, caption: str = None) -> s
         ],
         "stream": False
     }
-    auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+    vision_user = settings.VISION_OLLAMA_USERNAME if settings.VISION_OLLAMA_USERNAME else settings.OLLAMA_USERNAME
+    vision_pass = settings.VISION_OLLAMA_PASSWORD if settings.VISION_OLLAMA_PASSWORD else settings.OLLAMA_PASSWORD
+    auth = (vision_user, vision_pass) if vision_user else None
     try:
-        res = await ollama_client.post(_ollama_url("/api/chat"), json=payload, auth=auth, timeout=180.0)
+        res = await ollama_client.post(_vision_ollama_url("/api/chat"), json=payload, auth=auth, timeout=180.0)
         res.raise_for_status()
         data = res.json()
         content = data.get("message", {}).get("content", "")
