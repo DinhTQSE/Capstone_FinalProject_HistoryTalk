@@ -8,6 +8,7 @@ import com.historytalk.entity.enums.DocumentType;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.DocumentRepository;
+import com.historytalk.service.chat.AiServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,8 @@ import java.util.UUID;
 public class DocumentContentServiceImpl implements DocumentContentService {
 
     private final DocumentRepository documentRepository;
+    private final SupabaseDocumentStorageService supabaseDocumentStorageService;
+    private final AiServiceClient aiServiceClient;
 
     @Override
     @Transactional
@@ -32,7 +35,10 @@ public class DocumentContentServiceImpl implements DocumentContentService {
         Document doc = documentRepository.findById(UUID.fromString(request.getDocId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + request.getDocId()));
 
-        doc.setContent(request.getContent());
+        // Chuyển toàn bộ ảnh tư liệu trong bài nháp từ staging sang published vĩnh viễn
+        String finalContent = supabaseDocumentStorageService.commitStagingImages(request.getContent());
+
+        doc.setContent(finalContent);
         doc.setStatus(request.getStatus());
 
         if (doc.getDocumentType() == DocumentType.TEXT) {
@@ -41,6 +47,11 @@ public class DocumentContentServiceImpl implements DocumentContentService {
 
         Document saved = documentRepository.save(doc);
         log.info("Document content saved for document {} with status {}", saved.getDocId(), saved.getStatus());
+
+        // Nếu trạng thái là ACTIVE thì trigger cắt chunk và tạo vector embedding ngay
+        if (saved.getStatus() == ContentStatus.ACTIVE && saved.getContent() != null && !saved.getContent().isBlank()) {
+            aiServiceClient.processDocumentAsync(saved.getDocId().toString(), saved.getEntityId().toString(), saved.getContent());
+        }
 
         return mapToResponse(saved);
     }

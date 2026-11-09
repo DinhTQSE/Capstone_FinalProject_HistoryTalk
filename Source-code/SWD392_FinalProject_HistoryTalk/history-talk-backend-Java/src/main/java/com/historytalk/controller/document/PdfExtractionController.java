@@ -50,10 +50,12 @@ public class PdfExtractionController {
     public ResponseEntity<ApiResponse<PdfExtractionResponse>> extractText(
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) Integer startPage,
-            @RequestParam(required = false) Integer endPage) throws IOException {
+            @RequestParam(required = false) Integer endPage,
+            @RequestParam(required = false, defaultValue = "false") Boolean enableAiVision) throws IOException {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
-        PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage);
+        log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}, enableAiVision={}",
+                staffId, startPage, endPage, enableAiVision);
+        PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage, Boolean.TRUE.equals(enableAiVision), null);
         return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
     }
 
@@ -68,13 +70,15 @@ public class PdfExtractionController {
     public SseEmitter uploadAndExtract(
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) Integer startPage,
-            @RequestParam(required = false) Integer endPage) {
+            @RequestParam(required = false) Integer endPage,
+            @RequestParam(required = false, defaultValue = "false") Boolean enableAiVision) {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/upload-and-extract (SSE stream) by user {}, startPage={}, endPage={}", staffId, startPage, endPage);
+        log.info("POST /api/v1/documents/pdf/upload-and-extract (SSE stream) by user {}, startPage={}, endPage={}, enableAiVision={}",
+                staffId, startPage, endPage, enableAiVision);
 
         SseEmitter emitter = new SseEmitter(15 * 60 * 1000L);
 
-        // Heartbeat executor: Bắn SSE comment ": ping\n\n" mỗi 3 giây
+        // Heartbeat executor: Bắn SSE comment ": ping\n\n" mỗi 15 giây
         // Giúp Cloudflare, Caddy và Trình duyệt duy trì kết nối liên tục, chống rớt mạng / timeout 524
         ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
         ScheduledFuture<?> heartbeatFuture = heartbeatScheduler.scheduleAtFixedRate(() -> {
@@ -90,6 +94,7 @@ public class PdfExtractionController {
                         file,
                         startPage,
                         endPage,
+                        Boolean.TRUE.equals(enableAiVision),
                         (page, total) -> {
                             try {
                                 String progressJson = String.format("{\"type\":\"progress\",\"page\":%d,\"total\":%d}", page, total);
