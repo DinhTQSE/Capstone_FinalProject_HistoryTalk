@@ -24,6 +24,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
 import java.util.function.BiConsumer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,16 +42,26 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
     private final OcrService ocrService;
     private final PdfTypeClassifier pdfTypeClassifier;
     private final AiServiceClient aiServiceClient;
+    private final SupabaseDocumentStorageService supabaseDocumentStorageService;
 
     public PdfExtractionServiceImpl(
             OcrService ocrService,
             PdfTypeClassifier pdfTypeClassifier,
-            AiServiceClient aiServiceClient) {
+            AiServiceClient aiServiceClient,
+            SupabaseDocumentStorageService supabaseDocumentStorageService) {
         this.ocrService = ocrService;
         this.pdfTypeClassifier = pdfTypeClassifier;
         this.aiServiceClient = aiServiceClient;
-        log.info("PdfExtractionService initialized with In-Place VLM Image Enrichment and Unbounded Page Range");
+        this.supabaseDocumentStorageService = supabaseDocumentStorageService;
+        log.info("PdfExtractionService initialized with In-Place VLM Image Enrichment and Permanent Storage");
     }
+
+    private record ExtractedHistoricalImage(
+            AiServiceClient.ImageToDescribeDto describeDto,
+            String imageUrl,
+            int pageNumber,
+            String caption
+    ) {}
 
     @Override
     public PdfExtractionResponse extractText(MultipartFile file) throws IOException {
@@ -169,7 +181,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                 log.info("=== Routing Decision: NATIVE EXTRACTION WITH IN-PLACE VLM BINDING ===");
                 
                 // 1. Quét và thu thập toàn bộ ảnh tư liệu có giá trị lịch sử
-                List<AiServiceClient.ImageToDescribeDto> allImages = extractAllHistoricalImages(document, startPage, endPage);
+                List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(document, startPage, endPage);
                 Map<Integer, List<String>> pageDescriptionsMap = new HashMap<>();
 
                 if (!allImages.isEmpty()) {
@@ -179,13 +191,36 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                         // Gọi sang AI Service theo từng đợt để đảm bảo an toàn cho GPU/API
                         int batchSize = 5;
                         for (int i = 0; i < allImages.size(); i += batchSize) {
-                            List<AiServiceClient.ImageToDescribeDto> batch = allImages.subList(i, Math.min(i + batchSize, allImages.size()));
-                            List<AiServiceClient.DescribedImageDto> batchResult = aiServiceClient.describeImages(batch);
+                            List<ExtractedHistoricalImage> batch = allImages.subList(i, Math.min(i + batchSize, allImages.size()));
+                            List<AiServiceClient.ImageToDescribeDto> describeBatch = batch.stream()
+                                    .map(ExtractedHistoricalImage::describeDto)
+                                    .toList();
+                            List<AiServiceClient.DescribedImageDto> batchResult = aiServiceClient.describeImages(describeBatch);
                             if (batchResult != null) {
-                                for (AiServiceClient.DescribedImageDto desc : batchResult) {
-                                    if (desc.descriptionBlock() != null && !desc.descriptionBlock().isBlank()) {
+                                for (int j = 0; j < batchResult.size(); j++) {
+                                    AiServiceClient.DescribedImageDto desc = batchResult.get(j);
+                                    ExtractedHistoricalImage item = (j < batch.size()) ? batch.get(j) : null;
+                                    String descBlock = desc.descriptionBlock();
+                                    if (descBlock != null && !descBlock.isBlank()) {
+                                        // Lọc bỏ nếu AI nhận diện ra là Biểu trưng / Logo lưu trữ
+                                        if (descBlock.contains("Biểu trưng (Logo)") 
+                                                || descBlock.contains("Biểu trưng lưu trữ") 
+                                                || descBlock.contains("VĂN THƯ LƯU TRỮ VN")) {
+                                            log.debug("Filtering out archive logo/watermark block on page {}", desc.pageNumber());
+                                            continue;
+                                        }
+
+                                        String formattedBlock = descBlock;
+                                        if (item != null && item.imageUrl() != null) {
+                                            String captionTitle = (item.caption() != null && !item.caption().isBlank()) 
+                                                    ? item.caption() 
+                                                    : "Ảnh tư liệu lịch sử";
+                                            formattedBlock = String.format("![%s](%s)\n%s\n- Đường dẫn ảnh tư liệu: %s",
+                                                    captionTitle, item.imageUrl(), descBlock, item.imageUrl());
+                                        }
+
                                         pageDescriptionsMap.computeIfAbsent(desc.pageNumber(), k -> new ArrayList<>())
-                                                .add(desc.descriptionBlock());
+                                                .add(formattedBlock);
                                     }
                                 }
                             }
@@ -245,14 +280,47 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
         }
     }
 
+    private String computeImageHash(PDImageXObject image) {
+        try (InputStream is = image.createInputStream()) {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = is.read(buffer)) != -1) {
+                md.update(buffer, 0, read);
+            }
+            return HexFormat.of().formatHex(md.digest());
+        } catch (Exception e) {
+            return image.getWidth() + "x" + image.getHeight();
+        }
+    }
+
     /**
      * Quét và trích xuất TOÀN BỘ hình ảnh có ý nghĩa lịch sử (lược đồ, bản đồ, di vật, chân dung)
-     * Không giới hạn số lượng ảnh để đảm bảo không bỏ sót bất kỳ chi tiết lịch sử nào.
+     * Tự động loại trừ watermark/logo lặp lại và tải ảnh lên Supabase Storage lấy Public URL vĩnh viễn.
      */
-    private List<AiServiceClient.ImageToDescribeDto> extractAllHistoricalImages(
+    private List<ExtractedHistoricalImage> extractAllHistoricalImages(
             PDDocument document, int startPage, int endPage) {
-        List<AiServiceClient.ImageToDescribeDto> result = new ArrayList<>();
-        Pattern captionPattern = Pattern.compile("(?i)(?:H\\u00ecnh|L\\u01b0\\u1ee3c \\u0111\\u1ed3|B\\u1ea3n \\u0111\\u1ed3|\\u1ea2nh t\\u01b0 li\\u1ec7u|S\\u01a1 \\u0111\\u1ed3|Tranh|Di t\\u00edch|Chi\\u1ebfn d\\u1ecbch|Tr\\u1eadn)\\s*\\d*[.:]?[^\\n\\r]+");
+        List<ExtractedHistoricalImage> result = new ArrayList<>();
+        Pattern captionPattern = Pattern.compile("(?im)(?:^|[\\.\\n\\r])\\s*(?:H\\u00ecnh|L\\u01b0\\u1ee3c \\u0111\\u1ed3|B\\u1ea3n \\u0111\\u1ed3|\\u1ea2nh t\\u01b0 li\\u1ec7u|S\\u01a1 \\u0111\\u1ed3|Tranh|Di t\\u00edch)\\s*\\d*[.:]?[^\\n\\r]+");
+
+        // 1. Phân tích trước tần suất hash ảnh trên các trang để loại trừ watermark/logo lặp lại
+        Map<String, Integer> hashOccurrences = new HashMap<>();
+        int totalPages = document.getNumberOfPages();
+        int scanEnd = Math.min(totalPages, Math.max(endPage, startPage + 3));
+        for (int p = 1; p <= scanEnd; p++) {
+            PDPage page = document.getPage(p - 1);
+            PDResources res = page.getResources();
+            if (res == null) continue;
+            for (COSName xName : res.getXObjectNames()) {
+                try {
+                    if (res.isImageXObject(xName)) {
+                        PDImageXObject imgObj = (PDImageXObject) res.getXObject(xName);
+                        String hash = computeImageHash(imgObj);
+                        hashOccurrences.merge(hash, 1, Integer::sum);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
 
         for (int p = startPage; p <= endPage; p++) {
             PDPage page = document.getPage(p - 1);
@@ -267,6 +335,8 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                 snippetStripper.setEndPage(p);
                 pageTextSnippet = snippetStripper.getText(document);
             } catch (Exception ignored) {}
+
+            Set<String> pageExtractedHashes = new HashSet<>();
 
             for (COSName xObjectName : resources.getXObjectNames()) {
                 try {
@@ -286,6 +356,18 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                             continue;
                         }
 
+                        String imgHash = computeImageHash(image);
+                        // Bỏ qua nếu ảnh là watermark/logo lặp lại trên nhiều trang
+                        if (hashOccurrences.getOrDefault(imgHash, 0) > 1) {
+                            log.debug("Skipping repeating watermark/logo (hash: {}) on page {}", imgHash, p);
+                            continue;
+                        }
+
+                        // Tránh xử lý trùng lặp trên cùng 1 trang
+                        if (!pageExtractedHashes.add(imgHash)) {
+                            continue;
+                        }
+
                         BufferedImage bImage = image.getImage();
                         if (bImage == null) continue;
 
@@ -301,16 +383,30 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                             continue;
                         }
 
-                        String base64Image = Base64.getEncoder().encodeToString(baos.toByteArray());
+                        byte[] imageBytes = baos.toByteArray();
+                        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+                        // Upload ảnh lên Supabase Storage để nhận Public URL vĩnh viễn
+                        String imageUrl = null;
+                        try {
+                            imageUrl = supabaseDocumentStorageService.uploadHistoricalImage(imageBytes, "jpg");
+                        } catch (Exception uploadEx) {
+                            log.warn("Could not upload historical image on page {} to Supabase: {}", p, uploadEx.getMessage());
+                        }
 
                         // Tìm chú thích (caption) của bức ảnh trên trang sách
                         String caption = null;
                         Matcher matcher = captionPattern.matcher(pageTextSnippet);
                         if (matcher.find()) {
-                            caption = matcher.group().trim();
+                            caption = matcher.group().replaceAll("^[\\.\\n\\r\\s]+", "").trim();
                         }
 
-                        result.add(new AiServiceClient.ImageToDescribeDto(base64Image, caption, p));
+                        result.add(new ExtractedHistoricalImage(
+                                new AiServiceClient.ImageToDescribeDto(base64Image, caption, p),
+                                imageUrl,
+                                p,
+                                caption
+                        ));
                     }
                 } catch (Exception e) {
                     log.debug("Skipping unreadable image object in page {}: {}", p, e.getMessage());
@@ -322,7 +418,6 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     /**
      * Thu nhỏ kích thước ảnh nếu vượt quá maxDimension và vẽ lên nền trắng chuẩn RGB
-     * Giúp xử lý triệt để lớp nền trong suốt (ARGB), giảm dung lượng base64 và chống timeout cho VLM
      */
     private BufferedImage scaleDownAndNormalize(BufferedImage original, int maxDimension) {
         int width = original.getWidth();

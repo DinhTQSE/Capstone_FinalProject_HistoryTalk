@@ -464,6 +464,7 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
         "không gọi tên mình ở ngôi thứ ba, bỏ các số chú thích như (1), [1].\n"
         "2. KHÔNG bịa đặt hay sáng tác thêm. Dữ liệu không nhắc tới thì nói 'Sử sách không ghi chép rõ'.\n"
         "3. Không lặp lại y hệt câu trả lời trước đó.\n"
+        "4. Nếu người dùng hỏi xem ảnh/bản đồ hoặc dữ liệu tham khảo có chứa đường dẫn ảnh tư liệu (URL), HÃY chèn ảnh bằng cú pháp Markdown: ![Tên ảnh](URL).\n"
         f"{broad_rule}\n"
         f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
     )
@@ -870,14 +871,14 @@ async def describe_historical_image(image_base64: str, caption: str = None) -> s
         fallback_name = caption or 'Ảnh tư liệu'
         return f"[TƯ LIỆU HÌNH ẢNH: {fallback_name}]\n- Chú giải tư liệu: {caption_info}\n[HẾT TƯ LIỆU HÌNH ẢNH]"
     prompt_text = (
-        "Bạn là chuyên gia thẩm định tư liệu lịch sử Việt Nam. Nguyên tắc tối cao: TRUNG THỰC VỚI NGUYÊN BẢN & KHÔNG SUY ĐOÁN BỊA ĐẶT.\n"
+        "Bạn là chuyên gia thẩm định tư liệu lịch sử Việt Nam phục vụ giáo dục học tập. Nguyên tắc tối cao: TRUNG THỰC VỚI NGUYÊN BẢN & DỄ HIỂU CHO HỌC TẬP.\n"
         f"- Chú thích gốc trong tài liệu: {caption_info}\n\n"
         "Nhiệm vụ: Phân tích khách quan những gì TRỰC TIẾP NHÌN THẤY trên hình ảnh/lược đồ này theo cấu trúc Markdown sau:\n"
         "[TƯ LIỆU HÌNH ẢNH]\n"
         "- Phân loại: (Lược đồ tác chiến / Bản đồ chiến dịch / Ảnh tư liệu hiện trường / Chân dung nhân vật / Hiện vật di tích)\n"
-        "- Nội dung chi tiết trên ảnh: (Đọc CHÍNH XÁC toàn bộ chữ in, mũi tên tiến thoái, tên căn cứ, cứ điểm, địa danh, mốc thời gian, người chỉ huy có trên hình)\n"
-        "- Chú giải khách quan: (Tóm tắt ngắn gọn 1-2 câu về sự kiện được phản ánh trực tiếp trong hình)\n"
-        "- Ghi chú thẩm định: (Nếu chi tiết nào mờ hoặc không có trong hình, TUYỆT ĐỐI không đoán bừa mà ghi rõ: 'Chi tiết trên ảnh không thể hiện')\n"
+        "- Nội dung chi tiết trên ảnh: (Ghi nhận rõ ràng các địa danh, cứ điểm, sông núi, hướng tiến công/phòng ngự, mốc thời gian, tên nhân vật. Nếu trên bản đồ có chữ tiếng Pháp/ngoại ngữ thì mở ngoặc dịch nghĩa tiếng Việt ngay bên cạnh; bỏ qua các thông số trắc địa in ấn ngoài lề không phục vụ bài học)\n"
+        "- Chú giải khách quan: (Tóm tắt ngắn gọn 1-2 câu về sự kiện lịch sử được phản ánh trực tiếp trong hình)\n"
+        "- Ghi chú thẩm định: (Nếu chi tiết nào mờ hoặc không có trong hình, ghi rõ: 'Chi tiết trên ảnh không thể hiện')\n"
         "[HẾT TƯ LIỆU HÌNH ẢNH]"
     )
 
@@ -919,7 +920,7 @@ async def describe_historical_image(image_base64: str, caption: str = None) -> s
             logger.warning(f"Failed to describe image via Gemini ({e}), falling back to Ollama Vision...")
 
     # 2. Xử lý qua Ollama Vision (qwen2.5-vl hoặc VLM self-host trên server)
-    model_name = settings.VISION_MODEL if settings.VISION_MODEL not in ("gemini-2.5-flash", "gemini-1.5-flash") else "qwen2.5vl:7b"
+    model_name = "qwen2.5vl:7b" if "gemini" in settings.VISION_MODEL.lower() else settings.VISION_MODEL
     payload = {
         "model": model_name,
         "messages": [

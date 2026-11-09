@@ -258,6 +258,41 @@ public class SupabaseDocumentStorageService {
         }
     }
 
+    /**
+     * Build a permanent public URL for an object in the documents bucket.
+     */
+    public String buildPublicUrl(String storagePath) {
+        String cleanPath = storagePath.startsWith(bucket + "/") 
+                ? storagePath.substring(bucket.length() + 1) 
+                : storagePath;
+        String cleanBase = supabaseUrl.replaceAll("/+$", "");
+        return cleanBase + "/storage/v1/object/public/" + bucket + "/" + cleanPath;
+    }
+
+    /**
+     * Upload an extracted historical image (battle map, artifact, photograph) to the public documents bucket
+     * under the 'historical-images' folder and return its permanent public URL.
+     */
+    public String uploadHistoricalImage(byte[] imageBytes, String extension) {
+        if (imageBytes == null || imageBytes.length == 0) {
+            return null;
+        }
+        String ext = (extension != null && !extension.isBlank()) ? extension.toLowerCase(Locale.ROOT) : "jpg";
+        String filename = UUID.randomUUID() + "." + ext;
+        String objectPath = "historical-images/" + filename;
+        String contentType = ext.equals("png") ? "image/png" : "image/jpeg";
+
+        try {
+            uploadFile(objectPath, new java.io.ByteArrayInputStream(imageBytes), contentType, imageBytes.length);
+            String publicUrl = buildPublicUrl(objectPath);
+            log.info("Historical image uploaded to Supabase: {}", publicUrl);
+            return publicUrl;
+        } catch (Exception ex) {
+            log.warn("Failed to upload historical image to Supabase: {}", ex.getMessage());
+            return null;
+        }
+    }
+
     private record PresignedUploadRequest(@JsonProperty("expiresIn") long expiresIn) {
     }
 

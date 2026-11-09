@@ -82,7 +82,7 @@ public class PdfExtractionController {
                 emitter.send(SseEmitter.event().comment("ping"));
             } catch (Exception ignored) {
             }
-        }, 1, 3, TimeUnit.SECONDS);
+        }, 15, 15, TimeUnit.SECONDS);
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
