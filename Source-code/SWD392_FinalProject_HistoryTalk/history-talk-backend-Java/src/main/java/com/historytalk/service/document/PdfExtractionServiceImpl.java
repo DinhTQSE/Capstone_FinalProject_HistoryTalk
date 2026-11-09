@@ -212,13 +212,13 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             } else {
                 Map<Integer, List<String>> pageDescriptionsMap = new HashMap<>();
 
-                if (visionEnabled) {
-                    log.info("=== Routing Decision: NATIVE EXTRACTION WITH IN-PLACE VLM BINDING ===");
-                    // 1. Quét và thu thập toàn bộ ảnh tư liệu có giá trị lịch sử
-                    List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(document, startPage, endPage);
+                // 1. Quét và trích xuất TOÀN BỘ ảnh tư liệu có trong PDF, upload lên Storage
+                List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(document, startPage, endPage);
 
-                    if (!allImages.isEmpty()) {
-                        log.info("Found {} historical images/battle maps across pages [{} - {}]. Processing via Vision AI...",
+                if (!allImages.isEmpty()) {
+                    if (visionEnabled) {
+                        log.info("=== Routing Decision: NATIVE EXTRACTION WITH VLM ANALYSIS ===");
+                        log.info("Found {} historical images across pages [{} - {}]. Analyzing via Vision AI...",
                                 allImages.size(), startPage, endPage);
                         try {
                             // Gọi sang AI Service theo từng đợt để đảm bảo an toàn cho GPU/API
@@ -260,11 +260,34 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                             }
                             log.info("Successfully received {} image descriptions from AI", pageDescriptionsMap.size());
                         } catch (Exception e) {
-                            log.warn("Failed during Vision AI processing, falling back to text-only: {}", e.getMessage());
+                            log.warn("Failed during Vision AI processing, falling back to basic image tags: {}", e.getMessage());
+                            // Fallback sang tag ảnh cơ bản nếu AI Service gặp sự cố
+                            for (ExtractedHistoricalImage item : allImages) {
+                                if (item.imageUrl() != null) {
+                                    String captionTitle = (item.caption() != null && !item.caption().isBlank()) 
+                                            ? item.caption() 
+                                            : "Ảnh tư liệu lịch sử";
+                                    pageDescriptionsMap.computeIfAbsent(item.pageNumber(), k -> new ArrayList<>())
+                                            .add(String.format("![%s](%s)", captionTitle, item.imageUrl()));
+                                }
+                            }
+                        }
+                    } else {
+                        log.info("=== Routing Decision: NATIVE EXTRACTION (IMAGE STORED, AI VISION DISABLED) ===");
+                        log.info("Found {} historical images across pages [{} - {}]. Binding image tags without AI VLM analysis...",
+                                allImages.size(), startPage, endPage);
+                        for (ExtractedHistoricalImage item : allImages) {
+                            if (item.imageUrl() != null) {
+                                String captionTitle = (item.caption() != null && !item.caption().isBlank()) 
+                                        ? item.caption() 
+                                        : "Ảnh tư liệu lịch sử";
+                                pageDescriptionsMap.computeIfAbsent(item.pageNumber(), k -> new ArrayList<>())
+                                        .add(String.format("![%s](%s)", captionTitle, item.imageUrl()));
+                            }
                         }
                     }
                 } else {
-                    log.info("=== Routing Decision: NATIVE EXTRACTION (TEXT ONLY - AI VISION DISABLED) ===");
+                    log.info("No historical images found across pages [{} - {}]. Processing text only.", startPage, endPage);
                 }
 
                 // 2. Trích xuất Text từng trang và ghim khối mô tả ảnh ngay tại trang đó (In-Place Binding)
@@ -288,8 +311,8 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                         }
                     }
 
-                    // Nếu bật AI Vision và trang này có ảnh tư liệu / lược đồ, ghim trực tiếp vào ngay sau nội dung trang đó
-                    if (visionEnabled && pageDescriptionsMap.containsKey(p)) {
+                    // Ghim ảnh tư liệu / lược đồ vào ngay sau nội dung trang tương ứng
+                    if (pageDescriptionsMap.containsKey(p)) {
                         List<String> imgBlocks = pageDescriptionsMap.get(p);
                         for (String block : imgBlocks) {
                             fullDocumentBuilder.append("\n").append(block).append("\n\n");
@@ -298,7 +321,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                 }
 
                 String rawText = fullDocumentBuilder.toString().trim();
-                finalResultText = cleanDocumentNoise(rawText, !visionEnabled);
+                finalResultText = cleanDocumentNoise(rawText, false);
                 if (finalResultText.isBlank()) {
                     throw new InvalidRequestException("Không tìm thấy nội dung văn bản trong các trang đã chọn");
                 }
