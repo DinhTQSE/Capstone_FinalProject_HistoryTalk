@@ -45,6 +45,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
     private final UserRepository userRepository;
     private final DocumentProcessorFactory documentProcessorFactory;
     private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
+    private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
     
     /**
      * Get all documents
@@ -135,7 +136,8 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
 
         DocumentType type = request.getType() != null ? request.getType() : DocumentType.TEXT;
         DocumentProcessorStrategy processor = documentProcessorFactory.getStrategy(type);
-        String processedContent = processor.processContent(request.getContent());
+        String committedContent = supabaseDocumentStorageService.commitStagingImages(request.getContent());
+        String processedContent = processor.processContent(committedContent);
 
         Document doc = Document.builder()
             .entityId(character.getCharacterId())
@@ -190,7 +192,8 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         
         if (request.getContent() != null && !request.getContent().isBlank()) {
             DocumentProcessorStrategy processor = documentProcessorFactory.getStrategy(doc.getDocumentType());
-            String processedContent = processor.processContent(request.getContent());
+            String committedContent = supabaseDocumentStorageService.commitStagingImages(request.getContent());
+        String processedContent = processor.processContent(committedContent);
             doc.setContent(processedContent);
         }
 
