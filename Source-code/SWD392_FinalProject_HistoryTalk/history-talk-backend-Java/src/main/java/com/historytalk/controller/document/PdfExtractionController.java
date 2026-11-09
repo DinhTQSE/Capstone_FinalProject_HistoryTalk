@@ -6,6 +6,7 @@ import com.historytalk.dto.document.DocumentFileResponse;
 import com.historytalk.dto.document.PdfExtractionResponse;
 import com.historytalk.dto.document.SaveDocumentRequest;
 import com.historytalk.service.document.DocumentContentService;
+import com.historytalk.service.document.PdfExtractionRateLimiter;
 import com.historytalk.service.document.PdfExtractionService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,7 @@ public class PdfExtractionController {
 
     private final PdfExtractionService pdfExtractionService;
     private final DocumentContentService documentContentService;
+    private final PdfExtractionRateLimiter pdfExtractionRateLimiter;
     private final ObjectMapper objectMapper;
 
     @PostMapping(value = "/extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -55,8 +57,14 @@ public class PdfExtractionController {
         String staffId = SecurityUtils.getUserId();
         log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}, enableAiVision={}",
                 staffId, startPage, endPage, enableAiVision);
-        PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage, Boolean.TRUE.equals(enableAiVision), null);
-        return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
+
+        pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
+        try {
+            PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage, Boolean.TRUE.equals(enableAiVision), null);
+            return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
+        } finally {
+            pdfExtractionRateLimiter.release(staffId);
+        }
     }
 
     @PostMapping(
@@ -76,7 +84,15 @@ public class PdfExtractionController {
         log.info("POST /api/v1/documents/pdf/upload-and-extract (SSE stream) by user {}, startPage={}, endPage={}, enableAiVision={}",
                 staffId, startPage, endPage, enableAiVision);
 
+        // Kiểm tra quota và acquire lock đồng thời trước khi thiết lập SSE handshake
+        pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
+
         SseEmitter emitter = new SseEmitter(15 * 60 * 1000L);
+
+        // Đảm bảo giải phóng lock an toàn trong mọi trường hợp client ngắt kết nối hoặc timeout
+        emitter.onCompletion(() -> pdfExtractionRateLimiter.release(staffId));
+        emitter.onTimeout(() -> pdfExtractionRateLimiter.release(staffId));
+        emitter.onError(ex -> pdfExtractionRateLimiter.release(staffId));
 
         // Heartbeat executor: Bắn SSE comment ": ping\n\n" mỗi 15 giây
         // Giúp Cloudflare, Caddy và Trình duyệt duy trì kết nối liên tục, chống rớt mạng / timeout 524
@@ -123,6 +139,7 @@ public class PdfExtractionController {
             } finally {
                 heartbeatFuture.cancel(true);
                 heartbeatScheduler.shutdown();
+                pdfExtractionRateLimiter.release(staffId);
             }
         });
 
