@@ -40,7 +40,7 @@ public class SupabaseDocumentStorageService {
             @Value("${supabase.storage.bucket:documents}") String bucket,
             RestClient.Builder restClientBuilder) {
         this.supabaseUrl = supabaseUrl.replaceAll("/+$", "");
-        this.bucket = bucket;
+        this.bucket = (bucket != null) ? bucket.trim() : "documents";
         this.restClient = restClientBuilder
                 .baseUrl(this.supabaseUrl)
                 .defaultHeader("Authorization", "Bearer " + serviceRoleKey)
