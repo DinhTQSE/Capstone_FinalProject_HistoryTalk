@@ -101,6 +101,9 @@ spring.servlet.multipart.max-request-size=50MB
 supabase.url=${SUPABASE_URL}
 supabase.service-role-key=${SUPABASE_SERVICE_ROLE_KEY}
 supabase.storage.bucket=${SUPABASE_STORAGE_BUCKET}
+supabase.storage.staging.enabled=true
+supabase.storage.staging.cleanup-interval-ms=900000
+supabase.storage.staging.ttl-minutes=15
 
 # =============================================================================
 # Mail / SMTP & Password Reset

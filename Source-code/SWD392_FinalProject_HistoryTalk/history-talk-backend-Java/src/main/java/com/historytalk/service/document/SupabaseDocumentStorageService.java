@@ -13,6 +13,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -432,6 +435,97 @@ public class SupabaseDocumentStorageService {
     ) {
         public String getEffectiveUrl() {
             return url != null ? url : signedUrl;
+        }
+    }
+
+    public record SupabaseStorageItem(
+            @JsonProperty("name") String name,
+            @JsonProperty("id") String id,
+            @JsonProperty("created_at") String createdAt,
+            @JsonProperty("updated_at") String updatedAt
+    ) {
+    }
+
+    private record SupabaseListRequest(
+            @JsonProperty("prefix") String prefix,
+            @JsonProperty("limit") int limit,
+            @JsonProperty("sortBy") Map<String, String> sortBy
+    ) {
+    }
+
+    /**
+     * Purge expired staging objects in a given folder prefix older than maxAge.
+     * Direct deletion on Supabase storage tables is locked by 'storage.protect_delete()',
+     * so this uses the Supabase Storage List API followed by Storage Delete API.
+     *
+     * @param prefix folder prefix (e.g. "staging/historical-images")
+     * @param maxAge maximum age duration before an object is considered expired
+     * @return number of purged objects
+     */
+    public int purgeExpiredStagingObjects(String prefix, Duration maxAge) {
+        if (prefix == null || prefix.isBlank() || maxAge == null) {
+            return 0;
+        }
+        String cleanPrefix = prefix.replaceAll("^/+", "").replaceAll("/+$", "");
+        Instant expirationThreshold = Instant.now().minus(maxAge);
+        int purgedCount = 0;
+
+        try {
+            SupabaseListRequest request = new SupabaseListRequest(
+                    cleanPrefix,
+                    100,
+                    Map.of("column", "created_at", "order", "asc")
+            );
+
+            SupabaseStorageItem[] items = restClient.post()
+                    .uri("/storage/v1/object/list/" + bucket)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(SupabaseStorageItem[].class);
+
+            if (items == null || items.length == 0) {
+                log.debug("No staging objects found under prefix '{}'", cleanPrefix);
+                return 0;
+            }
+
+            for (SupabaseStorageItem item : items) {
+                if (item.name() == null || item.name().isBlank() || ".emptyFolderPlaceholder".equalsIgnoreCase(item.name())) {
+                    continue;
+                }
+                if (item.createdAt() == null || item.createdAt().isBlank()) {
+                    continue;
+                }
+
+                try {
+                    Instant createdAt = parseSupabaseTimestamp(item.createdAt());
+                    if (createdAt.isBefore(expirationThreshold)) {
+                        String filePath = item.name().startsWith(cleanPrefix)
+                                ? item.name()
+                                : cleanPrefix + "/" + item.name();
+                        deleteFile(filePath);
+                        purgedCount++;
+                        log.info("Purged expired staging object: {} (created at {})", filePath, createdAt);
+                    }
+                } catch (Exception ex) {
+                    log.warn("Failed to evaluate/delete staging object '{}': {}", item.name(), ex.getMessage());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to list/purge staging objects under prefix '{}': {}", cleanPrefix, ex.getMessage());
+        }
+
+        if (purgedCount > 0) {
+            log.info("Finished staging cleanup for '{}': purged {} expired objects", cleanPrefix, purgedCount);
+        }
+        return purgedCount;
+    }
+
+    private Instant parseSupabaseTimestamp(String timestamp) {
+        try {
+            return Instant.parse(timestamp);
+        } catch (Exception e) {
+            return OffsetDateTime.parse(timestamp).toInstant();
         }
     }
 }
