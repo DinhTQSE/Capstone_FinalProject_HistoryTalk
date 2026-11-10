@@ -38,10 +38,14 @@ public class CharacterSpeechServiceImpl implements CharacterSpeechService {
             return "";
         }
         String cleaned = text
-                .replaceAll("!\\[([^\\]]*)\\]\\([^)]*\\)?", "$1")
+                .replaceAll("!\\[[^\\]]*\\](?:\\([^)]*\\)?)?", "")
+                .replaceAll("!\\[[^\\]]*(?:\\([^)]*)?", "")
+                .replaceAll("(?i)/historical-images/\\S+", "")
+                .replaceAll("(?i)[a-zA-Z0-9_-]+\\.(?:jpg|jpeg|png|webp|gif)\\)?", "")
                 .replaceAll("\\{\\{IMG_\\d+\\}\\}", "")
                 .replaceAll("https?://\\S+", "")
                 .replaceAll("\\(\\s*\\)", "")
+                .replaceAll("\\[\\s*\\]", "")
                 .replaceAll("\\s{2,}", " ")
                 .trim();
         return cleaned.isEmpty() ? text.trim() : cleaned;
