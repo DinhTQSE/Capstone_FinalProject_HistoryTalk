@@ -302,9 +302,9 @@ public class SupabaseDocumentStorageService {
 
         try {
             uploadFile(objectPath, new java.io.ByteArrayInputStream(imageBytes), contentType, imageBytes.length);
-            String publicUrl = buildPublicUrl(objectPath);
-            log.info("Historical image uploaded to Supabase (isStaging={}): {}", isStaging, publicUrl);
-            return publicUrl;
+            String relativeUrl = (isStaging ? "/historical-images/staging/" : "/historical-images/published/") + filename;
+            log.info("Historical image uploaded to Supabase (isStaging={}): {}", isStaging, relativeUrl);
+            return relativeUrl;
         } catch (Exception ex) {
             log.warn("Failed to upload historical image to Supabase: {}", ex.getMessage());
             return null;
@@ -348,11 +348,12 @@ public class SupabaseDocumentStorageService {
      * Images deleted by the user from the draft remain in staging and are purged by TTL.
      */
     public String commitStagingImages(String content) {
-        if (content == null || content.isBlank() || !content.contains("staging/historical-images/")) {
+        if (content == null || content.isBlank()
+                || (!content.contains("staging/historical-images/") && !content.contains("/historical-images/staging/"))) {
             return content;
         }
 
-        Pattern pattern = Pattern.compile("staging/historical-images/([a-zA-Z0-9_.-]+)");
+        Pattern pattern = Pattern.compile("(?:staging/historical-images/|/historical-images/staging/)([a-zA-Z0-9_.-]+)");
         Matcher matcher = pattern.matcher(content);
         Set<String> filenames = new HashSet<>();
         while (matcher.find()) {
@@ -365,7 +366,61 @@ public class SupabaseDocumentStorageService {
             moveFile(sourceKey, destinationKey);
         }
 
-        return content.replace("staging/historical-images/", "published/historical-images/");
+        return content
+                .replace("/historical-images/staging/", "/historical-images/published/")
+                .replace("staging/historical-images/", "published/historical-images/");
+    }
+
+    /**
+     * Best-effort cleanup of a document's PDF file and all extracted historical images
+     * (both staging and published) referenced in its markdown content.
+     * Never throws so database deletion is not aborted if an object was already removed.
+     */
+    public void deleteDocumentStorageAssets(String fileUrl, String content) {
+        if (fileUrl != null && !fileUrl.isBlank()) {
+            safeDeleteStorageObject(fileUrl);
+        }
+        if (content != null && !content.isBlank()) {
+            Pattern imgPattern = Pattern.compile("(?:(staging|published)/historical-images/|/historical-images/(staging|published)/)([a-zA-Z0-9_.-]+)");
+            Matcher matcher = imgPattern.matcher(content);
+            Set<String> paths = new HashSet<>();
+            while (matcher.find()) {
+                String folder = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+                String filename = matcher.group(3);
+                paths.add(folder + "/historical-images/" + filename);
+            }
+            for (String path : paths) {
+                safeDeleteStorageObject(path);
+            }
+        }
+    }
+
+    /**
+     * Best-effort cleanup for a single URL or storage path if it belongs to this Supabase bucket.
+     */
+    public void safeDeleteStorageObject(String urlOrPath) {
+        if (urlOrPath == null || urlOrPath.isBlank()) {
+            return;
+        }
+        try {
+            String path = urlOrPath.trim();
+            String publicPrefix = "/storage/v1/object/public/" + bucket + "/";
+            int pubIdx = path.indexOf(publicPrefix);
+            if (pubIdx != -1) {
+                path = path.substring(pubIdx + publicPrefix.length());
+            } else if (path.startsWith("http://") || path.startsWith("https://")) {
+                // External URL not stored in our documents bucket
+                return;
+            }
+            int queryIdx = path.indexOf('?');
+            if (queryIdx != -1) {
+                path = path.substring(0, queryIdx);
+            }
+            deleteFile(path);
+            log.info("Deleted Supabase storage asset: {}", path);
+        } catch (Exception ex) {
+            log.warn("Best-effort Supabase delete skipped/failed for {}: {}", urlOrPath, ex.getMessage());
+        }
     }
 
     private record PresignedUploadRequest(@JsonProperty("expiresIn") long expiresIn) {

@@ -40,6 +40,12 @@ class TrashServiceImplTest {
     @Mock
     private ChatSessionRepository chatSessionRepository;
 
+    @Mock
+    private com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
+
+    @Mock
+    private com.historytalk.service.chat.AiServiceClient aiServiceClient;
+
     @InjectMocks
     private TrashServiceImpl trashService;
 
