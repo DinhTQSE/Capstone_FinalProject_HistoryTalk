@@ -301,19 +301,26 @@ def _downsample_factor() -> int:
     return max(1, factor)
 
 
-_MD_IMAGE_SPEECH_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)?")
+_MD_IMAGE_SPEECH_RE = re.compile(r"!\[[^\]]*\](?:\([^)]*\)?)?")
+_MD_INCOMPLETE_IMAGE_RE = re.compile(r"!\[[^\]]*(?:\([^)]*)?")
+_HIST_IMAGE_PATH_RE = re.compile(r"/historical-images/\S+", re.IGNORECASE)
+_ORPHAN_IMAGE_EXT_RE = re.compile(r"[a-zA-Z0-9_-]+\.(?:jpg|jpeg|png|webp|gif)\)?", re.IGNORECASE)
 _RAW_URL_SPEECH_RE = re.compile(r"https?://\S+")
 _IMG_PLACEHOLDER_SPEECH_RE = re.compile(r"\{\{IMG_\d+\}\}")
 
 
 def sanitize_text_for_speech(text: str) -> str:
-    """Strip Markdown image links and raw URLs so TTS never reads URLs aloud."""
+    """Strip Markdown image links, relative image paths, and raw URLs so TTS never reads URLs aloud."""
     if not text:
         return ""
-    cleaned = _MD_IMAGE_SPEECH_RE.sub(r"\1", text)
+    cleaned = _MD_IMAGE_SPEECH_RE.sub("", text)
+    cleaned = _MD_INCOMPLETE_IMAGE_RE.sub("", cleaned)
+    cleaned = _HIST_IMAGE_PATH_RE.sub("", cleaned)
+    cleaned = _ORPHAN_IMAGE_EXT_RE.sub("", cleaned)
     cleaned = _IMG_PLACEHOLDER_SPEECH_RE.sub("", cleaned)
     cleaned = _RAW_URL_SPEECH_RE.sub("", cleaned)
     cleaned = re.sub(r"\(\s*\)", "", cleaned)
+    cleaned = re.sub(r"\[\s*\]", "", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
     return cleaned or text.strip()
 
