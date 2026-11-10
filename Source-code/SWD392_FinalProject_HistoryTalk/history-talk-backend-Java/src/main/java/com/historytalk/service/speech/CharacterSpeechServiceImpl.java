@@ -33,14 +33,28 @@ public class CharacterSpeechServiceImpl implements CharacterSpeechService {
     /** The sample sentence of each voice never changes, so it is generated once per voice. */
     private final Map<String, byte[]> sampleCache = new ConcurrentHashMap<>();
 
+    private static String sanitizeForSpeech(String text) {
+        if (text == null) {
+            return "";
+        }
+        String cleaned = text
+                .replaceAll("!\\[([^\\]]*)\\]\\([^)]*\\)?", "$1")
+                .replaceAll("\\{\\{IMG_\\d+\\}\\}", "")
+                .replaceAll("https?://\\S+", "")
+                .replaceAll("\\(\\s*\\)", "")
+                .replaceAll("\\s{2,}", " ")
+                .trim();
+        return cleaned.isEmpty() ? text.trim() : cleaned;
+    }
+
     @Override
     public byte[] synthesize(String characterId, String text) {
-        return aiServiceClient.synthesizeSpeech(text.trim(), voiceOf(characterId));
+        return aiServiceClient.synthesizeSpeech(sanitizeForSpeech(text), voiceOf(characterId));
     }
 
     @Override
     public SpeechStream openStream(String characterId, String text) {
-        return aiServiceClient.openSpeechStream(text.trim(), voiceOf(characterId));
+        return aiServiceClient.openSpeechStream(sanitizeForSpeech(text), voiceOf(characterId));
     }
 
     @Override
@@ -68,8 +82,9 @@ public class CharacterSpeechServiceImpl implements CharacterSpeechService {
             return sampleCache.computeIfAbsent(voice, v -> aiServiceClient.synthesizeSpeech(SAMPLE_SENTENCE, v));
         }
 
-        ChatContentPolicy.requireAppropriate(text);
-        return aiServiceClient.synthesizeSpeech(text.trim(), voice);
+        String sanitized = sanitizeForSpeech(text);
+        ChatContentPolicy.requireAppropriate(sanitized);
+        return aiServiceClient.synthesizeSpeech(sanitized, voice);
     }
 
     private String voiceOf(String characterId) {

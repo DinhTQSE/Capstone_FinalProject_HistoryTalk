@@ -301,13 +301,31 @@ def _downsample_factor() -> int:
     return max(1, factor)
 
 
+_MD_IMAGE_SPEECH_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)?")
+_RAW_URL_SPEECH_RE = re.compile(r"https?://\S+")
+_IMG_PLACEHOLDER_SPEECH_RE = re.compile(r"\{\{IMG_\d+\}\}")
+
+
+def sanitize_text_for_speech(text: str) -> str:
+    """Strip Markdown image links and raw URLs so TTS never reads URLs aloud."""
+    if not text:
+        return ""
+    cleaned = _MD_IMAGE_SPEECH_RE.sub(r"\1", text)
+    cleaned = _IMG_PLACEHOLDER_SPEECH_RE.sub("", cleaned)
+    cleaned = _RAW_URL_SPEECH_RE.sub("", cleaned)
+    cleaned = re.sub(r"\(\s*\)", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    return cleaned or text.strip()
+
+
 async def open_speech_stream(text: str, voice: str) -> httpx.Response:
     """Start streaming raw PCM from the TTS server. Fails before any audio is sent to the client."""
+    clean_text = sanitize_text_for_speech(text)
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
     request = ollama_client.build_request(
         "POST",
         _ollama_url("/v1/audio/speech"),
-        json={"model": settings.TTS_MODEL, "input": text, "voice": voice, "response_format": "pcm"},
+        json={"model": settings.TTS_MODEL, "input": clean_text, "voice": voice, "response_format": "pcm"},
     )
     try:
         response = await ollama_client.send(request, auth=auth, stream=True)
@@ -443,17 +461,87 @@ async def retrieve_history_context(user_question: str, entity_ids: List[str]) ->
         raise RagUnavailableError("Không tra cứu được tư liệu lịch sử. Vui lòng thử lại sau.") from e
 
 
+_RAG_IMAGE_URL_RE = re.compile(
+    r"(?:https?://[^\s)\]]+|/historical-images/(?:staging|published)/[^\s)\]]+)\.(?:jpg|jpeg|png|webp|gif)",
+    re.IGNORECASE,
+)
+_SUPABASE_HIST_IMG_RE = re.compile(
+    r"https?://[^\s)\]]+/storage/v1/object/public/[^/]+/(staging|published)/historical-images/([a-zA-Z0-9_.-]+)",
+    re.IGNORECASE,
+)
+_BROKEN_MD_IMG_NEWLINE_RE = re.compile(r"!\[([^\]]*)\]\s+\(([^)]+)\)")
+_COMPLETE_MD_IMG_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+_TRUNCATED_MD_IMG_END_RE = re.compile(r"!\[[^\]]*\](?:\s*\([^)]*)?$")
+
+
+def _to_relative_historical_image(url: str) -> str:
+    """Convert any full Supabase historical image URL to a clean relative path /historical-images/<folder>/<file>."""
+    return _SUPABASE_HIST_IMG_RE.sub(r"/historical-images/\1/\2", url)
+
+
+def _compress_rag_images(rag_context: str) -> tuple[str, dict[str, str]]:
+    """
+    Replace image URLs/paths in rag_context with short placeholders {{IMG_1}}, {{IMG_2}}...
+    Maps each placeholder to its clean relative path (/historical-images/...) so Supabase URLs are never exposed.
+    """
+    if not rag_context:
+        return "", {}
+    url_to_tag: dict[str, str] = {}
+    tag_to_url: dict[str, str] = {}
+
+    def _replacer(match: re.Match) -> str:
+        raw_url = match.group(0)
+        normalized_url = _to_relative_historical_image(raw_url)
+        if normalized_url not in url_to_tag:
+            tag = f"{{{{IMG_{len(url_to_tag) + 1}}}}}"
+            url_to_tag[normalized_url] = tag
+            tag_to_url[tag] = normalized_url
+        return url_to_tag[normalized_url]
+
+    compressed = _RAG_IMAGE_URL_RE.sub(_replacer, rag_context)
+    return compressed, tag_to_url
+
+
+def _expand_and_clean_reply_images(text: str, tag_to_url: dict[str, str]) -> str:
+    """
+    1. Collapse accidental newlines/spaces between ![alt] and (url).
+    2. Replace {{IMG_n}} with the real Supabase URL.
+    3. Strip any hallucinated external image markdown whose URL is not in tag_to_url.
+    4. Strip any truncated/unclosed ![alt](https://... at the end of the reply.
+    """
+    if not text:
+        return ""
+    cleaned = _BROKEN_MD_IMG_NEWLINE_RE.sub(r"![\1](\2)", text)
+    for tag, real_url in tag_to_url.items():
+        cleaned = cleaned.replace(tag, real_url)
+
+    allowed_urls = set(tag_to_url.values())
+
+    def _validate_md_image(match: re.Match) -> str:
+        alt_text = match.group(1).strip()
+        target_url = match.group(2).strip()
+        if target_url in allowed_urls:
+            return f"![{alt_text}]({target_url})"
+        logger.warning(f"Stripped hallucinated or unverified image URL from LLM reply: {target_url}")
+        return ""
+
+    cleaned = _COMPLETE_MD_IMG_RE.sub(_validate_md_image, cleaned)
+    cleaned = _TRUNCATED_MD_IMG_END_RE.sub("", cleaned)
+    return cleaned.strip()
+
+
 def _build_final_user_content(user_message: str, rag_context: str, self_pronoun: str = "ta") -> str:
     """Put the grounding rules next to the question, where the model follows them most closely."""
     if not rag_context:
         return (
             "[KHÔNG TÌM THẤY TƯ LIỆU CHO CÂU NÀY]\n"
             "LỆNH: Chỉ dùng THÔNG TIN LỊCH SỬ CỦA BẠN. Chào hỏi hoặc chuyện thường ngày thì trả lời tự nhiên. "
-            "Hỏi về sự kiện, con số, tên người hay địa danh không có ở đó thì BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không suy diễn.\n\n"
+            "Hỏi về sự kiện, con số, tên người hay địa danh không có ở đó thì BẮT BUỘC đáp 'Sử sách không ghi chép rõ', không suy diễn. "
+            "TUYỆT ĐỐI KHÔNG tự tạo thẻ ảnh ![]() khi không có tư liệu.\n\n"
             f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
         )
     broad_rule = (
-        "4. Câu này cần tổng hợp nhiều sự việc: được trả lời tối đa 200 từ, kể theo trình tự thời gian.\n"
+        "5. Câu này cần tổng hợp nhiều sự việc: được trả lời tối đa 200 từ, kể theo trình tự thời gian.\n"
         if _is_broad_question(user_message)
         else ""
     )
@@ -464,7 +552,7 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
         "không gọi tên mình ở ngôi thứ ba, bỏ các số chú thích như (1), [1].\n"
         "2. KHÔNG bịa đặt hay sáng tác thêm. Dữ liệu không nhắc tới thì nói 'Sử sách không ghi chép rõ'.\n"
         "3. Không lặp lại y hệt câu trả lời trước đó.\n"
-        "4. Nếu người dùng hỏi xem ảnh/bản đồ hoặc dữ liệu tham khảo có chứa đường dẫn ảnh tư liệu (URL), HÃY chèn ảnh bằng cú pháp Markdown: ![Tên ảnh](URL).\n"
+        "4. Nếu người dùng hỏi xem ảnh/bản đồ và trong DỮ LIỆU THAM KHẢO có mã ảnh dạng {{IMG_1}}, {{IMG_2}}..., HÃY chèn đúng mã đó trên cùng 1 dòng: ![Tên ảnh]({{IMG_1}}). KHÔNG tự bịa URL ngoài.\n"
         f"{broad_rule}\n"
         f"CÂU HỎI CỦA NGƯỜI DÙNG: {user_message}"
     )
@@ -568,6 +656,7 @@ async def generate_reply(
     rag_context = ""
     quotes_used = []
     rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
+    compressed_rag_context, img_tag_map = _compress_rag_images(rag_context)
     
     system_prompt = build_chat_system_prompt(character, context)
     
@@ -578,11 +667,12 @@ async def generate_reply(
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = _build_final_user_content(user_message, rag_context, character_pronouns(character)[0])
+    final_user_content = _build_final_user_content(user_message, compressed_rag_context, character_pronouns(character)[0])
 
     messages.append({"role": "user", "content": final_user_content})
 
     response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
+    response_text = _expand_and_clean_reply_images(response_text, img_tag_map)
     
     suggested_questions = []
     sq_pt = 0
@@ -622,6 +712,7 @@ async def generate_reply_stream(
     quotes_used = []
     started_at = time.perf_counter()
     rag_context, quotes_used = await retrieve_history_context(user_message, entity_ids)
+    compressed_rag_context, img_tag_map = _compress_rag_images(rag_context)
     rag_seconds = time.perf_counter() - started_at
     
     system_prompt = build_chat_system_prompt(character, context)
@@ -631,25 +722,66 @@ async def generate_reply_stream(
         messages.append({"role": item.role, "content": item.content})
         
     # Inject RAG context vào câu hỏi cuối cùng để AI tập trung nhất
-    final_user_content = _build_final_user_content(user_message, rag_context, character_pronouns(character)[0])
+    final_user_content = _build_final_user_content(user_message, compressed_rag_context, character_pronouns(character)[0])
 
     messages.append({"role": "user", "content": final_user_content})
 
     full_message = ""
+    pending_buffer = ""
     prompt_tokens = 0
     completion_tokens = 0
 
-    # Stream the message
+    # Stream the message while buffering any in-progress ![...](...) or {{IMG_n}}
     stream_gen = _call_llm_stream(messages)
     async for chunk in stream_gen:
         if isinstance(chunk, dict):
             prompt_tokens = chunk.get("prompt_tokens", 0)
             completion_tokens = chunk.get("completion_tokens", 0)
         else:
-            if not full_message:
+            if not full_message and not pending_buffer:
                 logger.info(f"Chat stream timing: rag={rag_seconds:.2f}s first_token={time.perf_counter() - started_at:.2f}s")
-            full_message += chunk
-            yield chunk
+            pending_buffer += chunk
+
+            # Expand any completed ![alt]({{IMG_n}}) or {{IMG_n}} inside pending_buffer
+            pending_buffer = _BROKEN_MD_IMG_NEWLINE_RE.sub(r"![\1](\2)", pending_buffer)
+            for tag, real_url in img_tag_map.items():
+                if tag in pending_buffer:
+                    pending_buffer = pending_buffer.replace(tag, real_url)
+
+            # Validate any completed ![alt](url) in pending_buffer so hallucinated mid-stream URLs are stripped
+            allowed_urls = set(img_tag_map.values())
+            pending_buffer = _COMPLETE_MD_IMG_RE.sub(
+                lambda m: f"![{m.group(1).strip()}]({m.group(2).strip()})" if m.group(2).strip() in allowed_urls else "",
+                pending_buffer,
+            )
+
+            # Hold back an unclosed markdown image `![...` or `{{` at the tail of pending_buffer
+            hold_idx = -1
+            last_bang = pending_buffer.rfind("![")
+            if last_bang != -1:
+                tail = pending_buffer[last_bang:]
+                if not _COMPLETE_MD_IMG_RE.match(tail):
+                    hold_idx = last_bang
+            last_brace = pending_buffer.rfind("{{")
+            if last_brace != -1 and "}" not in pending_buffer[last_brace:]:
+                hold_idx = min(hold_idx, last_brace) if hold_idx != -1 else last_brace
+
+            if hold_idx > 0:
+                emit_part = pending_buffer[:hold_idx]
+                pending_buffer = pending_buffer[hold_idx:]
+                full_message += emit_part
+                yield emit_part
+            elif hold_idx == -1:
+                emit_part = pending_buffer
+                pending_buffer = ""
+                full_message += emit_part
+                yield emit_part
+
+    if pending_buffer:
+        flushed = _expand_and_clean_reply_images(pending_buffer, img_tag_map)
+        if flushed:
+            full_message += flushed
+            yield flushed
 
     if _contains_cjk(full_message) and not any(_contains_cjk(m["content"]) for m in messages):
         logger.warning("Streamed LLM reply contains Chinese characters.")

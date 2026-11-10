@@ -229,6 +229,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
             throw new InvalidRequestException("Bạn không có quyền xóa tài liệu này");
         }
 
+        supabaseDocumentStorageService.deleteDocumentStorageAssets(doc.getFileUrl(), doc.getContent());
         documentRepository.delete(doc);
         log.info("Document deleted: {}", docId);
         

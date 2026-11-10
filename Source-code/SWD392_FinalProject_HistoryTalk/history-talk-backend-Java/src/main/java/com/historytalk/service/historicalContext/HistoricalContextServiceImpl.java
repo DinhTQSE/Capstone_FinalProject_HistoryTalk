@@ -47,6 +47,8 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final MapPinService mapPinService;
         private final MapFocusService mapFocusService;
         private final ObjectMapper objectMapper;
+        private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
+        private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
     
     /**
      * Get all historical contexts with pagination and search
@@ -88,11 +90,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         log.info("Fetching historical context with ID: {}", contextId);
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
-                .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: "+contextId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
         if (!isStaffOrAdmin(role)
                 && (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
-            throw new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: " + contextId);
+            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
 
         // School-owned isolation check: local content cannot be viewed by outsiders
@@ -110,7 +112,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 }
             }
             if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
-                throw new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: " + contextId);
+                throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
             }
         }
         
@@ -128,7 +130,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         // Check for duplicate name
         if (contextRepository.findByNameIgnoreCase(request.getName()).isPresent()) {
-            throw new InvalidRequestException("Bá»‘i cáº£nh lá»‹ch sá»­ Ä‘Ã£ tá»“n táº¡i");
+            throw new InvalidRequestException("Bối cảnh lịch sử đã tồn tại");
         }
 
         User user = userRepository.findById(UUID.fromString(userId))
@@ -168,22 +170,18 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         log.info("Updating historical context with ID: {}", contextId);
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: "+contextId
-                ));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
         
         // Check if user has permission to update (staff/admin)
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException(
-                    "Báº¡n khÃ´ng cÃ³ quyá»n cáº­p nháº­t bá»‘i cáº£nh lá»‹ch sá»­ nÃ y"
-            );
+            throw new InvalidRequestException("Bạn không có quyền cập nhật bối cảnh lịch sử này");
         }
         
         // Check for duplicate name (if name is being changed)
         if (request.getName() != null && 
             !request.getName().equalsIgnoreCase(context.getName()) &&
             contextRepository.existsByNameIgnoreCaseAndContextIdNot(request.getName(), UUID.fromString(contextId))) {
-            throw new InvalidRequestException("Bá»‘i cáº£nh lá»‹ch sá»­ \"" + request.getName() + "\" Ä‘Ã£ tá»“n táº¡i");
+            throw new InvalidRequestException("Bối cảnh lịch sử \"" + request.getName() + "\" đã tồn tại");
         }
         
         // Update fields
@@ -248,16 +246,15 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Not found with ID: "+contextId
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId
                 ));
         
         // Check if user has permission to delete (staff/admin)
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException(
-                    "Báº¡n khÃ´ng cÃ³ quyá»n xÃ³a bá»‘i cáº£nh lá»‹ch sá»­ nÃ y"
-            );
+            throw new InvalidRequestException("Bạn không có quyền xóa bối cảnh lịch sử này");
         }
         
+        cleanupContextAssetsAndDocuments(context);
         contextRepository.delete(context);
         log.info("Historical context deleted successfully with ID: {}", contextId);
     }
@@ -271,13 +268,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Not found with ID: " + contextId
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId
                 ));
         
         if (!isStaffOrAdmin(userRole)) {
-            throw new InvalidRequestException(
-                    "Báº¡n khÃ´ng cÃ³ quyá»n xÃ³a má»m bá»‘i cáº£nh lá»‹ch sá»­ nÃ y"
-            );
+            throw new InvalidRequestException("Bạn không có quyền xóa mềm bối cảnh lịch sử này");
         }
         
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
@@ -301,9 +296,6 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             context.getQuizzes().forEach(quiz -> {
                 // Questions live in the bank and may be shared by other quizzes, so only the quiz is soft-deleted
                 quiz.setDeletedAt(now);
-                // Note: QuizSessions aren't directly fetched via Quiz mapping usually,
-                // but handled in @Where or soft-deleted individually.
-                // Currently Quiz entity does not map quizSessions.
             });
         }
 
@@ -325,17 +317,32 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
     @Transactional
     public void restoreContext(String contextId) {
-        int updated = contextRepository.restoreById(UUID.fromString(contextId));
+        UUID uuid = UUID.fromString(contextId);
+        int updated = contextRepository.restoreById(uuid);
         if (updated == 0) {
-            throw new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y bá»‘i cáº£nh lá»‹ch sá»­ vá»›i ID: " + contextId);
+            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
+        documentRepository.findByEntityIdAndEntityType(uuid, EntityType.CONTEXT)
+                .forEach(doc -> doc.setDeletedAt(null));
     }
 
     @Transactional
     public void permanentDeleteContext(String contextId) {
-        contextRepository.deleteById(UUID.fromString(contextId));
+        UUID uuid = UUID.fromString(contextId);
+        contextRepository.findById(uuid).ifPresent(this::cleanupContextAssetsAndDocuments);
+        contextRepository.deleteById(uuid);
     }
-    
+
+    private void cleanupContextAssetsAndDocuments(HistoricalContext context) {
+        documentRepository.findByEntityIdAndEntityType(context.getContextId(), EntityType.CONTEXT)
+                .forEach(doc -> {
+                    supabaseDocumentStorageService.deleteDocumentStorageAssets(doc.getFileUrl(), doc.getContent());
+                    aiServiceClient.deleteDocumentAsync(doc.getDocId().toString());
+                    documentRepository.delete(doc);
+                });
+        supabaseDocumentStorageService.safeDeleteStorageObject(context.getImageUrl());
+    }
+
     /**
      * Helper method to map entity to response DTO
      */
@@ -371,11 +378,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 .build();
     }
 
-        private HistoricalContextResponse mapToResponseWithInactive(HistoricalContext context) {
+    private HistoricalContextResponse mapToResponseWithInactive(HistoricalContext context) {
         HistoricalContextResponse response = mapToResponse(context);
         response.setStatus(buildStatus(context.getIsPublished(), context.getDeletedAt()));
         return response;
-        }
+    }
     
     /**
      * Helper method to map page to paginated response
@@ -454,26 +461,25 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             // version must be 1
             Object version = map.get("version");
             if (!Integer.valueOf(1).equals(version) && !"1".equals(String.valueOf(version))) {
-                throw new InvalidRequestException("battleMap.version pháº£i lÃ  1");
+                throw new InvalidRequestException("battleMap.version phải là 1");
             }
 
             // mode must be 'custom' or 'image'
             Object mode = map.get("mode");
             if (mode == null || !VALID_BATTLE_MAP_MODES.contains(mode.toString())) {
-                throw new InvalidRequestException(
-                        "battleMap.mode pháº£i lÃ  'custom' hoáº·c 'image'. Nháº­n: " + mode);
+                throw new InvalidRequestException("battleMap.mode phải là 'custom' hoặc 'image'. Nhận: " + mode);
             }
 
             // imageUrl must be a non-blank string
             Object imageUrl = map.get("imageUrl");
             if (imageUrl == null || imageUrl.toString().isBlank()) {
-                throw new InvalidRequestException("battleMap.imageUrl khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng");
+                throw new InvalidRequestException("battleMap.imageUrl không được để trống");
             }
 
             // imageSource max 500 chars
             Object imageSource = map.get("imageSource");
             if (imageSource != null && imageSource.toString().length() > 500) {
-                throw new InvalidRequestException("battleMap.imageSource tá»‘i Ä‘a 500 kÃ½ tá»±");
+                throw new InvalidRequestException("battleMap.imageSource tối đa 500 ký tự");
             }
 
             // Validate symbols if present
@@ -483,8 +489,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                     if (sym instanceof Map<?, ?> symMap) {
                         Object symType = symMap.get("type");
                         if (symType != null && !VALID_SYMBOL_TYPES.contains(symType.toString())) {
-                            throw new InvalidRequestException(
-                                    "battleMap.symbols[].type khÃ´ng há»£p lá»‡: " + symType);
+                            throw new InvalidRequestException("battleMap.symbols[].type không hợp lệ: " + symType);
                         }
                     }
                 }
@@ -492,7 +497,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
             return json;
         } catch (JsonProcessingException ex) {
-            throw new InvalidRequestException("battleMap khÃ´ng pháº£i JSON há»£p lá»‡: " + ex.getMessage());
+            throw new InvalidRequestException("battleMap không phải JSON hợp lệ: " + ex.getMessage());
         }
     }
 
@@ -507,7 +512,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         try {
             return objectMapper.readValue(json, new TypeReference<Object>() {});
         } catch (JsonProcessingException ex) {
-            log.warn("Could not deserialize battleMap â€” returning raw string: {}", ex.getMessage());
+            log.warn("Could not deserialize battleMap — returning raw string: {}", ex.getMessage());
             return json;
         }
     }
