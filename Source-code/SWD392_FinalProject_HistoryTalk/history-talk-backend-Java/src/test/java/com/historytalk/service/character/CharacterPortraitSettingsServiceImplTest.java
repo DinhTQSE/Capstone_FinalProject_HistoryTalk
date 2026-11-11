@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.enums.EntityType;
+import com.historytalk.exception.ForbiddenException;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.UnauthorizedException;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -160,13 +162,17 @@ class CharacterPortraitSettingsServiceImplTest {
     }
 
     @Test
-    void save_teacherNotOwner_throwsUnauthorized_andDoesNotSave() {
+    void save_teacherNotOwner_throwsForbidden403_andDoesNotSave() {
         doThrow(new UnauthorizedException("You can only modify content you created"))
                 .when(mediaService).assertCanManageMedia(eq(EntityType.CHARACTER), eq(characterUuid), anyString(), eq("TEACHER"));
 
+        // A logged-in caller lacking permission is 403, not 401 (FE treats 401 as an expired session).
         assertThatThrownBy(() -> service.savePortraitSettings(
                 characterId, EXAMPLE_BODY.getBytes(StandardCharsets.UTF_8), userId, "TEACHER"))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("You can only modify content you created")
+                .extracting(ex -> ((ForbiddenException) ex).getHttpStatus())
+                .isEqualTo(HttpStatus.FORBIDDEN);
         verify(characterRepository, never()).save(any());
     }
 

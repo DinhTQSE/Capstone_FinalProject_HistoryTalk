@@ -25,7 +25,7 @@ public interface CharacterPortraitSettingsService {
      * caller may manage the character's media, saves the settings and returns them.
      *
      * @throws com.historytalk.exception.InvalidRequestException when the body is not a JSON object or too large
-     * @throws com.historytalk.exception.UnauthorizedException when the caller may not edit this character
+     * @throws com.historytalk.exception.ForbiddenException when the caller may not edit this character (403)
      * @throws com.historytalk.exception.ResourceNotFoundException when the character is missing or soft-deleted
      */
     JsonNode savePortraitSettings(String characterId, byte[] rawBody, String userId, String userRole);

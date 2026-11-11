@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.entity.character.Character;
 import com.historytalk.entity.enums.EntityType;
+import com.historytalk.exception.ForbiddenException;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
+import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.CharacterRepository;
 import com.historytalk.service.media.MediaService;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +55,12 @@ public class CharacterPortraitSettingsServiceImpl implements CharacterPortraitSe
         JsonNode settings = parseSettings(rawBody);
 
         UUID characterUuid = UUID.fromString(characterId);
-        mediaService.assertCanManageMedia(EntityType.CHARACTER, characterUuid, userId, userRole);
+        try {
+            mediaService.assertCanManageMedia(EntityType.CHARACTER, characterUuid, userId, userRole);
+        } catch (UnauthorizedException ex) {
+            // The caller is authenticated but not allowed: 403, so the FE does not treat it as an expired session.
+            throw new ForbiddenException(ex.getMessage(), ex);
+        }
 
         Character character = characterRepository.findById(characterUuid)
                 .filter(c -> c.getDeletedAt() == null)
