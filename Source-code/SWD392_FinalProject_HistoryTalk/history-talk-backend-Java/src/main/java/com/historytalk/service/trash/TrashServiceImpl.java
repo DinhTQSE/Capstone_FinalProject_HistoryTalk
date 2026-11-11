@@ -37,6 +37,8 @@ public class TrashServiceImpl implements TrashService {
     private final QuizRepository quizRepository;
     private final DocumentRepository documentRepository;
     private final ChatSessionRepository chatSessionRepository;
+    private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
+    private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -71,6 +73,8 @@ public class TrashServiceImpl implements TrashService {
                         return result(id, NOT_TRASHED, "Character is not in trash");
                     }
                     character.setDeletedAt(null);
+                    documentRepository.findByEntityIdAndEntityType(character.getCharacterId(), EntityType.CHARACTER)
+                            .forEach(doc -> doc.setDeletedAt(null));
                     return result(id, RESTORED, "Character restored");
                 })
                 .orElseGet(() -> result(id, NOT_FOUND, "Character not found")));
@@ -85,6 +89,8 @@ public class TrashServiceImpl implements TrashService {
                         return result(id, NOT_TRASHED, "Historical context is not in trash");
                     }
                     context.setDeletedAt(null);
+                    documentRepository.findByEntityIdAndEntityType(context.getContextId(), EntityType.CONTEXT)
+                            .forEach(doc -> doc.setDeletedAt(null));
                     return result(id, RESTORED, "Historical context restored");
                 })
                 .orElseGet(() -> result(id, NOT_FOUND, "Historical context not found")));
@@ -148,7 +154,12 @@ public class TrashServiceImpl implements TrashService {
 
     private void hardDeleteCharacter(Character character) {
         documentRepository.findByEntityIdAndEntityType(character.getCharacterId(), EntityType.CHARACTER)
-                .forEach(documentRepository::delete);
+                .forEach(doc -> {
+                    supabaseDocumentStorageService.deleteDocumentStorageAssets(doc.getFileUrl(), doc.getContent());
+                    aiServiceClient.deleteDocumentAsync(doc.getDocId().toString());
+                    documentRepository.delete(doc);
+                });
+        supabaseDocumentStorageService.safeDeleteStorageObject(character.getImageUrl());
         chatSessionRepository.findByCharacterCharacterId(character.getCharacterId())
                 .forEach(chatSessionRepository::delete);
         character.getHistoricalContexts().clear();
@@ -157,7 +168,12 @@ public class TrashServiceImpl implements TrashService {
 
     private void hardDeleteContext(HistoricalContext context) {
         documentRepository.findByEntityIdAndEntityType(context.getContextId(), EntityType.CONTEXT)
-                .forEach(documentRepository::delete);
+                .forEach(doc -> {
+                    supabaseDocumentStorageService.deleteDocumentStorageAssets(doc.getFileUrl(), doc.getContent());
+                    aiServiceClient.deleteDocumentAsync(doc.getDocId().toString());
+                    documentRepository.delete(doc);
+                });
+        supabaseDocumentStorageService.safeDeleteStorageObject(context.getImageUrl());
         chatSessionRepository.findByHistoricalContextContextId(context.getContextId())
                 .forEach(chatSessionRepository::delete);
         context.getCharacters().clear();

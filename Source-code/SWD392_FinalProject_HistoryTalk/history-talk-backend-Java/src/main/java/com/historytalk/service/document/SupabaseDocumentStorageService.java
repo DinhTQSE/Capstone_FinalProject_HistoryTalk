@@ -13,11 +13,19 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
@@ -35,7 +43,7 @@ public class SupabaseDocumentStorageService {
             @Value("${supabase.storage.bucket:documents}") String bucket,
             RestClient.Builder restClientBuilder) {
         this.supabaseUrl = supabaseUrl.replaceAll("/+$", "");
-        this.bucket = bucket;
+        this.bucket = (bucket != null) ? bucket.trim() : "documents";
         this.restClient = restClientBuilder
                 .baseUrl(this.supabaseUrl)
                 .defaultHeader("Authorization", "Bearer " + serviceRoleKey)
@@ -258,6 +266,180 @@ public class SupabaseDocumentStorageService {
         }
     }
 
+    /**
+     * Build a permanent public URL for an object in the documents bucket.
+     */
+    public String buildPublicUrl(String storagePath) {
+        String cleanPath = storagePath.startsWith(bucket + "/") 
+                ? storagePath.substring(bucket.length() + 1) 
+                : storagePath;
+        String cleanBase = supabaseUrl.replaceAll("/+$", "");
+        return cleanBase + "/storage/v1/object/public/" + bucket + "/" + cleanPath;
+    }
+
+    /**
+     * Upload an extracted historical image (battle map, artifact, photograph) to Supabase Storage.
+     * By default, uploads to the staging directory ('staging/historical-images/') subject to TTL cleanup.
+     */
+    public String uploadHistoricalImage(byte[] imageBytes, String extension) {
+        return uploadHistoricalImage(imageBytes, extension, true);
+    }
+
+    /**
+     * Upload historical image to staging or published directory.
+     *
+     * @param imageBytes image binary data
+     * @param extension file extension (e.g., "jpg", "png")
+     * @param isStaging true if saving temporarily in staging folder, false if published directly
+     * @return Public URL of the uploaded image
+     */
+    public String uploadHistoricalImage(byte[] imageBytes, String extension, boolean isStaging) {
+        if (imageBytes == null || imageBytes.length == 0) {
+            return null;
+        }
+        String ext = (extension != null && !extension.isBlank()) ? extension.toLowerCase(Locale.ROOT) : "jpg";
+        String filename = UUID.randomUUID() + "." + ext;
+        String folder = isStaging ? "staging/historical-images/" : "published/historical-images/";
+        String objectPath = folder + filename;
+        String contentType = ext.equals("png") ? "image/png" : "image/jpeg";
+
+        try {
+            uploadFile(objectPath, new java.io.ByteArrayInputStream(imageBytes), contentType, imageBytes.length);
+            String relativeUrl = (isStaging ? "/historical-images/staging/" : "/historical-images/published/") + filename;
+            log.info("Historical image uploaded to Supabase (isStaging={}): {}", isStaging, relativeUrl);
+            return relativeUrl;
+        } catch (Exception ex) {
+            log.warn("Failed to upload historical image to Supabase: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Move an object inside Supabase Storage using /storage/v1/object/move.
+     */
+    public void moveFile(String sourceKey, String destinationKey) {
+        String cleanSource = sourceKey.startsWith(bucket + "/") 
+                ? sourceKey.substring(bucket.length() + 1) 
+                : sourceKey;
+        String cleanDest = destinationKey.startsWith(bucket + "/") 
+                ? destinationKey.substring(bucket.length() + 1) 
+                : destinationKey;
+
+        Map<String, String> body = Map.of(
+                "bucketId", bucket,
+                "sourceKey", cleanSource,
+                "destinationKey", cleanDest
+        );
+
+        try {
+            restClient.post()
+                    .uri("/storage/v1/object/move")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Moved Supabase object from {} to {}", cleanSource, cleanDest);
+        } catch (Exception ex) {
+            log.error("Failed to move file in Supabase from {} to {}: {}", sourceKey, destinationKey, ex.getMessage());
+            throw new SystemException("Không thể chuyển ảnh tư liệu sang thư mục xuất bản: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Commit staging images referenced in markdown content.
+     * Moves each referenced file from 'staging/historical-images/' to 'published/historical-images/'
+     * and rewrites the content URLs accordingly.
+     * Images deleted by the user from the draft remain in staging and are purged by TTL.
+     */
+    public String commitStagingImages(String content) {
+        if (content == null || content.isBlank()
+                || (!content.contains("staging/historical-images/") && !content.contains("/historical-images/staging/"))) {
+            return content;
+        }
+
+        Pattern pattern = Pattern.compile("(?:staging/historical-images/|/historical-images/staging/)([a-zA-Z0-9_.-]+)");
+        Matcher matcher = pattern.matcher(content);
+        Set<String> filenames = new HashSet<>();
+        while (matcher.find()) {
+            filenames.add(matcher.group(1));
+        }
+
+        int failedCount = 0;
+        for (String filename : filenames) {
+            String sourceKey = "staging/historical-images/" + filename;
+            String destinationKey = "published/historical-images/" + filename;
+            try {
+                moveFile(sourceKey, destinationKey);
+            } catch (Exception ex) {
+                log.error("Image move failed for file {}: {}", filename, ex.getMessage());
+                failedCount++;
+            }
+        }
+
+        if (failedCount > 0) {
+            throw new InvalidRequestException(String.format(
+                    "Không thể lưu tài liệu: Có %d hình ảnh tư liệu đã hết hạn lưu tạm (quá 1 giờ) hoặc không tồn tại trên bộ nhớ lưu trữ. Vui lòng tải lại file PDF và thực hiện lại.",
+                    failedCount
+            ));
+        }
+
+        return content
+                .replace("/historical-images/staging/", "/historical-images/published/")
+                .replace("staging/historical-images/", "published/historical-images/");
+    }
+
+    /**
+     * Best-effort cleanup of a document's PDF file and all extracted historical images
+     * (both staging and published) referenced in its markdown content.
+     * Never throws so database deletion is not aborted if an object was already removed.
+     */
+    public void deleteDocumentStorageAssets(String fileUrl, String content) {
+        if (fileUrl != null && !fileUrl.isBlank()) {
+            safeDeleteStorageObject(fileUrl);
+        }
+        if (content != null && !content.isBlank()) {
+            Pattern imgPattern = Pattern.compile("(?:(staging|published)/historical-images/|/historical-images/(staging|published)/)([a-zA-Z0-9_.-]+)");
+            Matcher matcher = imgPattern.matcher(content);
+            Set<String> paths = new HashSet<>();
+            while (matcher.find()) {
+                String folder = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+                String filename = matcher.group(3);
+                paths.add(folder + "/historical-images/" + filename);
+            }
+            for (String path : paths) {
+                safeDeleteStorageObject(path);
+            }
+        }
+    }
+
+    /**
+     * Best-effort cleanup for a single URL or storage path if it belongs to this Supabase bucket.
+     */
+    public void safeDeleteStorageObject(String urlOrPath) {
+        if (urlOrPath == null || urlOrPath.isBlank()) {
+            return;
+        }
+        try {
+            String path = urlOrPath.trim();
+            String publicPrefix = "/storage/v1/object/public/" + bucket + "/";
+            int pubIdx = path.indexOf(publicPrefix);
+            if (pubIdx != -1) {
+                path = path.substring(pubIdx + publicPrefix.length());
+            } else if (path.startsWith("http://") || path.startsWith("https://")) {
+                // External URL not stored in our documents bucket
+                return;
+            }
+            int queryIdx = path.indexOf('?');
+            if (queryIdx != -1) {
+                path = path.substring(0, queryIdx);
+            }
+            deleteFile(path);
+            log.info("Deleted Supabase storage asset: {}", path);
+        } catch (Exception ex) {
+            log.warn("Best-effort Supabase delete skipped/failed for {}: {}", urlOrPath, ex.getMessage());
+        }
+    }
+
     private record PresignedUploadRequest(@JsonProperty("expiresIn") long expiresIn) {
     }
 
@@ -267,6 +449,97 @@ public class SupabaseDocumentStorageService {
     ) {
         public String getEffectiveUrl() {
             return url != null ? url : signedUrl;
+        }
+    }
+
+    public record SupabaseStorageItem(
+            @JsonProperty("name") String name,
+            @JsonProperty("id") String id,
+            @JsonProperty("created_at") String createdAt,
+            @JsonProperty("updated_at") String updatedAt
+    ) {
+    }
+
+    private record SupabaseListRequest(
+            @JsonProperty("prefix") String prefix,
+            @JsonProperty("limit") int limit,
+            @JsonProperty("sortBy") Map<String, String> sortBy
+    ) {
+    }
+
+    /**
+     * Purge expired staging objects in a given folder prefix older than maxAge.
+     * Direct deletion on Supabase storage tables is locked by 'storage.protect_delete()',
+     * so this uses the Supabase Storage List API followed by Storage Delete API.
+     *
+     * @param prefix folder prefix (e.g. "staging/historical-images")
+     * @param maxAge maximum age duration before an object is considered expired
+     * @return number of purged objects
+     */
+    public int purgeExpiredStagingObjects(String prefix, Duration maxAge) {
+        if (prefix == null || prefix.isBlank() || maxAge == null) {
+            return 0;
+        }
+        String cleanPrefix = prefix.replaceAll("^/+", "").replaceAll("/+$", "");
+        Instant expirationThreshold = Instant.now().minus(maxAge);
+        int purgedCount = 0;
+
+        try {
+            SupabaseListRequest request = new SupabaseListRequest(
+                    cleanPrefix,
+                    100,
+                    Map.of("column", "created_at", "order", "asc")
+            );
+
+            SupabaseStorageItem[] items = restClient.post()
+                    .uri("/storage/v1/object/list/" + bucket)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(SupabaseStorageItem[].class);
+
+            if (items == null || items.length == 0) {
+                log.debug("No staging objects found under prefix '{}'", cleanPrefix);
+                return 0;
+            }
+
+            for (SupabaseStorageItem item : items) {
+                if (item.name() == null || item.name().isBlank() || ".emptyFolderPlaceholder".equalsIgnoreCase(item.name())) {
+                    continue;
+                }
+                if (item.createdAt() == null || item.createdAt().isBlank()) {
+                    continue;
+                }
+
+                try {
+                    Instant createdAt = parseSupabaseTimestamp(item.createdAt());
+                    if (createdAt.isBefore(expirationThreshold)) {
+                        String filePath = item.name().startsWith(cleanPrefix)
+                                ? item.name()
+                                : cleanPrefix + "/" + item.name();
+                        deleteFile(filePath);
+                        purgedCount++;
+                        log.info("Purged expired staging object: {} (created at {})", filePath, createdAt);
+                    }
+                } catch (Exception ex) {
+                    log.warn("Failed to evaluate/delete staging object '{}': {}", item.name(), ex.getMessage());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to list/purge staging objects under prefix '{}': {}", cleanPrefix, ex.getMessage());
+        }
+
+        if (purgedCount > 0) {
+            log.info("Finished staging cleanup for '{}': purged {} expired objects", cleanPrefix, purgedCount);
+        }
+        return purgedCount;
+    }
+
+    private Instant parseSupabaseTimestamp(String timestamp) {
+        try {
+            return Instant.parse(timestamp);
+        } catch (Exception e) {
+            return OffsetDateTime.parse(timestamp).toInstant();
         }
     }
 }
