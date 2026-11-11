@@ -318,20 +318,20 @@ public class SupabaseDocumentStorageService {
      * Move an object inside Supabase Storage using /storage/v1/object/move.
      */
     public void moveFile(String sourceKey, String destinationKey) {
+        String cleanSource = sourceKey.startsWith(bucket + "/") 
+                ? sourceKey.substring(bucket.length() + 1) 
+                : sourceKey;
+        String cleanDest = destinationKey.startsWith(bucket + "/") 
+                ? destinationKey.substring(bucket.length() + 1) 
+                : destinationKey;
+
+        Map<String, String> body = Map.of(
+                "bucketId", bucket,
+                "sourceKey", cleanSource,
+                "destinationKey", cleanDest
+        );
+
         try {
-            String cleanSource = sourceKey.startsWith(bucket + "/") 
-                    ? sourceKey.substring(bucket.length() + 1) 
-                    : sourceKey;
-            String cleanDest = destinationKey.startsWith(bucket + "/") 
-                    ? destinationKey.substring(bucket.length() + 1) 
-                    : destinationKey;
-
-            Map<String, String> body = Map.of(
-                    "bucketId", bucket,
-                    "sourceKey", cleanSource,
-                    "destinationKey", cleanDest
-            );
-
             restClient.post()
                     .uri("/storage/v1/object/move")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -340,7 +340,8 @@ public class SupabaseDocumentStorageService {
                     .toBodilessEntity();
             log.info("Moved Supabase object from {} to {}", cleanSource, cleanDest);
         } catch (Exception ex) {
-            log.warn("Could not move file in Supabase from {} to {}: {}", sourceKey, destinationKey, ex.getMessage());
+            log.error("Failed to move file in Supabase from {} to {}: {}", sourceKey, destinationKey, ex.getMessage());
+            throw new SystemException("Không thể chuyển ảnh tư liệu sang thư mục xuất bản: " + ex.getMessage());
         }
     }
 
@@ -363,10 +364,23 @@ public class SupabaseDocumentStorageService {
             filenames.add(matcher.group(1));
         }
 
+        int failedCount = 0;
         for (String filename : filenames) {
             String sourceKey = "staging/historical-images/" + filename;
             String destinationKey = "published/historical-images/" + filename;
-            moveFile(sourceKey, destinationKey);
+            try {
+                moveFile(sourceKey, destinationKey);
+            } catch (Exception ex) {
+                log.error("Image move failed for file {}: {}", filename, ex.getMessage());
+                failedCount++;
+            }
+        }
+
+        if (failedCount > 0) {
+            throw new InvalidRequestException(String.format(
+                    "Không thể lưu tài liệu: Có %d hình ảnh tư liệu đã hết hạn lưu tạm (quá 1 giờ) hoặc không tồn tại trên bộ nhớ lưu trữ. Vui lòng tải lại file PDF và thực hiện lại.",
+                    failedCount
+            ));
         }
 
         return content
