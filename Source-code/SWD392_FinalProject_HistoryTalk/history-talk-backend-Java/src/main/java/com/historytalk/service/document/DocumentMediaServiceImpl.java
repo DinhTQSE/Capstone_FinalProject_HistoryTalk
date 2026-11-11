@@ -194,7 +194,8 @@ public class DocumentMediaServiceImpl implements MediaService {
      * Platform roles manage any media. School roles are confined to local content of their own
      * school: SCHOOL_ADMIN for any item of the school, TEACHER only for items they created.
      */
-    private void assertCanManageMedia(EntityType entityType, UUID entityId, String userId, String userRole) {
+    @Override
+    public void assertCanManageMedia(EntityType entityType, UUID entityId, String userId, String userRole) {
         if (isPlatformRole(userRole)) {
             return;
         }
