@@ -41,8 +41,8 @@ class PdfExtractionRateLimiterTest {
 
     @Test
     void acquire_shouldEnforceBurstCooldownAfterRelease() {
-        rateLimiter.acquire("user-1", false);
-        rateLimiter.release("user-1");
+        String token = rateLimiter.acquire("user-1", false);
+        rateLimiter.release("user-1", token);
 
         // Immediately requesting again should trigger 3s cooldown
         assertThatThrownBy(() -> rateLimiter.acquire("user-1", false))
@@ -51,9 +51,22 @@ class PdfExtractionRateLimiterTest {
     }
 
     @Test
+    void release_shouldIgnoreMismatchedToken() {
+        String token1 = rateLimiter.acquire("user-1", false);
+        
+        // Attempting to release with a wrong/stale token should NOT release the lock
+        rateLimiter.release("user-1", "stale-wrong-token");
+
+        // The user should still be locked
+        assertThatThrownBy(() -> rateLimiter.acquire("user-1", false))
+                .isInstanceOf(RateLimitExceededException.class)
+                .hasMessageContaining("Bạn đang có một tài liệu đang được trích xuất");
+    }
+
+    @Test
     void release_shouldAllowNextRequestAfterCooldown() throws InterruptedException {
-        rateLimiter.acquire("user-1", false);
-        rateLimiter.release("user-1");
+        String token = rateLimiter.acquire("user-1", false);
+        rateLimiter.release("user-1", token);
 
         // Wait past 3s cooldown
         Thread.sleep(3050L);

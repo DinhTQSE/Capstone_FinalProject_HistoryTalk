@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -40,6 +41,7 @@ public class PdfExtractionRateLimiter {
     @Setter
     public static class UserExtractionState {
         private volatile boolean isProcessing = false;
+        private volatile String currentLockToken = null;
         private volatile long lastRequestTimeMs = 0L;
         private final Deque<Long> regularTimestamps = new ArrayDeque<>();
         private final Deque<Long> visionTimestamps = new ArrayDeque<>();
@@ -47,17 +49,20 @@ public class PdfExtractionRateLimiter {
 
     /**
      * Atomically check and acquire extraction permission for a user.
+     * Returns a unique lock token (UUID) representing this specific extraction execution.
      *
      * @param userId ID of the requesting user
      * @param enableAiVision whether AI Vision extraction is requested
+     * @return unique lock token to be used when releasing
      * @throws RateLimitExceededException if user violates concurrency, cooldown, or quota limits
      */
-    public void acquire(String userId, boolean enableAiVision) {
+    public String acquire(String userId, boolean enableAiVision) {
         if (userId == null || userId.isBlank()) {
-            return;
+            return UUID.randomUUID().toString();
         }
 
         long now = System.currentTimeMillis();
+        String lockToken = UUID.randomUUID().toString();
 
         userStates.compute(userId, (key, existingState) -> {
             UserExtractionState state = (existingState != null) ? existingState : new UserExtractionState();
@@ -99,28 +104,45 @@ public class PdfExtractionRateLimiter {
             }
 
             state.setLastRequestTimeMs(now);
+            state.setCurrentLockToken(lockToken);
             state.setProcessing(true);
             return state;
         });
 
-        log.debug("Acquired extraction lock for user: {}, enableAiVision: {}", userId, enableAiVision);
+        log.debug("Acquired extraction lock for user: {}, enableAiVision: {}, token: {}", userId, enableAiVision, lockToken);
+        return lockToken;
     }
 
     /**
      * Release active task lock for a user once extraction completes, fails, or disconnects.
+     * Only releases the lock if the provided lockToken matches the active extraction token.
      *
      * @param userId ID of the requesting user
+     * @param lockToken the token received from acquire()
      */
-    public void release(String userId) {
+    public void release(String userId, String lockToken) {
         if (userId == null || userId.isBlank()) {
             return;
         }
 
-        UserExtractionState state = userStates.get(userId);
-        if (state != null) {
-            state.setProcessing(false);
-            log.debug("Released extraction lock for user: {}", userId);
-        }
+        userStates.computeIfPresent(userId, (key, state) -> {
+            if (lockToken == null || lockToken.equals(state.getCurrentLockToken())) {
+                state.setProcessing(false);
+                state.setCurrentLockToken(null);
+                log.debug("Released extraction lock for user: {} with token: {}", userId, lockToken);
+            } else {
+                log.debug("Ignored release for user: {} (token mismatch: expected {}, got {})",
+                        userId, state.getCurrentLockToken(), lockToken);
+            }
+            return state;
+        });
+    }
+
+    /**
+     * Backwards-compatible release without token check (for testing or emergency cleanup).
+     */
+    public void release(String userId) {
+        release(userId, null);
     }
 
     private void cleanOldTimestamps(Deque<Long> timestamps, long cutoff) {

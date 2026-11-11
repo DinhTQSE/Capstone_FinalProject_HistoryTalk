@@ -22,7 +22,7 @@ public class StagingCleanupScheduler {
 
     private final SupabaseDocumentStorageService storageService;
 
-    @Value("${supabase.storage.staging.ttl-minutes:15}")
+    @Value("${supabase.storage.staging.ttl-minutes:60}")
     private long ttlMinutes;
 
     /**

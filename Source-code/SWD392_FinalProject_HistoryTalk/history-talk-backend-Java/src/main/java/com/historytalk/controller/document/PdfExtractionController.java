@@ -2,6 +2,7 @@ package com.historytalk.controller.document;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.ApiResponse;
+import com.historytalk.exception.SystemException;
 import com.historytalk.dto.document.DocumentFileResponse;
 import com.historytalk.dto.document.PdfExtractionResponse;
 import com.historytalk.dto.document.SaveDocumentRequest;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
 @RequestMapping("/api/v1/documents/pdf")
@@ -58,12 +60,12 @@ public class PdfExtractionController {
         log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}, enableAiVision={}",
                 staffId, startPage, endPage, enableAiVision);
 
-        pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
+        String lockToken = pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
         try {
             PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage, Boolean.TRUE.equals(enableAiVision), null);
             return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
         } finally {
-            pdfExtractionRateLimiter.release(staffId);
+            pdfExtractionRateLimiter.release(staffId, lockToken);
         }
     }
 
@@ -84,15 +86,25 @@ public class PdfExtractionController {
         log.info("POST /api/v1/documents/pdf/upload-and-extract (SSE stream) by user {}, startPage={}, endPage={}, enableAiVision={}",
                 staffId, startPage, endPage, enableAiVision);
 
-        // Kiểm tra quota và acquire lock đồng thời trước khi thiết lập SSE handshake
-        pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
+        // Kiểm tra quota và acquire lock đồng thời với lock token riêng biệt
+        String lockToken = pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
+        AtomicBoolean isAborted = new AtomicBoolean(false);
 
         SseEmitter emitter = new SseEmitter(15 * 60 * 1000L);
 
-        // Đảm bảo giải phóng lock an toàn trong mọi trường hợp client ngắt kết nối hoặc timeout
-        emitter.onCompletion(() -> pdfExtractionRateLimiter.release(staffId));
-        emitter.onTimeout(() -> pdfExtractionRateLimiter.release(staffId));
-        emitter.onError(ex -> pdfExtractionRateLimiter.release(staffId));
+        // Đảm bảo giải phóng lock an toàn và dừng worker ngầm nếu client ngắt kết nối hoặc timeout
+        emitter.onCompletion(() -> {
+            isAborted.set(true);
+            pdfExtractionRateLimiter.release(staffId, lockToken);
+        });
+        emitter.onTimeout(() -> {
+            isAborted.set(true);
+            pdfExtractionRateLimiter.release(staffId, lockToken);
+        });
+        emitter.onError(ex -> {
+            isAborted.set(true);
+            pdfExtractionRateLimiter.release(staffId, lockToken);
+        });
 
         // Heartbeat executor: Bắn SSE comment ": ping\n\n" mỗi 15 giây
         // Giúp Cloudflare, Caddy và Trình duyệt duy trì kết nối liên tục, chống rớt mạng / timeout 524
@@ -112,6 +124,9 @@ public class PdfExtractionController {
                         endPage,
                         Boolean.TRUE.equals(enableAiVision),
                         (page, total) -> {
+                            if (isAborted.get()) {
+                                throw new SystemException("Quá trình trích xuất PDF đã bị hủy bởi client ngắt kết nối");
+                            }
                             try {
                                 String progressJson = String.format("{\"type\":\"progress\",\"page\":%d,\"total\":%d}", page, total);
                                 emitter.send(SseEmitter.event().data(progressJson));
@@ -128,18 +143,22 @@ public class PdfExtractionController {
                 emitter.send(SseEmitter.event().data(doneJson));
                 emitter.complete();
             } catch (Exception e) {
-                log.error("PDF stream extraction failed: {}", e.getMessage(), e);
-                try {
-                    String errorJson = String.format("{\"type\":\"error\",\"message\":\"%s\"}", e.getMessage());
-                    emitter.send(SseEmitter.event().data(errorJson));
-                } catch (Exception ex) {
-                    // Ignore SSE send error
+                if (isAborted.get()) {
+                    log.info("PDF stream extraction gracefully stopped as client disconnected (user: {})", staffId);
+                } else {
+                    log.error("PDF stream extraction failed: {}", e.getMessage(), e);
+                    try {
+                        String errorJson = String.format("{\"type\":\"error\",\"message\":\"%s\"}", e.getMessage());
+                        emitter.send(SseEmitter.event().data(errorJson));
+                    } catch (Exception ex) {
+                        // Ignore SSE send error
+                    }
+                    emitter.completeWithError(e);
                 }
-                emitter.completeWithError(e);
             } finally {
                 heartbeatFuture.cancel(true);
                 heartbeatScheduler.shutdown();
-                pdfExtractionRateLimiter.release(staffId);
+                pdfExtractionRateLimiter.release(staffId, lockToken);
             }
         });
 
