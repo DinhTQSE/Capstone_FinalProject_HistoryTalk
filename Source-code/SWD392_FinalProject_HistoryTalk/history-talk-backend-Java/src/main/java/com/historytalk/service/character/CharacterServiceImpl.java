@@ -75,6 +75,12 @@ public class CharacterServiceImpl implements CharacterService {
     @Transactional(readOnly = true)
     public CharacterResponse getCharacterById(String characterId, String role) {
         log.info("Fetching character with ID: {}", characterId);
+        return mapToResponse(findVisibleCharacter(characterId, role));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Character findVisibleCharacter(String characterId, String role) {
         Character character = characterRepository.findById(UUID.fromString(characterId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy nhân vật với id: " + characterId));
@@ -105,7 +111,7 @@ public class CharacterServiceImpl implements CharacterService {
             }
         }
 
-        return mapToResponse(character);
+        return character;
     }
 
     @Transactional(readOnly = true)

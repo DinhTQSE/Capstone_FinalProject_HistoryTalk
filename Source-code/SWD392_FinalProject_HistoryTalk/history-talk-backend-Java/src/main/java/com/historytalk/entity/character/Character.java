@@ -27,8 +27,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -68,6 +70,14 @@ public class Character {
 
     @Column(name = "model_url", length = 500)
     private String modelUrl;
+
+    /**
+     * Lip-sync portrait settings saved by the FE portrait editor, stored verbatim as a JSON object
+     * (mode, mouthOpen, zoom, points, imageUrl...). NULL when never saved.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "portrait_settings", columnDefinition = "jsonb")
+    private String portraitSettings;
 
     @Column(name = "personality", length = 500)
     private String personality;

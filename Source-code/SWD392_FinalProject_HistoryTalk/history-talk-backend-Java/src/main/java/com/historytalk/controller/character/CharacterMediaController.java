@@ -1,14 +1,17 @@
 package com.historytalk.controller.character;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.historytalk.dto.ApiResponse;
 import com.historytalk.dto.document.DocumentMediaMetadataResponse;
 import com.historytalk.dto.document.SignedViewUrlResponse;
 import com.historytalk.entity.enums.EntityType;
+import com.historytalk.service.character.CharacterPortraitSettingsService;
 import com.historytalk.service.media.MediaService;
 import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +24,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -37,6 +42,7 @@ import java.util.UUID;
 public class CharacterMediaController {
 
     private final MediaService mediaService;
+    private final CharacterPortraitSettingsService portraitSettingsService;
 
     @PostMapping(value = "/upload-direct", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
@@ -109,7 +115,66 @@ public class CharacterMediaController {
         log.info("DELETE /api/v1/characters/{}/media by user {}", characterId, userId);
         
         mediaService.deleteMedia(characterUuid, EntityType.CHARACTER, mediaType, userId, userRole);
-        
+
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/portrait-settings")
+    @Operation(
+        summary = "Get lip-sync portrait settings of a character",
+        description = "Public. Returns the saved portrait settings JSON object, or data = null when the character has none yet. 404 when the character does not exist or is hidden from the caller."
+    )
+    public ResponseEntity<ApiResponse<JsonNode>> getPortraitSettings(
+            @Parameter(description = "Character ID", required = true)
+            @PathVariable String characterId) {
+
+        log.info("GET /api/v1/characters/{}/media/portrait-settings", characterId);
+
+        JsonNode settings = portraitSettingsService.getPortraitSettings(characterId, SecurityUtils.getRoleName());
+
+        return ResponseEntity.ok(ApiResponse.success(settings, "Portrait settings retrieved successfully"));
+    }
+
+    @PutMapping(value = "/portrait-settings", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(
+        summary = "Save lip-sync portrait settings of a character",
+        description = "Body must be a JSON object of at most 8KB; it is stored as-is (mode AUTO|PORTRAIT|MODEL_3D, mouthOpen, zoom, optional points and imageUrl). 400 when the body is not a JSON object or exceeds 8KB. TEACHER may only edit local characters they created."
+    )
+    public ResponseEntity<ApiResponse<JsonNode>> savePortraitSettings(
+            @Parameter(description = "Character ID", required = true)
+            @PathVariable String characterId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(value = PORTRAIT_SETTINGS_EXAMPLE)))
+            @RequestBody byte[] body) {
+
+        String userId = SecurityUtils.getUserId();
+        String userRole = SecurityUtils.getRoleName();
+
+        log.info("PUT /api/v1/characters/{}/media/portrait-settings by user {}", characterId, userId);
+
+        JsonNode saved = portraitSettingsService.savePortraitSettings(characterId, body, userId, userRole);
+
+        return ResponseEntity.ok(ApiResponse.success(saved, "Portrait settings saved successfully"));
+    }
+
+    private static final String PORTRAIT_SETTINGS_EXAMPLE = """
+            {
+              "mode": "AUTO",
+              "mouthOpen": 1,
+              "zoom": 1,
+              "points": {
+                "eyeLeft": [0.45, 0.25],
+                "eyeRight": [0.55, 0.25],
+                "mouth": [0.5, 0.33],
+                "chin": [0.5, 0.38]
+              },
+              "imageUrl": "https://..."
+            }
+            """;
 }

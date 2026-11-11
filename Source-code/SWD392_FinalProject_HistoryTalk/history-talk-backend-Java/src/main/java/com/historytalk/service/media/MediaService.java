@@ -103,4 +103,18 @@ public interface MediaService {
             String mediaType,
             String userId,
             String userRole);
+
+    /**
+     * Asserts the caller may manage (upload, replace, delete) media or media settings of an entity.
+     * Platform roles manage any entity; TEACHER only local content they created; SCHOOL_ADMIN any
+     * local content of their own school; a USER entity only by that user.
+     *
+     * @throws com.historytalk.exception.UnauthorizedException when the caller lacks permission
+     * @throws com.historytalk.exception.ResourceNotFoundException when the entity does not exist
+     */
+    void assertCanManageMedia(
+            EntityType entityType,
+            UUID entityId,
+            String userId,
+            String userRole);
 }
