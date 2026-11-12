@@ -151,10 +151,18 @@ public class AiServiceClient {
                         @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
         }
 
-        public record ExamGradeResult(
-                        @JsonProperty("verdict") String verdict,
-                        @JsonProperty("feedback") String feedback,
-                        @JsonProperty("tokenUsage") AiMetricsService.TokenUsage tokenUsage) {
+        public record ExamTurnRequest(
+                        @JsonProperty("characterId") String characterId,
+                        @JsonProperty("contextId") String contextId,
+                        @JsonProperty("characterData") CharacterPayload characterData,
+                        @JsonProperty("contextData") ContextPayload contextData,
+                        @JsonProperty("question") String question,
+                        @JsonProperty("expectedAnswer") String expectedAnswer,
+                        @JsonProperty("sourceExcerpt") String sourceExcerpt,
+                        @JsonProperty("answer") String answer,
+                        @JsonProperty("askedQuestions") List<String> askedQuestions,
+                        @JsonProperty("usedSources") List<String> usedSources,
+                        @JsonProperty("askNext") boolean askNext) {
         }
 
         // ── Internal request / response records ───────────────────────────────
@@ -212,22 +220,6 @@ public class AiServiceClient {
         record ExamQuestionApiResponse(
                         @JsonProperty("success") boolean success,
                         @JsonProperty("data") ExamQuestionResult data) {
-        }
-
-        record ExamGradeRequest(
-                        @JsonProperty("characterId") String characterId,
-                        @JsonProperty("contextId") String contextId,
-                        @JsonProperty("characterData") CharacterPayload characterData,
-                        @JsonProperty("contextData") ContextPayload contextData,
-                        @JsonProperty("question") String question,
-                        @JsonProperty("expectedAnswer") String expectedAnswer,
-                        @JsonProperty("sourceExcerpt") String sourceExcerpt,
-                        @JsonProperty("answer") String answer) {
-        }
-
-        record ExamGradeApiResponse(
-                        @JsonProperty("success") boolean success,
-                        @JsonProperty("data") ExamGradeResult data) {
         }
 
         /** Raw 16-bit mono PCM; format looks like "pcm_s16le;rate=24000;channels=1". */
@@ -305,10 +297,32 @@ public class AiServiceClient {
             
             ChatRequest requestPayload = new ChatRequest(characterId, contextId, userMessage,
                             messageHistory, characterData, contextData, skipSuggestions);
+            streamSse("/v1/ai/chat/stream", requestPayload, "chat_stream", onData, onComplete, onError);
+        }
+
+        /**
+         * Calls BE-Python POST /v1/ai/exam/turn/stream asynchronously. Text events are the feedback and the
+         * next question; the metadata event holds the verdict and the next answer key, so it must not be forwarded.
+         */
+        public void streamExamTurn(
+                        ExamTurnRequest requestPayload,
+                        Consumer<String> onData,
+                        Runnable onComplete,
+                        Consumer<Throwable> onError) {
+            streamSse("/v1/ai/exam/turn/stream", requestPayload, "exam_turn_stream", onData, onComplete, onError);
+        }
+
+        private void streamSse(
+                        String path,
+                        Object requestPayload,
+                        String metric,
+                        Consumer<String> onData,
+                        Runnable onComplete,
+                        Consumer<Throwable> onError) {
             try {
                 String requestBody = objectMapper.writeValueAsString(requestPayload);
                 HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                        .uri(URI.create(this.aiServiceUrlStr + "/v1/ai/chat/stream"))
+                        .uri(URI.create(this.aiServiceUrlStr + path))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8));
                 
@@ -325,7 +339,7 @@ public class AiServiceClient {
                             try (Stream<String> lines = response.body()) {
                                 errorBody = lines.collect(java.util.stream.Collectors.joining("\n"));
                             } catch (Exception ignored) {}
-                            aiMetricsService.recordRequest("chat_stream", "failure");
+                            aiMetricsService.recordRequest(metric, "failure");
                             onError.accept(new SystemException("AI streaming failed with status " + response.statusCode() + ". Body: " + errorBody));
                             return;
                         }
@@ -339,11 +353,11 @@ public class AiServiceClient {
                             onError.accept(e);
                             return;
                         }
-                        aiMetricsService.recordRequest("chat_stream", "success");
+                        aiMetricsService.recordRequest(metric, "success");
                         onComplete.run();
                     })
                     .exceptionally(ex -> {
-                        aiMetricsService.recordRequest("chat_stream", "failure");
+                        aiMetricsService.recordRequest(metric, "failure");
                         onError.accept(ex);
                         return null;
                     });
@@ -387,43 +401,6 @@ public class AiServiceClient {
                 } catch (RestClientException e) {
                         aiMetricsService.recordRequest("exam_question", "failure");
                         log.error("AI service /exam/question call failed: {}", e.getMessage());
-                        throw new SystemException("Dịch vụ AI không khả dụng: " + e.getMessage());
-                }
-        }
-
-        /**
-         * Calls BE-Python POST /v1/ai/exam/grade.
-         */
-        public ExamGradeResult gradeExamAnswer(
-                        String characterId,
-                        String contextId,
-                        CharacterPayload characterData,
-                        ContextPayload contextData,
-                        String question,
-                        String expectedAnswer,
-                        String sourceExcerpt,
-                        String answer) {
-
-                ExamGradeRequest request = new ExamGradeRequest(characterId, contextId, characterData, contextData,
-                                question, expectedAnswer, sourceExcerpt, answer);
-                try {
-                        ExamGradeApiResponse response = restClient.post()
-                                        .uri("/v1/ai/exam/grade")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .body(request)
-                                        .retrieve()
-                                        .body(ExamGradeApiResponse.class);
-
-                        if (response == null || response.data() == null) {
-                                throw new SystemException("Phản hồi trống từ dịch vụ AI");
-                        }
-
-                        aiMetricsService.recordRequest("exam_grade", "success");
-                        aiMetricsService.recordTokens(response.data().tokenUsage());
-                        return response.data();
-                } catch (RestClientException e) {
-                        aiMetricsService.recordRequest("exam_grade", "failure");
-                        log.error("AI service /exam/grade call failed: {}", e.getMessage());
                         throw new SystemException("Dịch vụ AI không khả dụng: " + e.getMessage());
                 }
         }

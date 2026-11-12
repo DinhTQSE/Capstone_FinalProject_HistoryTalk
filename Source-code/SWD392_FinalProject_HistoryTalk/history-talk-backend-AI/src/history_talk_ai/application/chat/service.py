@@ -101,7 +101,7 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True, temperatu
         logger.error(f"Failed to call Ollama: {e}")
         raise
 
-async def _call_ollama_stream(messages: list[dict]) -> tuple:
+async def _call_ollama_stream(messages: list[dict], temperature: float | None = None) -> tuple:
     """Make an async call to the Ollama endpoint with streaming enabled. Yields chunks and finally returns tokens."""
     payload = {
         "model": settings.LLM_MODEL,
@@ -109,7 +109,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         "stream": True,
         "think": False,
         "options": {
-            "temperature": settings.LLM_TEMPERATURE,
+            "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
             "num_predict": settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
             "repeat_penalty": 1.15,
@@ -184,7 +184,7 @@ async def _call_external(messages: list[dict], expect_json: bool = True, tempera
         logger.error(f"Failed to call external API: {e}")
         raise
 
-async def _call_external_stream(messages: list[dict]) -> tuple:
+async def _call_external_stream(messages: list[dict], temperature: float | None = None) -> tuple:
     """Make an async call to an external API with streaming enabled."""
     api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
     headers = {
@@ -195,7 +195,7 @@ async def _call_external_stream(messages: list[dict]) -> tuple:
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
-        "temperature": settings.LLM_TEMPERATURE,
+        "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
         "max_tokens": settings.LLM_MAX_TOKENS,
         "stream": True,
     }
@@ -270,13 +270,13 @@ async def _call_llm(messages: list[dict], expect_json: bool = True, temperature:
         raise ValueError("LLM reply still contains Chinese characters after retrying.")
     return content, prompt_tokens + retry_prompt_tokens, completion_tokens + retry_completion_tokens
 
-async def _call_llm_stream(messages: list[dict]) -> tuple:
+async def _call_llm_stream(messages: list[dict], temperature: float | None = None) -> tuple:
     """Router to stream from either Ollama or External API based on settings."""
     if settings.LLM_PROVIDER.lower() in ("external", "google"):
-        async for chunk in _call_external_stream(messages):
+        async for chunk in _call_external_stream(messages, temperature):
             yield chunk
     else:
-        async for chunk in _call_ollama_stream(messages):
+        async for chunk in _call_ollama_stream(messages, temperature):
             yield chunk
 
 class _PcmDownsampler:

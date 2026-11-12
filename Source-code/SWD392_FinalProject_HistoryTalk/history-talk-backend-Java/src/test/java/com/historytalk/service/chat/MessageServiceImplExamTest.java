@@ -31,6 +31,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -101,12 +103,19 @@ class MessageServiceImplExamTest {
     }
 
     @Test
-    void sendMessageStreamAnswersExamTurnsWithoutTheChatStream() {
-        when(examSessionService.submitAnswer(session.getSessionId(), request)).thenReturn(examTurn());
+    void sendMessageStreamStreamsExamTurnsWithoutTheChatStream() {
+        doAnswer(invocation -> {
+            ExamSessionService.ExamStreamListener listener = invocation.getArgument(2);
+            listener.onText("Đúng vậy.");
+            listener.onText("\n---\nCâu tiếp theo?");
+            listener.onComplete(examTurn());
+            return null;
+        }).when(examSessionService).streamAnswer(eq(session.getSessionId()), eq(request), any());
 
         SseEmitter emitter = service.sendMessageStream(userId.toString(), request);
 
         assertThat(emitter).isNotNull();
+        verify(examSessionService, never()).submitAnswer(any(), any());
         verify(aiServiceClient, never()).streamChat(any(), any(), any(), any(), any(), any(),
                 org.mockito.ArgumentMatchers.anyBoolean(), any(), any(), any());
     }

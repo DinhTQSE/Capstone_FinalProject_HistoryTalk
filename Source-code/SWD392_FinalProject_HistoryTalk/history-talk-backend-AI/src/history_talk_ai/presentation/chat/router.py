@@ -10,12 +10,10 @@ from history_talk_ai.presentation.chat.schemas import (
     ChatRequest,
     ChatResponse,
     ChatResponseData,
-    ExamGradeRequest,
-    ExamGradeResponse,
-    ExamGradeResponseData,
     ExamQuestionRequest,
     ExamQuestionResponse,
     ExamQuestionResponseData,
+    ExamTurnRequest,
     GenerateTitleRequest,
     GenerateTitleResponse,
     GenerateTitleResponseData,
@@ -268,46 +266,47 @@ async def exam_question(body: ExamQuestionRequest) -> ExamQuestionResponse:
     )
 
 
-# ── POST /v1/ai/exam/grade ───────────────────────────────────────────────────
+# ── POST /v1/ai/exam/turn/stream ─────────────────────────────────────────────
 
 @router.post(
-    "/exam/grade",
-    response_model=ExamGradeResponse,
-    summary="Grade a learner's oral-exam answer against the source excerpt",
+    "/exam/turn/stream",
+    summary="Grade an oral-exam answer and ask a follow-up question, streamed",
+    description=(
+        "Streams the feedback, then the bubble separator and a next question built on the learner's answer. "
+        "The final metadata event holds the verdict and the next answer key, which must not reach the learner."
+    ),
 )
-async def exam_grade(body: ExamGradeRequest) -> ExamGradeResponse:
-    character, _ = await _resolve_character_and_context(
+async def exam_turn_stream(body: ExamTurnRequest):
+    character, context = await _resolve_character_and_context(
         body.characterId,
         body.contextId,
         body.characterData,
         body.contextData,
     )
 
-    try:
-        verdict, feedback, prompt_tokens, completion_tokens = await exam_service.grade_exam_answer(
-            character=character,
-            question=body.question,
-            expected_answer=body.expectedAnswer,
-            source=body.sourceExcerpt,
-            answer=body.answer,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"LLM error: {exc}",
-        )
+    async def event_generator():
+        try:
+            stream = exam_service.stream_exam_turn(
+                character=character,
+                context=context,
+                question=body.question,
+                expected_answer=body.expectedAnswer,
+                source=body.sourceExcerpt,
+                answer=body.answer,
+                asked_questions=body.askedQuestions,
+                used_sources=body.usedSources,
+                ask_next=body.askNext,
+            )
+            async for chunk in stream:
+                if isinstance(chunk, dict):
+                    yield f"data: {json.dumps({'type': 'metadata', 'data': chunk})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
+        except Exception as exc:
+            logger.error(f"Exam turn stream failed: {exc}")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Dịch vụ AI đang gặp sự cố. Vui lòng thử lại sau.'})}\n\n"
 
-    return ExamGradeResponse(
-        data=ExamGradeResponseData(
-            verdict=verdict,
-            feedback=feedback,
-            tokenUsage=TokenUsage(
-                promptTokens=prompt_tokens,
-                completionTokens=completion_tokens,
-                totalTokens=prompt_tokens + completion_tokens,
-            ),
-        )
-    )
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ── POST /v1/ai/tts ───────────────────────────────────────────────────────────

@@ -3,10 +3,12 @@
 import json
 import logging
 import random
+import re
 from typing import List
 
 from history_talk_ai.application.chat import service as llm_service
 from history_talk_ai.application.prompting.prompt_builder import (
+    build_exam_follow_up_prompt,
     build_exam_grading_prompt,
     build_exam_question_prompt,
 )
@@ -15,13 +17,28 @@ from history_talk_ai.dataaccess.java_backend.historical_context_schema import Hi
 
 logger = logging.getLogger(__name__)
 
+# Web and mobile render the parts around this separator as separate chat bubbles.
+BUBBLE_SEPARATOR = "\n---\n"
+
 _QUESTION_TEMPERATURE = 0.5
 _GRADING_TEMPERATURE = 0.1
 _MAX_JSON_ATTEMPTS = 2
 _SOURCE_CANDIDATES = 10
+_FOLLOW_UP_CANDIDATES = 3
 _MIN_CHUNK_CHARS = 80
 _MAX_FALLBACK_SOURCE_CHARS = 4000
-_VERDICTS = {"CORRECT", "PARTIAL", "INCORRECT"}
+
+# INCORRECT comes first so it is not read as CORRECT.
+_VERDICT_RE = re.compile(r"(INCORRECT|PARTIAL|CORRECT)")
+_FEEDBACK_LABEL_RE = re.compile(r"\s*\**\s*NHẬN XÉT\s*\**\s*:\s*\**\s*", re.IGNORECASE)
+_QUESTION_LABEL_RE = re.compile(r"\s*\**\s*CÂU HỎI\s*\**\s*:\s*\**\s*", re.IGNORECASE)
+# The question is one line, so a new line or the answer marker ends it and the answer is never streamed.
+_QUESTION_END_RE = re.compile(r"\n|\**\s*ĐÁP ÁN\s*\**\s*:", re.IGNORECASE)
+_ANSWER_RE = re.compile(r"ĐÁP ÁN\s*\**\s*:\s*\**\s*(.+)", re.IGNORECASE | re.DOTALL)
+_MISSING_ANSWER_KEY = "Xem tư liệu."
+_LABEL_HOLD_CHARS = 12
+_STOP_HOLD_CHARS = 16
+_VERDICT_HOLD_CHARS = 80
 
 
 class ExamSourceUnavailableError(Exception):
@@ -66,9 +83,15 @@ async def _pick_source(
     character: CharacterData,
     context: HistoricalContextData | None,
     used_sources: List[str],
+    focus: str | None = None,
 ) -> str:
-    """Pick an unused document chunk, falling back to the character's background text."""
+    """
+    Pick an unused document chunk, falling back to the character's background text.
+    With a focus, the closest chunks to it are preferred so the question follows on from it.
+    """
     query = f"{character.name} {context.name}" if context else character.name
+    if focus:
+        query = f"{query} {focus}"
     chunks: List[str] = []
 
     query_vector = await llm_service.get_embedding_from_ollama(query)
@@ -91,8 +114,10 @@ async def _pick_source(
             logger.error(f"Supabase RPC error while picking exam source: {e}")
 
     unused = [chunk for chunk in chunks if chunk not in used_sources]
-    if unused or chunks:
-        return random.choice(unused or chunks)
+    candidates = unused or chunks
+    if candidates:
+        # Chunks come back closest first.
+        return random.choice(candidates[:_FOLLOW_UP_CANDIDATES] if focus else candidates)
 
     fallback_parts = [character.background]
     if context and context.description:
@@ -146,18 +171,160 @@ async def generate_exam_question(
     )
 
 
-async def grade_exam_answer(
+def _visible_part(full: str, label_re: re.Pattern, stop_re: re.Pattern | None, final: bool) -> str:
+    """The part of a streamed reply the learner may see: without its label, and cut before stop_re."""
+    if not final and len(full.lstrip()) < _LABEL_HOLD_CHARS:
+        return ""
+    label = label_re.match(full)
+    text = full[label.end():] if label else full.lstrip()
+
+    stop = stop_re.search(text) if stop_re else None
+    if stop:
+        return text[:stop.start()].rstrip()
+    if final:
+        return text.rstrip()
+    # The answer marker may still be arriving, so the tail is held back until it can be ruled out.
+    return text[:max(0, len(text) - _STOP_HOLD_CHARS)] if stop_re else text
+
+
+async def _stream_feedback(prompt: str):
+    """Yields feedback text chunks, then a dict with the verdict, the full feedback and token counts."""
+    buffer = ""
+    verdict = None
+    body = ""
+    emitted = ""
+    tokens = {"prompt_tokens": 0, "completion_tokens": 0}
+
+    async for chunk in llm_service._call_llm_stream(
+        [{"role": "user", "content": prompt}], temperature=_GRADING_TEMPERATURE
+    ):
+        if isinstance(chunk, dict):
+            tokens = chunk
+            continue
+        if verdict is None:
+            buffer += chunk
+            split = _split_verdict(buffer, final=False)
+            if split is None:
+                continue
+            verdict, body = split
+        else:
+            body += chunk
+
+        visible = _visible_part(body, _FEEDBACK_LABEL_RE, None, final=False)
+        if len(visible) > len(emitted):
+            yield visible[len(emitted):]
+            emitted = visible
+
+    if verdict is None:
+        verdict, body = _split_verdict(buffer, final=True)
+    feedback = _visible_part(body, _FEEDBACK_LABEL_RE, None, final=True)
+    if not feedback:
+        raise ValueError("LLM returned a verdict without feedback")
+    if len(feedback) > len(emitted):
+        yield feedback[len(emitted):]
+
+    yield {"verdict": verdict, "feedback": feedback, **tokens}
+
+
+def _split_verdict(buffer: str, final: bool) -> tuple[str, str] | None:
+    """
+    Splits "KẾT QUẢ: CORRECT\\nnhận xét" into the verdict and the feedback.
+    Returns None while the header may still be arriving.
+    """
+    match = _VERDICT_RE.search(buffer)
+    if not match:
+        if final or len(buffer) >= _VERDICT_HOLD_CHARS:
+            raise ValueError(f"No exam verdict in LLM output: {buffer[:200]}")
+        return None
+    rest = buffer[match.end():]
+    if "\n" not in rest and not final and len(buffer) < _VERDICT_HOLD_CHARS:
+        return None
+    return match.group(1), rest.lstrip(" :.-*\n")
+
+
+async def _stream_follow_up_question(prompt: str):
+    """Yields question text chunks, then a dict with the question, its hidden answer and token counts."""
+    full = ""
+    emitted = ""
+    tokens = {"prompt_tokens": 0, "completion_tokens": 0}
+
+    async for chunk in llm_service._call_llm_stream(
+        [{"role": "user", "content": prompt}], temperature=_QUESTION_TEMPERATURE
+    ):
+        if isinstance(chunk, dict):
+            tokens = chunk
+            continue
+        full += chunk
+        visible = _visible_part(full, _QUESTION_LABEL_RE, _QUESTION_END_RE, final=False)
+        if len(visible) > len(emitted):
+            yield visible[len(emitted):]
+            emitted = visible
+
+    question = _visible_part(full, _QUESTION_LABEL_RE, _QUESTION_END_RE, final=True)
+    if not question:
+        raise ValueError(f"No exam question in LLM output: {full[:200]}")
+    if len(question) > len(emitted):
+        yield question[len(emitted):]
+
+    answer = _ANSWER_RE.search(full)
+    expected_answer = answer.group(1).strip() if answer else ""
+    yield {
+        "question": question,
+        "expectedAnswer": expected_answer or _MISSING_ANSWER_KEY,
+        **tokens,
+    }
+
+
+async def stream_exam_turn(
     character: CharacterData,
+    context: HistoricalContextData | None,
     question: str,
     expected_answer: str,
     source: str,
     answer: str,
-) -> tuple[str, str, int, int]:
-    """Returns (verdict, feedback, prompt_tokens, completion_tokens)."""
-    prompt = build_exam_grading_prompt(character, question, expected_answer, source, answer)
+    asked_questions: List[str],
+    used_sources: List[str],
+    ask_next: bool,
+):
+    """
+    Grades the answer and, unless the exam is over, asks a follow-up question built on that answer.
 
-    parsed, prompt_tokens, completion_tokens = await _call_llm_for_json(prompt, _GRADING_TEMPERATURE)
-    verdict = _clean_text(parsed, "verdict").upper()
-    if verdict not in _VERDICTS:
-        raise ValueError(f"Unknown exam verdict from LLM: {verdict}")
-    return verdict, _clean_text(parsed, "feedback"), prompt_tokens, completion_tokens
+    Yields visible text chunks (feedback, then "\\n---\\n" and the next question) and finally a dict
+    with the verdict and the next answer key, which only the Java backend may see.
+    """
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    grading_prompt = build_exam_grading_prompt(character, question, expected_answer, source, answer)
+    graded: dict = {}
+    async for chunk in _stream_feedback(grading_prompt):
+        if isinstance(chunk, dict):
+            graded = chunk
+        else:
+            yield chunk
+    prompt_tokens += graded["prompt_tokens"]
+    completion_tokens += graded["completion_tokens"]
+
+    result = {"verdict": graded["verdict"], "feedback": graded["feedback"]}
+
+    if ask_next:
+        # Searching with the learner's own words makes the next question continue from what they said.
+        next_source = await _pick_source(character, context, used_sources + [source], focus=f"{question} {answer}")
+        follow_up_prompt = build_exam_follow_up_prompt(
+            character, context, next_source, asked_questions, question, answer, graded["verdict"]
+        )
+        asked: dict = {}
+        separator_sent = False
+        async for chunk in _stream_follow_up_question(follow_up_prompt):
+            if isinstance(chunk, dict):
+                asked = chunk
+                continue
+            if not separator_sent:
+                yield BUBBLE_SEPARATOR
+                separator_sent = True
+            yield chunk
+        prompt_tokens += asked["prompt_tokens"]
+        completion_tokens += asked["completion_tokens"]
+        result.update(question=asked["question"], expectedAnswer=asked["expectedAnswer"], sourceExcerpt=next_source)
+
+    yield {**result, "promptTokens": prompt_tokens, "completionTokens": completion_tokens}

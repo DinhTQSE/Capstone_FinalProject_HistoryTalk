@@ -1,6 +1,7 @@
 package com.historytalk.service.chat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.chat.ExamProgressResponse;
 import com.historytalk.dto.chat.SendMessageRequest;
@@ -16,7 +17,6 @@ import com.historytalk.repository.MessageRepository;
 import com.historytalk.service.character.CharacterPronouns;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
 import com.historytalk.service.chat.AiServiceClient.ContextPayload;
-import com.historytalk.service.chat.AiServiceClient.ExamGradeResult;
 import com.historytalk.service.chat.AiServiceClient.ExamQuestionResult;
 import com.historytalk.service.gamification.GamificationService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +29,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * LLM calls take seconds and the connection pool is small, so no transaction stays open across them:
@@ -42,6 +48,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     /** Both web and mobile render the parts around this separator as separate chat bubbles. */
     private static final String BUBBLE_SEPARATOR = "\n---\n";
     private static final String NO_CONTEXT_ID = "00000000-0000-0000-0000-000000000000";
+    private static final long TURN_TIMEOUT_SECONDS = 180;
 
     private final MessageRepository messageRepository;
     private final ChatSessionRepository chatSessionRepository;
@@ -74,7 +81,13 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     public Message startExam(UUID sessionId) {
         ExamContext context = transactionTemplate.execute(status -> buildContext(loadSession(sessionId)));
 
-        ExamQuestionResult first = askQuestion(context, List.of());
+        ExamQuestionResult first = aiServiceClient.generateExamQuestion(
+                context.characterId(),
+                context.contextId(),
+                context.characterData(),
+                context.contextData(),
+                List.of(),
+                List.of());
 
         String opening = CharacterPronouns.capitalize(context.selfPronoun()) + " là " + context.characterName()
                 + ". Hôm nay " + context.selfPronoun() + " sẽ hỏi " + context.addressPronoun() + " "
@@ -97,53 +110,142 @@ public class ExamSessionServiceImpl implements ExamSessionService {
 
     @Override
     public ExamTurnResult submitAnswer(UUID sessionId, SendMessageRequest request) {
-        PreparedAnswer prepared = transactionTemplate.execute(status -> prepareAnswer(sessionId, request));
-
-        ExamGradeResult grade;
-        ExamQuestionResult next = null;
-        ExamProgressResponse progress;
-        ExamVerdict verdict;
-        try {
-            Message current = prepared.currentQuestion();
-            grade = aiServiceClient.gradeExamAnswer(
-                    prepared.context().characterId(),
-                    prepared.context().contextId(),
-                    prepared.context().characterData(),
-                    prepared.context().contextData(),
-                    current.getExamQuestion(),
-                    current.getExamExpectedAnswer(),
-                    current.getExamSource(),
-                    request.getContent());
-            verdict = parseVerdict(grade.verdict());
-
-            List<Message> graded = new ArrayList<>(prepared.existingMessages());
-            graded.add(Message.builder().examVerdict(verdict).build());
-            progress = computeProgress(prepared.context().totalQuestions(), graded);
-
-            if (!progress.isFinished()) {
-                next = askQuestion(prepared.context(), prepared.existingMessages());
+        CompletableFuture<ExamTurnResult> result = new CompletableFuture<>();
+        streamAnswer(sessionId, request, new ExamStreamListener() {
+            @Override
+            public void onText(String text) {
             }
-        } catch (RuntimeException e) {
-            // The learner can answer again, so a failed turn leaves nothing behind.
-            discard(prepared.userMessage());
-            throw e;
-        }
 
-        int promptTokens = promptTokensOf(grade.tokenUsage()) + (next != null ? promptTokensOf(next.tokenUsage()) : 0);
-        int completionTokens = completionTokensOf(grade.tokenUsage())
-                + (next != null ? completionTokensOf(next.tokenUsage()) : 0);
+            @Override
+            public void onComplete(ExamTurnResult turn) {
+                result.complete(turn);
+            }
+
+            @Override
+            public void onError(RuntimeException error) {
+                result.completeExceptionally(error);
+            }
+        });
+
+        try {
+            return result.get(TURN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            throw e.getCause() instanceof RuntimeException runtime ? runtime : new SystemException(e.getMessage());
+        } catch (TimeoutException e) {
+            throw new SystemException("Dịch vụ AI không trả lời. Vui lòng thử lại.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SystemException("Lượt vấn đáp bị gián đoạn.");
+        }
+    }
+
+    @Override
+    public void streamAnswer(UUID sessionId, SendMessageRequest request, ExamStreamListener listener) {
+        PreparedAnswer prepared = transactionTemplate.execute(status -> prepareAnswer(sessionId, request));
+        ExamContext context = prepared.context();
+        Message current = prepared.currentQuestion();
+
+        int answeredBefore = computeProgress(context.totalQuestions(), prepared.existingMessages()).getAnsweredQuestions();
+        boolean askNext = answeredBefore + 1 < context.totalQuestions();
+
+        List<Message> questionMessages = prepared.existingMessages().stream()
+                .filter(m -> m.getExamQuestion() != null)
+                .toList();
+
+        AiServiceClient.ExamTurnRequest turnRequest = new AiServiceClient.ExamTurnRequest(
+                context.characterId(),
+                context.contextId(),
+                context.characterData(),
+                context.contextData(),
+                current.getExamQuestion(),
+                current.getExamExpectedAnswer(),
+                current.getExamSource(),
+                request.getContent(),
+                questionMessages.stream().map(Message::getExamQuestion).toList(),
+                questionMessages.stream().map(Message::getExamSource).filter(Objects::nonNull).toList(),
+                askNext);
+
+        AtomicReference<JsonNode> metadata = new AtomicReference<>();
+        AtomicReference<String> aiError = new AtomicReference<>();
+        AtomicBoolean finished = new AtomicBoolean(false);
+
+        aiServiceClient.streamExamTurn(
+                turnRequest,
+                line -> {
+                    if (!line.startsWith("data: ")) {
+                        return;
+                    }
+                    try {
+                        JsonNode node = objectMapper.readTree(line.substring(6));
+                        switch (node.path("type").asText()) {
+                            case "text" -> listener.onText(node.path("data").asText());
+                            case "metadata" -> metadata.set(node.path("data"));
+                            case "error" -> aiError.set(node.path("message").asText());
+                            default -> {
+                            }
+                        }
+                    } catch (JsonProcessingException e) {
+                        log.warn("Skipping malformed exam stream line: {}", e.getMessage());
+                    }
+                },
+                () -> {
+                    if (!finished.compareAndSet(false, true)) {
+                        return;
+                    }
+                    ExamTurnResult turn;
+                    try {
+                        if (aiError.get() != null || metadata.get() == null) {
+                            throw new SystemException(aiError.get() != null
+                                    ? aiError.get()
+                                    : "Dịch vụ AI không trả lời. Vui lòng thử lại.");
+                        }
+                        turn = finishAnswer(sessionId, prepared, metadata.get(), askNext);
+                    } catch (RuntimeException e) {
+                        // The learner can answer again, so a failed turn leaves nothing behind.
+                        discard(prepared.userMessage());
+                        listener.onError(e);
+                        return;
+                    }
+                    // Only the closing text is not streamed by the AI service, since Java computes the score.
+                    if (!askNext) {
+                        listener.onText(BUBBLE_SEPARATOR + closingText(turn.progress(), context.addressPronoun()));
+                    }
+                    listener.onComplete(turn);
+                },
+                error -> {
+                    if (!finished.compareAndSet(false, true)) {
+                        return;
+                    }
+                    log.error("AI exam stream error", error);
+                    discard(prepared.userMessage());
+                    listener.onError(new SystemException("Dịch vụ AI không khả dụng. Vui lòng thử lại."));
+                });
+    }
+
+    private ExamTurnResult finishAnswer(UUID sessionId, PreparedAnswer prepared, JsonNode metadata, boolean askNext) {
+        ExamVerdict verdict = parseVerdict(metadata.path("verdict").asText(null));
+        String feedback = requiredText(metadata, "feedback");
+        String nextQuestion = askNext ? requiredText(metadata, "question") : null;
+
+        List<Message> graded = new ArrayList<>(prepared.existingMessages());
+        graded.add(Message.builder().examVerdict(verdict).build());
+        ExamProgressResponse progress = computeProgress(prepared.context().totalQuestions(), graded);
+
+        // Prompt tokens already come divided by 10 from the AI service.
+        int promptTokens = metadata.path("promptTokens").asInt(0);
+        int completionTokens = metadata.path("completionTokens").asInt(0);
 
         // The excerpt held the answer, so it only becomes a visible citation once the question is graded.
         Message assistantMessage = Message.builder()
-                .content(grade.feedback() + BUBBLE_SEPARATOR
-                        + (next != null ? next.question() : closingText(progress, prepared.context().addressPronoun())))
+                .content(feedback + BUBBLE_SEPARATOR
+                        + (nextQuestion != null ? nextQuestion : closingText(progress, prepared.context().addressPronoun())))
                 .isFromAi(true)
                 .messageType(prepared.messageType())
                 .examVerdict(verdict)
                 .quotes(serializeQuotes(prepared.currentQuestion().getExamSource()))
-                .examQuestion(next != null ? next.question() : null)
-                .examExpectedAnswer(next != null ? next.expectedAnswer() : null)
-                .examSource(next != null ? next.sourceExcerpt() : null)
+                .examQuestion(nextQuestion)
+                .examExpectedAnswer(nextQuestion != null ? requiredText(metadata, "expectedAnswer") : null)
+                .examSource(nextQuestion != null ? requiredText(metadata, "sourceExcerpt") : null)
                 .token(completionTokens)
                 .build();
 
@@ -222,20 +324,6 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
     }
 
-    private ExamQuestionResult askQuestion(ExamContext context, List<Message> existingMessages) {
-        List<Message> questionMessages = existingMessages.stream()
-                .filter(m -> m.getExamQuestion() != null)
-                .toList();
-
-        return aiServiceClient.generateExamQuestion(
-                context.characterId(),
-                context.contextId(),
-                context.characterData(),
-                context.contextData(),
-                questionMessages.stream().map(Message::getExamQuestion).toList(),
-                questionMessages.stream().map(Message::getExamSource).filter(Objects::nonNull).toList());
-    }
-
     private ExamProgressResponse computeProgress(int total, List<Message> messages) {
         int correct = 0;
         int partial = 0;
@@ -289,12 +377,12 @@ public class ExamSessionServiceImpl implements ExamSessionService {
         }
     }
 
-    private int promptTokensOf(AiMetricsService.TokenUsage usage) {
-        return usage != null && usage.promptTokens() != null ? usage.promptTokens() : 0;
-    }
-
-    private int completionTokensOf(AiMetricsService.TokenUsage usage) {
-        return usage != null && usage.completionTokens() != null ? usage.completionTokens() : 0;
+    private String requiredText(JsonNode metadata, String field) {
+        String value = metadata.path(field).asText("").trim();
+        if (value.isEmpty()) {
+            throw new SystemException("Dịch vụ AI trả về lượt vấn đáp thiếu " + field);
+        }
+        return value;
     }
 
     private String serializeQuotes(String source) {

@@ -89,24 +89,93 @@ def test_question_without_any_source_is_rejected(monkeypatch):
         asyncio.run(exam_service.generate_exam_question(_character(background=" "), None, [], []))
 
 
-def test_grade_retries_once_on_malformed_json_and_counts_both_calls(monkeypatch):
-    calls = _stub_llm(monkeypatch, "không phải json", '{"verdict": "partial", "feedback": "Còn thiếu ý."}')
+def _stub_stream(monkeypatch, *replies):
+    """Each reply is a list of chunks streamed by one LLM call."""
+    calls = []
+    pending = list(replies)
 
-    verdict, feedback, prompt_tokens, completion_tokens = asyncio.run(
-        exam_service.grade_exam_answer(_character(), "Hỏi?", "Đáp", "Tư liệu", "Trả lời")
+    async def fake_stream(messages, temperature=None):
+        calls.append({"messages": messages, "temperature": temperature})
+        for chunk in pending.pop(0):
+            yield chunk
+        yield {"prompt_tokens": 10, "completion_tokens": 5}
+
+    monkeypatch.setattr(exam_service.llm_service, "_call_llm_stream", fake_stream)
+    return calls
+
+
+def _run_turn(ask_next=True, used_sources=None):
+    async def collect():
+        items = []
+        async for item in exam_service.stream_exam_turn(
+            _character(), None, "Ta dùng kế gì?", "Cọc gỗ", CHUNK_A, "Cắm cọc gỗ dưới sông",
+            ["Ta dùng kế gì?"], used_sources or [CHUNK_A], ask_next,
+        ):
+            items.append(item)
+        return items
+
+    items = asyncio.run(collect())
+    return "".join(i for i in items if isinstance(i, str)), items[-1]
+
+
+def test_turn_streams_feedback_then_a_follow_up_without_its_answer(monkeypatch):
+    captured = _stub_chunks(monkeypatch, [CHUNK_A, CHUNK_B])
+    calls = _stub_stream(
+        monkeypatch,
+        ["KẾT QUẢ: COR", "RECT\nNHẬN XÉT: Đúng ", "vậy, ngươi nhớ rõ."],
+        ["CÂU HỎI: Sau trận ấy ta ", "đóng đô ở đâu?\nĐÁP", " ÁN: Cổ Loa"],
     )
 
-    assert (verdict, feedback) == ("PARTIAL", "Còn thiếu ý.")
-    assert (prompt_tokens, completion_tokens) == (20, 10)
-    assert len(calls) == 2
+    text, metadata = _run_turn()
+
+    assert text == "Đúng vậy, ngươi nhớ rõ.\n---\nSau trận ấy ta đóng đô ở đâu?"
+    assert "Cổ Loa" not in text
+    assert metadata == {
+        "verdict": "CORRECT",
+        "feedback": "Đúng vậy, ngươi nhớ rõ.",
+        "question": "Sau trận ấy ta đóng đô ở đâu?",
+        "expectedAnswer": "Cổ Loa",
+        "sourceExcerpt": CHUNK_B,
+        "promptTokens": 20,
+        "completionTokens": 10,
+    }
     assert calls[0]["temperature"] == exam_service._GRADING_TEMPERATURE
+    # The next question is searched and written from the learner's own answer.
+    assert "Cắm cọc gỗ dưới sông" in captured["query"]
+    assert "Cắm cọc gỗ dưới sông" in calls[1]["messages"][0]["content"]
+    assert "ĐÚNG" in calls[1]["messages"][0]["content"]
 
 
-def test_grade_rejects_unknown_verdict(monkeypatch):
-    _stub_llm(monkeypatch, '{"verdict": "FULL_MARKS", "feedback": "Tốt."}')
+def test_answer_marker_on_the_same_line_is_never_streamed(monkeypatch):
+    _stub_chunks(monkeypatch, [CHUNK_B])
+    _stub_stream(
+        monkeypatch,
+        ["KẾT QUẢ: INCORRECT\nChưa đúng, ta dùng cọc gỗ."],
+        ["CÂU HỎI: Ta đóng đô ở đâu? **Đáp án:** Cổ Loa"],
+    )
+
+    text, metadata = _run_turn()
+
+    assert metadata["verdict"] == "INCORRECT"
+    assert text.endswith("\n---\nTa đóng đô ở đâu?")
+    assert metadata["expectedAnswer"].startswith("Cổ Loa")
+
+
+def test_last_answer_is_graded_without_asking_again(monkeypatch):
+    calls = _stub_stream(monkeypatch, ["KẾT QUẢ: PARTIAL Còn thiếu ý."])
+
+    text, metadata = _run_turn(ask_next=False)
+
+    assert text == "Còn thiếu ý."
+    assert metadata == {"verdict": "PARTIAL", "feedback": "Còn thiếu ý.", "promptTokens": 10, "completionTokens": 5}
+    assert len(calls) == 1
+
+
+def test_reply_without_a_verdict_fails_instead_of_guessing(monkeypatch):
+    _stub_stream(monkeypatch, ["Câu trả lời rất hay, ngươi giỏi lắm."])
 
     with pytest.raises(ValueError):
-        asyncio.run(exam_service.grade_exam_answer(_character(), "Hỏi?", "Đáp", "Tư liệu", "Trả lời"))
+        _run_turn()
 
 
 def test_grading_prompt_keeps_answers_with_braces_and_marks_them_as_data():

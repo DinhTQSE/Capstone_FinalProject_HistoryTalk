@@ -19,11 +19,11 @@ Trong chế độ vấn đáp, **nhân vật hỏi và chấm, người học tr
 ### Luồng một buổi vấn đáp
 1. `POST /chat/sessions` với `mode: "EXAM"`. BE trả session, và tin nhắn đầu tiên đã chứa câu hỏi số 1.
 2. `GET /chat/sessions/{id}/messages` để hiển thị tin nhắn đó.
-3. Người học trả lời qua `POST /chat/messages`.
-4. Response gồm nhận xét, kết quả chấm và câu hỏi tiếp theo. Lặp lại bước 3.
+3. Người học trả lời qua `POST /chat/messages/stream` (hoặc `POST /chat/messages`).
+4. Nhận xét chạy chữ trước, sau đó là `---` và câu hỏi tiếp theo. Câu tiếp theo được nhân vật đặt **dựa trên câu trả lời vừa rồi**, không sinh sẵn. Kết quả chấm và tiến độ về ở event cuối. Lặp lại bước 3.
 5. Khi `exam.finished = true`: khóa ô nhập và hiện điểm. Gửi thêm sẽ nhận lỗi `400`.
 
-**Khuyến nghị:** dùng `POST /chat/messages` (không stream) cho vấn đáp, vì câu trả lời vẫn về một lần. API stream vẫn hoạt động, xem mục 2.3.
+**Khuyến nghị:** dùng `POST /chat/messages/stream` cho vấn đáp, giống chat thường, để chữ chạy dần và đọc giọng sớm. Xem mục 2.3.
 
 ---
 
@@ -46,7 +46,7 @@ Chat thường không đổi: không gửi `mode` thì vẫn là `CHAT`.
 | Trường | Bắt buộc | Mô tả |
 |---|---|---|
 | `mode` | Không | `CHAT` (mặc định) hoặc `EXAM` |
-| `examQuestionCount` | Không | Từ 3 đến 10, mặc định 5. Chỉ dùng với `EXAM` |
+| `examQuestionCount` | Không | Từ 3 đến 10, mặc định 5. Chỉ dùng với `EXAM`. Tài khoản `CUSTOMER` chưa mua gói luôn bị giới hạn 2 câu, đọc số câu thật từ `examQuestionCount` trong response |
 
 #### Response `201`: các trường mới
 ```json
@@ -125,17 +125,27 @@ Các lỗi hết token và khóa gói vẫn giống chat thường.
 
 ---
 
-### 2.3. Stream: `POST /chat/messages/stream`
+### 2.3. Stream: `POST /chat/messages/stream` (nên dùng)
 
-Vẫn dùng được cho vấn đáp, cùng định dạng event. Nhưng toàn bộ nội dung nằm trong **một** event `text`, không có chữ chạy dần:
+Request và định dạng event giống chat thường. Chữ chạy dần theo thứ tự:
+
+1. Nhận xét câu vừa trả lời.
+2. `\n---\n`, rồi câu hỏi tiếp theo, do nhân vật đặt dựa trên câu trả lời vừa rồi.
+3. Ở câu cuối: `\n---\n` rồi lời tổng kết điểm, thay cho câu hỏi.
 
 ```text
-data:{"type":"text","data":"Nhận xét\n---\nCâu tiếp theo?"}
+data:{"type":"text","data":"Ngươi đã nêu được "}
+data:{"type":"text","data":"một phần."}
+data:{"type":"text","data":"\n---\n"}
+data:{"type":"text","data":"Vậy sau trận ấy, ta đóng đô ở đâu?"}
 data:{"type":"metadata","data":{"suggestedQuestions":[],"promptTokens":59,"completionTokens":56,"quotes_used":["..."],"examVerdict":"PARTIAL","exam":{"totalQuestions":5,"answeredQuestions":1,"correctCount":0,"partialCount":1,"incorrectCount":0,"score":1.0,"finished":false}}}
 data:{"type":"done","remainingTokens":99993903}
 ```
 
-Nếu dùng stream, phải đọc `examVerdict` và `exam` trong `metadata`.
+* `examVerdict` và `exam` chỉ có trong `metadata`, tức là sau khi chữ đã chạy xong. Nhãn Đúng / Một phần / Sai hiện lúc đó.
+* Đáp án của câu tiếp theo không bao giờ nằm trong stream.
+* AI lỗi giữa chừng thì có event `error` rồi `done`, kể cả khi đã nhận một phần chữ. Câu trả lời **không được lưu**: xóa phần chữ dở, báo lỗi và cho gửi lại.
+* Buổi đã kết thúc thì trả HTTP `400` JSON ngay, không mở stream.
 
 ---
 
@@ -209,16 +219,17 @@ Session không bị khóa. Người dùng sửa nội dung là gửi tiếp đư
 - [ ] Hiển thị "Câu X/Y" và điểm từ `exam`. Số câu đang hỏi: `answeredQuestions + 1`.
 - [ ] Hiện nhãn Đúng / Một phần / Sai từ `examVerdict`.
 - [ ] Ẩn câu hỏi gợi ý.
-- [ ] Hiện trạng thái chờ như "Nhân vật đang chấm bài...", vì mỗi lượt mất khoảng 7–8 giây.
+- [ ] Dùng API stream cho câu trả lời vấn đáp, hiện chữ chạy dần và đọc giọng từng câu như chat thường. Hiện "Nhân vật đang chấm bài..." tới khi có chữ đầu tiên.
 - [ ] Khóa nút gửi trong lúc chờ. BE chưa chặn gửi trùng, nên gửi 2 lần có thể bị chấm 2 lần.
 - [ ] Khi `finished = true`, khóa ô nhập và hiện màn hình điểm.
 - [ ] Mở lại session phải đọc `exam` từ API messages.
 - [ ] Gắn nhãn "Vấn đáp" trong lịch sử theo `mode`.
 - [ ] Bỏ `---` trước khi gửi nội dung sang đọc giọng nói.
+- [x] Web: `sendExamAnswer` đã chuyển sang `chatService.sendMessageStream`, `onDone` có thêm `exam` và `examVerdict`.
 - [ ] Đặt timeout tạo session và gửi câu trả lời đủ dài, như API chat hiện tại (90 giây trở lên).
 
 ### Mobile
-`chatApi.streamMessage` chỉ trả về chữ và bỏ qua `metadata`. Để lấy `exam`, dùng `chatApi.sendMessage` cho vấn đáp, hoặc gọi lại API messages sau mỗi lượt.
+`chatApi.streamMessage` chỉ trả về chữ và bỏ qua `metadata`. Muốn stream vấn đáp thì phải đọc thêm `examVerdict` và `exam` trong `metadata`. Nếu chưa sửa kịp, dùng tạm `chatApi.sendMessage` (không chạy chữ), hoặc gọi lại API messages sau mỗi lượt.
 
 ---
 
@@ -251,7 +262,7 @@ Số đo trên production ngày 05/11/2026, với GPU `qwen3.8:27b`, đo từ m�
 | Chat không có tài liệu: chữ đầu tiên | khoảng 2,9 giây |
 | Chat: tổng cả câu hỏi gợi ý | 7–9 giây |
 | Tạo session vấn đáp | khoảng 4,4 giây |
-| Một lượt vấn đáp, có câu tiếp theo | 7,6–8 giây |
+| Một lượt vấn đáp, có câu tiếp theo | 7,6–8 giây khi chưa stream. Bản stream chưa đo lại trên production |
 
 * **Chưa đạt mục tiêu 3 giây** với chat có tài liệu và vấn đáp.
 * **Chấm điểm còn khắt khe, giọng nhận xét còn nặng** (có câu "Ngươi thật vô dụng!"). Prompt sẽ được chỉnh ở BE, API không đổi.
