@@ -60,6 +60,20 @@ class QuizCsvFileReaderTest {
     }
 
     @Test
+    void rowsOfOnlyCommasFromClearedExcelCellsAreSkipped() {
+        List<CSVRecord> records = reader.read(file(utf8(HEADER + "EASY,Q1\n,\n , \n")));
+
+        assertThat(records).hasSize(1);
+    }
+
+    @Test
+    void fileWithOnlyCommaRowsFails() {
+        assertThatThrownBy(() -> reader.read(file(utf8(HEADER + ",\n,\n"))))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessage("File CSV không chứa hàng dữ liệu hợp lệ nào");
+    }
+
+    @Test
     void fileWithoutTitleAndContextIdColumnsIsAccepted() {
         assertThat(reader.read(file(utf8(HEADER + "EASY,Câu 1\n")))).hasSize(1);
     }

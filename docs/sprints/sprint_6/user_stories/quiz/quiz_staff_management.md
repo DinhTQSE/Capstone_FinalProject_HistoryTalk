@@ -50,11 +50,11 @@
   5. **Xoá cứng:** `DELETE /api/v1/staff/quizzes/{quizId}` — xoá hoàn toàn.
   6. **Xoá mềm:** `PATCH /api/v1/staff/quizzes/{quizId}/soft-delete` — set `deletedAt = NOW()`.
   7. **Import CSV:**
-     - `POST /api/v1/staff/quizzes/import` (multipart/form-data, key = `file`).
-     - File phải đủ 10 cột header bắt buộc, định dạng UTF-8.
-     - Mỗi title duy nhất tạo 1 quiz. Quiz import được tạo ở trạng thái **draft** (`isPublished = false`).
-     - Quiz có title trùng hoặc lỗi validation → bị skip, ghi vào `errors[]`.
-     - `HTTP 200`: `{ totalQuizzesAttempted, successCount, skippedCount, errors[], imported[] }`.
+     - Trên UI người dùng chọn bối cảnh, nhập tên quiz, rồi chọn file CSV câu hỏi.
+     - `POST /api/v1/staff/quizzes/import` (multipart/form-data) với các part `file` (.csv), `contextId` (UUID), `title` (≤ 255 ký tự). Mỗi lần gọi tạo **đúng 1 quiz** ở trạng thái **draft** (`isPublished = false`).
+     - File UTF-8, dấu phẩy; mỗi dòng dữ liệu là 1 câu hỏi. Cột bắt buộc: `level`, `questionContent` (đủ cột xem template `GET /api/v1/staff/quizzes/import/template`). Dòng bắt đầu bằng `#` là ghi chú; dòng chỉ toàn dấu phẩy bị bỏ qua.
+     - Tất cả hoặc không gì cả: nếu có câu hỏi sai → `HTTP 400` liệt kê mọi câu lỗi (`Câu hỏi N: ...`), không lưu câu nào. Tên rỗng/quá dài hoặc `contextId` sai định dạng → `HTTP 400`; bối cảnh không tồn tại/đã xoá → `HTTP 404`; tên quiz trùng → `HTTP 409`.
+     - `HTTP 200`: `QuizStaffResponse` của quiz vừa tạo.
 
 ---
 

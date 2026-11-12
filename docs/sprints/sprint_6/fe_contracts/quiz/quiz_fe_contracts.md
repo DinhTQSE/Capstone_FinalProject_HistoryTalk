@@ -400,7 +400,7 @@
 - MULTIPLE_CHOICE: `correctAnswer` là số thứ tự đáp án **đếm từ 0** (option1 = 0), nhiều đáp án ngăn bằng `|` (vd `0|2`).
 - FILL_IN_BLANK: để trống option; `correctAnswer` = các đáp án chấp nhận ngăn bằng `|`.
 - MATCHING: mỗi option là `Vế trái => Vế phải`; để trống `correctAnswer`.
-- Dòng bắt đầu bằng `#` là ghi chú, bị bỏ qua. Cột `title`/`contextId` nếu còn trong file cũ cũng bị bỏ qua.
+- Dòng bắt đầu bằng `#` là ghi chú, bị bỏ qua; dòng chỉ toàn dấu phẩy (ô Excel đã xoá) cũng bị bỏ qua. Cột `title`/`contextId` nếu còn trong file cũ cũng bị bỏ qua.
 - Template: `GET /staff/quizzes/import/template`; file mẫu có hướng dẫn: `quiz_import_template.csv` (cùng thư mục).
 
 **Response 200:** `QuizStaffResponse` của quiz vừa tạo (`isPublished = false`).

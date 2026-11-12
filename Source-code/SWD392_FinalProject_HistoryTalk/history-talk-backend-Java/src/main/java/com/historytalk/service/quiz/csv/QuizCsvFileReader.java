@@ -64,7 +64,10 @@ public class QuizCsvFileReader {
         List<CSVRecord> records;
         try (CSVParser parser = FORMAT.parse(new StringReader(content))) {
             validateHeaders(parser.getHeaderMap());
-            records = parser.getRecords();
+            // Excel writes cleared rows in the used range as ",,,," — not empty lines, so skip them here
+            records = parser.getRecords().stream()
+                    .filter(record -> record.stream().anyMatch(value -> value != null && !value.isBlank()))
+                    .toList();
         } catch (InvalidRequestException e) {
             throw e;
         } catch (IOException | UncheckedIOException | IllegalArgumentException | IllegalStateException e) {
