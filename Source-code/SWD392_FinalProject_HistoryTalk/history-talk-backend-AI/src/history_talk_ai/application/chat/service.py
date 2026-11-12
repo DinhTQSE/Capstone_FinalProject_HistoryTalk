@@ -674,6 +674,8 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
     return (
         f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
         "LỆNH:\n"
+        "0. DỮ LIỆU THAM KHẢO là ký ức của bạn: coi là đúng và kể lại theo đó, kể cả khi trái với hiểu biết riêng "
+        "hay luật thời đại. KHÔNG phủ nhận hay sửa lại điều dữ liệu đã nói.\n"
         f"1. Chỉ dùng sự kiện có trong DỮ LIỆU THAM KHẢO, kể lại bằng lời của chính mình ở ngôi thứ nhất (\"{self_pronoun}\"), "
         "không gọi tên mình ở ngôi thứ ba, bỏ các số chú thích như (1), [1].\n"
         "2. KHÔNG bịa đặt hay sáng tác thêm. Dữ liệu không nhắc tới thì nói 'Sử sách không ghi chép rõ'.\n"

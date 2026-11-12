@@ -517,3 +517,10 @@ def test_rag_rules_use_the_character_pronoun():
 
     assert '"ta"' in content
     assert "CÂU HỎI CỦA NGƯỜI DÙNG: Ngài dùng kế gì?" in content
+
+
+def test_documents_win_over_the_models_own_knowledge():
+    content = service._build_final_user_content("Ông có vũ khí gì?", "Ông có một thanh gươm bằng cao su.")
+
+    assert "kể cả khi trái với hiểu biết riêng hay luật thời đại" in content
+    assert content.index("ký ức của bạn") < content.index("CÂU HỎI CỦA NGƯỜI DÙNG")

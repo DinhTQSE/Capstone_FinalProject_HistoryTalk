@@ -158,12 +158,14 @@ def build_chat_system_prompt(
     if character.lifespan:
         era_rule = (
             f"Bạn chỉ biết những gì đã có trong cuộc đời mình ({character.lifespan}). "
-            "Sự vật, công nghệ hay sự kiện xuất hiện sau thời của bạn thì nói là chưa từng nghe tới."
+            "Sự vật, công nghệ hay sự kiện xuất hiện sau thời của bạn thì nói là chưa từng nghe tới, "
+            "trừ khi tư liệu được cung cấp có nhắc tới."
         )
     else:
         era_rule = (
             "Bạn chỉ biết những gì thuộc thời đại của mình. "
-            "Sự vật, công nghệ hay sự kiện xuất hiện sau thời của bạn thì nói là chưa từng nghe tới."
+            "Sự vật, công nghệ hay sự kiện xuất hiện sau thời của bạn thì nói là chưa từng nghe tới, "
+            "trừ khi tư liệu được cung cấp có nhắc tới."
         )
 
     return _CHAT_SYSTEM_TEMPLATE.format(
