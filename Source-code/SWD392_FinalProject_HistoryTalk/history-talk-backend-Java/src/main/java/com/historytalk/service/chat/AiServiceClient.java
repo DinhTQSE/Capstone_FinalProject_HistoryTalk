@@ -408,6 +408,43 @@ public class AiServiceClient {
                 }
         }
 
+        /** Status and JSON body of an authoring call, passed back to the editor as they are. */
+        public record AuthoringResponse(int status, String body) {
+        }
+
+        /** A full story draft written synchronously can take minutes on a local model. */
+        private static final java.time.Duration AUTHORING_TIMEOUT = java.time.Duration.ofMinutes(4);
+
+        /**
+         * Calls one of the BE-Python authoring endpoints (story scripts, battle-map plans, jobs).
+         * Errors from the AI service are returned rather than thrown, so the editor sees why a draft failed.
+         */
+        public AuthoringResponse forwardAuthoring(String method, String path, String jsonBody) {
+                HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                .uri(URI.create(this.aiServiceUrlStr + path))
+                                .timeout(AUTHORING_TIMEOUT)
+                                .header("Content-Type", "application/json")
+                                .method(method, jsonBody == null
+                                                ? HttpRequest.BodyPublishers.noBody()
+                                                : HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8));
+                if (this.basicAuthHeader != null) {
+                        builder.header(HttpHeaders.AUTHORIZATION, this.basicAuthHeader);
+                }
+                try {
+                        HttpResponse<String> response = javaHttpClient.send(builder.build(),
+                                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                        aiMetricsService.recordRequest("authoring", response.statusCode() >= 500 ? "failure" : "success");
+                        return new AuthoringResponse(response.statusCode(), response.body());
+                } catch (java.io.IOException e) {
+                        aiMetricsService.recordRequest("authoring", "failure");
+                        log.error("AI service authoring call {} failed: {}", path, e.getMessage());
+                        throw new SystemException("Dịch vụ AI không khả dụng. Vui lòng thử lại sau.");
+                } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new SystemException("Yêu cầu tới dịch vụ AI bị gián đoạn.");
+                }
+        }
+
         /**
          * Calls BE-Python POST /v1/ai/tts and returns a WAV file.
          */

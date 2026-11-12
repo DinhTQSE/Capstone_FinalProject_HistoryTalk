@@ -64,8 +64,17 @@ def _vision_ollama_url(path: str) -> str:
     base_url = settings.VISION_OLLAMA_BASE_URL.strip() if settings.VISION_OLLAMA_BASE_URL else settings.OLLAMA_BASE_URL.strip()
     return f"{base_url.rstrip('/')}{path}"
 
-async def _call_ollama(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
+async def _call_ollama(
+    messages: list[dict],
+    expect_json: bool = True,
+    temperature: float | None = None,
+    json_schema: dict | None = None,
+    max_tokens: int | None = None,
+) -> tuple[str, int, int]:
+    """
+    Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens).
+    A JSON schema, when given, constrains the output to it instead of to any JSON.
+    """
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
@@ -73,14 +82,14 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True, temperatu
         "think": False,
         "options": {
             "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
-            "num_predict": settings.LLM_MAX_TOKENS,
+            "num_predict": max_tokens or settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
             "repeat_penalty": 1.15,
         }
     }
     
     if expect_json:
-        payload["format"] = "json"
+        payload["format"] = json_schema or "json"
 
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
 
@@ -169,14 +178,16 @@ def _external_url() -> str:
     return f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions"
 
 
-def _external_payload(messages: list[dict], temperature: float | None, stream: bool, expect_json: bool) -> dict:
+def _external_payload(
+    messages: list[dict], temperature: float | None, stream: bool, expect_json: bool, max_tokens: int | None = None
+) -> dict:
     """The same request as the Ollama one, in OpenAI Chat Completions form."""
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
         "stream": stream,
         "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
-        _external_max_tokens_key[0]: settings.LLM_MAX_TOKENS,
+        _external_max_tokens_key[0]: max_tokens or settings.LLM_MAX_TOKENS,
     }
     # Ollama runs with thinking off; a reasoning model is kept as close to that as it allows.
     if settings.EXTERNAL_REASONING_EFFORT:
@@ -207,13 +218,22 @@ def _adapt_external_request(error_body: str) -> bool:
     return False
 
 
-async def _call_external(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Make an async call to an external OpenAI-compatible API (e.g. OpenAI on Amazon Bedrock, Gemini, Groq)."""
+async def _call_external(
+    messages: list[dict],
+    expect_json: bool = True,
+    temperature: float | None = None,
+    json_schema: dict | None = None,
+    max_tokens: int | None = None,
+) -> tuple[str, int, int]:
+    """
+    Make an async call to an external OpenAI-compatible API (e.g. OpenAI on Amazon Bedrock, Gemini, Groq).
+    Not every model takes a JSON schema, so callers describe the shape in the prompt and validate the reply.
+    """
     try:
         for attempt in range(_EXTERNAL_MAX_ADAPTATIONS + 1):
             response = await ollama_client.post(
                 _external_url(),
-                json=_external_payload(messages, temperature, stream=False, expect_json=expect_json),
+                json=_external_payload(messages, temperature, stream=False, expect_json=expect_json, max_tokens=max_tokens),
                 headers=_external_headers(),
             )
             if response.status_code == 400 and attempt < _EXTERNAL_MAX_ADAPTATIONS and _adapt_external_request(response.text):
@@ -293,22 +313,27 @@ def _contains_cjk(text: str) -> bool:
     return _CJK_PATTERN.search(text) is not None
 
 
-async def _call_provider(messages: list[dict], expect_json: bool, temperature: float | None) -> tuple[str, int, int]:
+async def _call_provider(messages: list[dict], expect_json: bool, temperature: float | None, **options) -> tuple[str, int, int]:
     if settings.LLM_PROVIDER.lower() in ("external", "google"):
-        return await _call_external(messages, expect_json, temperature)
-    return await _call_ollama(messages, expect_json, temperature)
+        return await _call_external(messages, expect_json, temperature, **options)
+    return await _call_ollama(messages, expect_json, temperature, **options)
 
 
-async def _call_llm(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Call the configured provider, retrying once if the reply leaks Chinese into a Vietnamese conversation."""
-    content, prompt_tokens, completion_tokens = await _call_provider(messages, expect_json, temperature)
+async def _call_llm(
+    messages: list[dict], expect_json: bool = True, temperature: float | None = None, **options
+) -> tuple[str, int, int]:
+    """
+    Call the configured provider, retrying once if the reply leaks Chinese into a Vietnamese conversation.
+    options are json_schema and max_tokens, passed on to the provider.
+    """
+    content, prompt_tokens, completion_tokens = await _call_provider(messages, expect_json, temperature, **options)
 
     # Sources may legitimately quote Hán characters, in which case the reply may quote them too.
     if not _contains_cjk(content) or any(_contains_cjk(m.get("content", "")) for m in messages):
         return content, prompt_tokens, completion_tokens
 
     logger.warning("LLM reply contains Chinese characters, retrying once.")
-    content, retry_prompt_tokens, retry_completion_tokens = await _call_provider(messages, expect_json, temperature)
+    content, retry_prompt_tokens, retry_completion_tokens = await _call_provider(messages, expect_json, temperature, **options)
     if _contains_cjk(content):
         raise ValueError("LLM reply still contains Chinese characters after retrying.")
     return content, prompt_tokens + retry_prompt_tokens, completion_tokens + retry_completion_tokens

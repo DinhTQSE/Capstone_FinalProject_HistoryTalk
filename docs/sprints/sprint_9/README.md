@@ -10,6 +10,7 @@
 
 * 📦 **[chat_exam_mode_api_contract.md](fe_contracts/chat_exam_mode_api_contract.md):** API, việc FE cần làm và các thay đổi hành vi của chat. **FE đọc file này để tích hợp.**
 * 📝 **[exam_streaming_fe_tasks.md](fe_contracts/exam_streaming_fe_tasks.md):** Việc FE web và mobile cần sửa khi vấn đáp chuyển sang chạy chữ.
+* 🎬 **[ai_story_battle_map_api_contract.md](fe_contracts/ai_story_battle_map_api_contract.md):** API AI sinh kịch bản kể chuyện, kế hoạch lược đồ trận đánh và đoán vị trí điểm mốc trên ảnh.
 * 📑 **[b2b_custom_plan_and_quote_flow_api_contract.md](fe_contracts/b2b_custom_plan_and_quote_flow_api_contract.md):** API Contract cho Bảng giá B2B Customize, Live Quote Calculator, Form Đăng ký Báo giá (Humy.ai style) và Cổng System Admin duyệt báo giá khởi tạo trường học.
 * 🏫 **[b2b_subscription_pricing_and_quote_specification.md](business_flows/b2b_subscription_pricing_and_quote_specification.md):** Đặc tả chi tiết Unit Economics, bảng giá toàn bộ gói B2C & B2B (đã nới lỏng quota Học sinh/Giáo viên), công thức tính giá Customize B2B Plan, luồng đăng ký `Request a Quote` (tham khảo Humy.ai) và kế hoạch Unit/Integration Test cho Report 5.
 
@@ -92,6 +93,13 @@
 * Session chat giữ nguyên, vấn đáp xong web có nút "Quay lại phỏng vấn". Chi tiết ở mục 9 của contract.
 * Migration: `V20261112140000__add_source_session_to_chat_session.sql`.
 * Bỏ được nhãn "Lời nhận xét:" khi model ghi khác "NHẬN XÉT:".
+
+### 12. AI soạn kịch bản kể chuyện và lược đồ trận đánh
+* AI service: `POST /v1/ai/story/generate` (4 mode), `/battle-map/plan`, `/battle-map/locate-anchors`, `GET`/`DELETE /jobs/{id}`. Sinh dài chạy dạng job trong bộ nhớ, giữ 30 phút.
+* Viết từ tối đa 12 đoạn tài liệu của bối cảnh và nhân vật, bắt trích `sources`, kiểm tra theo luật của editor, sai thì cho model sửa 1 lần, vẫn sai thì trả kèm `warnings`.
+* Đoán vị trí điểm mốc dùng `qwen3.8:27b` (có thị giác) trên server GPU, cấu hình bằng `LOCATE_MODEL`.
+* Java: proxy `/api/v1/ai-authoring/**` cho `CONTENT_ADMIN` và `TEACHER`, tự gắn dữ liệu bối cảnh và nhân vật, tắt open-in-view cho đường dẫn này.
+* Chưa có phần lưu kịch bản xuống Java.
 
 ---
 

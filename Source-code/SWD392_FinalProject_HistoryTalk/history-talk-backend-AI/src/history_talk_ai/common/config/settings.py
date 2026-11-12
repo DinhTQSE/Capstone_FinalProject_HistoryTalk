@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     VISION_PROVIDER: str = "ollama"
     VISION_MODEL: str = "qwen2.5vl:7b"
     VISION_CONCURRENCY: int = 4
+    # Finds landmarks on battle-map images for the editor; any Ollama model with vision works.
+    LOCATE_MODEL: str = "qwen3.8:27b"
     # Dedicated Ollama server for Vision / VLM (to avoid overloading Chat LLM GPU)
     # If left empty, falls back to OLLAMA_BASE_URL
     VISION_OLLAMA_BASE_URL: str = ""
