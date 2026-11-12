@@ -58,6 +58,10 @@ public class ChatSession {
     @Column(name = "exam_question_count")
     private Integer examQuestionCount;
 
+    /** The chat an exam session was started from: its questions come from that conversation. */
+    @Column(name = "source_session_id")
+    private UUID sourceSessionId;
+
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 

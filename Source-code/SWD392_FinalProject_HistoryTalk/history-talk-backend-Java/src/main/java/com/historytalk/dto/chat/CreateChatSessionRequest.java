@@ -28,4 +28,8 @@ public class CreateChatSessionRequest {
     @Max(value = 10, message = "Số câu vấn đáp tối đa là 10")
     @JsonProperty("examQuestionCount")
     private Integer examQuestionCount;
+
+    /** EXAM only: a chat of the same character whose conversation the questions are asked about. */
+    @JsonProperty("sourceSessionId")
+    private String sourceSessionId;
 }

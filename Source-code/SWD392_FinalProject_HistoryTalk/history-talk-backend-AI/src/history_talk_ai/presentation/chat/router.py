@@ -244,6 +244,7 @@ async def exam_question(body: ExamQuestionRequest) -> ExamQuestionResponse:
             context=context,
             asked_questions=body.askedQuestions,
             used_sources=body.usedSources,
+            source_pool=body.sourcePool,
         )
     except exam_service.ExamSourceUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
@@ -297,6 +298,7 @@ async def exam_turn_stream(body: ExamTurnRequest):
                 asked_questions=body.askedQuestions,
                 used_sources=body.usedSources,
                 ask_next=body.askNext,
+                source_pool=body.sourcePool,
             )
             async for chunk in stream:
                 if isinstance(chunk, dict):

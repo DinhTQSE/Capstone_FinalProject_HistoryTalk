@@ -189,6 +189,7 @@ def build_exam_question_prompt(
     context: HistoricalContextData | None,
     source: str,
     asked_questions: list[str],
+    from_conversation: bool = False,
 ) -> str:
     self_pronoun, address_pronoun = character_pronouns(character)
     return _EXAM_QUESTION_TEMPLATE.format(
@@ -196,7 +197,7 @@ def build_exam_question_prompt(
         name=character.name,
         self_pronoun=self_pronoun,
         address_pronoun=address_pronoun,
-        context_line=f"Chủ đề vấn đáp: {context.name}\n" if context else "",
+        context_line=_exam_context_line(context, from_conversation, self_pronoun, address_pronoun),
         source=source,
         asked_questions="\n".join(f"- {q}" for q in asked_questions) or "(chưa có)",
     )
@@ -230,6 +231,7 @@ def build_exam_follow_up_prompt(
     previous_question: str,
     answer: str,
     verdict: str,
+    from_conversation: bool = False,
 ) -> str:
     """The next question follows up on what the learner just said instead of being picked in advance."""
     self_pronoun, address_pronoun = character_pronouns(character)
@@ -238,7 +240,7 @@ def build_exam_follow_up_prompt(
         name=character.name,
         self_pronoun=self_pronoun,
         address_pronoun=address_pronoun,
-        context_line=f"Chủ đề vấn đáp: {context.name}\n" if context else "",
+        context_line=_exam_context_line(context, from_conversation, self_pronoun, address_pronoun),
         previous_question=previous_question,
         verdict_label=_VERDICT_LABELS.get(verdict, verdict),
         answer=answer,
@@ -254,6 +256,18 @@ def build_suggestion_prompt(character: CharacterData, rag_context: str, reply: s
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _exam_context_line(
+    context: HistoricalContextData | None, from_conversation: bool, self_pronoun: str, address_pronoun: str
+) -> str:
+    line = f"Chủ đề vấn đáp: {context.name}\n" if context else ""
+    if from_conversation:
+        line += (
+            f"TƯ LIỆU dưới đây là điều {self_pronoun} vừa kể cho {address_pronoun} trong cuộc trò chuyện trước. "
+            f"Hãy hỏi lại để xem {address_pronoun} còn nhớ không.\n"
+        )
+    return line
 
 
 def _resolve_year_label(context: HistoricalContextData) -> str:

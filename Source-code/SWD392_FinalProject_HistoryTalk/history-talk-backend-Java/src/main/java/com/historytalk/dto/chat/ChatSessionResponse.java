@@ -38,4 +38,9 @@ public class ChatSessionResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonProperty("examQuestionCount")
     private Integer examQuestionCount;
+
+    /** Set on an exam started from a chat; the client offers to go back to that chat. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonProperty("sourceSessionId")
+    private String sourceSessionId;
 }

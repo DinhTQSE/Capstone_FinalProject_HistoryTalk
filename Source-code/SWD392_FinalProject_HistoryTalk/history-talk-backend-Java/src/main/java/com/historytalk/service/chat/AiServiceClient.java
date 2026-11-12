@@ -162,7 +162,8 @@ public class AiServiceClient {
                         @JsonProperty("answer") String answer,
                         @JsonProperty("askedQuestions") List<String> askedQuestions,
                         @JsonProperty("usedSources") List<String> usedSources,
-                        @JsonProperty("askNext") boolean askNext) {
+                        @JsonProperty("askNext") boolean askNext,
+                        @JsonProperty("sourcePool") List<String> sourcePool) {
         }
 
         // ── Internal request / response records ───────────────────────────────
@@ -214,7 +215,8 @@ public class AiServiceClient {
                         @JsonProperty("characterData") CharacterPayload characterData,
                         @JsonProperty("contextData") ContextPayload contextData,
                         @JsonProperty("askedQuestions") List<String> askedQuestions,
-                        @JsonProperty("usedSources") List<String> usedSources) {
+                        @JsonProperty("usedSources") List<String> usedSources,
+                        @JsonProperty("sourcePool") List<String> sourcePool) {
         }
 
         record ExamQuestionApiResponse(
@@ -376,10 +378,11 @@ public class AiServiceClient {
                         CharacterPayload characterData,
                         ContextPayload contextData,
                         List<String> askedQuestions,
-                        List<String> usedSources) {
+                        List<String> usedSources,
+                        List<String> sourcePool) {
 
                 ExamQuestionRequest request = new ExamQuestionRequest(characterId, contextId, characterData,
-                                contextData, askedQuestions, usedSources);
+                                contextData, askedQuestions, usedSources, sourcePool);
                 try {
                         ExamQuestionApiResponse response = restClient.post()
                                         .uri("/v1/ai/exam/question")

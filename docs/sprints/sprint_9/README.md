@@ -87,6 +87,12 @@
 * Embedding `bge-m3`, reranker và giọng đọc vẫn chạy trên VM GPU, nên VM vẫn phải bật.
 * Quay lại Ollama: đặt `LLM_PROVIDER=ollama` rồi restart AI service.
 
+### 11. Vấn đáp về cuộc trò chuyện
+* Tạo session vấn đáp với `sourceSessionId` của một session chat: câu hỏi lấy từ các đoạn tư liệu nhân vật đã dùng trong cuộc chat đó, câu nối tiếp ưu tiên đoạn gần với câu trả lời của người học.
+* Session chat giữ nguyên, vấn đáp xong web có nút "Quay lại phỏng vấn". Chi tiết ở mục 9 của contract.
+* Migration: `V20261112140000__add_source_session_to_chat_session.sql`.
+* Bỏ được nhãn "Lời nhận xét:" khi model ghi khác "NHẬN XÉT:".
+
 ---
 
 ## 🧪 KẾT QUẢ KIỂM THỬ TRÊN PRODUCTION (05/11/2026)

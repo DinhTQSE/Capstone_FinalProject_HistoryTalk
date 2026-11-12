@@ -30,7 +30,7 @@ _MAX_FALLBACK_SOURCE_CHARS = 4000
 
 # INCORRECT comes first so it is not read as CORRECT.
 _VERDICT_RE = re.compile(r"(INCORRECT|PARTIAL|CORRECT)")
-_FEEDBACK_LABEL_RE = re.compile(r"\s*\**\s*NHẬN XÉT\s*\**\s*:\s*\**\s*", re.IGNORECASE)
+_FEEDBACK_LABEL_RE = re.compile(r"\s*\**\s*(?:LỜI\s+)?NHẬN XÉT\s*\**\s*:\s*\**\s*", re.IGNORECASE)
 _QUESTION_LABEL_RE = re.compile(r"\s*\**\s*CÂU HỎI\s*\**\s*:\s*\**\s*", re.IGNORECASE)
 # The question is one line, so a new line or the answer marker ends it and the answer is never streamed.
 _QUESTION_END_RE = re.compile(r"\n|\**\s*ĐÁP ÁN\s*\**\s*:", re.IGNORECASE)
@@ -79,16 +79,41 @@ def _exam_entity_ids(character: CharacterData, context: HistoricalContextData | 
     return entity_ids
 
 
+def _words(text: str) -> set[str]:
+    return {word for word in re.findall(r"\w+", text.lower()) if len(word) > 1}
+
+
+def _pick_from_pool(pool: List[str], used_sources: List[str], focus: str | None) -> str | None:
+    """
+    An unused excerpt of the conversation the exam was started from. With a focus, the excerpts sharing the most
+    words with it come first, so the next question still follows on from the learner's answer.
+    """
+    unused = [source for source in pool if source not in used_sources]
+    if not unused:
+        return None
+    if focus:
+        focus_words = _words(focus)
+        unused.sort(key=lambda source: len(focus_words & _words(source)), reverse=True)
+        return random.choice(unused[:_FOLLOW_UP_CANDIDATES])
+    return random.choice(unused)
+
+
 async def _pick_source(
     character: CharacterData,
     context: HistoricalContextData | None,
     used_sources: List[str],
     focus: str | None = None,
+    source_pool: List[str] | None = None,
 ) -> str:
     """
     Pick an unused document chunk, falling back to the character's background text.
     With a focus, the closest chunks to it are preferred so the question follows on from it.
+    An exam started from a chat asks about that chat's excerpts first, then about the rest of the documents.
     """
+    from_pool = _pick_from_pool(source_pool or [], used_sources, focus)
+    if from_pool:
+        return from_pool
+
     query = f"{character.name} {context.name}" if context else character.name
     if focus:
         query = f"{query} {focus}"
@@ -156,10 +181,13 @@ async def generate_exam_question(
     context: HistoricalContextData | None,
     asked_questions: List[str],
     used_sources: List[str],
+    source_pool: List[str] | None = None,
 ) -> tuple[str, str, str, int, int]:
     """Returns (question, expected_answer, source_excerpt, prompt_tokens, completion_tokens)."""
-    source = await _pick_source(character, context, used_sources)
-    prompt = build_exam_question_prompt(character, context, source, asked_questions)
+    source = await _pick_source(character, context, used_sources, source_pool=source_pool)
+    prompt = build_exam_question_prompt(
+        character, context, source, asked_questions, from_conversation=source in (source_pool or [])
+    )
 
     parsed, prompt_tokens, completion_tokens = await _call_llm_for_json(prompt, _QUESTION_TEMPERATURE)
     return (
@@ -285,6 +313,7 @@ async def stream_exam_turn(
     asked_questions: List[str],
     used_sources: List[str],
     ask_next: bool,
+    source_pool: List[str] | None = None,
 ):
     """
     Grades the answer and, unless the exam is over, asks a follow-up question built on that answer.
@@ -309,9 +338,12 @@ async def stream_exam_turn(
 
     if ask_next:
         # Searching with the learner's own words makes the next question continue from what they said.
-        next_source = await _pick_source(character, context, used_sources + [source], focus=f"{question} {answer}")
+        next_source = await _pick_source(
+            character, context, used_sources + [source], focus=f"{question} {answer}", source_pool=source_pool
+        )
         follow_up_prompt = build_exam_follow_up_prompt(
-            character, context, next_source, asked_questions, question, answer, graded["verdict"]
+            character, context, next_source, asked_questions, question, answer, graded["verdict"],
+            from_conversation=next_source in (source_pool or []),
         )
         asked: dict = {}
         separator_sent = False

@@ -1,6 +1,7 @@
 package com.historytalk.service.chat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.chat.ExamProgressResponse;
@@ -26,8 +27,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -49,6 +52,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     private static final String BUBBLE_SEPARATOR = "\n---\n";
     private static final String NO_CONTEXT_ID = "00000000-0000-0000-0000-000000000000";
     private static final long TURN_TIMEOUT_SECONDS = 180;
+    private static final int MAX_CONVERSATION_SOURCES = 30;
 
     private final MessageRepository messageRepository;
     private final ChatSessionRepository chatSessionRepository;
@@ -66,7 +70,8 @@ public class ExamSessionServiceImpl implements ExamSessionService {
             ContextPayload contextData,
             int totalQuestions,
             String selfPronoun,
-            String addressPronoun) {
+            String addressPronoun,
+            List<String> sourcePool) {
     }
 
     private record PreparedAnswer(
@@ -87,11 +92,14 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                 context.characterData(),
                 context.contextData(),
                 List.of(),
-                List.of());
+                List.of(),
+                context.sourcePool());
 
+        String topic = context.sourcePool().isEmpty() ? "" : " về những điều chúng ta vừa trò chuyện";
         String opening = CharacterPronouns.capitalize(context.selfPronoun()) + " là " + context.characterName()
                 + ". Hôm nay " + context.selfPronoun() + " sẽ hỏi " + context.addressPronoun() + " "
-                + context.totalQuestions() + " câu. Hãy trả lời theo hiểu biết của " + context.addressPronoun() + ".";
+                + context.totalQuestions() + " câu" + topic + ". Hãy trả lời theo hiểu biết của "
+                + context.addressPronoun() + ".";
 
         return transactionTemplate.execute(status -> {
             ChatSession session = loadSession(sessionId);
@@ -163,7 +171,8 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                 request.getContent(),
                 questionMessages.stream().map(Message::getExamQuestion).toList(),
                 questionMessages.stream().map(Message::getExamSource).filter(Objects::nonNull).toList(),
-                askNext);
+                askNext,
+                context.sourcePool());
 
         AtomicReference<JsonNode> metadata = new AtomicReference<>();
         AtomicReference<String> aiError = new AtomicReference<>();
@@ -316,7 +325,34 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                         : null,
                 session.getExamQuestionCount() != null ? session.getExamQuestionCount() : 0,
                 CharacterPronouns.selfOf(session.getCharacter()),
-                CharacterPronouns.addressOf(session.getCharacter()));
+                CharacterPronouns.addressOf(session.getCharacter()),
+                conversationSources(session.getSourceSessionId()));
+    }
+
+    /**
+     * The document excerpts the character answered with in the chat an exam was started from, so the questions
+     * are about what the learner just heard while still coming from the documents.
+     */
+    private List<String> conversationSources(UUID sourceSessionId) {
+        if (sourceSessionId == null) {
+            return List.of();
+        }
+        Set<String> sources = new LinkedHashSet<>();
+        for (Message message : messageRepository.findByChatSessionSessionIdOrderByTimestampAsc(sourceSessionId, false)) {
+            if (!Boolean.TRUE.equals(message.getIsFromAi()) || message.getQuotes() == null) {
+                continue;
+            }
+            try {
+                for (String quote : objectMapper.readValue(message.getQuotes(), new TypeReference<List<String>>() {})) {
+                    if (quote != null && !quote.isBlank()) {
+                        sources.add(quote.trim());
+                    }
+                }
+            } catch (JsonProcessingException e) {
+                log.warn("Skipping unreadable quotes of message {}: {}", message.getMessageId(), e.getMessage());
+            }
+        }
+        return sources.stream().limit(MAX_CONVERSATION_SOURCES).toList();
     }
 
     private ChatSession loadSession(UUID sessionId) {

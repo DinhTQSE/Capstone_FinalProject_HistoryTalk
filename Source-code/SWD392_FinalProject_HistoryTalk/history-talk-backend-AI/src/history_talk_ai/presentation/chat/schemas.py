@@ -70,6 +70,7 @@ class ExamQuestionRequest(BaseModel):
     contextData: Optional[HistoricalContextData] = None
     askedQuestions: List[str] = Field(default_factory=list, description="Questions already asked in this session")
     usedSources: List[str] = Field(default_factory=list, description="Source excerpts already used in this session")
+    sourcePool: List[str] = Field(default_factory=list, description="Excerpts of the chat the exam was started from")
 
 
 class ExamTurnRequest(BaseModel):
@@ -84,6 +85,7 @@ class ExamTurnRequest(BaseModel):
     askedQuestions: List[str] = Field(default_factory=list, description="Questions already asked in this session")
     usedSources: List[str] = Field(default_factory=list, description="Source excerpts already used in this session")
     askNext: bool = Field(True, description="False on the last question, which ends the exam")
+    sourcePool: List[str] = Field(default_factory=list, description="Excerpts of the chat the exam was started from")
 
 
 class SpeechRequest(BaseModel):

@@ -44,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -104,7 +105,7 @@ class ExamSessionServiceImplTest {
 
     @Test
     void startExamStoresTheAnswerKeyAndAsksTheFirstQuestion() {
-        when(aiServiceClient.generateExamQuestion(anyString(), anyString(), any(), any(), any(), any()))
+        when(aiServiceClient.generateExamQuestion(anyString(), anyString(), any(), any(), any(), any(), eq(List.of())))
                 .thenReturn(new ExamQuestionResult("Ta dùng kế gì?", "Cọc gỗ", "Tư liệu 1", USAGE));
 
         Message message = service.startExam(session.getSessionId());
@@ -115,6 +116,24 @@ class ExamSessionServiceImplTest {
         assertThat(message.getExamExpectedAnswer()).isEqualTo("Cọc gỗ");
         assertThat(message.getExamSource()).isEqualTo("Tư liệu 1");
         assertThat(message.getQuotes()).isNull();
+    }
+
+    @Test
+    void examFromAChatAsksAboutTheExcerptsThatChatQuoted() {
+        UUID chatId = UUID.randomUUID();
+        session.setSourceSessionId(chatId);
+        when(messageRepository.findByChatSessionSessionIdOrderByTimestampAsc(chatId, false)).thenReturn(List.of(
+                Message.builder().isFromAi(false).content("Hỏi").build(),
+                Message.builder().isFromAi(true).quotes("[\"Tư liệu A\",\"Tư liệu B\"]").build(),
+                Message.builder().isFromAi(true).quotes("[\"Tư liệu B\",\" \"]").build(),
+                Message.builder().isFromAi(true).build()));
+        when(aiServiceClient.generateExamQuestion(anyString(), anyString(), any(), any(), any(), any(),
+                eq(List.of("Tư liệu A", "Tư liệu B"))))
+                .thenReturn(new ExamQuestionResult("Ta dùng kế gì?", "Cọc gỗ", "Tư liệu A", USAGE));
+
+        Message message = service.startExam(session.getSessionId());
+
+        assertThat(message.getContent()).contains("về những điều chúng ta vừa trò chuyện");
     }
 
     @Test
@@ -138,6 +157,7 @@ class ExamSessionServiceImplTest {
         assertThat(sent.get().askedQuestions()).containsExactly("Ta dùng kế gì?");
         assertThat(sent.get().usedSources()).containsExactly("Tư liệu 1");
         assertThat(sent.get().askNext()).isTrue();
+        assertThat(sent.get().sourcePool()).isEmpty();
 
         assertThat(String.join("", streamed)).isEqualTo("Đúng vậy.\n---\nTa đóng đô ở đâu?").doesNotContain("Cổ Loa");
         ExamTurnResult turn = result.get();

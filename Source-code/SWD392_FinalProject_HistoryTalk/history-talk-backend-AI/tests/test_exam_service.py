@@ -73,6 +73,30 @@ def test_question_comes_from_an_unused_chunk(monkeypatch):
     assert "Ta dùng kế gì?" in calls[0]["messages"][0]["content"]
 
 
+def test_exam_from_a_chat_asks_about_that_chat_without_searching(monkeypatch):
+    captured = _stub_chunks(monkeypatch, [CHUNK_B])
+    calls = _stub_llm(monkeypatch, '{"question": "Ta dùng gì cắm dưới sông?", "expectedAnswer": "Cọc gỗ"}')
+
+    _, _, source, _, _ = asyncio.run(
+        exam_service.generate_exam_question(_character(), None, [], [], source_pool=[CHUNK_A])
+    )
+
+    assert source == CHUNK_A
+    assert "query" not in captured
+    assert "vừa kể cho ngươi trong cuộc trò chuyện trước" in calls[0]["messages"][0]["content"]
+
+
+def test_follow_up_prefers_the_chat_excerpt_closest_to_the_answer(monkeypatch):
+    other = "Lê Hoàn đánh tan quân Tống ở Chi Lăng năm 981, giữ vững nền độc lập vừa giành lại được."
+    third = "Nhà Ngô đóng đô ở Cổ Loa, đặt nền móng cho các triều đại độc lập về sau của nước ta."
+    monkeypatch.setattr(exam_service.random, "choice", lambda items: items[0])
+
+    picked = exam_service._pick_from_pool([other, third, CHUNK_B], [], focus="đóng đô ở Cổ Loa")
+
+    assert picked in (third, CHUNK_B)
+    assert exam_service._pick_from_pool([CHUNK_A], [CHUNK_A], focus=None) is None
+
+
 def test_question_falls_back_to_background_without_documents(monkeypatch):
     _stub_chunks(monkeypatch, [])
     _stub_llm(monkeypatch, '{"question": "Câu hỏi?", "expectedAnswer": "Đáp án"}')
@@ -159,6 +183,15 @@ def test_answer_marker_on_the_same_line_is_never_streamed(monkeypatch):
     assert metadata["verdict"] == "INCORRECT"
     assert text.endswith("\n---\nTa đóng đô ở đâu?")
     assert metadata["expectedAnswer"].startswith("Cổ Loa")
+
+
+def test_longer_feedback_label_is_not_streamed(monkeypatch):
+    _stub_stream(monkeypatch, ["KẾT QUẢ: PARTIAL\nLời nhận xét: Ngươi mới nói được phần phòng ngự."])
+
+    text, metadata = _run_turn(ask_next=False)
+
+    assert text == "Ngươi mới nói được phần phòng ngự."
+    assert metadata["feedback"] == "Ngươi mới nói được phần phòng ngự."
 
 
 def test_last_answer_is_graded_without_asking_again(monkeypatch):

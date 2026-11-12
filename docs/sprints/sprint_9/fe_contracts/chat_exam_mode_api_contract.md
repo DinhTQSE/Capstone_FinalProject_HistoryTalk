@@ -426,3 +426,49 @@ Thêm vào request tạo và sửa nhân vật, ở cả API nhân vật hệ th
 - [ ] Hiện lỗi `400` dưới ô nhập khi sai định dạng.
 
 **Migration:** `V20261106143000__add_character_pronouns.sql` thêm 2 cột `self_pronoun`, `address_pronoun` (`VARCHAR(30)`) vào bảng `character`.
+
+---
+
+## 9. Vấn đáp về cuộc trò chuyện vừa có
+
+Đang phỏng vấn, người học có thể chuyển sang vấn đáp về chính những gì nhân vật vừa kể, rồi quay lại phỏng vấn để hỏi tiếp.
+
+### 9.1. Luồng
+1. Trong session chat (`mode: "CHAT"`), người học bấm "Vấn đáp về cuộc trò chuyện này".
+2. FE gọi `POST /chat/sessions` với `mode: "EXAM"` và `sourceSessionId` là id của session chat đó. BE tạo **session vấn đáp mới**, session chat giữ nguyên.
+3. Câu hỏi được đặt từ các đoạn tư liệu nhân vật đã dùng để trả lời trong cuộc chat (`quotes`). Hết đoạn thì hỏi tiếp từ các tư liệu khác của nhân vật. Chat chưa dùng tư liệu nào thì vấn đáp như bình thường.
+4. Vấn đáp xong, nút "Quay lại phỏng vấn" mở lại session chat theo `sourceSessionId`.
+
+### 9.2. Request
+```json
+{
+  "characterId": "5f1050f7-...",
+  "contextId": "1055f5d5-...",
+  "mode": "EXAM",
+  "examQuestionCount": 5,
+  "sourceSessionId": "id của session chat"
+}
+```
+
+| Trường | Bắt buộc | Mô tả |
+|---|---|---|
+| `sourceSessionId` | Không | Chỉ dùng với `EXAM`. Phải là session chat của chính người dùng, cùng nhân vật, chưa bị xóa |
+
+Lời mở đầu có thêm "về những điều chúng ta vừa trò chuyện". Giới hạn số câu, cách chấm, stream và trừ token giống vấn đáp thường.
+
+### 9.3. Response
+Session vấn đáp có thêm `sourceSessionId`, ở cả response tạo session và `GET /chat/sessions`. Session thường không có trường này.
+
+### 9.4. Lỗi
+| HTTP | Khi nào | Message |
+|---|---|---|
+| `400` | `sourceSessionId` sai định dạng | `Phiên trò chuyện nguồn không hợp lệ.` |
+| `400` | Không tìm thấy, của người khác hoặc đã xóa | `Không tìm thấy phiên trò chuyện để vấn đáp.` |
+| `400` | Là session vấn đáp, hoặc khác nhân vật | `Chỉ vấn đáp được từ cuộc trò chuyện với cùng nhân vật.` |
+
+### 9.5. Việc Frontend cần làm
+- [x] Web: nút "Vấn đáp về cuộc trò chuyện này" hiện khi người học đã hỏi ít nhất 1 câu, mở hộp chọn số câu rồi tạo session với `sourceSessionId`.
+- [x] Web: khi vấn đáp xong và có `sourceSessionId`, hiện nút "Quay lại phỏng vấn".
+- [ ] Mobile: làm cùng lúc với chế độ vấn đáp (xem [exam_streaming_fe_tasks.md](exam_streaming_fe_tasks.md)).
+
+**Migration:** `V20261112140000__add_source_session_to_chat_session.sql` thêm cột `source_session_id` vào `chat_session`.
