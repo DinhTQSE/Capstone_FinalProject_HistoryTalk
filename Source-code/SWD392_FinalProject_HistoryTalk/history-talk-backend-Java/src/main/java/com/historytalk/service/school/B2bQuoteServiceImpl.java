@@ -461,6 +461,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         int exactPool = (int) Math.min(Integer.MAX_VALUE, quote.getTotalTokenPool());
         schoolEntity.setTotalSchoolTokenQuota(exactPool);
         schoolEntity.setUnallocatedTokenQuota(exactPool);
+        schoolEntity.setBaseCustomTokenQuota(exactPool);
         schoolEntity.setDefaultDailyStudentQuota(quote.getStudentDailyTokenLimit());
         schoolEntity.setDefaultDailyTeacherQuota(quote.getTeacherDailyTokenLimit());
         schoolEntity.setMaxStudents(quote.getNumberOfStudents());

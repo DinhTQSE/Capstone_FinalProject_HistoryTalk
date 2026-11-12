@@ -75,11 +75,65 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         school.setRenewedForNextYear(true);
         school.setNextPackageType(request.getPackageType());
 
+        if (request.getPackageType() == EnterprisePackage.ENTERPRISE_CUSTOM) {
+            Integer customQuota = request.getCustomTokenQuota();
+            if (customQuota != null && customQuota > 0) {
+                school.setNextCustomTokenQuota(customQuota);
+            } else {
+                // Scenario 1: Retain existing custom contracted scale
+                Integer existingQuota = school.getBaseCustomTokenQuota() != null
+                        ? school.getBaseCustomTokenQuota()
+                        : school.getTotalSchoolTokenQuota();
+                if (existingQuota == null || existingQuota <= 0) {
+                    throw new InvalidRequestException(
+                            "Vui lòng nhập định mức token tùy chỉnh (customTokenQuota) khi gia hạn gói Tùy chỉnh.");
+                }
+                school.setNextCustomTokenQuota(existingQuota);
+            }
+
+            if (request.getMaxStudents() != null) {
+                school.setNextMaxStudents(request.getMaxStudents());
+            }
+            if (request.getMaxTeachers() != null) {
+                school.setNextMaxTeachers(request.getMaxTeachers());
+            }
+            if (request.getDefaultDailyStudentQuota() != null) {
+                school.setNextDailyStudentQuota(request.getDefaultDailyStudentQuota());
+            }
+            if (request.getDefaultDailyTeacherQuota() != null) {
+                school.setNextDailyTeacherQuota(request.getDefaultDailyTeacherQuota());
+            }
+            if (request.getSubscriptionStartDate() != null) {
+                school.setNextSubscriptionStartDate(request.getSubscriptionStartDate());
+            }
+            if (request.getSubscriptionEndDate() != null) {
+                school.setNextSubscriptionEndDate(request.getSubscriptionEndDate());
+            }
+        } else {
+            // Standard package selected: clear custom overrides
+            school.setNextCustomTokenQuota(null);
+            school.setNextMaxStudents(request.getMaxStudents());
+            school.setNextMaxTeachers(request.getMaxTeachers());
+            school.setNextDailyStudentQuota(request.getDefaultDailyStudentQuota());
+            school.setNextDailyTeacherQuota(request.getDefaultDailyTeacherQuota());
+            school.setNextSubscriptionStartDate(request.getSubscriptionStartDate());
+            school.setNextSubscriptionEndDate(request.getSubscriptionEndDate());
+        }
+
         School saved = schoolRepository.save(school);
-        log.info("School {} renewed subscription in May for next academic year with package {}",
-                school.getSchoolCode(), request.getPackageType());
+        log.info("School {} renewed subscription in May for next academic year with package {}, nextCustomQuota={}",
+                school.getSchoolCode(), request.getPackageType(), school.getNextCustomTokenQuota());
 
         return mapToSchoolResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public SchoolResponse renewSchoolSubscriptionForSchoolAdmin(
+            UserPrincipal schoolAdminPrincipal, RenewSchoolSubscriptionRequest request) {
+        UserPrincipal principal = resolvePrincipal(schoolAdminPrincipal);
+        UUID schoolId = resolveSchoolId(principal);
+        return renewSchoolSubscription(schoolId, request);
     }
 
     @Override
@@ -104,12 +158,32 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         int rolloverTokens = (int) Math.floor(remainingOldPool * MAX_ROLLOVER_RATE);
 
         EnterprisePackage nextPkg = school.getNextPackageType();
-        int newPackageTokens = nextPkg.getTokens();
+        int newPackageTokens;
+        if (nextPkg == EnterprisePackage.ENTERPRISE_CUSTOM) {
+            Integer customQuota = school.getNextCustomTokenQuota();
+            if (customQuota == null || customQuota <= 0) {
+                customQuota = school.getBaseCustomTokenQuota() != null
+                        ? school.getBaseCustomTokenQuota()
+                        : school.getTotalSchoolTokenQuota();
+            }
+            if (customQuota == null || customQuota <= 0) {
+                throw new InvalidRequestException("Không tìm thấy hạn mức token tùy chỉnh hợp lệ cho năm học mới.");
+            }
+            newPackageTokens = customQuota;
+            school.setBaseCustomTokenQuota(customQuota);
+        } else {
+            newPackageTokens = nextPkg.getTokens();
+            school.setBaseCustomTokenQuota(null);
+        }
+
         int newTotalQuota = newPackageTokens + rolloverTokens;
 
         LocalDate newStart;
         LocalDate newEnd;
-        if (school.getSubscriptionStartDate() != null && school.getSubscriptionEndDate() != null) {
+        if (school.getNextSubscriptionStartDate() != null && school.getNextSubscriptionEndDate() != null) {
+            newStart = school.getNextSubscriptionStartDate();
+            newEnd = school.getNextSubscriptionEndDate();
+        } else if (school.getSubscriptionStartDate() != null && school.getSubscriptionEndDate() != null) {
             long cycleDays = java.time.temporal.ChronoUnit.DAYS.between(
                     school.getSubscriptionStartDate(), school.getSubscriptionEndDate());
             newStart = refDate;
@@ -120,6 +194,31 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
             newEnd = LocalDate.of(startYear + 1, 5, 31);
         }
 
+        // Apply updated caps if configured
+        if (school.getNextMaxStudents() != null) {
+            school.setMaxStudents(school.getNextMaxStudents());
+        } else if (nextPkg != EnterprisePackage.ENTERPRISE_CUSTOM && nextPkg.getRecommendedStudents() > 0) {
+            school.setMaxStudents(nextPkg.getRecommendedStudents());
+        }
+
+        if (school.getNextMaxTeachers() != null) {
+            school.setMaxTeachers(school.getNextMaxTeachers());
+        } else if (nextPkg != EnterprisePackage.ENTERPRISE_CUSTOM && nextPkg.getRecommendedTeachers() > 0) {
+            school.setMaxTeachers(nextPkg.getRecommendedTeachers());
+        }
+
+        if (school.getNextDailyStudentQuota() != null) {
+            school.setDefaultDailyStudentQuota(school.getNextDailyStudentQuota());
+        } else if (nextPkg.getDefaultDailyQuota() > 0) {
+            school.setDefaultDailyStudentQuota(nextPkg.getDefaultDailyQuota());
+        }
+
+        if (school.getNextDailyTeacherQuota() != null) {
+            school.setDefaultDailyTeacherQuota(school.getNextDailyTeacherQuota());
+        } else if (nextPkg.getDefaultDailyTeacherQuota() > 0) {
+            school.setDefaultDailyTeacherQuota(nextPkg.getDefaultDailyTeacherQuota());
+        }
+
         school.setPackageType(nextPkg);
         school.setTotalSchoolTokenQuota(newTotalQuota);
         school.setUnallocatedTokenQuota(newTotalQuota);
@@ -127,6 +226,13 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         school.setSubscriptionEndDate(newEnd);
         school.setRenewedForNextYear(false);
         school.setNextPackageType(null);
+        school.setNextCustomTokenQuota(null);
+        school.setNextMaxStudents(null);
+        school.setNextMaxTeachers(null);
+        school.setNextDailyStudentQuota(null);
+        school.setNextDailyTeacherQuota(null);
+        school.setNextSubscriptionStartDate(null);
+        school.setNextSubscriptionEndDate(null);
         school.setStatus(SchoolStatus.ACTIVE);
 
         School saved = schoolRepository.save(school);
@@ -359,6 +465,10 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
                 .subscriptionEndDate(school.getSubscriptionEndDate())
                 .renewedForNextYear(school.getRenewedForNextYear())
                 .nextPackageType(school.getNextPackageType())
+                .nextCustomTokenQuota(school.getNextCustomTokenQuota())
+                .baseCustomTokenQuota(school.getBaseCustomTokenQuota())
+                .maxStudents(school.getMaxStudents())
+                .maxTeachers(school.getMaxTeachers())
                 .localHistoryPolicyAccepted(school.getLocalHistoryPolicyAccepted())
                 .status(school.getStatus())
                 .createdAt(school.getCreatedAt() != null ? school.getCreatedAt() : LocalDateTime.now())

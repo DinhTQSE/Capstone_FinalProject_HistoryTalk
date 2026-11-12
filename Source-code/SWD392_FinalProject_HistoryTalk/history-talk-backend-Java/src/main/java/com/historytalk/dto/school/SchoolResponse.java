@@ -33,6 +33,10 @@ public class SchoolResponse {
     private LocalDate subscriptionEndDate;
     private Boolean renewedForNextYear;
     private EnterprisePackage nextPackageType;
+    private Integer nextCustomTokenQuota;
+    private Integer baseCustomTokenQuota;
+    private Integer maxStudents;
+    private Integer maxTeachers;
     private Boolean localHistoryPolicyAccepted;
     private SchoolStatus status;
     private LocalDateTime createdAt;

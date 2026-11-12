@@ -60,6 +60,17 @@ public class SchoolLifecycleAndTokenController {
         return ResponseEntity.ok(ApiResponse.success(response, "School subscription renewed for next academic year"));
     }
 
+    @PostMapping("/school-admin/subscription/renew")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin renews school subscription in May for the next academic year")
+    public ResponseEntity<ApiResponse<SchoolResponse>> schoolAdminRenewSubscription(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody RenewSchoolSubscriptionRequest request) {
+        log.info("POST /api/v1/school-admin/subscription/renew (package={})", request.getPackageType());
+        SchoolResponse response = academicLifecycleService.renewSchoolSubscriptionForSchoolAdmin(principal, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "School subscription renewed for next academic year"));
+    }
+
     @PostMapping("/admin/schools/{id}/activate-academic-year")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     @Operation(summary = "Activate renewed school subscription on/after 01/09 with up to 20% token rollover (US-SP7-14)")
