@@ -12,6 +12,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -67,4 +69,8 @@ public class SubmitB2bQuoteRequest {
 
     @Size(max = 50, message = "Promo code must not exceed 50 characters")
     private String promoCode;
+
+    private LocalDate subscriptionStartDate;
+
+    private LocalDate subscriptionEndDate;
 }

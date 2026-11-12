@@ -157,6 +157,21 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
             }
         }
 
+        if (request.getSubscriptionStartDate() != null && request.getSubscriptionEndDate() != null) {
+            if (!request.getSubscriptionEndDate().isAfter(request.getSubscriptionStartDate())) {
+                throw new InvalidRequestException("Ngày kết thúc năm học/gói phải sau ngày bắt đầu.");
+            }
+        }
+
+        LocalDate subStart = request.getSubscriptionStartDate();
+        LocalDate subEnd = request.getSubscriptionEndDate();
+        if (subStart == null || subEnd == null) {
+            LocalDate today = LocalDate.now();
+            int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
+            subStart = LocalDate.of(academicStartYear, 9, 1);
+            subEnd = LocalDate.of(academicStartYear + 1, 5, 31);
+        }
+
         long discountAmountVnd = (subtotalVnd * discountPercent) / 100L;
         long finalPriceVnd = subtotalVnd - discountAmountVnd;
         long avgMonthlyPerStudent = students > 0 ? finalPriceVnd / ((long) students * ACADEMIC_MONTHS_PER_YEAR) : 0L;
@@ -183,17 +198,36 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .finalPriceVnd(finalPriceVnd)
                 .averageMonthlyCostPerStudentVnd(avgMonthlyPerStudent)
                 .promoCodeApplied(appliedPromo)
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
                 .build();
     }
 
     @Override
     @Transactional
     public B2bQuoteResponse submitQuoteRequest(SubmitB2bQuoteRequest request) {
+        LocalDate subStart = request.getSubscriptionStartDate();
+        LocalDate subEnd = request.getSubscriptionEndDate();
+        if (subStart != null && subEnd != null) {
+            if (!subEnd.isAfter(subStart)) {
+                throw new InvalidRequestException("Ngày kết thúc năm học/gói phải sau ngày bắt đầu.");
+            }
+        } else if (subStart != null || subEnd != null) {
+            throw new InvalidRequestException("Vui lòng cung cấp đầy đủ cả ngày bắt đầu và ngày kết thúc chu kỳ gói.");
+        } else {
+            LocalDate today = LocalDate.now();
+            int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
+            subStart = LocalDate.of(academicStartYear, 9, 1);
+            subEnd = LocalDate.of(academicStartYear + 1, 5, 31);
+        }
+
         B2bQuoteCalculationResponse calc = calculateQuote(CalculateB2bQuoteRequest.builder()
                 .selectedPackage(request.getSelectedPackage())
                 .numberOfStudents(request.getNumberOfStudents())
                 .numberOfTeachers(request.getNumberOfTeachers())
                 .promoCode(request.getPromoCode())
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
                 .build());
 
         String quoteCode = generateUniqueQuoteCode();
@@ -224,6 +258,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .discountPercent(calc.getDiscountPercent())
                 .discountAmountVnd(calc.getDiscountAmountVnd())
                 .finalPriceVnd(calc.getFinalPriceVnd())
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
                 .promoCode(calc.getPromoCodeApplied())
                 .message(request.getMessage() != null ? request.getMessage().trim() : null)
                 .status(B2bQuoteStatus.PENDING)
@@ -289,6 +325,14 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
             quote.setFinalPriceVnd(quote.getSubtotalVnd() - discountAmount);
         }
 
+        if (request.getSubscriptionStartDate() != null && request.getSubscriptionEndDate() != null) {
+            if (!request.getSubscriptionEndDate().isAfter(request.getSubscriptionStartDate())) {
+                throw new InvalidRequestException("Ngày kết thúc năm học/gói phải sau ngày bắt đầu.");
+            }
+            quote.setSubscriptionStartDate(request.getSubscriptionStartDate());
+            quote.setSubscriptionEndDate(request.getSubscriptionEndDate());
+        }
+
         quote.setStatus(request.getStatus());
         if (request.getAdminNote() != null) {
             quote.setAdminNote(request.getAdminNote().trim());
@@ -322,6 +366,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                         .contactEmail(quote.getContactEmail())
                         .contactPhone(quote.getContactPhone())
                         .packageType(quote.getSelectedPackage())
+                        .subscriptionStartDate(quote.getSubscriptionStartDate())
+                        .subscriptionEndDate(quote.getSubscriptionEndDate())
                         .localHistoryPolicyAccepted(true)
                         .build());
 
@@ -335,6 +381,12 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         schoolEntity.setDefaultDailyTeacherQuota(quote.getTeacherDailyTokenLimit());
         schoolEntity.setMaxStudents(quote.getNumberOfStudents());
         schoolEntity.setMaxTeachers(quote.getNumberOfTeachers());
+        if (quote.getSubscriptionStartDate() != null) {
+            schoolEntity.setSubscriptionStartDate(quote.getSubscriptionStartDate());
+        }
+        if (quote.getSubscriptionEndDate() != null) {
+            schoolEntity.setSubscriptionEndDate(quote.getSubscriptionEndDate());
+        }
         schoolEntity.setStatus(SchoolStatus.ACTIVE);
         schoolRepository.save(schoolEntity);
 
@@ -343,6 +395,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         createdSchool.setDefaultDailyStudentQuota(quote.getStudentDailyTokenLimit());
         createdSchool.setDefaultDailyTeacherQuota(quote.getTeacherDailyTokenLimit());
         createdSchool.setRecommendedStudents(quote.getNumberOfStudents());
+        createdSchool.setSubscriptionStartDate(schoolEntity.getSubscriptionStartDate());
+        createdSchool.setSubscriptionEndDate(schoolEntity.getSubscriptionEndDate());
 
         String fullName = (quote.getLastName() + " " + quote.getFirstName()).trim();
         SchoolAdminResponse schoolAdmin = schoolManagementService.createSchoolAdmin(
@@ -480,6 +534,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .discountPercent(q.getDiscountPercent())
                 .discountAmountVnd(q.getDiscountAmountVnd())
                 .finalPriceVnd(q.getFinalPriceVnd())
+                .subscriptionStartDate(q.getSubscriptionStartDate())
+                .subscriptionEndDate(q.getSubscriptionEndDate())
                 .promoCode(q.getPromoCode())
                 .message(q.getMessage())
                 .status(q.getStatus())

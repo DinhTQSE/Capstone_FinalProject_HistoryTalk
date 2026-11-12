@@ -58,9 +58,18 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
 
         LocalDate refDate = request.getReferenceDate() != null ? request.getReferenceDate() : LocalDate.now();
-        if (refDate.getMonth() != Month.MAY) {
+        LocalDate subEnd = school.getSubscriptionEndDate();
+        boolean isEligible;
+        if (subEnd != null) {
+            LocalDate windowStart = subEnd.minusDays(31);
+            isEligible = (!refDate.isBefore(windowStart) && !refDate.isAfter(subEnd.plusDays(30))) || (refDate.getMonth() == Month.MAY);
+        } else {
+            isEligible = (refDate.getMonth() == Month.MAY);
+        }
+
+        if (!isEligible) {
             throw new InvalidRequestException(
-                    "Theo quy định gói trường học (01/09 - 31/05), việc gia hạn cho năm học kế tiếp phải được thực hiện trong tháng 5 (01/05 - 31/05).");
+                    "Việc gia hạn cho năm học kế tiếp phải được thực hiện trong tháng 5 hoặc trong vòng 30 ngày trước khi gói hiện tại hết hạn.");
         }
 
         school.setRenewedForNextYear(true);
@@ -84,8 +93,10 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         }
 
         LocalDate refDate = referenceDate != null ? referenceDate : LocalDate.now();
-        if (refDate.getMonthValue() < 9) {
-            throw new InvalidRequestException("Gói gia hạn năm học mới chỉ được kích hoạt bắt đầu từ ngày 01/09.");
+        LocalDate subEnd = school.getSubscriptionEndDate();
+        boolean canActivate = (subEnd != null && !refDate.isBefore(subEnd)) || refDate.getMonthValue() >= 9;
+        if (!canActivate) {
+            throw new InvalidRequestException("Gói gia hạn năm học mới chỉ được kích hoạt sau khi gói cũ kết thúc (hoặc bắt đầu từ ngày 01/09).");
         }
 
         // Pure Shared Pool: All unspent tokens are already inside school.unallocatedTokenQuota.
@@ -96,9 +107,18 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         int newPackageTokens = nextPkg.getTokens();
         int newTotalQuota = newPackageTokens + rolloverTokens;
 
-        int startYear = refDate.getYear();
-        LocalDate newStart = LocalDate.of(startYear, 9, 1);
-        LocalDate newEnd = LocalDate.of(startYear + 1, 5, 31);
+        LocalDate newStart;
+        LocalDate newEnd;
+        if (school.getSubscriptionStartDate() != null && school.getSubscriptionEndDate() != null) {
+            long cycleDays = java.time.temporal.ChronoUnit.DAYS.between(
+                    school.getSubscriptionStartDate(), school.getSubscriptionEndDate());
+            newStart = refDate;
+            newEnd = newStart.plusDays(cycleDays);
+        } else {
+            int startYear = refDate.getYear();
+            newStart = LocalDate.of(startYear, 9, 1);
+            newEnd = LocalDate.of(startYear + 1, 5, 31);
+        }
 
         school.setPackageType(nextPkg);
         school.setTotalSchoolTokenQuota(newTotalQuota);

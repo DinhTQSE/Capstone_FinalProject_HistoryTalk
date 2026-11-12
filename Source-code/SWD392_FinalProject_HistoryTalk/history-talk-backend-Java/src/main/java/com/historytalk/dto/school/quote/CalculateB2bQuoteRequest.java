@@ -9,6 +9,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -28,4 +30,8 @@ public class CalculateB2bQuoteRequest {
     private Integer numberOfTeachers;
 
     private String promoCode;
+
+    private LocalDate subscriptionStartDate;
+
+    private LocalDate subscriptionEndDate;
 }
