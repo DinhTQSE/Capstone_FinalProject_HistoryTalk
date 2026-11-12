@@ -51,11 +51,4 @@ public interface MapFocusService {
      * Admin/Staff only.
      */
     void deleteFocus(String contextId, String focusId, String role);
-
-    /**
-     * Cascade soft-delete: sets {@code deletedAt=now()} on all non-deleted
-     * focus points for a context.
-     * Called by {@code HistoricalContextServiceImpl.softDeleteContext()}.
-     */
-    void softDeleteAllFocusesForContext(String contextId);
 }

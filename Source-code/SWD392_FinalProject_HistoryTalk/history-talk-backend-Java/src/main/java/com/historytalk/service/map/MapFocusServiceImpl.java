@@ -244,24 +244,6 @@ public class MapFocusServiceImpl implements MapFocusService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CASCADE – called by HistoricalContextServiceImpl.softDeleteContext()
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Override
-    @Transactional
-    public void softDeleteAllFocusesForContext(String contextId) {
-        UUID ctxUuid = parseUuid(contextId, "context");
-        List<MapFocus> focuses =
-                focusRepository.findByHistoricalContext_ContextIdAndDeletedAtIsNull(ctxUuid);
-        if (focuses.isEmpty()) return;
-
-        LocalDateTime now = LocalDateTime.now();
-        focuses.forEach(f -> f.setDeletedAt(now));
-        focusRepository.saveAll(focuses);
-        log.info("Cascade soft-deleted {} map focuses for contextId={}", focuses.size(), contextId);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
