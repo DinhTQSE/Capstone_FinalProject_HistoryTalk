@@ -22,6 +22,7 @@ import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
 import com.historytalk.repository.payment.UserTierRepository;
+import com.historytalk.service.authentication.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +44,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final UserTierRepository userTierRepository;
@@ -107,6 +109,9 @@ public class UserServiceImpl implements UserService {
             throw new InvalidRequestException("Máº­t kháº©u má»›i vÃ  máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordChangedAt(LocalDateTime.now());
+        user.setMustChangePassword(false);
+        refreshTokenService.revokeAllUserTokens(user.getUid());
         userRepository.save(user);
     }
 
