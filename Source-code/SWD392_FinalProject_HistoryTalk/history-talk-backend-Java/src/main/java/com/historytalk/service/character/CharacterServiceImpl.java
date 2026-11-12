@@ -162,7 +162,7 @@ public class CharacterServiceImpl implements CharacterService {
     public CharacterResponse createCharacter(CreateCharacterRequest request, String userId) {
         log.info("Creating character: {} by user: {}", request.getName(), userId);
 
-        if (characterRepository.existsByNameIgnoreCase(request.getName())) {
+        if (characterRepository.existsByNameIgnoreCaseAndSchoolIsNull(request.getName())) {
             throw new InvalidRequestException("Tên nhân vật đã tồn tại");
         }
 
@@ -215,7 +215,7 @@ public class CharacterServiceImpl implements CharacterService {
         }
 
         if (request.getName() != null && !request.getName().isBlank()) {
-            if (characterRepository.existsByNameIgnoreCaseAndCharacterIdNot(request.getName(), character.getCharacterId())) {
+            if (characterRepository.existsByNameIgnoreCaseAndSchoolIsNullAndCharacterIdNot(request.getName(), character.getCharacterId())) {
                 throw new InvalidRequestException("Tên nhân vật đã tồn tại");
             }
             character.setName(request.getName());

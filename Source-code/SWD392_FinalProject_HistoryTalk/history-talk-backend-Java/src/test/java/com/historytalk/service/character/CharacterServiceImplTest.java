@@ -126,7 +126,7 @@ class CharacterServiceImplTest {
                 .isPublished(true)
                 .build();
 
-        when(characterRepository.existsByNameIgnoreCase("Tran Hung Dao")).thenReturn(false);
+        when(characterRepository.existsByNameIgnoreCaseAndSchoolIsNull("Tran Hung Dao")).thenReturn(false);
         when(userRepository.findById(userId)).thenReturn(Optional.of(creator));
         when(characterRepository.save(any(Character.class))).thenAnswer(invocation -> {
             Character character = invocation.getArgument(0);
@@ -149,7 +149,7 @@ class CharacterServiceImplTest {
                 .background("Historical character background")
                 .build();
 
-        when(characterRepository.existsByNameIgnoreCase("Tran Hung Dao")).thenReturn(true);
+        when(characterRepository.existsByNameIgnoreCaseAndSchoolIsNull("Tran Hung Dao")).thenReturn(true);
 
         assertThatThrownBy(() -> characterService.createCharacter(request, UUID.randomUUID().toString()))
                 .isInstanceOf(InvalidRequestException.class)
