@@ -69,6 +69,18 @@ public class B2bQuoteRequest {
     private Integer numberOfTeachers;
 
     @Builder.Default
+    @Column(name = "academic_weeks")
+    private Integer academicWeeks = 35;
+
+    @Builder.Default
+    @Column(name = "student_days_per_week")
+    private Integer studentDaysPerWeek = 4;
+
+    @Builder.Default
+    @Column(name = "teacher_days_per_week")
+    private Integer teacherDaysPerWeek = 6;
+
+    @Builder.Default
     @Column(name = "student_daily_token_limit", nullable = false)
     private Integer studentDailyTokenLimit = 5000;
 

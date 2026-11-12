@@ -384,6 +384,44 @@ class B2bQuoteServiceImplTest {
     }
 
     @Test
+    @DisplayName("UT-B2B-14: Calculate quote with customized academic weeks and daily limits")
+    void calculateQuote_DeepCustomization_Success() {
+        CalculateB2bQuoteRequest request = CalculateB2bQuoteRequest.builder()
+                .selectedPackage(EnterprisePackage.ENTERPRISE_CUSTOM)
+                .numberOfStudents(500)
+                .numberOfTeachers(20)
+                .academicWeeks(40)
+                .studentDailyTokenLimit(3000)
+                .teacherDailyTokenLimit(10000)
+                .studentDaysPerWeek(5)
+                .teacherDaysPerWeek(5)
+                .build();
+
+        B2bQuoteCalculationResponse res = b2bQuoteService.calculateQuote(request);
+
+        assertThat(res.getAcademicWeeks()).isEqualTo(40);
+        assertThat(res.getStudentDailyTokenLimit()).isEqualTo(3000);
+        assertThat(res.getTeacherDailyTokenLimit()).isEqualTo(10000);
+        assertThat(res.getStudentDaysPerWeek()).isEqualTo(5);
+        assertThat(res.getTeacherDaysPerWeek()).isEqualTo(5);
+
+        // HS: 3000 * 5 * 40 = 600,000 / HS -> 500 HS = 300,000,000 tokens
+        // GV: 10000 * 5 * 40 = 2,000,000 / GV -> 20 GV = 40,000,000 tokens
+        // Total Pool = 340,000,000 tokens
+        assertThat(res.getTotalTokenPool()).isEqualTo(340_000_000L);
+        assertThat(res.getAiTokenCostVnd()).isEqualTo(51_000_000L); // 340M * 0.15
+
+        // Prorated LMS & DB: 7000 * 40 / 35 = 8000; 42500 * 40 / 35 = 48571
+        // DB cost: 500 * 8000 + 20 * 48571 = 4,000,000 + 971,420 = 4,971,420
+        assertThat(res.getStudentDbAndQuizFeeVnd()).isEqualTo(8000L);
+        assertThat(res.getTeacherLmsAndStorageFeeVnd()).isEqualTo(48571L);
+        assertThat(res.getDbAndLmsCostVnd()).isEqualTo(4_971_420L);
+        assertThat(res.getSubtotalVnd()).isEqualTo(55_971_420L);
+        assertThat(res.getDiscountPercent()).isEqualTo(0);
+        assertThat(res.getFinalPriceVnd()).isEqualTo(55_971_420L);
+    }
+
+    @Test
     @DisplayName("UT-B2B-13: Approving an already approved quote throws DataConflictException")
     void approveQuoteAndProvisionSchool_WhenAlreadyApproved_ShouldThrowDataConflictException() {
         UUID quoteId = UUID.randomUUID();
