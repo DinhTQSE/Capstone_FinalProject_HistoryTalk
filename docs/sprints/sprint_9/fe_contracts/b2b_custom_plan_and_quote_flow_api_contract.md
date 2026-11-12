@@ -190,6 +190,11 @@
   "selectedPackage": "ENTERPRISE_CUSTOM",
   "numberOfStudents": 850,
   "numberOfTeachers": 22,
+  "academicWeeks": 35,
+  "studentDailyTokenLimit": 5000,
+  "teacherDailyTokenLimit": 5000,
+  "studentDaysPerWeek": 4,
+  "teacherDaysPerWeek": 6,
   "promoCode": ""
 }
 ```
@@ -199,6 +204,11 @@
 | `selectedPackage` | `String` | Không | `ENTERPRISE_SMALL`, `ENTERPRISE_MEDIUM`, `ENTERPRISE_LARGE`, hoặc `ENTERPRISE_CUSTOM` |
 | `numberOfStudents` | `Integer` | **Có** | `1 <= numberOfStudents <= 50000` |
 | `numberOfTeachers` | `Integer` | **Có** | `1 <= numberOfTeachers <= 5000` |
+| `academicWeeks` | `Integer` | Không | Chu kỳ năm học (số tuần), `1 <= academicWeeks <= 60` (Mặc định: `35`) |
+| `studentDailyTokenLimit` | `Long` | Không | Hạn mức token/ngày của Học sinh, `500 <= limit <= 100000` (Mặc định: `5000`) |
+| `teacherDailyTokenLimit` | `Long` | Không | Hạn mức token/ngày của Giáo viên, `500 <= limit <= 100000` (Mặc định: `5000`) |
+| `studentDaysPerWeek` | `Integer` | Không | Số ngày học/tuần của Học sinh, `1 <= days <= 7` (Mặc định: `4`) |
+| `teacherDaysPerWeek` | `Integer` | Không | Số ngày dùng/tuần của Giáo viên, `1 <= days <= 7` (Mặc định: `6`) |
 | `promoCode` | `String` | Không | Mã ưu đãi (ví dụ: `EDU2026` hoặc `HISTORYTALK5` được giảm thêm `+5%`) |
 
 #### Response `200 OK`
@@ -210,8 +220,11 @@
     "selectedPackage": "ENTERPRISE_CUSTOM",
     "numberOfStudents": 850,
     "numberOfTeachers": 22,
+    "academicWeeks": 35,
     "studentDailyTokenLimit": 5000,
     "teacherDailyTokenLimit": 5000,
+    "studentDaysPerWeek": 4,
+    "teacherDaysPerWeek": 6,
     "studentTokensPerYear": 700000,
     "teacherTokensPerYear": 1050000,
     "totalStudentTokens": 595000000,
@@ -239,7 +252,7 @@
 - **Method & Path:** `POST /Historical-tell/api/v1/b2b/quotes/request`
 - **Auth:** Public (Không cần token)
 
-#### Request Body (Chuẩn form Humy.ai)
+#### Request Body (Chuẩn form Humy.ai + Deep Customization)
 ```json
 {
   "firstName": "Quốc Dinh",
@@ -253,6 +266,13 @@
   "selectedPackage": "ENTERPRISE_CUSTOM",
   "numberOfStudents": 850,
   "numberOfTeachers": 22,
+  "academicWeeks": 35,
+  "studentDailyTokenLimit": 5000,
+  "teacherDailyTokenLimit": 5000,
+  "studentDaysPerWeek": 4,
+  "teacherDaysPerWeek": 6,
+  "subscriptionStartDate": "2026-09-01",
+  "subscriptionEndDate": "2027-05-31",
   "promoCode": "",
   "message": "Trường cần xuất hóa đơn VAT và triển khai trước ngày 01/09."
 }
@@ -271,6 +291,13 @@
 | `selectedPackage` | `String` | Không | Mặc định `ENTERPRISE_CUSTOM` (hoặc `ENTERPRISE_SMALL`, `ENTERPRISE_MEDIUM`, `ENTERPRISE_LARGE`) |
 | `numberOfStudents` | `Integer` | **Có** | `1 <= numberOfStudents <= 50000` |
 | `numberOfTeachers` | `Integer` | **Có** | `1 <= numberOfTeachers <= 5000` |
+| `academicWeeks` | `Integer` | Không | Chu kỳ năm học (số tuần), `1 <= academicWeeks <= 60` (Mặc định: `35`) |
+| `studentDailyTokenLimit` | `Long` | Không | Hạn mức token/ngày của Học sinh, `500 <= limit <= 100000` (Mặc định: `5000`) |
+| `teacherDailyTokenLimit` | `Long` | Không | Hạn mức token/ngày của Giáo viên, `500 <= limit <= 100000` (Mặc định: `5000`) |
+| `studentDaysPerWeek` | `Integer` | Không | Số ngày học/tuần của Học sinh, `1 <= days <= 7` (Mặc định: `4`) |
+| `teacherDaysPerWeek` | `Integer` | Không | Số ngày dùng/tuần của Giáo viên, `1 <= days <= 7` (Mặc định: `6`) |
+| `subscriptionStartDate` | `LocalDate` | Không | Ngày bắt đầu niên khóa (VD: `2026-09-01`) |
+| `subscriptionEndDate` | `LocalDate` | Không | Ngày kết thúc niên khóa (VD: `2027-05-31`) |
 | `promoCode` | `String` | Không | Mã ưu đãi (nếu có) |
 | `message` | `String` | Không | Ghi chú thêm của trường (tối đa 2000 ký tự) |
 
@@ -294,8 +321,11 @@
     "selectedPackage": "ENTERPRISE_CUSTOM",
     "numberOfStudents": 850,
     "numberOfTeachers": 22,
+    "academicWeeks": 35,
     "studentDailyTokenLimit": 5000,
     "teacherDailyTokenLimit": 5000,
+    "studentDaysPerWeek": 4,
+    "teacherDaysPerWeek": 6,
     "totalTokenPool": 618100000,
     "aiTokenCostVnd": 92715000,
     "dbAndLmsCostVnd": 6885000,
@@ -339,7 +369,7 @@
 
 ---
 
-### 3.3. Cập nhật trạng thái tư vấn / từ chối báo giá
+### 3.3. Cập nhật trạng thái tư vấn / thương lượng chiết khấu / điều chỉnh tham số gói
 - **Method & Path:** `PATCH /Historical-tell/api/v1/admin/b2b-quotes/{id}/status`
 - **Auth:** `Bearer <jwt_access_token>` (`SYSTEM_ADMIN`)
 
@@ -348,7 +378,12 @@
 {
   "status": "CONTACTED",
   "customDiscountPercent": 15,
-  "adminNote": "Đã liên hệ Hiệu trưởng và thống nhất mức chiết khấu hợp đồng 15%."
+  "academicWeeks": 40,
+  "studentDailyTokenLimit": 5000,
+  "teacherDailyTokenLimit": 6000,
+  "studentDaysPerWeek": 4,
+  "teacherDaysPerWeek": 6,
+  "adminNote": "Đã thương lượng với trường mở rộng năm học lên 40 tuần và chiết khấu 15%."
 }
 ```
 
@@ -356,6 +391,11 @@
 | :--- | :--- | :---: | :--- |
 | `status` | `String` | **Có** | `CONTACTED` hoặc `REJECTED` (Để duyệt và tạo trường, gọi API `/approve` bên dưới) |
 | `customDiscountPercent` | `Integer` | Không | `0–100`. Nếu truyền vào, BE sẽ tính lại `discountAmountVnd` và `finalPriceVnd` theo chiết khấu mới |
+| `academicWeeks` | `Integer` | Không | `1–60`. Tùy chỉnh lại số tuần học khi đàm phán hợp đồng (BE tự động tính lại toàn bộ chi phí) |
+| `studentDailyTokenLimit` | `Long` | Không | `500–100000`. Điều chỉnh hạn mức token ngày của Học sinh |
+| `teacherDailyTokenLimit` | `Long` | Không | `500–100000`. Điều chỉnh hạn mức token ngày của Giáo viên |
+| `studentDaysPerWeek` | `Integer` | Không | `1–7`. Điều chỉnh số ngày dùng/tuần của Học sinh |
+| `teacherDaysPerWeek` | `Integer` | Không | `1–7`. Điều chỉnh số ngày dùng/tuần của Giáo viên |
 | `adminNote` | `String` | Không | Ghi chú nội bộ của System Admin |
 
 ---
@@ -414,11 +454,96 @@
 
 ---
 
-## 4. Bảng Mã Lỗi (Error Handling)
+## 4. Mua Thêm Token Cho Trường Học (School Token Top-up via PayOS Self-Service)
+
+> **Mục đích:** Khi nhà trường sử dụng hết hoặc sắp hết quỹ token chung (`unallocatedTokenQuota`) trước khi kết thúc chu kỳ năm học, Quản trị viên Trường (`SCHOOL_ADMIN`) có thể chủ động mua thêm token mà **không cần qua phê duyệt của System Admin**.
+> **Cơ chế:** Chọn số token $\to$ Sinh link thanh toán PayOS & Mã VietQR $\to$ Quét mã trả tiền $\to$ Webhook PayOS tự động nạp thẳng token vào hồ chứa chung của trường ngay lập tức!
+> **Đơn giá:** Cố định **`0,15 đ / 1 token`** (Tối thiểu 100.000 tokens).
+
+### 4.1. Khởi tạo đơn mua thêm token qua PayOS
+- **Method & Path:** `POST /Historical-tell/api/v1/school-admin/tokens/purchase`
+- **Auth:** `Bearer <jwt_access_token>` (`ROLE_SCHOOL_ADMIN`)
+
+#### Request Body
+```json
+{
+  "tokens": 10000000
+}
+```
+
+| Trường | Kiểu | Bắt buộc | Ràng buộc / Diễn giải |
+| :--- | :--- | :---: | :--- |
+| `tokens` | `Long` | **Có** | Số lượng token cần nạp thêm (`>= 100000`). Số tiền thanh toán: `tokens * 0.15đ` |
+
+#### Response `200 OK`
+```json
+{
+  "success": true,
+  "message": "Khởi tạo đơn mua token qua PayOS thành công",
+  "data": {
+    "orderId": "b1f48695-12c8-4712-9c1a-7b89d421e330",
+    "orderCode": 20261112001,
+    "schoolId": "d1428c19-8320-41ef-8a00-7218aa291001",
+    "schoolName": "Trường THPT Lê Quý Đôn",
+    "tokens": 10000000,
+    "amount": 1500000,
+    "paymentLinkId": "plink_68491029481",
+    "checkoutUrl": "https://pay.payos.vn/web/20261112001",
+    "qrCode": "00020101021238570010A00000072701270006970422...",
+    "status": "PENDING",
+    "expiredAt": "2026-11-12T13:45:00",
+    "createdAt": "2026-11-12T13:30:00"
+  },
+  "timestamp": "2026-11-12T13:30:00"
+}
+```
+
+---
+
+### 4.2. Lịch sử mua thêm token của trường
+- **Method & Path:** `GET /Historical-tell/api/v1/school-admin/tokens/purchase-history?page=0&size=10`
+- **Auth:** `Bearer <jwt_access_token>` (`ROLE_SCHOOL_ADMIN`)
+
+#### Response `200 OK`
+```json
+{
+  "success": true,
+  "message": "Lấy lịch sử mua token thành công",
+  "data": {
+    "content": [
+      {
+        "orderId": "b1f48695-12c8-4712-9c1a-7b89d421e330",
+        "orderCode": 20261112001,
+        "schoolId": "d1428c19-8320-41ef-8a00-7218aa291001",
+        "schoolName": "Trường THPT Lê Quý Đôn",
+        "tokens": 10000000,
+        "amount": 1500000,
+        "status": "PAID",
+        "fulfillmentStatus": "FULFILLED",
+        "paidAt": "2026-11-12T13:32:15",
+        "createdAt": "2026-11-12T13:30:00"
+      }
+    ],
+    "totalElements": 1,
+    "totalPages": 1,
+    "currentPage": 0,
+    "pageSize": 10,
+    "hasNext": false,
+    "hasPrevious": false
+  },
+  "timestamp": "2026-11-12T13:35:00"
+}
+```
+
+---
+
+## 5. Bảng Mã Lỗi (Error Handling)
 
 | HTTP Status | Tình huống | Message mẫu từ BE |
 | :---: | :--- | :--- |
 | `400 Bad Request` | Số học sinh `< 1` hoặc `> 50000`, số giáo viên `< 1` hoặc `> 5000` | `Number of students must be at least 1` |
-| `400 Bad Request` | Thiếu thông tin bắt buộc trong form báo giá (`firstName`, `lastName`, `contactEmail`, `contactPhone`, `jobTitle`, `schoolName`) | `Contact email is required` |
+| `400 Bad Request` | Thiếu thông tin bắt buộc trong form báo giá | `Contact email is required` |
+| `400 Bad Request` | Mua token trường học với số lượng `< 100.000 tokens` | `Số lượng token mua thêm tối thiểu là 100.000 tokens` |
+| `400 Bad Request` | Tài khoản School Admin chưa liên kết với trường học nào | `Tài khoản chưa được liên kết với bất kỳ trường học nào` |
 | `404 Not Found` | Không tìm thấy ID báo giá | `B2B quote request not found with ID: ...` |
-| `409 Conflict` | Báo giá đã được duyệt trước đó hoặc email School Admin đã tồn tại trên hệ thống | `Quote request QT-2026-4821 has already been approved` / `Email ... is already in use by another account` |
+| `409 Conflict` | Báo giá đã được duyệt trước đó hoặc email School Admin đã tồn tại | `Quote request QT-2026-4821 has already been approved` |

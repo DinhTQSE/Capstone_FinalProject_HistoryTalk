@@ -8,6 +8,13 @@ import com.historytalk.dto.payment.PaymentHistoryResponse;
 import com.historytalk.dto.payment.PayOSReturnRequest;
 import com.historytalk.dto.payment.PayOSReturnResponse;
 import com.historytalk.dto.payment.TierResponse;
+import com.historytalk.dto.school.CreateSchoolTokenPurchaseRequest;
+import com.historytalk.dto.school.SchoolTokenPurchaseHistoryResponse;
+import com.historytalk.dto.school.SchoolTokenPurchaseResponse;
+import com.historytalk.entity.enums.PaymentOrderType;
+import com.historytalk.entity.school.School;
+import com.historytalk.security.UserPrincipal;
+import com.historytalk.utils.SecurityUtils;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.Tier;
@@ -281,5 +288,136 @@ public class PaymentService {
         long millis = System.currentTimeMillis();
         int random = ThreadLocalRandom.current().nextInt(100, 999);
         return Long.parseLong(millis + "" + random);
+    }
+
+    @Transactional
+    public SchoolTokenPurchaseResponse createSchoolTokenPurchase(
+            CreateSchoolTokenPurchaseRequest request) throws Exception {
+        String uidStr = SecurityUtils.getUserId();
+        if (uidStr == null) {
+            throw new InvalidRequestException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
+        }
+        UUID uid = UUID.fromString(uidStr);
+        User user = userRepository.findById(uid)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài khoản người dùng: " + uid));
+
+        if (user.getSchool() == null) {
+            throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");
+        }
+        School school = user.getSchool();
+
+        if (request.getTokens() == null || request.getTokens() < 100_000) {
+            throw new InvalidRequestException("Số lượng token mua thêm tối thiểu là 100.000 tokens");
+        }
+
+        // 0.15 VND per token
+        int amount = (int) Math.round(request.getTokens() * 0.15);
+        if (amount < 2_000) {
+            amount = 2_000;
+        }
+
+        Instant expiredAtInstant = Instant.now().plus(15, ChronoUnit.MINUTES);
+        long payosExpiredAt = expiredAtInstant.getEpochSecond();
+        LocalDateTime expiredAtDb = LocalDateTime.ofInstant(
+                expiredAtInstant,
+                ZoneId.of("Asia/Ho_Chi_Minh")
+        );
+
+        Long orderCode = generateOrderCode();
+        String description = "HTTOK" + orderCode.toString().substring(orderCode.toString().length() - 6);
+
+        PaymentOrder order = PaymentOrder.builder()
+                .user(user)
+                .school(school)
+                .orderType(PaymentOrderType.SCHOOL_TOKEN_TOPUP)
+                .topupTokens(request.getTokens())
+                .orderCode(orderCode)
+                .amount(amount)
+                .description(description)
+                .status(PaymentOrderStatus.PENDING)
+                .expiredAt(expiredAtDb)
+                .isActive(true)
+                .build();
+
+        paymentOrderRepository.save(order);
+
+        CreatePaymentLinkRequest payosRequest = CreatePaymentLinkRequest.builder()
+                .orderCode(orderCode)
+                .amount((long) amount)
+                .description(description)
+                .returnUrl(payOSConfig.getReturnUrl())
+                .cancelUrl(payOSConfig.getCancelUrl())
+                .expiredAt(payosExpiredAt)
+                .build();
+
+        var paymentLink = payOS.paymentRequests().create(payosRequest);
+
+        order.setPaymentLinkId(paymentLink.getPaymentLinkId());
+        order.setCheckoutUrl(paymentLink.getCheckoutUrl());
+        order.setQrCode(paymentLink.getQrCode());
+
+        paymentOrderRepository.save(order);
+        log.info("Created PayOS school token purchase checkout: orderCode={}, school={}, tokens={}, amount={}",
+                orderCode, school.getSchoolCode(), request.getTokens(), amount);
+
+        return SchoolTokenPurchaseResponse.builder()
+                .orderId(order.getOrderId().toString())
+                .orderCode(order.getOrderCode())
+                .schoolId(school.getId().toString())
+                .schoolName(school.getName())
+                .tokens(request.getTokens())
+                .amount(amount)
+                .paymentLinkId(order.getPaymentLinkId())
+                .checkoutUrl(order.getCheckoutUrl())
+                .qrCode(order.getQrCode())
+                .status(order.getStatus().name())
+                .expiredAt(order.getExpiredAt() != null ? order.getExpiredAt().toString() : null)
+                .createdAt(order.getCreatedAt() != null ? order.getCreatedAt().toString() : null)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PaginatedResponse<SchoolTokenPurchaseHistoryResponse> getSchoolTokenPurchaseHistory(
+            Pageable pageable) {
+        String uidStr = SecurityUtils.getUserId();
+        if (uidStr == null) {
+            throw new InvalidRequestException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
+        }
+        UUID uid = UUID.fromString(uidStr);
+        User user = userRepository.findById(uid)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài khoản người dùng: " + uid));
+
+        if (user.getSchool() == null) {
+            throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");
+        }
+        School school = user.getSchool();
+
+        Page<PaymentOrder> orders = paymentOrderRepository.findBySchoolIdAndOrderTypeOrderByCreatedAtDesc(
+                school.getId(), PaymentOrderType.SCHOOL_TOKEN_TOPUP, pageable);
+
+        List<SchoolTokenPurchaseHistoryResponse> items = orders.getContent().stream()
+                .map(o -> SchoolTokenPurchaseHistoryResponse.builder()
+                        .orderId(o.getOrderId().toString())
+                        .orderCode(o.getOrderCode())
+                        .schoolId(school.getId().toString())
+                        .schoolName(school.getName())
+                        .tokens(o.getTopupTokens())
+                        .amount(o.getAmount())
+                        .status(o.getStatus() != null ? o.getStatus().name() : null)
+                        .fulfillmentStatus(o.getFulfillmentStatus() != null ? o.getFulfillmentStatus().name() : null)
+                        .paidAt(o.getPaidAt() != null ? o.getPaidAt().toString() : null)
+                        .createdAt(o.getCreatedAt() != null ? o.getCreatedAt().toString() : null)
+                        .build())
+                .toList();
+
+        return PaginatedResponse.<SchoolTokenPurchaseHistoryResponse>builder()
+                .content(items)
+                .currentPage(orders.getNumber())
+                .pageSize(orders.getSize())
+                .totalElements(orders.getTotalElements())
+                .totalPages(orders.getTotalPages())
+                .hasNext(orders.hasNext())
+                .hasPrevious(orders.hasPrevious())
+                .build();
     }
 }

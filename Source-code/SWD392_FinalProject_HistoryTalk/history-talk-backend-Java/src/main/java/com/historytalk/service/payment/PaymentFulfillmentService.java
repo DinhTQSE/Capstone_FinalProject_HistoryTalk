@@ -6,7 +6,10 @@ import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.user.User;
+import com.historytalk.entity.enums.PaymentOrderType;
+import com.historytalk.entity.school.School;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.UserTierRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,7 @@ public class PaymentFulfillmentService {
     private final PaymentOrderRepository paymentOrderRepository;
     private final UserTierRepository userTierRepository;
     private final UserRepository userRepository;
+    private final SchoolRepository schoolRepository;
 
     @Transactional
     public boolean fulfillPaidOrder(Long orderCode) {
@@ -56,6 +60,25 @@ public class PaymentFulfillmentService {
         markProcessing(order, now);
 
         try {
+            if (PaymentOrderType.SCHOOL_TOKEN_TOPUP.equals(order.getOrderType())) {
+                School school = order.getSchool();
+                if (school == null) {
+                    throw new IllegalStateException("School token topup order is missing associated school");
+                }
+                long addTokens = order.getTopupTokens() != null ? order.getTopupTokens() : 0L;
+                int currentTotal = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0;
+                int currentUnallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
+
+                school.setTotalSchoolTokenQuota(currentTotal + (int) addTokens);
+                school.setUnallocatedTokenQuota(currentUnallocated + (int) addTokens);
+                schoolRepository.save(school);
+
+                markFulfilled(order, now);
+                log.info("School token topup order {} fulfilled: +{} tokens to school {} (id={})",
+                        order.getOrderCode(), addTokens, school.getName(), school.getId());
+                return true;
+            }
+
             Optional<UserTier> userTierForOrder = userTierRepository.findByPaymentOrder_OrderId(order.getOrderId());
             if (userTierForOrder.isPresent()) {
                 markFulfilled(order, now);

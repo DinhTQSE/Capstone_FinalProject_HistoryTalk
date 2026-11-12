@@ -7,7 +7,10 @@ import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.user.User;
+import com.historytalk.entity.enums.PaymentOrderType;
+import com.historytalk.entity.school.School;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.UserTierRepository;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +44,9 @@ class PaymentFulfillmentServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private SchoolRepository schoolRepository;
 
     @InjectMocks
     private PaymentFulfillmentService paymentFulfillmentService;
@@ -187,5 +194,43 @@ class PaymentFulfillmentServiceTest {
         assertThat(order.getFulfillmentError()).contains("Order user is missing or deleted");
         verify(userTierRepository, never()).save(any(UserTier.class));
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void fulfillPaidOrder_SchoolTokenTopup_Success() {
+        UUID orderId = UUID.randomUUID();
+        UUID schoolId = UUID.randomUUID();
+
+        School school = School.builder()
+                .id(schoolId)
+                .name("THPT Chuyên Lê Hồng Phong")
+                .schoolCode("LHP-HCM")
+                .totalSchoolTokenQuota(100_000_000)
+                .unallocatedTokenQuota(50_000)
+                .build();
+
+        PaymentOrder order = PaymentOrder.builder()
+                .orderId(orderId)
+                .orderCode(998877665L)
+                .school(school)
+                .orderType(PaymentOrderType.SCHOOL_TOKEN_TOPUP)
+                .topupTokens(10_000_000L)
+                .amount(1_500_000)
+                .status(PaymentOrderStatus.PAID)
+                .fulfillmentStatus(PaymentFulfillmentStatus.PENDING)
+                .build();
+
+        when(paymentOrderRepository.findByOrderCodeForUpdate(order.getOrderCode())).thenReturn(Optional.of(order));
+        when(paymentOrderRepository.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(schoolRepository.save(any(School.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        boolean fulfilled = paymentFulfillmentService.fulfillPaidOrder(order.getOrderCode());
+
+        assertThat(fulfilled).isTrue();
+        assertThat(order.getFulfillmentStatus()).isEqualTo(PaymentFulfillmentStatus.FULFILLED);
+        assertThat(school.getTotalSchoolTokenQuota()).isEqualTo(110_000_000);
+        assertThat(school.getUnallocatedTokenQuota()).isEqualTo(10_050_000);
+        verify(schoolRepository).save(school);
+        verify(paymentOrderRepository, atLeastOnce()).save(order);
     }
 }

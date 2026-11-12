@@ -17,6 +17,9 @@ public class B2bQuoteCalculationResponse {
     private EnterprisePackage selectedPackage;
     private Integer numberOfStudents;
     private Integer numberOfTeachers;
+    private Integer academicWeeks;
+    private Integer studentDaysPerWeek;
+    private Integer teacherDaysPerWeek;
     private Integer studentDailyTokenLimit;
     private Integer teacherDailyTokenLimit;
     private Long studentTokensPerYear;
