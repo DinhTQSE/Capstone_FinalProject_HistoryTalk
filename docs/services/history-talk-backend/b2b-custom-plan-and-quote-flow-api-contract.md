@@ -454,11 +454,96 @@
 
 ---
 
-## 4. Bảng Mã Lỗi (Error Handling)
+## 4. Mua Thêm Token Cho Trường Học (School Token Top-up via PayOS Self-Service)
+
+> **Mục đích:** Khi nhà trường sử dụng hết hoặc sắp hết quỹ token chung (`unallocatedTokenQuota`) trước khi kết thúc chu kỳ năm học, Quản trị viên Trường (`SCHOOL_ADMIN`) có thể chủ động mua thêm token mà **không cần qua phê duyệt của System Admin**.
+> **Cơ chế:** Chọn số token $\to$ Sinh link thanh toán PayOS & Mã VietQR $\to$ Quét mã trả tiền $\to$ Webhook PayOS tự động nạp thẳng token vào hồ chứa chung của trường ngay lập tức!
+> **Đơn giá:** Cố định **`0,15 đ / 1 token`** (Tối thiểu 100.000 tokens).
+
+### 4.1. Khởi tạo đơn mua thêm token qua PayOS
+- **Method & Path:** `POST /Historical-tell/api/v1/school-admin/tokens/purchase`
+- **Auth:** `Bearer <jwt_access_token>` (`ROLE_SCHOOL_ADMIN`)
+
+#### Request Body
+```json
+{
+  "tokens": 10000000
+}
+```
+
+| Trường | Kiểu | Bắt buộc | Ràng buộc / Diễn giải |
+| :--- | :--- | :---: | :--- |
+| `tokens` | `Long` | **Có** | Số lượng token cần nạp thêm (`>= 100000`). Số tiền thanh toán: `tokens * 0.15đ` |
+
+#### Response `200 OK`
+```json
+{
+  "success": true,
+  "message": "Khởi tạo đơn mua token qua PayOS thành công",
+  "data": {
+    "orderId": "b1f48695-12c8-4712-9c1a-7b89d421e330",
+    "orderCode": 20261112001,
+    "schoolId": "d1428c19-8320-41ef-8a00-7218aa291001",
+    "schoolName": "Trường THPT Lê Quý Đôn",
+    "tokens": 10000000,
+    "amount": 1500000,
+    "paymentLinkId": "plink_68491029481",
+    "checkoutUrl": "https://pay.payos.vn/web/20261112001",
+    "qrCode": "00020101021238570010A00000072701270006970422...",
+    "status": "PENDING",
+    "expiredAt": "2026-11-12T13:45:00",
+    "createdAt": "2026-11-12T13:30:00"
+  },
+  "timestamp": "2026-11-12T13:30:00"
+}
+```
+
+---
+
+### 4.2. Lịch sử mua thêm token của trường
+- **Method & Path:** `GET /Historical-tell/api/v1/school-admin/tokens/purchase-history?page=0&size=10`
+- **Auth:** `Bearer <jwt_access_token>` (`ROLE_SCHOOL_ADMIN`)
+
+#### Response `200 OK`
+```json
+{
+  "success": true,
+  "message": "Lấy lịch sử mua token thành công",
+  "data": {
+    "content": [
+      {
+        "orderId": "b1f48695-12c8-4712-9c1a-7b89d421e330",
+        "orderCode": 20261112001,
+        "schoolId": "d1428c19-8320-41ef-8a00-7218aa291001",
+        "schoolName": "Trường THPT Lê Quý Đôn",
+        "tokens": 10000000,
+        "amount": 1500000,
+        "status": "PAID",
+        "fulfillmentStatus": "FULFILLED",
+        "paidAt": "2026-11-12T13:32:15",
+        "createdAt": "2026-11-12T13:30:00"
+      }
+    ],
+    "totalElements": 1,
+    "totalPages": 1,
+    "currentPage": 0,
+    "pageSize": 10,
+    "hasNext": false,
+    "hasPrevious": false
+  },
+  "timestamp": "2026-11-12T13:35:00"
+}
+```
+
+---
+
+## 5. Bảng Mã Lỗi (Error Handling)
 
 | HTTP Status | Tình huống | Message mẫu từ BE |
 | :---: | :--- | :--- |
 | `400 Bad Request` | Số học sinh `< 1` hoặc `> 50000`, số giáo viên `< 1` hoặc `> 5000` | `Number of students must be at least 1` |
-| `400 Bad Request` | Thiếu thông tin bắt buộc trong form báo giá (`firstName`, `lastName`, `contactEmail`, `contactPhone`, `jobTitle`, `schoolName`) | `Contact email is required` |
+| `400 Bad Request` | Thiếu thông tin bắt buộc trong form báo giá | `Contact email is required` |
+| `400 Bad Request` | Mua token trường học với số lượng `< 100.000 tokens` | `Số lượng token mua thêm tối thiểu là 100.000 tokens` |
+| `400 Bad Request` | Tài khoản School Admin chưa liên kết với trường học nào | `Tài khoản chưa được liên kết với bất kỳ trường học nào` |
 | `404 Not Found` | Không tìm thấy ID báo giá | `B2B quote request not found with ID: ...` |
-| `409 Conflict` | Báo giá đã được duyệt trước đó hoặc email School Admin đã tồn tại trên hệ thống | `Quote request QT-2026-4821 has already been approved` / `Email ... is already in use by another account` |
+| `409 Conflict` | Báo giá đã được duyệt trước đó hoặc email School Admin đã tồn tại | `Quote request QT-2026-4821 has already been approved` |

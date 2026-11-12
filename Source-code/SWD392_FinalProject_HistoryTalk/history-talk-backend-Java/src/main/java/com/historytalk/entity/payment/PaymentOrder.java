@@ -2,6 +2,8 @@ package com.historytalk.entity.payment;
 
 import com.historytalk.entity.enums.PaymentFulfillmentStatus;
 import com.historytalk.entity.enums.PaymentOrderStatus;
+import com.historytalk.entity.enums.PaymentOrderType;
+import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,8 +40,20 @@ public class PaymentOrder {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tier_id", nullable = false)
+    @JoinColumn(name = "tier_id")
     private Tier tier;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", length = 30, nullable = false)
+    private PaymentOrderType orderType = PaymentOrderType.TIER_SUBSCRIPTION;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "school_id")
+    private School school;
+
+    @Column(name = "topup_tokens")
+    private Long topupTokens;
 
     /** External order code (bigint) from payment gateway */
     @Column(name = "order_code", nullable = false)

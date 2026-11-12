@@ -155,6 +155,10 @@ $$\begin{aligned}
    - School Admin và Ban Giám hiệu có thể theo dõi biểu đồ tiêu thụ token theo ngày, theo khối, theo lớp và theo từng học sinh.
 4. **Hồ sơ Pháp lý & Hóa đơn Hợp lệ:**
    - Cung cấp đầy đủ Hợp đồng cung cấp dịch vụ phần mềm giáo dục, Biên bản nghiệm thu và Hóa đơn điện tử GTGT (VAT) hợp lệ phục vụ công tác thanh quyết toán kho bạc nhà nước.
+5. **Cơ chế Nạp Thêm Token Tự Động Trực Tuyến Giữa Năm Học (Self-Service Top-up qua PayOS):**
+   - Khi nhà trường có nhu cầu đột xuất (mở đợt ôn thi học kỳ tập trung, thi học sinh giỏi) hoặc dùng hết quỹ token trước khi hết năm học:
+   - Quản trị viên Trường (`SCHOOL_ADMIN`) chỉ cần vào mục **Mua thêm Token**, chọn số lượng mong muốn và thanh toán trực tiếp qua cổng **PayOS (VietQR)** theo đúng đơn giá gốc **`0,15 đ / token`**.
+   - **Tự động 100%, không cần chờ duyệt hay làm lại hợp đồng:** Ngay khi quét mã QR chuyển tiền thành công, hệ thống Webhook tự động cộng ngay lập tức token vào kho chung của trường, mở khóa cho giáo viên và học sinh tiếp tục sử dụng tức thì.
 
 ---
 
