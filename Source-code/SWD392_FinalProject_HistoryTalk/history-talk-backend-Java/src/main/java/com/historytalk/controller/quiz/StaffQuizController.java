@@ -175,33 +175,34 @@ public class StaffQuizController {
 
     /**
      * POST /staff/quizzes/import
-     * Bulk-import quizzes from a CSV file.
-     * Each distinct quiz title in the CSV becomes one quiz.
-     * Rows sharing the same title become the questions for that quiz.
-     * Conflicting/invalid quiz groups are skipped and reported in the response.
+     * Create one draft quiz from a CSV of question rows. The quiz title and context are
+     * form fields; every CSV row is one question. All-or-nothing.
      */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-            summary = "Import quizzes from CSV",
-            description = "Upload a .csv file to bulk-create quizzes. " +
-                    "Rows with the same 'title' are grouped into one quiz; each row is one question. " +
-                    "Duplicate titles and invalid rows are skipped and reported in the response. " +
-                    "All imported quizzes are created as drafts (isPublished = false). " +
-                    "Required columns: title, contextId, level, questionContent. " +
-                    "'level' (EASY | MEDIUM | HARD) is each question's own difficulty. " +
-                    "Optional: questionType (MULTIPLE_CHOICE | FILL_IN_BLANK | MATCHING, default MULTIPLE_CHOICE), " +
-                    "option1..option6, correctAnswer, explanation, caseSensitive, trimWhitespace. " +
-                    "File must be UTF-8 comma-separated; download GET /import/template. " +
-                    "All rows of one title must share contextId."
+            summary = "Import one quiz from CSV",
+            description = "Multipart parts: 'file' (.csv), 'contextId' (UUID of the historical context), " +
+                    "'title' (quiz title, max 255). Creates exactly one quiz as a draft (isPublished = false); " +
+                    "each CSV row is one question. " +
+                    "CSV columns: level,questionType,questionContent,option1,option2,option3,option4,option5,option6," +
+                    "correctAnswer,caseSensitive,trimWhitespace,explanation. " +
+                    "Required: level (EASY | MEDIUM | HARD), questionContent. " +
+                    "questionType defaults to MULTIPLE_CHOICE; MULTIPLE_CHOICE correctAnswer is 0-based (e.g. 0|2). " +
+                    "Lines starting with '#' are comments. Legacy title/contextId columns are ignored. " +
+                    "If any row is invalid the request fails with 400 listing every bad row ('Câu hỏi N: ...'), " +
+                    "and nothing is saved. 404 if the context is missing or deleted; 409 if the title exists. " +
+                    "File must be UTF-8 comma-separated; download GET /import/template."
     )
-    public ResponseEntity<ApiResponse<QuizImportResponse>> importQuizzes(
-            @RequestPart("file") MultipartFile file) {
+    public ResponseEntity<ApiResponse<QuizStaffResponse>> importQuiz(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("contextId") String contextId,
+            @RequestParam("title") String title) {
 
-        log.info("POST /api/v1/staff/quizzes/import filename={} size={}",
-                file.getOriginalFilename(), file.getSize());
+        log.info("POST /api/v1/staff/quizzes/import contextId={} filename={} size={}",
+                contextId, file.getOriginalFilename(), file.getSize());
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
-        QuizImportResponse data = quizService.importQuizzesFromCsv(file, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "CSV import completed"));
+        QuizStaffResponse data = quizService.importQuizFromCsv(file, contextId, title, userId);
+        return ResponseEntity.ok(ApiResponse.success(data, "Quiz imported successfully"));
     }
 
     /**
@@ -212,8 +213,9 @@ public class StaffQuizController {
     @GetMapping("/import/template")
     @Operation(
             summary = "Download quiz CSV import template",
-            description = "Returns a UTF-8 (BOM) CSV with the full header and one example row for " +
-                    "MULTIPLE_CHOICE, FILL_IN_BLANK and MATCHING. Replace contextId before importing."
+            description = "Returns a UTF-8 (BOM) CSV: '#' guidance lines (ignored on import), the question " +
+                    "header (no title/contextId — those are form fields on POST /import), and one example row " +
+                    "for MULTIPLE_CHOICE, FILL_IN_BLANK and MATCHING."
     )
     public ResponseEntity<byte[]> downloadImportTemplate() {
         log.info("GET /api/v1/staff/quizzes/import/template");

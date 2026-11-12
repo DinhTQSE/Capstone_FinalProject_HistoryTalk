@@ -68,7 +68,7 @@ class QuizCsvRowParserTest {
     @Test
     void mcGapInOptionsFails() {
         assertInvalid(Map.of("option1", "A", "option3", "C", "correctAnswer", "0"),
-                "Dòng 2: option2 không được để trống khi option3 có giá trị");
+                "Câu hỏi 1: option2 không được để trống khi option3 có giá trị");
     }
 
     @Test
@@ -76,7 +76,7 @@ class QuizCsvRowParserTest {
         assertThatThrownBy(() -> parser.parse(rec(Map.of(
                 "option1", "A", "option2", "B", "option3", "C", "correctAnswer", "3"))))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("Dòng 2")
+                .hasMessageContaining("Câu hỏi 1")
                 .hasMessageContaining("0-2");
     }
 
@@ -204,7 +204,7 @@ class QuizCsvRowParserTest {
     @Test
     void unknownQuestionTypeFails() {
         assertInvalid(Map.of("questionType", "ESSAY"),
-                "Dòng 2: questionType không hợp lệ: 'ESSAY'. Giá trị hợp lệ: MULTIPLE_CHOICE, FILL_IN_BLANK, MATCHING");
+                "Câu hỏi 1: questionType không hợp lệ: 'ESSAY'. Giá trị hợp lệ: MULTIPLE_CHOICE, FILL_IN_BLANK, MATCHING");
     }
 
     @Test
@@ -245,13 +245,13 @@ class QuizCsvRowParserTest {
     @Test
     void blankLevelIsRejectedWithLineNumber() {
         assertInvalid(Map.of("level", "", "option1", "A", "option2", "B", "correctAnswer", "0"),
-                "Dòng 2: level không được để trống");
+                "Câu hỏi 1: level không được để trống");
     }
 
     @Test
     void invalidLevelIsRejectedWithLineNumber() {
         assertInvalid(Map.of("level", "VERY_HARD", "option1", "A", "option2", "B", "correctAnswer", "0"),
-                "Dòng 2: level không hợp lệ: 'VERY_HARD'. Giá trị hợp lệ: EASY, MEDIUM, HARD");
+                "Câu hỏi 1: level không hợp lệ: 'VERY_HARD'. Giá trị hợp lệ: EASY, MEDIUM, HARD");
     }
 
     private void assertInvalid(Map<String, String> overrides, String message) {

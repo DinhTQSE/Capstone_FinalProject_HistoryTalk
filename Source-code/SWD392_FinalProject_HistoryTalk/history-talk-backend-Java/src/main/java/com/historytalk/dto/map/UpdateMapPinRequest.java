@@ -51,11 +51,4 @@ public class UpdateMapPinRequest {
 
     /** The exact year on the context timeline this pin is anchored to. */
     private Integer pinYear;
-
-    /**
-     * GeoJSON LineString for the movement/route arrow.
-     * If provided, will be validated to ensure type = "LineString".
-     * Send {"type":"LineString","coordinates":[]} for a point-only pin.
-     */
-    private Object pathGeoJson;
 }

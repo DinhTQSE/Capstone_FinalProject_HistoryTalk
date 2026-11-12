@@ -87,9 +87,9 @@ sequenceDiagram
     S->>API: DELETE /api/v1/staff/quizzes/{quizId}/questions/{questionId}
     API-->>S: 200 (void)
 
-    S->>API: POST /api/v1/staff/quizzes/import (multipart/form-data, file=*.csv)
-    Note over API: Group rows by title → 1 quiz / group<br/>Build MultipleChoiceQuestionData nội bộ<br/>Skip trùng title hoặc lỗi validation
-    API-->>S: { totalQuizzesAttempted, successCount, skippedCount, errors[], imported[] }
+    S->>API: POST /api/v1/staff/quizzes/import (multipart: file, contextId, title)
+    Note over API: Validate title/context (400/404/409)<br/>→ parse all rows (bỏ qua dòng #)<br/>→ any error: 400 liệt kê mọi câu lỗi, không lưu gì<br/>→ save 1 draft quiz
+    API-->>S: QuizStaffResponse
 ```
 
 ---

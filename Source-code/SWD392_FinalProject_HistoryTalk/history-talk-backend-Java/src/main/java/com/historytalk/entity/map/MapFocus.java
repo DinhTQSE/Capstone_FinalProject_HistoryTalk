@@ -1,7 +1,5 @@
 package com.historytalk.entity.map;
 
-import com.historytalk.entity.historicalContext.HistoricalContext;
-import com.historytalk.entity.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -36,9 +34,13 @@ public class MapFocus {
     @Column(name = "focus_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID focusId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "context_id", nullable = false)
-    private HistoricalContext historicalContext;
+    /**
+     * Owning context id. Plain column (no FK / association) so map_focus stays
+     * decoupled: purging a context never fails on focus rows, and orphan rows
+     * never trigger lazy-load {@code EntityNotFoundException}.
+     */
+    @Column(name = "context_id", columnDefinition = "uuid", nullable = false)
+    private UUID contextId;
 
     /** Display name shown in the map focus selector (e.g. "A1 Hill"). */
     @Column(name = "name", nullable = false, length = 255)
@@ -89,9 +91,9 @@ public class MapFocus {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", nullable = false)
-    private User createdBy;
+    /** Creator's user id. Plain column, no FK / association. */
+    @Column(name = "created_by", columnDefinition = "uuid", nullable = false)
+    private UUID createdBy;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

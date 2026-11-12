@@ -11,7 +11,6 @@ import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
-import com.historytalk.service.map.MapFocusService;
 import com.historytalk.service.map.MapPinService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,9 +48,6 @@ class HistoricalContextServiceImplTest {
 
     @Mock
     private MapPinService mapPinService;
-
-    @Mock
-    private MapFocusService mapFocusService;
 
     @InjectMocks
     private HistoricalContextServiceImpl historicalContextService;
@@ -134,6 +130,18 @@ class HistoricalContextServiceImplTest {
 
         assertThat(quiz.getDeletedAt()).isNotNull();
         assertThat(question.getDeletedAt()).isNull();
+    }
+
+    @Test
+    void softDeleteContext_cascadesToPinsWithoutMapFocus() {
+        HistoricalContext context = activeContext();
+        String contextId = context.getContextId().toString();
+        when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
+
+        historicalContextService.softDeleteContext(contextId, UUID.randomUUID().toString(), "CONTENT_ADMIN");
+
+        verify(mapPinService).softDeleteAllPinsForContext(contextId);
+        assertThat(context.getDeletedAt()).isNotNull();
     }
 
     private HistoricalContext activeContext() {
