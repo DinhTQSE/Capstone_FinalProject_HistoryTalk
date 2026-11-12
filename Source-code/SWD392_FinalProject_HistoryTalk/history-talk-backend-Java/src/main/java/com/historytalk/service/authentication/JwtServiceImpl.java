@@ -19,11 +19,6 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateRefreshToken(String email) {
-        return jwtTokenProvider.generateRefreshToken(email);
-    }
-
-    @Override
     public String extractEmail(String token) {
         return jwtTokenProvider.getUsernameFromToken(token);
     }

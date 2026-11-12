@@ -1,5 +1,6 @@
 package com.historytalk.config;
 
+import com.historytalk.repository.UserRepository;
 import com.historytalk.security.JwtAuthenticationFilter;
 import com.historytalk.security.JwtTokenProvider;
 import com.historytalk.security.oauth2.OAuth2AuthenticationFailureHandler;

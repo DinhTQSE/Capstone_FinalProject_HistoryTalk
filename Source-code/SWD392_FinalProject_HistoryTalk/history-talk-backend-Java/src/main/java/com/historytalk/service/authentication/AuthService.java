@@ -22,6 +22,10 @@ public interface AuthService {
 
     void resetPassword(String token, String newPassword, String confirmPassword);
 
+    void verifyEmail(String token);
+
+    void resendVerificationEmail(String email);
+
     RefreshTokenResponse refreshToken(String refreshToken);
 
     RefreshTokenResponse refreshToken(String refreshToken, String ipAddress, String deviceInfo);

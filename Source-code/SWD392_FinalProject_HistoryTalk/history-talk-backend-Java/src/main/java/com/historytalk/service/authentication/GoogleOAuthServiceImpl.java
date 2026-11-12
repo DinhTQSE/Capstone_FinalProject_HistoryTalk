@@ -56,6 +56,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
         if (user.getDeletedAt() != null) {
             throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
         }
+        markEmailVerifiedIfNeeded(user);
 
         UserPrincipal principal = new UserPrincipal(user);
         Map<String, Object> claims = buildClaims(principal);
@@ -102,6 +103,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
             if (user.getDeletedAt() != null) {
                 throw new UnauthorizedException("Account has been deactivated");
             }
+            markEmailVerifiedIfNeeded(user);
             
             UserPrincipal principal = new UserPrincipal(user);
             Map<String, Object> claims = buildClaims(principal);
@@ -123,6 +125,17 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
         } catch (Exception e) {
             log.error("Google ID Token verification failed: {}", e.getMessage());
             throw new UnauthorizedException("Google authentication failed: " + e.getMessage());
+        }
+    }
+
+    private void markEmailVerifiedIfNeeded(User user) {
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            user.setEmailVerified(true);
+            user.setEmailVerifiedAt(LocalDateTime.now());
+            user.setEmailVerificationTokenHash(null);
+            user.setEmailVerificationExpiresAt(null);
+            user.setEmailVerificationSentAt(null);
+            userRepository.save(user);
         }
     }
 
@@ -153,6 +166,8 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                 .email(email)
                 .password(passwordEncoder.encode(temporaryPassword))
                 .role(UserRole.CUSTOMER)
+                .emailVerified(true)
+                .emailVerifiedAt(LocalDateTime.now())
                 .build();
 
         java.util.Optional<Tier> freeTierOpt = tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free");
