@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS historical_schema.class_local_content (
 );
 
 -- =============================================================================
--- 11. TABLE: map_pin (Interactive Map Pins & GeoJSON Routes - V27, V28)
+-- 11. TABLE: map_pin (Interactive Map Pins - V27; GeoJSON dropped, context FK cascades - V20261112100000)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS historical_schema.map_pin (
     pin_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -234,19 +234,18 @@ CREATE TABLE IF NOT EXISTS historical_schema.map_pin (
     latitude        FLOAT8 NOT NULL,
     longitude       FLOAT8 NOT NULL,
     pin_year        INT4 NOT NULL,
-    path_geojson    JSONB NOT NULL DEFAULT '{"type":"LineString","coordinates":[]}'::jsonb,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP,
     deleted_at      TIMESTAMP
 );
 
 -- =============================================================================
--- 12. TABLE: map_focus (Historical Context Camera Viewpoints - V29)
+-- 12. TABLE: map_focus (Historical Context Camera Viewpoints - V29; standalone, no FKs - V20261112100000)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS historical_schema.map_focus (
     focus_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    context_id      UUID NOT NULL REFERENCES historical_schema.historical_context(context_id) ON DELETE CASCADE,
-    created_by      UUID NOT NULL REFERENCES historical_schema."user"(uid),
+    context_id      UUID NOT NULL,
+    created_by      UUID NOT NULL,
     name            VARCHAR(255) NOT NULL,
     description     TEXT,
     latitude        FLOAT8 NOT NULL,
