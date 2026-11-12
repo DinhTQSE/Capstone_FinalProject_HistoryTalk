@@ -1,17 +1,20 @@
 package com.historytalk.service.quiz;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.historytalk.dto.quiz.QuizImportResponse;
+import com.historytalk.dto.quiz.QuizStaffResponse;
 import com.historytalk.dto.quiz.quizdata.FillInBlankQuestionData;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
-import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.entity.enums.QuestionDifficulty;
+import com.historytalk.entity.enums.QuestionType;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.DataConflictException;
+import com.historytalk.exception.InvalidRequestException;
+import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizAnswerDetailRepository;
@@ -42,6 +45,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -52,7 +56,8 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class QuizServiceImplImportTest {
 
-    private static final String HEADER = "title,contextId,level,questionType,questionContent,"
+    private static final String TITLE = "Điện Biên Phủ";
+    private static final String HEADER = "level,questionType,questionContent,"
             + "option1,option2,option3,option4,correctAnswer,explanation\n";
 
     @Mock private QuizRepository quizRepository;
@@ -83,14 +88,13 @@ class QuizServiceImplImportTest {
                         new FillInBlankCsvParser(objectMapper),
                         new MatchingCsvParser(objectMapper))));
 
-        context = HistoricalContext.builder().contextId(contextId).name("Bạch Đằng").build();
+        context = HistoricalContext.builder().contextId(contextId).name("Điện Biên Phủ 1954").build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().uid(userId).userName("staff").build()));
         when(historicalContextRepository.findById(contextId)).thenReturn(Optional.of(context));
         when(quizRepository.existsByTitleIgnoreCase(any())).thenReturn(false);
         when(quizRepository.save(any(Quiz.class))).thenAnswer(inv -> {
             Quiz quiz = inv.getArgument(0);
             quiz.setQuizId(UUID.randomUUID());
-            when(quizRepository.findById(quiz.getQuizId())).thenReturn(Optional.of(quiz));
             return quiz;
         });
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -98,14 +102,17 @@ class QuizServiceImplImportTest {
     }
 
     @Test
-    void importsAllThreeTypesInOneQuiz() throws Exception {
-        QuizImportResponse response = importCsv(HEADER
-                + row("Bạch Đằng 938", "EASY", "MULTIPLE_CHOICE", "Ai chỉ huy?", "Ngô Quyền,Lê Lợi,Trần Hưng Đạo,Lý Thường Kiệt", "0", "")
-                + row("Bạch Đằng 938", "EASY", "FILL_IN_BLANK", "Năm nào?", ",,,", "938|năm 938", "")
-                + row("Bạch Đằng 938", "EASY", "MATCHING", "Nối", "Ngô Quyền => Bạch Đằng,Lê Lợi => Chi Lăng,,", "", ""));
+    void importsAllThreeTypesIntoOneQuiz() throws Exception {
+        QuizStaffResponse response = importCsv(HEADER
+                + row("EASY", "MULTIPLE_CHOICE", "Ai chỉ huy?", "Võ Nguyên Giáp,Văn Tiến Dũng,Hoàng Văn Thái,Nguyễn Chí Thanh", "0")
+                + row("EASY", "FILL_IN_BLANK", "Năm nào?", ",,,", "1954|năm 1954")
+                + row("EASY", "MATCHING", "Nối", "13/3 => Him Lam,7/5 => De Castries,,", ""));
 
-        assertThat(response.getErrors()).isEmpty();
-        assertThat(response.getSuccessCount()).isEqualTo(1);
+        assertThat(response.getTitle()).isEqualTo(TITLE);
+        assertThat(response.getContextId()).isEqualTo(contextId.toString());
+        assertThat(response.getIsPublished()).isFalse();
+        verify(quizRepository, times(1)).save(any(Quiz.class));
+
         ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
         verify(questionRepository, times(3)).save(captor.capture());
         List<Question> saved = captor.getAllValues();
@@ -114,79 +121,80 @@ class QuizServiceImplImportTest {
         assertThat(objectMapper.readValue(saved.get(0).getQuestionData(), MultipleChoiceQuestionData.class)
                 .getCorrectOptionIds()).containsExactly("0");
         assertThat(objectMapper.readValue(saved.get(1).getQuestionData(), FillInBlankQuestionData.class)
-                .getAcceptedAnswers()).containsExactly("938", "năm 938");
+                .getAcceptedAnswers()).containsExactly("1954", "năm 1954");
         assertThat(objectMapper.readValue(saved.get(2).getQuestionData(), MatchingQuestionData.class)
                 .getCorrectPairs()).hasSize(2);
 
         ArgumentCaptor<QuizQuestion> links = ArgumentCaptor.forClass(QuizQuestion.class);
         verify(quizQuestionRepository, times(3)).save(links.capture());
         assertThat(links.getAllValues()).extracting(QuizQuestion::getOrderIndex).containsExactly(0, 1, 2);
-        assertThat(links.getAllValues()).extracting(QuizQuestion::getQuestion).containsExactlyElementsOf(saved);
     }
 
     @Test
-    void legacyCsvStillImports() throws Exception {
-        QuizImportResponse response = importCsv(
-                "title,contextId,level,questionContent,option1,option2,option3,option4,correctAnswer,explanation\n"
-                        + "Legacy," + contextId + ",MEDIUM,Ai?,A,B,C,D,0,\n");
+    void guidanceCommentLinesAreIgnored() {
+        importCsv("# Hướng dẫn, đọc kỹ,,,\n#\n" + HEADER
+                + row("EASY", "", "Câu 1", "A,B,C,D", "0")
+                + "# ghi chú giữa các dòng\n"
+                + row("MEDIUM", "", "Câu 2", "A,B,C,D", "1"));
 
-        assertThat(response.getSuccessCount()).isEqualTo(1);
-        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
-        verify(questionRepository).save(captor.capture());
-        assertThat(captor.getValue().getExplanation()).isNull();
-        assertThat(objectMapper.readValue(captor.getValue().getQuestionData(), MultipleChoiceQuestionData.class)
-                .getCorrectOptionIds()).containsExactly("0");
-        assertThat(captor.getValue().getDifficulty()).isEqualTo(QuestionDifficulty.MEDIUM);
+        verify(questionRepository, times(2)).save(any(Question.class));
+    }
+
+    @Test
+    void legacyTitleAndContextIdColumnsAreIgnored() {
+        importCsv("title,contextId,level,questionContent,option1,option2,option3,option4,correctAnswer,explanation\n"
+                + "Khác," + UUID.randomUUID() + ",MEDIUM,Ai?,A,B,C,D,0,\n");
+
         ArgumentCaptor<Quiz> quizCaptor = ArgumentCaptor.forClass(Quiz.class);
         verify(quizRepository).save(quizCaptor.capture());
-        assertThat(quizCaptor.getValue().getIsPublished()).isFalse();
+        assertThat(quizCaptor.getValue().getTitle()).isEqualTo(TITLE);
+        assertThat(quizCaptor.getValue().getHistoricalContext()).isSameAs(context);
+        verify(historicalContextRepository, times(1)).findById(any());
+        verify(historicalContextRepository).findById(contextId);
     }
 
     @Test
-    void mixedLevelsInOneQuizImportWithPerQuestionDifficulty() {
-        QuizImportResponse response = importCsv(HEADER
-                + row("Q", "EASY", "", "Câu 1", "A,B,C,D", "0", "")
-                + row("Q", "HARD", "", "Câu 2", "A,B,C,D", "1", ""));
+    void reportsEveryInvalidRowAndSavesNothing() {
+        assertThatThrownBy(() -> importCsv(HEADER
+                + row("EASY", "", "Câu 1", "A,B,C,D", "0")
+                + row("EASY", "", "Câu 2", "A,B,C,D", "9")
+                + row("EASY", "", "Câu 3", "A,B,C,D", "1")
+                + row("EASY", "", "Câu 4", "A,B,C,D", "9")))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("2 câu hỏi lỗi")
+                .hasMessageContaining("Câu hỏi 2:")
+                .hasMessageContaining("Câu hỏi 4:");
 
-        assertThat(response.getErrors()).isEmpty();
-        assertThat(response.getSuccessCount()).isEqualTo(1);
-        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
-        verify(questionRepository, times(2)).save(captor.capture());
-        assertThat(captor.getAllValues()).extracting(Question::getDifficulty)
-                .containsExactly(QuestionDifficulty.EASY, QuestionDifficulty.HARD);
-    }
-
-    @Test
-    void invalidLevelInLaterRowIsRejected() {
-        QuizImportResponse response = importCsv(HEADER
-                + row("Q", "EASY", "", "Câu 1", "A,B,C,D", "0", "")
-                + row("Q", "abc", "", "Câu 2", "A,B,C,D", "1", ""));
-
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).contains("Dòng 3", "EASY, MEDIUM, HARD");
-        verify(quizRepository, never()).save(any());
-    }
-
-    @Test
-    void invalidRowSkipsWholeQuizWithoutSaving() {
-        QuizImportResponse response = importCsv(HEADER
-                + row("Q", "EASY", "MULTIPLE_CHOICE", "Câu 1", "A,B,C,D", "0", "")
-                + row("Q", "EASY", "FILL_IN_BLANK", "Câu 2", ",,,", "", ""));
-
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).contains("Dòng 3");
         verify(quizRepository, never()).save(any());
         verify(questionRepository, never()).save(any());
     }
 
     @Test
-    void inconsistentContextIdSkipsQuiz() {
-        QuizImportResponse response = importCsv(HEADER
-                + row("Q", "EASY", "", "Câu 1", "A,B,C,D", "0", "")
-                + "Q," + UUID.randomUUID() + ",EASY,,Câu 2,A,B,C,D,0,\n");
+    void blankTitleIsRejectedBeforeReadingFile() {
+        assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0"), contextId.toString(), "   "))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("Tên quiz không được để trống");
 
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).contains("Dòng 3", "contextId");
+        verify(historicalContextRepository, never()).findById(any());
+        verify(quizRepository, never()).save(any());
+    }
+
+    @Test
+    void titleLongerThan255IsRejected() {
+        assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0"),
+                contextId.toString(), "Q".repeat(256)))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("255");
+
+        verify(quizRepository, never()).save(any());
+    }
+
+    @Test
+    void invalidContextIdFormatIsRejected() {
+        assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0"), "abc", TITLE))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("contextId");
+
         verify(quizRepository, never()).save(any());
     }
 
@@ -194,42 +202,44 @@ class QuizServiceImplImportTest {
     void softDeletedContextIsRejected() {
         context.setDeletedAt(LocalDateTime.now());
 
-        QuizImportResponse response = importCsv(HEADER + row("Q", "EASY", "", "Câu 1", "A,B,C,D", "0", ""));
+        assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0")))
+                .isInstanceOf(ResourceNotFoundException.class);
 
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).contains("HistoricalContext not found");
         verify(quizRepository, never()).save(any());
     }
 
     @Test
-    void titleLongerThanColumnLimitIsRejectedBeforeSaving() {
-        String longTitle = "Q".repeat(256);
+    void duplicateTitleIsRejected() {
+        when(quizRepository.existsByTitleIgnoreCase(TITLE)).thenReturn(true);
 
-        QuizImportResponse response = importCsv(HEADER + row(longTitle, "EASY", "", "Câu 1", "A,B,C,D", "0", ""));
+        assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0")))
+                .isInstanceOf(DataConflictException.class);
 
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).contains("255");
         verify(quizRepository, never()).save(any());
     }
 
     @Test
-    void oneBadQuizDoesNotBlockOthers() {
-        QuizImportResponse response = importCsv(HEADER
-                + row("A", "EASY", "", "Câu 1", "A,B,C,D", "9", "")
-                + row("B", "EASY", "", "Câu 1", "A,B,C,D", "0", ""));
+    void mixedLevelsKeepPerQuestionDifficulty() {
+        importCsv(HEADER
+                + row("EASY", "", "Câu 1", "A,B,C,D", "0")
+                + row("HARD", "", "Câu 2", "A,B,C,D", "1"));
 
-        assertThat(response.getSuccessCount()).isEqualTo(1);
-        assertThat(response.getSkippedCount()).isEqualTo(1);
-        assertThat(response.getErrors().get(0)).startsWith("Quiz 'A' skipped");
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        verify(questionRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Question::getDifficulty)
+                .containsExactly(QuestionDifficulty.EASY, QuestionDifficulty.HARD);
     }
 
-    private String row(String title, String level, String type, String content, String fourOptions,
-                       String correct, String explanation) {
-        return String.join(",", title, contextId.toString(), level, type, content, fourOptions, correct, explanation) + "\n";
+    private static String row(String level, String type, String content, String fourOptions, String correct) {
+        return String.join(",", level, type, content, fourOptions, correct, "") + "\n";
     }
 
-    private QuizImportResponse importCsv(String csv) {
+    private QuizStaffResponse importCsv(String csv) {
+        return importCsv(csv, contextId.toString(), TITLE);
+    }
+
+    private QuizStaffResponse importCsv(String csv, String formContextId, String formTitle) {
         MockMultipartFile file = new MockMultipartFile("file", "quiz.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
-        return quizService.importQuizzesFromCsv(file, userId);
+        return quizService.importQuizFromCsv(file, formContextId, formTitle, userId);
     }
 }

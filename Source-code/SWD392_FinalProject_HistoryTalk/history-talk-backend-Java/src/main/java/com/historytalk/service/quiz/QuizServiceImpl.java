@@ -50,7 +50,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -524,153 +523,90 @@ public class QuizServiceImpl implements QuizService {
     // ==================== Import ====================
 
     /**
-     * Bulk-import quizzes from a CSV file.
+     * Import one quiz from a CSV of question rows. The quiz title and context come from the
+     * upload form, not from the file.
      *
-     * <p>CSV format (header required):
-     * <pre>title,contextId,level,questionType,questionContent,option1..option6,correctAnswer,caseSensitive,trimWhitespace,explanation</pre>
-     * Required columns: title, contextId, level, questionContent. questionType defaults to
-     * MULTIPLE_CHOICE, so the legacy 4-option format still imports unchanged. {@code level} is
-     * each question's own difficulty.
+     * <p>CSV format (header required; lines starting with '#' are comments):
+     * <pre>level,questionType,questionContent,option1..option6,correctAnswer,caseSensitive,trimWhitespace,explanation</pre>
+     * Required columns: level, questionContent. questionType defaults to MULTIPLE_CHOICE.
+     * Legacy {@code title}/{@code contextId} columns, if present, are ignored.
      *
-     * <p>Rows sharing the same {@code title} are grouped into one quiz and may mix question
-     * types and difficulties, but must share contextId.
-     * A single {@code @Transactional} session is used for the entire call so that
-     * all repository calls share the same Hibernate session and configured DB schema.
-     * Per-quiz isolation is handled by the try/catch in the processing loop.
+     * <p>All-or-nothing: title and context are checked before the file is read, then every row
+     * is parsed and validated. If any row is invalid, a single 400 lists every bad row and
+     * nothing is saved. The quiz is created as a draft.
      */
     @Override
     @Transactional
-    public QuizImportResponse importQuizzesFromCsv(MultipartFile file, UUID userId) {
-        log.info("importQuizzesFromCsv: filename={}, size={}",
+    public QuizStaffResponse importQuizFromCsv(MultipartFile file, String contextId, String title, UUID userId) {
+        log.info("importQuizFromCsv: contextId={}, filename={}, size={}", contextId,
                 file != null ? file.getOriginalFilename() : null, file != null ? file.getSize() : 0);
 
-        // ── 1. Read file (encoding, BOM, headers) and group by title ──────────
-        Map<String, List<CSVRecord>> grouped = new LinkedHashMap<>();
-        for (CSVRecord record : quizCsvFileReader.read(file)) {
-            String title = record.isSet("title") ? record.get("title").trim() : "";
-            if (title.isBlank()) {
-                continue; // skip rows with no title
-            }
-            grouped.computeIfAbsent(title, k -> new ArrayList<>()).add(record);
+        // ── 1. Form fields (checked before the file so nothing is parsed for a doomed request) ──
+        String quizTitle = title == null ? "" : title.trim();
+        if (quizTitle.isEmpty()) {
+            throw new InvalidRequestException("Tên quiz không được để trống");
         }
-
-        if (grouped.isEmpty()) {
-            throw new InvalidRequestException("File CSV không chứa hàng dữ liệu hợp lệ nào");
-        }
-
-        // ── 2. Process each quiz group ────────────────────────────────────────
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
-
-        int totalAttempted = grouped.size();
-        int successCount = 0;
-        int skippedCount = 0;
-        List<String> errors = new ArrayList<>();
-        List<QuizStaffResponse> imported = new ArrayList<>();
-
-        for (Map.Entry<String, List<CSVRecord>> entry : grouped.entrySet()) {
-            String title = entry.getKey();
-            List<CSVRecord> rows = entry.getValue();
-
-            try {
-                QuizStaffResponse created = saveQuizGroup(title, rows, user);
-                imported.add(created);
-                successCount++;
-            } catch (DataConflictException e) {
-                errors.add("Quiz '" + title + "' skipped — duplicate title: " + e.getMessage());
-                skippedCount++;
-            } catch (InvalidRequestException e) {
-                errors.add("Quiz '" + title + "' skipped — validation error: " + e.getMessage());
-                skippedCount++;
-            } catch (ResourceNotFoundException e) {
-                errors.add("Quiz '" + title + "' skipped — " + e.getMessage());
-                skippedCount++;
-            } catch (Exception e) {
-                log.error("Unexpected error saving quiz group '{}'", title, e);
-                errors.add("Quiz '" + title + "' skipped — unexpected error: " + e.getMessage());
-                skippedCount++;
-            }
-        }
-
-        log.info("importQuizzesFromCsv complete: attempted={} success={} skipped={}",
-                totalAttempted, successCount, skippedCount);
-
-        return QuizImportResponse.builder()
-                .totalQuizzesAttempted(totalAttempted)
-                .successCount(successCount)
-                .skippedCount(skippedCount)
-                .errors(errors)
-                .imported(imported)
-                .build();
-    }
-
-    /**
-     * Validates and persists one quiz group (quiz + questions).
-     * Every row is parsed and validated before anything is saved, so one bad row
-     * never leaves a half-imported quiz behind.
-     * Called from within the outer {@code @Transactional} session in
-     * {@link #importQuizzesFromCsv}, so all DB access shares the same
-     * Hibernate session and schema context.
-     */
-    private QuizStaffResponse saveQuizGroup(String title, List<CSVRecord> rows, User user) {
-        CSVRecord first = rows.get(0);
-
-        // Checked up front: a DB length violation would mark the shared transaction rollback-only
-        if (title.length() > QUIZ_TITLE_MAX_LENGTH) {
-            throw new InvalidRequestException("title dài " + title.length() + " ký tự, tối đa "
+        // Checked up front: a DB length violation would mark the transaction rollback-only
+        if (quizTitle.length() > QUIZ_TITLE_MAX_LENGTH) {
+            throw new InvalidRequestException("title dài " + quizTitle.length() + " ký tự, tối đa "
                     + QUIZ_TITLE_MAX_LENGTH + " ký tự");
         }
 
-        String contextIdStr = first.get("contextId").trim();
-        for (CSVRecord row : rows.subList(1, rows.size())) {
-            if (!contextIdStr.equals(row.get("contextId").trim())) {
-                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row)
-                        + ": contextId khác với dòng đầu của quiz '" + title + "'");
-            }
-        }
+        String contextIdStr = contextId == null ? "" : contextId.trim();
         UUID contextUuid;
         try {
             contextUuid = UUID.fromString(contextIdStr);
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException("contextId không phải là UUID hợp lệ: '" + contextIdStr + "'");
         }
-
         HistoricalContext context = historicalContextRepository.findById(contextUuid)
                 .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "HistoricalContext not found for contextId: " + contextIdStr));
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextIdStr));
 
-        // Duplicate-title check
-        if (quizRepository.existsByTitleIgnoreCase(title)) {
-            throw new DataConflictException("Quiz với tiêu đề '" + title + "' already exists");
+        if (quizRepository.existsByTitleIgnoreCase(quizTitle)) {
+            throw new DataConflictException("Quiz với tiêu đề '" + quizTitle + "' đã tồn tại");
         }
 
-        // Parse and validate every question before persisting anything
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        // ── 2. Parse and validate every row, collecting all errors ──────────────
         List<QuestionRequest> questionRequests = new ArrayList<>();
-        for (CSVRecord row : rows) {
-            QuestionRequest request = quizCsvRowParser.parse(row);
+        List<String> errors = new ArrayList<>();
+        for (CSVRecord row : quizCsvFileReader.read(file)) {
             try {
-                questionDataValidator.validate(request.getQuestionType(), request.getQuestionData());
+                // Parser errors are already prefixed with the question label
+                QuestionRequest request = quizCsvRowParser.parse(row);
+                try {
+                    questionDataValidator.validate(request.getQuestionType(), request.getQuestionData());
+                } catch (InvalidRequestException e) {
+                    throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
+                }
+                questionRequests.add(request);
             } catch (InvalidRequestException e) {
-                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
+                errors.add(e.getMessage());
             }
-            questionRequests.add(request);
+        }
+        if (!errors.isEmpty()) {
+            throw new InvalidRequestException("File có " + errors.size() + " câu hỏi lỗi, chưa lưu câu nào:\n"
+                    + String.join("\n", errors));
         }
 
-        // Build and save the Quiz entity (draft by default)
-        Quiz quiz = Quiz.builder()
-                .title(title)
+        // ── 3. Save the draft quiz and its questions in file order ──────────────
+        Quiz quiz = quizRepository.save(Quiz.builder()
+                .title(quizTitle)
                 .historicalContext(context)
                 .createdBy(user)
                 .isPublished(false)
-                .build();
-        quiz = quizRepository.save(quiz);
+                .build());
 
         int orderIndex = 0;
         for (QuestionRequest request : questionRequests) {
             linkQuestion(quiz, questionRepository.save(buildQuestion(request)), orderIndex++);
         }
 
+        log.info("importQuizFromCsv complete: quizId={} questions={}", quiz.getQuizId(), questionRequests.size());
         return mapToStaffResponse(quiz);
     }
 

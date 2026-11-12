@@ -55,7 +55,11 @@ public interface QuizService {
 
     // ==================== Import ====================
 
-    QuizImportResponse importQuizzesFromCsv(MultipartFile file, UUID userId);
+    /**
+     * Create one draft quiz from a CSV of question rows; title and context come from the form.
+     * All-or-nothing: any invalid row fails the whole import with every bad row listed.
+     */
+    QuizStaffResponse importQuizFromCsv(MultipartFile file, String contextId, String title, UUID userId);
 
     // ==================== Question Bank ====================
 
