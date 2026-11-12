@@ -23,13 +23,15 @@ import java.util.regex.Pattern;
 
 /**
  * Reads an uploaded quiz CSV into records, guarding against the encoding problems
- * that appear when the file is opened and saved with Excel.
+ * that appear when the file is opened and saved with Excel. Lines starting with '#'
+ * are comments and are skipped.
  */
 @Slf4j
 @Component
 public class QuizCsvFileReader {
 
-    public static final List<String> REQUIRED_HEADERS = List.of("title", "contextId", "level", "questionContent");
+    /** Quiz title and context come from the upload form; the file holds question rows only. */
+    public static final List<String> REQUIRED_HEADERS = List.of("level", "questionContent");
 
     /**
      * UTF-8 Vietnamese text that was decoded as Windows-1252 (e.g. "Tráº­n Báº¡ch Äáº±ng").
@@ -43,6 +45,8 @@ public class QuizCsvFileReader {
             // Excel keeps cleared cells in the used range, leaving trailing ",," in the header
             .setAllowMissingColumnNames(true)
             .setIgnoreEmptyLines(true)
+            // Lines starting with '#' are guidance notes for the user (see the template)
+            .setCommentMarker('#')
             .setTrim(true)
             .build();
 
@@ -77,9 +81,12 @@ public class QuizCsvFileReader {
         return records;
     }
 
-    /** Human-facing line number: the header is line 1, the first data row is line 2. */
+    /**
+     * Human-facing question number: the first data row is "Câu hỏi 1". Comment and header
+     * lines are not counted, so physical line numbers would not match once '#' lines exist.
+     */
     public static String lineLabel(CSVRecord row) {
-        return "Dòng " + (row.getRecordNumber() + 1);
+        return "Câu hỏi " + row.getRecordNumber();
     }
 
     private static byte[] readBytes(MultipartFile file) {
