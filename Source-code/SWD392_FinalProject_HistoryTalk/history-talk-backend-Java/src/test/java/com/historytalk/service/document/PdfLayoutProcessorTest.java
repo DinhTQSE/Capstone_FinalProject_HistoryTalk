@@ -97,4 +97,61 @@ class PdfLayoutProcessorTest {
         assertThat(markdown).contains("- Đợt 1: Từ ngày 13/3 đến 17/3 tiêu diệt phân khu Bắc.");
         assertThat(markdown).contains("Hình 1: Cờ chiến thắng trên nóc hầm Đờ Cát.");
     }
+
+    private static ExtractedLine ocrLine(int page, float leftX, float rightX, float topY, float bottomY, String text) {
+        return new ExtractedLine(page, 1275f, 1650f, leftX, rightX, topY, bottomY, 0f, text);
+    }
+
+    @Test
+    void reconstructMarkdown_stripsNoisyOcrRunningHeadersThinMarginRulesAndReflowsMirrorMarginBook() {
+        List<ExtractedLine> input = List.of(
+                // Page 1 (odd: left~210, right~1030): symbol dust + body with varying OCR heights
+                ocrLine(1, 530f, 750f, 350f, 370f, "ˆ^ „"),
+                ocrLine(1, 250f, 1030f, 410f, 448f, "Trong cuộc kháng chiến chống quân xâm lược Nam Hán lần thứ"),
+                ocrLine(1, 210f, 1028f, 460f, 505f, "hai năm 938, trận Bạch Đằng do Ngô Quyền chỉ huy là trận quyết"),
+                ocrLine(1, 210f, 1030f, 515f, 550f, "chiến chiến lược có ý nghĩa to lớn trên nhiều lĩnh vực và còn"),
+                ocrLine(1, 210f, 1028f, 565f, 608f, "ghi dấu ấn sâu đậm trong lịch sử chống ngoại xâm hào hùng của"),
+
+                // Page 2 (even mirror margin: left~280, right~1100): fuzzy OCR parity header + thin rule noise + continuation
+                ocrLine(2, 915f, 1095f, 122f, 149f, "ĐĂNG VIỆT THỦY"),
+                ocrLine(2, 275f, 1095f, 154f, 170f, "562 2C TP HH"),
+                ocrLine(2, 280f, 760f, 198f, 240f, "toàn dân tộc ta từ thuở dựng nước đến nay."),
+                ocrLine(2, 320f, 1100f, 255f, 298f, "Đoạn văn mới ở trang chẵn được thụt lề rõ ràng so với lề trái"),
+                ocrLine(2, 280f, 1098f, 310f, 352f, "của riêng trang chẵn nên không bị gộp vào đoạn trước đó và"),
+                ocrLine(2, 280f, 1098f, 365f, 405f, "cũng không bị tách vụn thành từng dòng ngắn rời rạc nữa."),
+
+                // Page 3 (odd): fuzzy OCR odd header variant 1 + body
+                ocrLine(3, 205f, 755f, 125f, 152f, "10 TR.ÂN ĐÁNH NỔI TIẾNG TRONG LịCH SỬ VIỆT NAM"),
+                ocrLine(3, 250f, 1030f, 200f, 242f, "Bạch Đằng là dòng sông gắn liền với chiến công năm 938."),
+                ocrLine(3, 210f, 1028f, 255f, 296f, "Địa thế hiểm trở giúp quân dân ta mai phục đánh tan thủy quân."),
+                ocrLine(3, 210f, 1028f, 310f, 350f, "Thủy triều lên xuống tạo lợi thế chiến thuật quyết định trận đánh."),
+                ocrLine(3, 210f, 1028f, 365f, 405f, "Chiến thắng mở ra kỷ nguyên độc lập tự chủ lâu dài cho đất nước."),
+
+                // Page 4 (even): exact ĐẶNG VIỆT THỦY + rule noise + body
+                ocrLine(4, 915f, 1095f, 122f, 149f, "ĐẶNG VIỆT THỦY"),
+                ocrLine(4, 275f, 1095f, 154f, 170f, "——————Ơ Ơn"),
+                ocrLine(4, 280f, 1098f, 200f, 242f, "Trang bốn tiếp tục nội dung lịch sử triều đại nhà Ngô."),
+
+                // Page 5 (odd): fuzzy OCR odd header variant 2 + body
+                ocrLine(5, 205f, 755f, 125f, 152f, "10 TRẤN ĐÁNH NỔI TIẾNG TR0NG LỊCH SỬ VIỆT NAM"),
+                ocrLine(5, 210f, 1028f, 200f, 242f, "Trang năm phân tích bài học quân sự để lại cho đời sau.")
+        );
+
+        String markdown = PdfLayoutProcessor.reconstructMarkdown(input, List.of());
+
+        assertThat(markdown).doesNotContain("ĐĂNG VIỆT THỦY");
+        assertThat(markdown).doesNotContain("ĐẶNG VIỆT THỦY");
+        assertThat(markdown).doesNotContain("TR.ÂN ĐÁNH");
+        assertThat(markdown).doesNotContain("TRẤN ĐÁNH");
+        assertThat(markdown).doesNotContain("562 2C TP HH");
+        assertThat(markdown).doesNotContain("——————");
+        assertThat(markdown).doesNotContain("ˆ^ „");
+
+        assertThat(markdown).contains(
+                "Trong cuộc kháng chiến chống quân xâm lược Nam Hán lần thứ hai năm 938, trận Bạch Đằng do Ngô Quyền chỉ huy là trận quyết chiến chiến lược có ý nghĩa to lớn trên nhiều lĩnh vực và còn ghi dấu ấn sâu đậm trong lịch sử chống ngoại xâm hào hùng của toàn dân tộc ta từ thuở dựng nước đến nay."
+        );
+        assertThat(markdown).contains(
+                "Đoạn văn mới ở trang chẵn được thụt lề rõ ràng so với lề trái của riêng trang chẵn nên không bị gộp vào đoạn trước đó và cũng không bị tách vụn thành từng dòng ngắn rời rạc nữa."
+        );
+    }
 }

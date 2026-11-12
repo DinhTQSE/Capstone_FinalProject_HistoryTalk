@@ -51,11 +51,13 @@ ENV JWT_EXPIRATION_MS=""
 ENV JWT_REFRESH_EXPIRATION_MS=""
 ENV AI_SERVICE_URL="http://localhost:8001"
 ENV MONITORING_ALLOWED_IPS="127.0.0.1,0:0:0:0:0:0:0:1,172.16.0.0/12,172.17.0.0/16,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16"
+# Prevent libtesseract OpenMP threads from contending with Java OCR worker pool inside CPU-limited containers
+ENV OMP_THREAD_LIMIT=1
 
 # ENTRYPOINT with JVM memory limits to prevent App Runner OOM kills
 ENTRYPOINT ["java", \
   "-Xms256m", \
-  "-Xmx512m", \
+  "-Xmx768m", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
   "-Djava.security.egd=file:/dev/./urandom", \
