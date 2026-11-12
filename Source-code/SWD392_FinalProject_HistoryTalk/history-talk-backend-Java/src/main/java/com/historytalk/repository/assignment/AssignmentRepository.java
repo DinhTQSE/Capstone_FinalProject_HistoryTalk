@@ -2,6 +2,7 @@ package com.historytalk.repository.assignment;
 
 import com.historytalk.entity.assignment.Assignment;
 import com.historytalk.entity.enums.AssignmentStatus;
+import com.historytalk.entity.enums.AssignmentType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,6 +27,11 @@ public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     List<Assignment> findByClassroomIdInAndStatusAndDeletedAtIsNull(Collection<UUID> classroomIds, AssignmentStatus status);
 
     List<Assignment> findByClassroomIdInAndDeletedAtIsNull(Collection<UUID> classroomIds);
+
+    boolean existsByAssignmentTypeAndTargetIdAndStatusNotAndDeletedAtIsNull(
+            AssignmentType assignmentType,
+            UUID targetId,
+            AssignmentStatus status);
 
     Page<Assignment> findByTeacherUidAndDeletedAtIsNull(UUID teacherUid, Pageable pageable);
 

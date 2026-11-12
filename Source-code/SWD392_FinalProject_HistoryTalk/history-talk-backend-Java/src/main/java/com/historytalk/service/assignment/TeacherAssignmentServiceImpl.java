@@ -317,6 +317,9 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
             assignment.setMinRequirement(request.getMinRequirement());
         }
         if (request.getStatus() != null) {
+            if (request.getStatus() == AssignmentStatus.ACTIVE && assignment.getAssignmentType() != null) {
+                validateAndGetTargetTitle(assignment.getAssignmentType(), assignment.getTargetId(), schoolId);
+            }
             assignment.setStatus(request.getStatus());
         }
 
