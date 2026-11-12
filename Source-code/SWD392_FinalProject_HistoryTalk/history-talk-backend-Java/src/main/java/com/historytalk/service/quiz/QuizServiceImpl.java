@@ -12,6 +12,8 @@ import com.historytalk.dto.quiz.quizdata.MatchingPair;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
+import com.historytalk.entity.enums.AssignmentStatus;
+import com.historytalk.entity.enums.AssignmentType;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuestType;
@@ -36,6 +38,7 @@ import com.historytalk.repository.QuizQuestionRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.assignment.AssignmentRepository;
 import com.historytalk.service.gamification.GamificationService;
 import com.historytalk.service.quiz.csv.QuizCsvFileReader;
 import com.historytalk.service.quiz.csv.QuizCsvRowParser;
@@ -75,6 +78,9 @@ public class QuizServiceImpl implements QuizService {
     private final GamificationService gamificationService;
     private final QuizQuestionRepository quizQuestionRepository;
     private final QuestionDataValidator questionDataValidator;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AssignmentRepository assignmentRepository;
     private final QuizCsvFileReader quizCsvFileReader;
     private final QuizCsvRowParser quizCsvRowParser;
 
@@ -452,6 +458,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("deleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quizRepository.delete(quiz);
     }
 
@@ -461,8 +468,16 @@ public class QuizServiceImpl implements QuizService {
         log.info("softDeleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quiz.setDeletedAt(LocalDateTime.now());
         quizRepository.save(quiz);
+    }
+
+    private void ensureQuizNotReferencedByAssignment(UUID quizId) {
+        if (assignmentRepository != null && assignmentRepository.existsByAssignmentTypeAndTargetIdAndStatusNotAndDeletedAtIsNull(
+                AssignmentType.QUIZ_TEST, quizId, AssignmentStatus.CANCELLED)) {
+            throw new InvalidRequestException("Không thể xóa bộ đề vì đang có bài tập giao cho học sinh sử dụng. Vui lòng hủy bài tập trước.");
+        }
     }
 
     @Override

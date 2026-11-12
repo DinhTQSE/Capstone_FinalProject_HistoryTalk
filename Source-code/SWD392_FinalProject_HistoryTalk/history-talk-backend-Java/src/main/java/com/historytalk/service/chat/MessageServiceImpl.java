@@ -9,11 +9,13 @@ import com.historytalk.dto.chat.SendMessageResponse;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 import com.historytalk.entity.enums.ChatSessionMode;
-
+import com.historytalk.entity.enums.SubmissionStatus;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.MessageRepository;
+import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
 import com.historytalk.service.chat.AiServiceClient;
 import com.historytalk.service.chat.AiServiceClient.AiChatResult;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
@@ -58,6 +60,9 @@ public class MessageServiceImpl implements MessageService {
     private final ExamSessionService examSessionService;
     private final ChatTokenCharger chatTokenCharger;
     private final TransactionTemplate transactionTemplate;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AssignmentSubmissionRepository assignmentSubmissionRepository;
 
     // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
@@ -306,6 +311,11 @@ public class MessageServiceImpl implements MessageService {
                 UUID.fromString(request.getSessionId()), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
+
+        if (assignmentSubmissionRepository != null && assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(
+                session.getSessionId(), List.of(SubmissionStatus.SUBMITTED, SubmissionStatus.LATE_SUBMITTED))) {
+            throw new InvalidRequestException("Phiên trò chuyện này đã được dùng để nộp bài tập, không thể gửi thêm tin nhắn mới");
+        }
 
         verifyUserTokenAndSubscriptionBeforeChat(session.getUser());
 
