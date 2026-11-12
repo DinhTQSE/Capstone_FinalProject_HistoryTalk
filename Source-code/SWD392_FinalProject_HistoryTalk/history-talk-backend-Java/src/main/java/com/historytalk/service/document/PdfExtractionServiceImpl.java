@@ -4,14 +4,17 @@ import com.historytalk.dto.document.PdfExtractionResponse;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.service.chat.AiServiceClient;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
+import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImage;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -30,11 +33,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,28 +55,21 @@ import java.util.regex.Pattern;
 public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     private static final long MAX_FILE_BYTES = 100 * 1024 * 1024; // Hỗ trợ tài liệu chuyên khảo lên tới 100MB
+    private static final int IMAGE_IO_CONCURRENCY = 6;
+    private static final int VISION_BATCH_SIZE = 3;
+    private static final int VISION_CONCURRENT_BATCHES = 2;
 
-    // Pattern dọn sạch siêu dữ liệu lưu trữ / con dấu trung tâm lưu trữ văn thư quốc gia
-    private static final Pattern ARCHIVE_METADATA_PATTERN = Pattern.compile(
-            "(?im)^.*(?:Trung tâm L[uư]u tr[uữ]|L[uư]u tr[uữ] qu[oố]c gia|M[uụ]c l[uụ]c [aả]nh|ph[oô]ng [Đđ][oơ]n v[iị]|h[oồ] s[oơ] \\d+|t[oờ] \\d+|SLT\\s*\\d+).*$\\R?",
+    // Pattern nhận diện chú thích ảnh để ghim metadata cho đúng bức ảnh gần nhất
+    private static final Pattern CAPTION_PATTERN = Pattern.compile(
+            "(?im)^\\s*(?:H[iì]nh|L[uư][oợ]c [đd][oồ]|B[aả]n [đd][oồ]|[AẢaả]nh t[uư] li[eệ]u|S[oơ] [đd][oồ]|Tranh|Di t[ií]ch)\\s*\\d*[.:]?.*$",
             Pattern.UNICODE_CHARACTER_CLASS
-    );
-
-    // Pattern dọn chú thích ảnh đơn độc khi tắt tính năng AI Vision
-    private static final Pattern LONE_CAPTION_PATTERN = Pattern.compile(
-            "(?im)^\\s*(?:H[iì]nh|L[uư][oợ]c [đd][oồ]|B[aả]n [đd][oồ]|[AẢaả]nh t[uư] li[eệ]u|S[oơ] [đd][oồ]|Tranh|Di t[ií]ch)\\s*\\d*[.:]?[^\\n\\r]*$\\R?",
-            Pattern.UNICODE_CHARACTER_CLASS
-    );
-
-    // Pattern dọn các số trang nằm đơn độc trên một dòng
-    private static final Pattern STANDALONE_PAGE_NUMBER_PATTERN = Pattern.compile(
-            "(?m)^\\s*\\d{1,4}\\s*$\\R?"
     );
 
     private final OcrService ocrService;
     private final PdfTypeClassifier pdfTypeClassifier;
     private final AiServiceClient aiServiceClient;
     private final SupabaseDocumentStorageService supabaseDocumentStorageService;
+    private final ExecutorService imageIoExecutor;
 
     public PdfExtractionServiceImpl(
             OcrService ocrService,
@@ -75,7 +80,21 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
         this.pdfTypeClassifier = pdfTypeClassifier;
         this.aiServiceClient = aiServiceClient;
         this.supabaseDocumentStorageService = supabaseDocumentStorageService;
-        log.info("PdfExtractionService initialized with In-Place VLM Image Enrichment and Permanent Storage");
+        AtomicInteger threadSeq = new AtomicInteger(1);
+        this.imageIoExecutor = Executors.newFixedThreadPool(IMAGE_IO_CONCURRENCY, r -> {
+            Thread t = new Thread(r, "pdf-image-io-" + threadSeq.getAndIncrement());
+            t.setDaemon(true);
+            return t;
+        });
+        log.info("PdfExtractionService initialized with Single-Pass Layout Pipeline & Bounded Parallel I/O");
+    }
+
+    @PreDestroy
+    public void shutdownExecutor() {
+        imageIoExecutor.shutdown();
+    }
+
+    private record ImageBounds(float topY, float bottomY) {
     }
 
     private record ExtractedHistoricalImage(
@@ -83,62 +102,47 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             String imageUrl,
             int pageNumber,
             String caption,
-            float topY
-    ) {}
-
-    private static class PageImageItem {
-        private final float topY;
-        private final String markdownBlock;
-        private boolean inserted;
-
-        public PageImageItem(float topY, String markdownBlock) {
-            this.topY = topY;
-            this.markdownBlock = markdownBlock;
-            this.inserted = false;
-        }
-
-        public float getTopY() {
-            return topY;
-        }
-
-        public String getMarkdownBlock() {
-            return markdownBlock;
-        }
-
-        public boolean isInserted() {
-            return inserted;
-        }
-
-        public void setInserted(boolean inserted) {
-            this.inserted = inserted;
-        }
+            float topY,
+            float bottomY
+    ) {
     }
 
     private static class PageImageLocationLocator extends PDFGraphicsStreamEngine {
-        private final Map<COSDictionary, Float> imageTopYMap = new HashMap<>();
-        private final float pageHeight;
+        private final Map<COSDictionary, ImageBounds> imageBoundsMap = new IdentityHashMap<>();
+        private final float upperY;
 
         public PageImageLocationLocator(PDPage page) {
             super(page);
-            this.pageHeight = page.getCropBox().getHeight();
+            PDRectangle cropBox = page.getCropBox();
+            this.upperY = (cropBox != null) ? cropBox.getUpperRightY() : 792f;
         }
 
-        public Map<COSDictionary, Float> locateImages() {
+        public Map<COSDictionary, ImageBounds> locateImages() {
             try {
                 processPage(getPage());
             } catch (Exception e) {
                 log.debug("Error tracing page image locations: {}", e.getMessage());
             }
-            return imageTopYMap;
+            return imageBoundsMap;
         }
 
         @Override
         public void drawImage(PDImage pdImage) throws IOException {
-            if (pdImage != null && pdImage.getCOSObject() != null) {
-                Matrix ctm = getGraphicsState().getCurrentTransformationMatrix();
-                float topY = pageHeight - (ctm.getTranslateY() + Math.abs(ctm.getScalingFactorY()));
-                imageTopYMap.put(pdImage.getCOSObject(), Math.max(0f, topY));
+            if (pdImage == null || pdImage.getCOSObject() == null) {
+                return;
             }
+            Matrix ctm = getGraphicsState().getCurrentTransformationMatrix();
+            Point2D.Float p00 = ctm.transformPoint(0f, 0f);
+            Point2D.Float p01 = ctm.transformPoint(0f, 1f);
+            Point2D.Float p10 = ctm.transformPoint(1f, 0f);
+            Point2D.Float p11 = ctm.transformPoint(1f, 1f);
+
+            float maxUserY = Math.max(Math.max(p00.y, p01.y), Math.max(p10.y, p11.y));
+            float minUserY = Math.min(Math.min(p00.y, p01.y), Math.min(p10.y, p11.y));
+
+            float topY = Math.max(0f, upperY - maxUserY);
+            float bottomY = Math.max(topY, upperY - minUserY);
+            imageBoundsMap.put(pdImage.getCOSObject(), new ImageBounds(topY, bottomY));
         }
 
         @Override public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3) {}
@@ -155,44 +159,101 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
         @Override public void shadingFill(COSName shadingName) {}
     }
 
-    private static class InPlaceImageBindingStripper extends PDFTextStripper {
-        private final Map<Integer, List<PageImageItem>> pageImagesMap;
+    /**
+     * Single-pass PDFTextStripper collecting exact line geometry (page, leftX, rightX, topY, bottomY, fontSize, text)
+     * without allocating unused concatenated page strings.
+     */
+    private static class SinglePassLayoutStripper extends PDFTextStripper {
+        private final List<PdfLayoutProcessor.ExtractedLine> collectedLines = new ArrayList<>();
+        private final StringBuilder currentText = new StringBuilder();
+        private float minLeftX = Float.MAX_VALUE;
+        private float maxRightX = 0f;
+        private float minTopY = Float.MAX_VALUE;
+        private float maxBottomY = 0f;
+        private float maxFontSize = 0f;
+        private float pageWidth = 0f;
+        private float pageHeight = 0f;
 
-        public InPlaceImageBindingStripper(Map<Integer, List<PageImageItem>> pageImagesMap) throws IOException {
+        public SinglePassLayoutStripper() throws IOException {
             super();
-            this.pageImagesMap = pageImagesMap;
             setSortByPosition(true);
         }
 
         @Override
-        protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
-            int pageNo = getCurrentPageNo();
-            if (textPositions != null && !textPositions.isEmpty() && pageImagesMap != null && pageImagesMap.containsKey(pageNo)) {
-                float lineTopY = textPositions.get(0).getYDirAdj();
-                List<PageImageItem> images = pageImagesMap.get(pageNo);
-                for (PageImageItem img : images) {
-                    if (!img.isInserted() && img.getTopY() <= lineTopY) {
-                        output.write(getLineSeparator() + getLineSeparator() + img.getMarkdownBlock() + getLineSeparator() + getLineSeparator());
-                        img.setInserted(true);
-                    }
-                }
-            }
-            super.writeString(text, textPositions);
+        protected void startPage(PDPage page) throws IOException {
+            resetLineBuffer();
+            super.startPage(page);
         }
 
         @Override
-        protected void writePageEnd() throws IOException {
-            int pageNo = getCurrentPageNo();
-            if (pageImagesMap != null && pageImagesMap.containsKey(pageNo)) {
-                List<PageImageItem> images = pageImagesMap.get(pageNo);
-                for (PageImageItem img : images) {
-                    if (!img.isInserted()) {
-                        output.write(getLineSeparator() + getLineSeparator() + img.getMarkdownBlock() + getLineSeparator() + getLineSeparator());
-                        img.setInserted(true);
-                    }
+        protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
+            if (text == null || text.isEmpty()) {
+                return;
+            }
+            if (textPositions != null && !textPositions.isEmpty()) {
+                for (TextPosition tp : textPositions) {
+                    float x = tp.getXDirAdj();
+                    float width = tp.getWidthDirAdj();
+                    float baselineY = tp.getYDirAdj();
+                    float height = Math.max(1f, tp.getHeightDir());
+
+                    minLeftX = Math.min(minLeftX, x);
+                    maxRightX = Math.max(maxRightX, x + width);
+                    minTopY = Math.min(minTopY, Math.max(0f, baselineY - height));
+                    maxBottomY = Math.max(maxBottomY, baselineY);
+                    maxFontSize = Math.max(maxFontSize, tp.getFontSizeInPt());
+                    pageWidth = tp.getPageWidth();
+                    pageHeight = tp.getPageHeight();
                 }
             }
-            super.writePageEnd();
+            currentText.append(text);
+        }
+
+        @Override
+        protected void writeLineSeparator() throws IOException {
+            flushCurrentLine();
+            super.writeLineSeparator();
+        }
+
+        @Override
+        protected void endPage(PDPage page) throws IOException {
+            flushCurrentLine();
+            super.endPage(page);
+        }
+
+        private void flushCurrentLine() {
+            String lineText = currentText.toString().trim();
+            if (!lineText.isEmpty()) {
+                float left = (minLeftX == Float.MAX_VALUE) ? 0f : minLeftX;
+                float top = (minTopY == Float.MAX_VALUE) ? 0f : minTopY;
+                float right = Math.max(left, maxRightX);
+                float bottom = Math.max(top + 1f, maxBottomY);
+                collectedLines.add(new PdfLayoutProcessor.ExtractedLine(
+                        getCurrentPageNo(),
+                        pageWidth,
+                        pageHeight,
+                        left,
+                        right,
+                        top,
+                        bottom,
+                        maxFontSize,
+                        lineText
+                ));
+            }
+            resetLineBuffer();
+        }
+
+        private void resetLineBuffer() {
+            currentText.setLength(0);
+            minLeftX = Float.MAX_VALUE;
+            maxRightX = 0f;
+            minTopY = Float.MAX_VALUE;
+            maxBottomY = 0f;
+            maxFontSize = 0f;
+        }
+
+        public List<PdfLayoutProcessor.ExtractedLine> getCollectedLines() {
+            return collectedLines;
         }
     }
 
@@ -213,14 +274,25 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     @Override
     public PdfExtractionResponse extractText(MultipartFile file, Integer startPage, Integer endPage, Boolean enableAiVision, BiConsumer<Integer, Integer> onProgress) throws IOException {
+        return extractText(file, startPage, endPage, enableAiVision, onProgress, null);
+    }
+
+    @Override
+    public PdfExtractionResponse extractText(
+            MultipartFile file,
+            Integer startPage,
+            Integer endPage,
+            Boolean enableAiVision,
+            BiConsumer<Integer, Integer> onProgress,
+            BooleanSupplier isCancelled) throws IOException {
         validatePdfFile(file);
-        
+
         Path tempFile = null;
         try {
             tempFile = Files.createTempFile("pdf-extraction-", ".pdf");
             file.transferTo(tempFile.toFile());
-            
-            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, onProgress);
+
+            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, onProgress, isCancelled);
         } finally {
             if (tempFile != null) {
                 try {
@@ -261,8 +333,8 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
         try {
             tempFile = Files.createTempFile("pdf-extraction-", ".pdf");
             Files.write(tempFile, pdfBytes);
-            
-            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, onProgress);
+
+            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, onProgress, null);
         } finally {
             if (tempFile != null) {
                 try {
@@ -279,11 +351,12 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             Integer reqStartPage,
             Integer reqEndPage,
             Boolean enableAiVision,
-            BiConsumer<Integer, Integer> onProgress) throws IOException {
+            BiConsumer<Integer, Integer> onProgress,
+            BooleanSupplier isCancelled) throws IOException {
         boolean visionEnabled = Boolean.TRUE.equals(enableAiVision);
         log.info("=== PDF Extraction Started (enableAiVision={}) ===", visionEnabled);
         log.info("File: {}, reqStartPage: {}, reqEndPage: {}", pdfFile.getName(), reqStartPage, reqEndPage);
-        
+
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
             if (document.isEncrypted()) {
                 throw new InvalidRequestException("Không thể trích xuất tài liệu PDF được mã hóa hoặc khóa mật khẩu");
@@ -294,7 +367,6 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                 throw new InvalidRequestException("File PDF không có trang nào");
             }
 
-            // Mở rộng toàn bộ số trang: Nếu không truyền, tự động đọc từ trang 1 đến hết sách
             int startPage = (reqStartPage != null && reqStartPage >= 1) ? reqStartPage : 1;
             int endPage = (reqEndPage != null && reqEndPage >= startPage) ? Math.min(reqEndPage, totalDocPages) : totalDocPages;
 
@@ -310,165 +382,219 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             log.info("Document loaded successfully. Total pages: {}, extracting range: [{} - {}] (count: {})",
                     totalDocPages, startPage, endPage, pageCount);
 
-            PdfType pdfType = pdfTypeClassifier.classify(document);
+            PdfType pdfType = pdfTypeClassifier.classify(document, startPage, endPage);
             log.info("=== Classification Decision: {} ===", pdfType);
 
             String finalResultText;
 
             if (pdfType == PdfType.SCANNED_IMAGE) {
-                log.info("=== Routing Decision: OCR PROCESSING ===");
+                log.info("=== Routing Decision: OCR PROCESSING (Pages [{} - {}]) ===", startPage, endPage);
                 try {
-                    String rawOcr = ocrService.extractTextFromPdf(pdfFile, onProgress);
-                    if (rawOcr == null || rawOcr.isBlank()) {
+                    List<PdfLayoutProcessor.ExtractedLine> ocrLines = ocrService.extractLinesFromPdf(
+                            pdfFile,
+                            startPage,
+                            endPage,
+                            onProgress,
+                            () -> Thread.currentThread().isInterrupted() || (isCancelled != null && isCancelled.getAsBoolean())
+                    );
+                    finalResultText = PdfLayoutProcessor.reconstructMarkdown(ocrLines, List.of());
+                    if (finalResultText.isBlank()) {
                         throw new InvalidRequestException("Không thể nhận diện ký tự từ tài liệu scan");
                     }
-                    finalResultText = cleanDocumentNoise(rawOcr.trim(), !visionEnabled);
+                } catch (CancellationException ce) {
+                    throw ce;
                 } catch (IOException ocrEx) {
                     throw new InvalidRequestException("Lỗi OCR tài liệu: " + ocrEx.getMessage());
                 }
             } else {
-                Map<Integer, List<PageImageItem>> pageImagesMap = new HashMap<>();
-
-                // 1. Quét và trích xuất TOÀN BỘ ảnh tư liệu có trong PDF, upload lên Storage
-                List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(document, startPage, endPage);
-
-                if (!allImages.isEmpty()) {
-                    if (visionEnabled) {
-                        log.info("=== Routing Decision: NATIVE EXTRACTION WITH VLM ANALYSIS ===");
-                        log.info("Found {} historical images across pages [{} - {}]. Analyzing via Vision AI...",
-                                allImages.size(), startPage, endPage);
-                        try {
-                            // Gọi sang AI Service theo từng đợt để đảm bảo an toàn cho GPU/API
-                            int batchSize = 5;
-                            for (int i = 0; i < allImages.size(); i += batchSize) {
-                                List<ExtractedHistoricalImage> batch = allImages.subList(i, Math.min(i + batchSize, allImages.size()));
-                                List<AiServiceClient.ImageToDescribeDto> describeBatch = batch.stream()
-                                        .map(ExtractedHistoricalImage::describeDto)
-                                        .toList();
-                                List<AiServiceClient.DescribedImageDto> batchResult = aiServiceClient.describeImages(describeBatch);
-                                if (batchResult != null) {
-                                    for (int j = 0; j < batchResult.size(); j++) {
-                                        AiServiceClient.DescribedImageDto desc = batchResult.get(j);
-                                        ExtractedHistoricalImage item = (j < batch.size()) ? batch.get(j) : null;
-                                        String descBlock = desc.descriptionBlock();
-                                        if (descBlock != null && !descBlock.isBlank()) {
-                                            // Lọc bỏ nếu AI nhận diện ra là Biểu trưng / Logo lưu trữ
-                                            if (descBlock.contains("Biểu trưng (Logo)") 
-                                                    || descBlock.contains("Biểu trưng lưu trữ") 
-                                                    || descBlock.contains("VĂN THƯ LƯU TRỮ VN")) {
-                                                log.debug("Filtering out archive logo/watermark block on page {}", desc.pageNumber());
-                                                continue;
-                                            }
-
-                                            String formattedBlock = descBlock;
-                                            if (item != null && item.imageUrl() != null) {
-                                                String captionTitle = (item.caption() != null && !item.caption().isBlank()) 
-                                                        ? item.caption() 
-                                                        : "Ảnh tư liệu lịch sử";
-                                                formattedBlock = String.format("![%s](%s)\n%s",
-                                                        captionTitle, item.imageUrl(), descBlock);
-                                            }
-
-                                            float topY = (item != null) ? item.topY() : 0f;
-                                            pageImagesMap.computeIfAbsent(desc.pageNumber(), k -> new ArrayList<>())
-                                                    .add(new PageImageItem(topY, formattedBlock));
-                                        }
-                                    }
-                                }
-                            }
-                            log.info("Successfully received {} image descriptions from AI", pageImagesMap.size());
-                        } catch (Exception e) {
-                            log.warn("Failed during Vision AI processing, falling back to basic image tags: {}", e.getMessage());
-                            // Fallback sang tag ảnh cơ bản nếu AI Service gặp sự cố
-                            for (ExtractedHistoricalImage item : allImages) {
-                                if (item.imageUrl() != null) {
-                                    String captionTitle = (item.caption() != null && !item.caption().isBlank()) 
-                                            ? item.caption() 
-                                            : "Ảnh tư liệu lịch sử";
-                                    String tag = String.format("![%s](%s)", captionTitle, item.imageUrl());
-                                    pageImagesMap.computeIfAbsent(item.pageNumber(), k -> new ArrayList<>())
-                                            .add(new PageImageItem(item.topY(), tag));
-                                }
-                            }
-                        }
-                    } else {
-                        log.info("=== Routing Decision: NATIVE EXTRACTION (IMAGE STORED, AI VISION DISABLED) ===");
-                        log.info("Found {} historical images across pages [{} - {}]. Binding image tags without AI VLM analysis...",
-                                allImages.size(), startPage, endPage);
-                        for (ExtractedHistoricalImage item : allImages) {
-                            if (item.imageUrl() != null) {
-                                String captionTitle = (item.caption() != null && !item.caption().isBlank()) 
-                                        ? item.caption() 
-                                        : "Ảnh tư liệu lịch sử";
-                                String tag = String.format("![%s](%s)", captionTitle, item.imageUrl());
-                                pageImagesMap.computeIfAbsent(item.pageNumber(), k -> new ArrayList<>())
-                                        .add(new PageImageItem(item.topY(), tag));
-                            }
-                        }
-                    }
-
-                    // Sắp xếp các ảnh trong từng trang theo tọa độ Y từ trên xuống
-                    pageImagesMap.values().forEach(list -> list.sort(Comparator.comparingDouble(PageImageItem::getTopY)));
-                } else {
-                    log.info("No historical images found across pages [{} - {}]. Processing text only.", startPage, endPage);
-                }
-
-                // 2. Trích xuất Text từng trang kết hợp ghim ảnh theo đúng tọa độ Y không gian (In-Place Binding)
-                StringBuilder fullDocumentBuilder = new StringBuilder();
-                InPlaceImageBindingStripper stripper = new InPlaceImageBindingStripper(pageImagesMap);
-
+                // 1. Single-pass text & layout extraction across [startPage..endPage]
+                SinglePassLayoutStripper layoutStripper = new SinglePassLayoutStripper();
+                Writer nullWriter = Writer.nullWriter();
                 for (int p = startPage; p <= endPage; p++) {
-                    stripper.setStartPage(p);
-                    stripper.setEndPage(p);
-                    String pageText = stripper.getText(document);
-
-                    if (pageText != null && !pageText.isBlank()) {
-                        fullDocumentBuilder.append(pageText.trim()).append("\n\n");
-                    }
-
-                    if (onProgress != null) {
-                        try {
-                            onProgress.accept(p - startPage + 1, pageCount);
-                        } catch (Exception ignored) {
-                        }
-                    }
+                    checkAborted(isCancelled);
+                    layoutStripper.setStartPage(p);
+                    layoutStripper.setEndPage(p);
+                    layoutStripper.writeText(document, nullWriter);
+                    notifyProgress(onProgress, p - startPage + 1, pageCount);
                 }
 
-                String rawText = fullDocumentBuilder.toString().trim();
-                finalResultText = cleanDocumentNoise(rawText, false);
+                List<PdfLayoutProcessor.ExtractedLine> extractedLines = layoutStripper.getCollectedLines();
+                Map<Integer, List<PdfLayoutProcessor.ExtractedLine>> linesByPage = new HashMap<>();
+                for (PdfLayoutProcessor.ExtractedLine line : extractedLines) {
+                    linesByPage.computeIfAbsent(line.pageNumber(), k -> new ArrayList<>()).add(line);
+                }
+
+                // 2. Extract images once (with MD5 cache + parallel JPEG encode/upload + spatial caption matching)
+                List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(
+                        document, startPage, endPage, linesByPage, isCancelled);
+
+                // 3. Build image placements (optionally enriched via bounded parallel Vision AI batches)
+                List<PdfLayoutProcessor.PageImagePlacement> imagePlacements = buildImagePlacements(
+                        allImages, visionEnabled, isCancelled);
+
+                // 4. Filter cross-page headers/footers, reflow paragraphs, and place images cleanly at paragraph boundaries
+                finalResultText = PdfLayoutProcessor.reconstructMarkdown(extractedLines, imagePlacements);
                 if (finalResultText.isBlank()) {
                     throw new InvalidRequestException("Không tìm thấy nội dung văn bản trong các trang đã chọn");
                 }
             }
 
-            log.info("=== Extraction Completed Successfully (Length: {} chars, Pages: {}) ===", finalResultText.length(), pageCount);
+            log.info("=== Extraction Completed Successfully (Length: {} chars, Pages: {}) ===",
+                    finalResultText.length(), pageCount);
 
             return PdfExtractionResponse.builder()
                     .rawText(finalResultText)
                     .pageCount(pageCount)
                     .build();
 
+        } catch (CancellationException ce) {
+            throw ce;
         } catch (IOException ex) {
             log.error("Failed to extract text from PDF: {}", ex.getMessage());
             throw new SystemException("Failed to extract text from PDF: " + ex.getMessage());
         }
     }
 
-    /**
-     * Dọn dẹp nhiễu văn bản: metadata lưu trữ, số trang đứng lẻ, và caption ảnh đơn độc (khi tắt AI Vision)
-     */
-    private String cleanDocumentNoise(String text, boolean removeCaptions) {
-        if (text == null || text.isBlank()) {
-            return "";
+    private List<PdfLayoutProcessor.PageImagePlacement> buildImagePlacements(
+            List<ExtractedHistoricalImage> allImages,
+            boolean visionEnabled,
+            BooleanSupplier isCancelled) {
+        if (allImages.isEmpty()) {
+            return List.of();
         }
-        // Giữ nguyên 100% chú thích ảnh, nguồn lưu trữ và số lưu trữ (SLT) để phục vụ AI RAG
-        String cleaned = STANDALONE_PAGE_NUMBER_PATTERN.matcher(text).replaceAll("");
-        if (removeCaptions) {
-            cleaned = LONE_CAPTION_PATTERN.matcher(cleaned).replaceAll("");
+
+        if (!visionEnabled) {
+            log.info("=== NATIVE EXTRACTION (IMAGE STORED, AI VISION DISABLED) ===");
+            return toFallbackPlacements(allImages);
         }
-        cleaned = cleaned.replaceAll("(?m)^[ \\t]+$", "");
-        cleaned = cleaned.replaceAll("\\n{3,}", "\n\n");
-        return cleaned.trim();
+
+        log.info("=== NATIVE EXTRACTION WITH VLM ANALYSIS ({} images) ===", allImages.size());
+        List<List<ExtractedHistoricalImage>> batches = new ArrayList<>();
+        for (int i = 0; i < allImages.size(); i += VISION_BATCH_SIZE) {
+            batches.add(allImages.subList(i, Math.min(i + VISION_BATCH_SIZE, allImages.size())));
+        }
+
+        @SuppressWarnings("unchecked")
+        List<PdfLayoutProcessor.PageImagePlacement>[] batchOutputs = new List[batches.size()];
+        Semaphore concurrencyLimiter = new Semaphore(VISION_CONCURRENT_BATCHES);
+        List<CompletableFuture<Void>> futures = new ArrayList<>(batches.size());
+
+        for (int bIdx = 0; bIdx < batches.size(); bIdx++) {
+            checkAborted(isCancelled);
+            final int currentBatchIndex = bIdx;
+            final List<ExtractedHistoricalImage> batch = batches.get(bIdx);
+
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    concurrencyLimiter.acquire();
+                    try {
+                        checkAborted(isCancelled);
+                        batchOutputs[currentBatchIndex] = describeBatchWithFallback(batch);
+                    } finally {
+                        concurrencyLimiter.release();
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new CancellationException("Vision AI processing interrupted");
+                }
+            }, imageIoExecutor);
+            futures.add(future);
+        }
+
+        try {
+            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+        } catch (CompletionException ce) {
+            if (ce.getCause() instanceof CancellationException cancelEx) {
+                throw cancelEx;
+            }
+            log.warn("Vision AI batch coordination error, falling back to basic image tags: {}", ce.getMessage());
+            return toFallbackPlacements(allImages);
+        }
+
+        List<PdfLayoutProcessor.PageImagePlacement> placements = new ArrayList<>(allImages.size());
+        for (int bIdx = 0; bIdx < batches.size(); bIdx++) {
+            if (batchOutputs[bIdx] != null) {
+                placements.addAll(batchOutputs[bIdx]);
+            } else {
+                placements.addAll(toFallbackPlacements(batches.get(bIdx)));
+            }
+        }
+        return placements;
+    }
+
+    private List<PdfLayoutProcessor.PageImagePlacement> describeBatchWithFallback(List<ExtractedHistoricalImage> batch) {
+        try {
+            List<AiServiceClient.ImageToDescribeDto> describeBatch = batch.stream()
+                    .map(ExtractedHistoricalImage::describeDto)
+                    .toList();
+            List<AiServiceClient.DescribedImageDto> batchResult = aiServiceClient.describeImages(describeBatch);
+            if (batchResult == null || batchResult.isEmpty()) {
+                return toFallbackPlacements(batch);
+            }
+
+            List<PdfLayoutProcessor.PageImagePlacement> placements = new ArrayList<>(batch.size());
+            for (int j = 0; j < batch.size(); j++) {
+                ExtractedHistoricalImage item = batch.get(j);
+                AiServiceClient.DescribedImageDto desc = (j < batchResult.size()) ? batchResult.get(j) : null;
+                String descBlock = (desc != null) ? desc.descriptionBlock() : null;
+
+                if (descBlock != null && !descBlock.isBlank()) {
+                    if (descBlock.contains("Biểu trưng (Logo)")
+                            || descBlock.contains("Biểu trưng lưu trữ")
+                            || descBlock.contains("VĂN THƯ LƯU TRỮ VN")) {
+                        log.debug("Filtering out archive logo/watermark block on page {}", item.pageNumber());
+                        continue;
+                    }
+                    String captionTitle = (item.caption() != null && !item.caption().isBlank())
+                            ? item.caption()
+                            : "Ảnh tư liệu lịch sử";
+                    String formattedBlock = (item.imageUrl() != null)
+                            ? String.format("![%s](%s)\n%s", captionTitle, item.imageUrl(), descBlock)
+                            : descBlock;
+                    placements.add(new PdfLayoutProcessor.PageImagePlacement(
+                            item.pageNumber(), item.topY(), item.bottomY(), formattedBlock));
+                } else if (item.imageUrl() != null) {
+                    placements.add(toFallbackPlacement(item));
+                }
+            }
+            return placements;
+        } catch (Exception e) {
+            log.warn("Failed during Vision AI batch processing, falling back to basic image tags: {}", e.getMessage());
+            return toFallbackPlacements(batch);
+        }
+    }
+
+    private List<PdfLayoutProcessor.PageImagePlacement> toFallbackPlacements(List<ExtractedHistoricalImage> items) {
+        List<PdfLayoutProcessor.PageImagePlacement> list = new ArrayList<>(items.size());
+        for (ExtractedHistoricalImage item : items) {
+            if (item.imageUrl() != null) {
+                list.add(toFallbackPlacement(item));
+            }
+        }
+        return list;
+    }
+
+    private PdfLayoutProcessor.PageImagePlacement toFallbackPlacement(ExtractedHistoricalImage item) {
+        String captionTitle = (item.caption() != null && !item.caption().isBlank())
+                ? item.caption()
+                : "Ảnh tư liệu lịch sử";
+        String tag = String.format("![%s](%s)", captionTitle, item.imageUrl());
+        return new PdfLayoutProcessor.PageImagePlacement(item.pageNumber(), item.topY(), item.bottomY(), tag);
+    }
+
+    private String computeImageHashCached(PDImageXObject image, Map<COSBase, String> hashCache) {
+        COSBase cosObj = image.getCOSObject();
+        if (cosObj != null) {
+            String cached = hashCache.get(cosObj);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        String hash = computeImageHash(image);
+        if (cosObj != null) {
+            hashCache.put(cosObj, hash);
+        }
+        return hash;
     }
 
     private String computeImageHash(PDImageXObject image) {
@@ -486,135 +612,222 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
     }
 
     /**
-     * Quét và trích xuất TOÀN BỘ hình ảnh có ý nghĩa lịch sử (lược đồ, bản đồ, di vật, chân dung)
-     * Tự động loại trừ watermark/logo lặp lại và tải ảnh lên Supabase Storage staging folder.
+     * Quét và trích xuất hình ảnh có ý nghĩa lịch sử (lược đồ, bản đồ, di vật, chân dung):
+     * - Cache MD5 hash để không giải mã stream 2 lần.
+     * - Đọc BufferedImage tuần tự trên thread PDFBox, sau đó resize/encode/upload Supabase song song có giới hạn.
+     * - Bắt caption gần tọa độ Y của từng ảnh từ tập dòng đã trích xuất (không gọi PDFTextStripper lại).
      */
     private List<ExtractedHistoricalImage> extractAllHistoricalImages(
-            PDDocument document, int startPage, int endPage) {
-        List<ExtractedHistoricalImage> result = new ArrayList<>();
-        Pattern captionPattern = Pattern.compile("(?im)(?:^|[\\.\\n\\r])\\s*(?:H\\u00ecnh|L\\u01b0\\u1ee3c \\u0111\\u1ed3|B\\u1ea3n \\u0111\\u1ed3|\\u1ea2nh t\\u01b0 li\\u1ec7u|S\\u01a1 \\u0111\\u1ed3|Tranh|Di t\\u00edch)\\s*\\d*[.:]?[^\\n\\r]+");
-
-        // 1. Phân tích trước tần suất hash ảnh trên các trang để loại trừ watermark/logo lặp lại
+            PDDocument document,
+            int startPage,
+            int endPage,
+            Map<Integer, List<PdfLayoutProcessor.ExtractedLine>> linesByPage,
+            BooleanSupplier isCancelled) {
+        Map<COSBase, String> hashCache = new IdentityHashMap<>();
         Map<String, Integer> hashOccurrences = new HashMap<>();
+
         int totalPages = document.getNumberOfPages();
         int scanEnd = Math.min(totalPages, Math.max(endPage, startPage + 3));
         for (int p = 1; p <= scanEnd; p++) {
             PDPage page = document.getPage(p - 1);
             PDResources res = page.getResources();
-            if (res == null) continue;
+            if (res == null) {
+                continue;
+            }
             for (COSName xName : res.getXObjectNames()) {
                 try {
                     if (res.isImageXObject(xName)) {
                         PDImageXObject imgObj = (PDImageXObject) res.getXObject(xName);
-                        String hash = computeImageHash(imgObj);
+                        if (imgObj.getWidth() < 150 || imgObj.getHeight() < 150) {
+                            continue;
+                        }
+                        String hash = computeImageHashCached(imgObj, hashCache);
                         hashOccurrences.merge(hash, 1, Integer::sum);
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
 
+        List<CompletableFuture<ExtractedHistoricalImage>> uploadFutures = new ArrayList<>();
+        Semaphore inFlightUploads = new Semaphore(IMAGE_IO_CONCURRENCY * 2);
+
         for (int p = startPage; p <= endPage; p++) {
+            checkAborted(isCancelled);
             PDPage page = document.getPage(p - 1);
             PDResources resources = page.getResources();
-            if (resources == null) continue;
+            if (resources == null) {
+                continue;
+            }
 
-            // Xác định tọa độ Y của các ảnh trên trang hiện tại
-            Map<COSDictionary, Float> topYMap = Collections.emptyMap();
+            Map<COSDictionary, ImageBounds> boundsMap = Collections.emptyMap();
             try {
                 PageImageLocationLocator locator = new PageImageLocationLocator(page);
-                topYMap = locator.locateImages();
+                boundsMap = locator.locateImages();
             } catch (Exception ex) {
                 log.debug("Failed locating image coordinates on page {}: {}", p, ex.getMessage());
             }
 
-            // Đọc text của trang để tìm caption phụ cận
-            String pageTextSnippet = "";
-            try {
-                PDFTextStripper snippetStripper = new PDFTextStripper();
-                snippetStripper.setStartPage(p);
-                snippetStripper.setEndPage(p);
-                pageTextSnippet = snippetStripper.getText(document);
-            } catch (Exception ignored) {}
-
+            List<PdfLayoutProcessor.ExtractedLine> pageLines = linesByPage.getOrDefault(p, List.of());
             Set<String> pageExtractedHashes = new HashSet<>();
 
             for (COSName xObjectName : resources.getXObjectNames()) {
                 try {
-                    if (resources.isImageXObject(xObjectName)) {
-                        PDImageXObject image = (PDImageXObject) resources.getXObject(xObjectName);
-                        int width = image.getWidth();
-                        int height = image.getHeight();
-
-                        // 1. Loại bỏ các chi tiết đồ họa layout, icon nhỏ (< 150x150)
-                        if (width < 150 || height < 150) {
-                            continue;
-                        }
-
-                        // 2. Loại bỏ các dải viền trang trí quá dài mỏng
-                        double ratio = (double) width / height;
-                        if (ratio > 5.5 || ratio < 0.18) {
-                            continue;
-                        }
-
-                        String imgHash = computeImageHash(image);
-                        // Bỏ qua nếu ảnh là watermark/logo lặp lại trên nhiều trang
-                        if (hashOccurrences.getOrDefault(imgHash, 0) > 1) {
-                            log.debug("Skipping repeating watermark/logo (hash: {}) on page {}", imgHash, p);
-                            continue;
-                        }
-
-                        // Tránh xử lý trùng lặp trên cùng 1 trang
-                        if (!pageExtractedHashes.add(imgHash)) {
-                            continue;
-                        }
-
-                        BufferedImage bImage = image.getImage();
-                        if (bImage == null) continue;
-
-                        // Chuẩn hóa về RGB nền trắng và resize về tối đa 1024px để tăng tốc độ AI gấp 10 lần
-                        BufferedImage processedImage = scaleDownAndNormalize(bImage, 1024);
-
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        ImageIO.write(processedImage, "jpeg", baos);
-
-                        if (baos.size() == 0) {
-                            log.debug("Skipping empty encoded image on page {}", p);
-                            continue;
-                        }
-
-                        byte[] imageBytes = baos.toByteArray();
-                        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-
-                        // Upload ảnh vào staging directory của Supabase Storage (sẽ tự hủy nếu không save)
-                        String imageUrl = null;
-                        try {
-                            imageUrl = supabaseDocumentStorageService.uploadHistoricalImage(imageBytes, "jpg", true);
-                        } catch (Exception uploadEx) {
-                            log.warn("Could not upload historical image on page {} to Supabase: {}", p, uploadEx.getMessage());
-                        }
-
-                        // Tìm chú thích (caption) của bức ảnh trên trang sách
-                        String caption = null;
-                        Matcher matcher = captionPattern.matcher(pageTextSnippet);
-                        if (matcher.find()) {
-                            caption = matcher.group().replaceAll("^[\\.\\n\\r\\s]+", "").trim();
-                        }
-
-                        float topY = topYMap.getOrDefault(image.getCOSObject(), (float) result.size());
-                        result.add(new ExtractedHistoricalImage(
-                                new AiServiceClient.ImageToDescribeDto(base64Image, caption, p),
-                                imageUrl,
-                                p,
-                                caption,
-                                topY
-                        ));
+                    if (!resources.isImageXObject(xObjectName)) {
+                        continue;
                     }
+                    PDImageXObject image = (PDImageXObject) resources.getXObject(xObjectName);
+                    int width = image.getWidth();
+                    int height = image.getHeight();
+
+                    if (width < 150 || height < 150) {
+                        continue;
+                    }
+                    double ratio = (double) width / height;
+                    if (ratio > 5.5 || ratio < 0.18) {
+                        continue;
+                    }
+
+                    String imgHash = computeImageHashCached(image, hashCache);
+                    if (hashOccurrences.getOrDefault(imgHash, 0) > 1) {
+                        log.debug("Skipping repeating watermark/logo (hash: {}) on page {}", imgHash, p);
+                        continue;
+                    }
+                    if (!pageExtractedHashes.add(imgHash)) {
+                        continue;
+                    }
+
+                    BufferedImage bImage = image.getImage();
+                    if (bImage == null) {
+                        continue;
+                    }
+
+                    ImageBounds bounds = boundsMap.getOrDefault(
+                            image.getCOSObject(),
+                            new ImageBounds((float) uploadFutures.size(), (float) uploadFutures.size() + 100f));
+                    String caption = findNearestCaption(pageLines, bounds);
+                    final int currentPage = p;
+
+                    inFlightUploads.acquire();
+                    CompletableFuture<ExtractedHistoricalImage> future = CompletableFuture.supplyAsync(() -> {
+                        try {
+                            checkAborted(isCancelled);
+                            BufferedImage processedImage = scaleDownAndNormalize(bImage, 1024);
+                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            ImageIO.write(processedImage, "jpeg", baos);
+                            processedImage.flush();
+
+                            if (baos.size() == 0) {
+                                return null;
+                            }
+
+                            byte[] imageBytes = baos.toByteArray();
+                            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+                            String imageUrl = null;
+                            try {
+                                imageUrl = supabaseDocumentStorageService.uploadHistoricalImage(imageBytes, "jpg", true);
+                            } catch (Exception uploadEx) {
+                                log.warn("Could not upload historical image on page {} to Supabase: {}", currentPage, uploadEx.getMessage());
+                            }
+
+                            return new ExtractedHistoricalImage(
+                                    new AiServiceClient.ImageToDescribeDto(base64Image, caption, currentPage),
+                                    imageUrl,
+                                    currentPage,
+                                    caption,
+                                    bounds.topY(),
+                                    bounds.bottomY()
+                            );
+                        } catch (CancellationException ce) {
+                            throw ce;
+                        } catch (Exception ex) {
+                            log.debug("Failed encoding/uploading image on page {}: {}", currentPage, ex.getMessage());
+                            return null;
+                        } finally {
+                            bImage.flush();
+                            inFlightUploads.release();
+                        }
+                    }, imageIoExecutor);
+
+                    uploadFutures.add(future);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new CancellationException("PDF image extraction interrupted");
+                } catch (CancellationException ce) {
+                    throw ce;
                 } catch (Exception e) {
                     log.debug("Skipping unreadable image object in page {}: {}", p, e.getMessage());
                 }
             }
         }
+
+        List<ExtractedHistoricalImage> result = new ArrayList<>(uploadFutures.size());
+        for (CompletableFuture<ExtractedHistoricalImage> future : uploadFutures) {
+            try {
+                ExtractedHistoricalImage item = future.join();
+                if (item != null) {
+                    result.add(item);
+                }
+            } catch (CompletionException ce) {
+                if (ce.getCause() instanceof CancellationException cancelEx) {
+                    throw cancelEx;
+                }
+            }
+        }
         return result;
+    }
+
+    private String findNearestCaption(List<PdfLayoutProcessor.ExtractedLine> pageLines, ImageBounds bounds) {
+        if (pageLines == null || pageLines.isEmpty()) {
+            return null;
+        }
+        String bestCaption = null;
+        float bestDistance = Float.MAX_VALUE;
+
+        for (PdfLayoutProcessor.ExtractedLine line : pageLines) {
+            String text = line.text();
+            if (text == null || text.isBlank()) {
+                continue;
+            }
+            Matcher matcher = CAPTION_PATTERN.matcher(text);
+            if (!matcher.matches()) {
+                continue;
+            }
+            // Prefer captions right below the image (within 90pt) or right above (within 45pt)
+            float distance;
+            if (line.topY() >= bounds.bottomY() - 10f && line.topY() <= bounds.bottomY() + 90f) {
+                distance = Math.abs(line.topY() - bounds.bottomY());
+            } else if (line.bottomY() <= bounds.topY() + 10f && line.bottomY() >= bounds.topY() - 45f) {
+                distance = Math.abs(bounds.topY() - line.bottomY()) + 20f;
+            } else {
+                continue;
+            }
+
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestCaption = text.trim();
+            }
+        }
+        return bestCaption;
+    }
+
+    private void notifyProgress(BiConsumer<Integer, Integer> onProgress, int current, int total) {
+        if (onProgress == null) {
+            return;
+        }
+        try {
+            onProgress.accept(current, total);
+        } catch (CancellationException ce) {
+            throw ce;
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void checkAborted(BooleanSupplier isCancelled) {
+        if (Thread.currentThread().isInterrupted() || (isCancelled != null && isCancelled.getAsBoolean())) {
+            throw new CancellationException("Quá trình trích xuất PDF đã bị hủy bởi client ngắt kết nối");
+        }
     }
 
     /**

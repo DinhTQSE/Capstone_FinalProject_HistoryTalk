@@ -2,7 +2,6 @@ package com.historytalk.controller.document;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.historytalk.dto.ApiResponse;
-import com.historytalk.exception.SystemException;
 import com.historytalk.dto.document.DocumentFileResponse;
 import com.historytalk.dto.document.PdfExtractionResponse;
 import com.historytalk.dto.document.SaveDocumentRequest;
@@ -13,6 +12,7 @@ import com.historytalk.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.PreDestroy;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +29,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -46,6 +48,15 @@ public class PdfExtractionController {
     private final DocumentContentService documentContentService;
     private final PdfExtractionRateLimiter pdfExtractionRateLimiter;
     private final ObjectMapper objectMapper;
+
+    private final ExecutorService extractionExecutor = Executors.newFixedThreadPool(4);
+    private final ScheduledExecutorService heartbeatScheduler = Executors.newScheduledThreadPool(2);
+
+    @PreDestroy
+    public void shutdownExecutors() {
+        extractionExecutor.shutdownNow();
+        heartbeatScheduler.shutdownNow();
+    }
 
     @PostMapping(value = "/extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
@@ -89,12 +100,15 @@ public class PdfExtractionController {
         // Kiểm tra quota và acquire lock đồng thời với lock token riêng biệt
         String lockToken = pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
         AtomicBoolean isAborted = new AtomicBoolean(false);
+        AtomicBoolean isCompleted = new AtomicBoolean(false);
 
         SseEmitter emitter = new SseEmitter(15 * 60 * 1000L);
 
         // Đảm bảo giải phóng lock an toàn và dừng worker ngầm nếu client ngắt kết nối hoặc timeout
         emitter.onCompletion(() -> {
-            isAborted.set(true);
+            if (!isCompleted.get()) {
+                isAborted.set(true);
+            }
             pdfExtractionRateLimiter.release(staffId, lockToken);
         });
         emitter.onTimeout(() -> {
@@ -108,15 +122,17 @@ public class PdfExtractionController {
 
         // Heartbeat executor: Bắn SSE comment ": ping\n\n" mỗi 15 giây
         // Giúp Cloudflare, Caddy và Trình duyệt duy trì kết nối liên tục, chống rớt mạng / timeout 524
-        ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
         ScheduledFuture<?> heartbeatFuture = heartbeatScheduler.scheduleAtFixedRate(() -> {
+            if (isAborted.get() || isCompleted.get()) {
+                return;
+            }
             try {
                 emitter.send(SseEmitter.event().comment("ping"));
             } catch (Exception ignored) {
             }
         }, 15, 15, TimeUnit.SECONDS);
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        extractionExecutor.execute(() -> {
             try {
                 PdfExtractionResponse result = pdfExtractionService.extractText(
                         file,
@@ -125,23 +141,30 @@ public class PdfExtractionController {
                         Boolean.TRUE.equals(enableAiVision),
                         (page, total) -> {
                             if (isAborted.get()) {
-                                throw new SystemException("Quá trình trích xuất PDF đã bị hủy bởi client ngắt kết nối");
+                                throw new CancellationException("Quá trình trích xuất PDF đã bị hủy bởi client ngắt kết nối");
                             }
                             try {
                                 String progressJson = String.format("{\"type\":\"progress\",\"page\":%d,\"total\":%d}", page, total);
                                 emitter.send(SseEmitter.event().data(progressJson));
                             } catch (Exception ignored) {
                             }
-                        }
+                        },
+                        isAborted::get
                 );
+                if (isAborted.get()) {
+                    return;
+                }
                 if (result.getFileUrl() == null || result.getFileUrl().isBlank()) {
                     result.setFileUrl(file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded_document.pdf");
                 }
 
                 String dataJson = objectMapper.writeValueAsString(result);
                 String doneJson = String.format("{\"type\":\"done\",\"data\":%s}", dataJson);
+                isCompleted.set(true);
                 emitter.send(SseEmitter.event().data(doneJson));
                 emitter.complete();
+            } catch (CancellationException e) {
+                log.info("PDF stream extraction gracefully stopped as client disconnected (user: {})", staffId);
             } catch (Exception e) {
                 if (isAborted.get()) {
                     log.info("PDF stream extraction gracefully stopped as client disconnected (user: {})", staffId);
@@ -157,7 +180,6 @@ public class PdfExtractionController {
                 }
             } finally {
                 heartbeatFuture.cancel(true);
-                heartbeatScheduler.shutdown();
                 pdfExtractionRateLimiter.release(staffId, lockToken);
             }
         });

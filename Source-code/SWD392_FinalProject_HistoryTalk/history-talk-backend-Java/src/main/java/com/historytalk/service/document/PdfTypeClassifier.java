@@ -16,6 +16,7 @@ public class PdfTypeClassifier {
 
     private static final int MIN_CHARS_PER_PAGE_THRESHOLD = 150;
     private static final int MIN_WORD_COUNT_THRESHOLD = 20;
+    private static final int MAX_CLASSIFICATION_SAMPLE_PAGES = 5;
 
     private String stripNoise(String text) {
         if (text == null || text.isBlank()) {
@@ -48,23 +49,36 @@ public class PdfTypeClassifier {
         if (document == null) {
             throw new IllegalArgumentException("Document cannot be null");
         }
+        return classify(document, 1, document.getNumberOfPages());
+    }
 
-        int pageCount = document.getNumberOfPages();
-        if (pageCount == 0) {
+    public PdfType classify(PDDocument document, int startPage, int endPage) throws IOException {
+        if (document == null) {
+            throw new IllegalArgumentException("Document cannot be null");
+        }
+
+        int totalPages = document.getNumberOfPages();
+        if (totalPages == 0) {
             log.warn("PDF has no pages, defaulting to NATIVE_TEXT");
             return PdfType.NATIVE_TEXT;
         }
 
-        log.info("=== PDF Classification Started ===");
-        log.info("Total pages: {}", pageCount);
+        int effectiveStart = Math.max(1, startPage);
+        int effectiveEnd = Math.min(totalPages, Math.max(effectiveStart, endPage));
+        int sampleEnd = Math.min(effectiveEnd, effectiveStart + MAX_CLASSIFICATION_SAMPLE_PAGES - 1);
+        int sampledPageCount = sampleEnd - effectiveStart + 1;
 
-        // Step 1 & 2: Check for fonts and images across all pages
+        log.info("=== PDF Classification Started (sampling pages [{} - {}] of {}) ===",
+                effectiveStart, sampleEnd, totalPages);
+
+        // Step 1 & 2: Check for fonts and images across sampled pages only
         boolean hasFonts = false;
         boolean hasImages = false;
         int totalFonts = 0;
         int totalImages = 0;
 
-        for (PDPage page : document.getPages()) {
+        for (int p = effectiveStart; p <= sampleEnd; p++) {
+            PDPage page = document.getPage(p - 1);
             PDResources resources = page.getResources();
             if (resources != null) {
                 Iterable<COSName> fontNames = resources.getFontNames();
@@ -108,10 +122,12 @@ public class PdfTypeClassifier {
             return PdfType.SCANNED_IMAGE;
         }
 
-        // Step 3: If fonts exist, check text density
+        // Step 3: If fonts exist, check text density on sampled pages only
         if (hasFonts) {
-            log.info("Fonts detected, proceeding to text density analysis");
+            log.info("Fonts detected, proceeding to text density analysis on {} sample pages", sampledPageCount);
             PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setStartPage(effectiveStart);
+            stripper.setEndPage(sampleEnd);
             String rawText = stripper.getText(document);
             
             if (rawText != null) {
@@ -121,7 +137,7 @@ public class PdfTypeClassifier {
                 // Strip noise before evaluation
                 String cleanedText = stripNoise(rawText);
                 int cleanedChars = cleanedText.length();
-                double cleanedCharsPerPage = (double) cleanedChars / pageCount;
+                double cleanedCharsPerPage = (double) cleanedChars / sampledPageCount;
                 
                 // Calculate word count from cleaned text
                 String[] words = cleanedText.split("\\s+");

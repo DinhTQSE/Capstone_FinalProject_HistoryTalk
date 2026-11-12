@@ -421,6 +421,82 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
     logger.error("All attempts to get embedding from Ollama failed.")
     return []
 
+
+async def get_embeddings_batch(
+    texts: List[str],
+    batch_size: int = 32,
+    max_retries: int = 3,
+) -> List[List[float]]:
+    """Batch-generate embedding vectors via Ollama /api/embed with per-item fallback."""
+    if not texts:
+        return []
+
+    results: List[List[float]] = [[] for _ in texts]
+    non_empty_indices = [i for i, t in enumerate(texts) if t and t.strip()]
+    if not non_empty_indices:
+        return results
+
+    auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+    effective_batch_size = max(1, batch_size)
+    batches = [
+        non_empty_indices[i:i + effective_batch_size]
+        for i in range(0, len(non_empty_indices), effective_batch_size)
+    ]
+    batch_sem = asyncio.Semaphore(4)
+
+    async def fallback_single(indices: List[int]) -> List[List[float]]:
+        single_sem = asyncio.Semaphore(10)
+
+        async def _one(idx: int) -> List[float]:
+            async with single_sem:
+                return await get_embedding_from_ollama(texts[idx], max_retries=max_retries)
+
+        return await asyncio.gather(*[_one(idx) for idx in indices])
+
+    async def process_batch(indices: List[int]) -> tuple[List[int], List[List[float]]]:
+        batch_texts = [texts[idx] for idx in indices]
+        embed_payload = {"model": "bge-m3", "input": batch_texts}
+        async with batch_sem:
+            for attempt in range(max_retries):
+                try:
+                    response = await ollama_client.post(
+                        _ollama_url("/api/embed"),
+                        json=embed_payload,
+                        auth=auth,
+                    )
+                    if response.status_code == 404:
+                        logger.info("Ollama /api/embed not available; falling back to /api/embeddings")
+                        return indices, await fallback_single(indices)
+                    response.raise_for_status()
+                    data = response.json()
+                    embeddings = data.get("embeddings", [])
+                    if isinstance(embeddings, list) and len(embeddings) == len(indices):
+                        normalized = [
+                            emb if isinstance(emb, list) else []
+                            for emb in embeddings
+                        ]
+                        return indices, normalized
+                    raise ValueError(
+                        f"Unexpected embeddings length: got {len(embeddings) if isinstance(embeddings, list) else type(embeddings)}, expected {len(indices)}"
+                    )
+                except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                    logger.error(f"Cannot reach the LLM server for batch embedding: {e}")
+                    return indices, [[] for _ in indices]
+                except Exception as e:
+                    logger.warning(f"Ollama batch embedding attempt {attempt + 1}/{max_retries} failed: {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1.0 * (attempt + 1))
+
+        logger.warning("Batch embedding retries exhausted; falling back to single-item embeddings for batch.")
+        return indices, await fallback_single(indices)
+
+    batch_outputs = await asyncio.gather(*[process_batch(b) for b in batches])
+    for indices, embeddings in batch_outputs:
+        for idx, emb in zip(indices, embeddings):
+            results[idx] = emb
+
+    return results
+
 async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> tuple[str, List[str]]:
     """Retrieve history context from Supabase VectorChunk and rerank via the LLM server."""
     query_vector = await get_embedding_from_ollama(user_question)
@@ -875,12 +951,7 @@ async def _semantic_chunking(content: str, max_chunk_chars: int = 1200) -> List[
     if len(sentences) <= 2 or len(content) <= 500:
         return [content]
 
-    sem = asyncio.Semaphore(10)
-    async def get_emb(s):
-        async with sem:
-            return await get_embedding_from_ollama(s)
-
-    embeddings = await asyncio.gather(*[get_emb(s) for s in sentences])
+    embeddings = await get_embeddings_batch(sentences)
 
     valid_sentences = []
     valid_embeddings = []
@@ -936,16 +1007,9 @@ async def process_document(request: ProcessDocumentRequest):
     content = request.content
     chunks = await _semantic_chunking(content)
     
-    # Generate embeddings concurrently for speed, but limit concurrency to avoid overwhelming Ollama
-    sem = asyncio.Semaphore(15) # Process maximum 15 chunks at a time
-
-    async def get_embedding_with_context(idx, chunk_text):
-        async with sem:
-            emb = await get_embedding_from_ollama(chunk_text)
-            return idx, chunk_text, emb
-
-    tasks = [get_embedding_with_context(idx, text) for idx, text in enumerate(chunks)]
-    results = await asyncio.gather(*tasks)
+    # Batch-generate embeddings for all document chunks (much lower HTTP overhead than per-chunk calls)
+    chunk_embeddings = await get_embeddings_batch(chunks)
+    results = [(idx, text, chunk_embeddings[idx]) for idx, text in enumerate(chunks)]
 
     records = []
     for idx, chunk_text, embedding in results:
