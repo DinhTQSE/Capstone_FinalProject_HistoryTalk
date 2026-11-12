@@ -213,8 +213,9 @@ public class StaffQuizController {
     @GetMapping("/import/template")
     @Operation(
             summary = "Download quiz CSV import template",
-            description = "Returns a UTF-8 (BOM) CSV with the full header and one example row for " +
-                    "MULTIPLE_CHOICE, FILL_IN_BLANK and MATCHING. Replace contextId before importing."
+            description = "Returns a UTF-8 (BOM) CSV: '#' guidance lines (ignored on import), the question " +
+                    "header (no title/contextId — those are form fields on POST /import), and one example row " +
+                    "for MULTIPLE_CHOICE, FILL_IN_BLANK and MATCHING."
     )
     public ResponseEntity<byte[]> downloadImportTemplate() {
         log.info("GET /api/v1/staff/quizzes/import/template");
