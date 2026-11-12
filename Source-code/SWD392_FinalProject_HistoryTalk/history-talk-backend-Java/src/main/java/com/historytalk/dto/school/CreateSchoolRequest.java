@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,4 +40,8 @@ public class CreateSchoolRequest {
 
     @NotNull(message = "Local history policy acceptance is required")
     private Boolean localHistoryPolicyAccepted;
+
+    private LocalDate subscriptionStartDate;
+
+    private LocalDate subscriptionEndDate;
 }

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -33,4 +35,6 @@ public class B2bQuoteCalculationResponse {
     private Long finalPriceVnd;
     private Long averageMonthlyCostPerStudentVnd;
     private String promoCodeApplied;
+    private LocalDate subscriptionStartDate;
+    private LocalDate subscriptionEndDate;
 }
