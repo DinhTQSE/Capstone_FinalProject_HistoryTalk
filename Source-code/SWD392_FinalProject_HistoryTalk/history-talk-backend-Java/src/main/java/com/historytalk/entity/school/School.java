@@ -75,6 +75,30 @@ public class School {
     @Column(name = "next_package_type", length = 50)
     private EnterprisePackage nextPackageType;
 
+    @Column(name = "next_custom_token_quota")
+    private Integer nextCustomTokenQuota;
+
+    @Column(name = "next_max_students")
+    private Integer nextMaxStudents;
+
+    @Column(name = "next_max_teachers")
+    private Integer nextMaxTeachers;
+
+    @Column(name = "next_daily_student_quota")
+    private Integer nextDailyStudentQuota;
+
+    @Column(name = "next_daily_teacher_quota")
+    private Integer nextDailyTeacherQuota;
+
+    @Column(name = "next_subscription_start_date")
+    private LocalDate nextSubscriptionStartDate;
+
+    @Column(name = "next_subscription_end_date")
+    private LocalDate nextSubscriptionEndDate;
+
+    @Column(name = "base_custom_token_quota")
+    private Integer baseCustomTokenQuota;
+
     @Builder.Default
     @Column(name = "default_daily_student_quota", nullable = false)
     private Integer defaultDailyStudentQuota = 5000;

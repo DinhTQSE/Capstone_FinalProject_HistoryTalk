@@ -537,7 +537,77 @@
 
 ---
 
-## 5. Bảng Mã Lỗi (Error Handling)
+## 5. API Gia Hạn Niên Khóa & Bảo Lưu Token (Renewal & Token Rollover)
+
+### 5.1 School Admin Gia hạn Gói Năm học (`POST /api/v1/school-admin/subscription/renew`)
+- **Mô tả:** Cho phép `ROLE_SCHOOL_ADMIN` đăng ký gia hạn gói trong tháng 5 (hoặc trong vòng 30 ngày trước khi hết hạn chu kỳ cũ).
+- **Hỗ trợ linh hoạt:**
+  - **Lựa chọn 1 (Giữ nguyên quy mô Custom cũ):** Chỉ truyền `packageType: "ENTERPRISE_CUSTOM"`, không cần truyền `customTokenQuota`. Hệ thống tự động lấy lại định mức token cơ sở của năm cũ.
+  - **Lựa chọn 2 (Điều chỉnh quy mô Custom mới):** Truyền `packageType: "ENTERPRISE_CUSTOM"` và `customTokenQuota` cùng các thông số điều chỉnh mới (`maxStudents`, `maxTeachers`, `defaultDailyStudentQuota`, `defaultDailyTeacherQuota`, `subscriptionStartDate`, `subscriptionEndDate`).
+  - **Lựa chọn 3 (Chuyển đổi giữa các gói):** Chuyển từ Custom sang Standard (`ENTERPRISE_SMALL` / `MEDIUM` / `LARGE`) hoặc ngược lại.
+
+- **Request Headers:**
+  - `Authorization: Bearer <school_admin_jwt>`
+
+- **Request Body (Ví dụ: Gia hạn Custom điều chỉnh quy mô):**
+```json
+{
+  "packageType": "ENTERPRISE_CUSTOM",
+  "customTokenQuota": 1200000000,
+  "maxStudents": 2000,
+  "maxTeachers": 50,
+  "defaultDailyStudentQuota": 5000,
+  "defaultDailyTeacherQuota": 5000,
+  "subscriptionStartDate": "2026-09-01",
+  "subscriptionEndDate": "2027-05-31"
+}
+```
+
+- **Request Body (Ví dụ: Gia hạn 1-Click giữ nguyên gói Custom cũ):**
+```json
+{
+  "packageType": "ENTERPRISE_CUSTOM"
+}
+```
+
+- **Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "message": "School subscription renewed for next academic year",
+  "data": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "THPT Marie Curie",
+    "schoolCode": "MC-HCM",
+    "packageType": "ENTERPRISE_CUSTOM",
+    "totalSchoolTokenQuota": 1452500000,
+    "unallocatedTokenQuota": 85000000,
+    "renewedForNextYear": true,
+    "nextPackageType": "ENTERPRISE_CUSTOM",
+    "nextCustomTokenQuota": 1200000000,
+    "baseCustomTokenQuota": 1200000000,
+    "maxStudents": 2000,
+    "maxTeachers": 50,
+    "status": "ACTIVE"
+  },
+  "timestamp": "2026-11-12T14:20:00"
+}
+```
+
+### 5.2 Cơ chế Tính toán khi Kích hoạt Năm học Mới (`POST /api/v1/admin/schools/{id}/activate-academic-year`)
+- **Thời điểm:** Ngày 01/09 hoặc sau khi gói cũ hết hạn.
+- **Công thức:**
+  $$\text{Quỹ mới} = \text{Token Gói năm mới} + \lfloor \text{Token dư cũ} \times 20\% \rfloor$$
+- **Dữ liệu được cập nhật:**
+  - `totalSchoolTokenQuota = newTotalQuota`
+  - `unallocatedTokenQuota = newTotalQuota`
+  - `packageType = nextPackageType`
+  - Cập nhật trần học sinh, giáo viên, hạn mức ngày theo cấu hình mới.
+  - Reset cờ `renewedForNextYear = false`, `nextPackageType = null`, `nextCustomTokenQuota = null`.
+
+---
+
+## 6. Bảng Mã Lỗi (Error Handling)
 
 | HTTP Status | Tình huống | Message mẫu từ BE |
 | :---: | :--- | :--- |

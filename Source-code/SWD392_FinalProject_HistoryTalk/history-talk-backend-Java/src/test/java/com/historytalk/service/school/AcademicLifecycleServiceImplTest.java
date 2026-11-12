@@ -104,6 +104,88 @@ class AcademicLifecycleServiceImplTest {
     }
 
     @Test
+    @DisplayName("US-SP7-14: School Admin renews subscription via principal")
+    void renewSchoolSubscriptionForSchoolAdmin_Success() {
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+        when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RenewSchoolSubscriptionRequest request = RenewSchoolSubscriptionRequest.builder()
+                .packageType(EnterprisePackage.ENTERPRISE_MEDIUM)
+                .referenceDate(LocalDate.of(2026, 5, 15))
+                .build();
+
+        SchoolResponse response = academicLifecycleService.renewSchoolSubscriptionForSchoolAdmin(
+                schoolAdminPrincipal, request);
+
+        assertTrue(response.getRenewedForNextYear());
+        assertEquals(EnterprisePackage.ENTERPRISE_MEDIUM, response.getNextPackageType());
+    }
+
+    @Test
+    @DisplayName("Custom Package Renewal: Keep existing custom scale retains previous base quota")
+    void renewSchoolSubscription_CustomPackage_KeepExistingScale_Success() {
+        school.setPackageType(EnterprisePackage.ENTERPRISE_CUSTOM);
+        school.setBaseCustomTokenQuota(1_200_000_000);
+        school.setTotalSchoolTokenQuota(1_250_000_000); // 1.2B base + 50M top-up
+
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+        when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RenewSchoolSubscriptionRequest request = RenewSchoolSubscriptionRequest.builder()
+                .packageType(EnterprisePackage.ENTERPRISE_CUSTOM)
+                .referenceDate(LocalDate.of(2026, 5, 10))
+                .build();
+
+        SchoolResponse response = academicLifecycleService.renewSchoolSubscription(school.getId(), request);
+
+        assertTrue(response.getRenewedForNextYear());
+        assertEquals(EnterprisePackage.ENTERPRISE_CUSTOM, response.getNextPackageType());
+        assertEquals(1_200_000_000, response.getNextCustomTokenQuota());
+    }
+
+    @Test
+    @DisplayName("Custom Package Renewal: Adjust scale sets new custom quota and caps")
+    void renewSchoolSubscription_CustomPackage_AdjustScale_Success() {
+        school.setPackageType(EnterprisePackage.ENTERPRISE_CUSTOM);
+        school.setBaseCustomTokenQuota(1_000_000_000);
+
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+        when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RenewSchoolSubscriptionRequest request = RenewSchoolSubscriptionRequest.builder()
+                .packageType(EnterprisePackage.ENTERPRISE_CUSTOM)
+                .customTokenQuota(1_600_000_000)
+                .maxStudents(2200)
+                .maxTeachers(60)
+                .referenceDate(LocalDate.of(2026, 5, 10))
+                .build();
+
+        SchoolResponse response = academicLifecycleService.renewSchoolSubscription(school.getId(), request);
+
+        assertTrue(response.getRenewedForNextYear());
+        assertEquals(EnterprisePackage.ENTERPRISE_CUSTOM, response.getNextPackageType());
+        assertEquals(1_600_000_000, response.getNextCustomTokenQuota());
+    }
+
+    @Test
+    @DisplayName("Custom Package Renewal: Standard package switching to Custom without customTokenQuota throws error")
+    void renewSchoolSubscription_StandardSwitchToCustom_WithoutQuota_ThrowsInvalidRequest() {
+        school.setPackageType(EnterprisePackage.ENTERPRISE_SMALL);
+        school.setBaseCustomTokenQuota(null);
+        school.setTotalSchoolTokenQuota(0);
+
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+
+        RenewSchoolSubscriptionRequest request = RenewSchoolSubscriptionRequest.builder()
+                .packageType(EnterprisePackage.ENTERPRISE_CUSTOM)
+                .referenceDate(LocalDate.of(2026, 5, 10))
+                .build();
+
+        assertThrows(InvalidRequestException.class,
+                () -> academicLifecycleService.renewSchoolSubscription(school.getId(), request));
+    }
+
+    @Test
     @DisplayName("US-SP7-14: Renewing subscription outside May is rejected")
     void renewSchoolSubscription_OutsideMay_ThrowsInvalidRequest() {
         when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
@@ -136,6 +218,74 @@ class AcademicLifecycleServiceImplTest {
         assertEquals(LocalDate.of(2027, 5, 31), response.getSubscriptionEndDate());
         assertFalse(response.getRenewedForNextYear());
         assertEquals(SchoolStatus.ACTIVE, response.getStatus());
+    }
+
+    @Test
+    @DisplayName("Custom Package Activation: Custom package retains contracted quota + 20% rollover")
+    void activateRenewedSubscription_CustomPackage_CalculatesRolloverCorrectly() {
+        school.setPackageType(EnterprisePackage.ENTERPRISE_CUSTOM);
+        school.setRenewedForNextYear(true);
+        school.setNextPackageType(EnterprisePackage.ENTERPRISE_CUSTOM);
+        school.setNextCustomTokenQuota(1_200_000_000);
+        school.setUnallocatedTokenQuota(50_000_000); // 20% rollover = 10,000,000
+
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+        when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SchoolResponse response = academicLifecycleService.activateRenewedSubscription(
+                school.getId(), LocalDate.of(2026, 9, 1));
+
+        assertEquals(EnterprisePackage.ENTERPRISE_CUSTOM, response.getPackageType());
+        // 1,200,000,000 + (50,000,000 * 20%) = 1,210,000,000
+        assertEquals(1_210_000_000, response.getTotalSchoolTokenQuota());
+        assertEquals(1_210_000_000, response.getUnallocatedTokenQuota());
+        assertEquals(1_200_000_000, response.getBaseCustomTokenQuota());
+        assertFalse(response.getRenewedForNextYear());
+        assertNull(response.getNextPackageType());
+        assertNull(response.getNextCustomTokenQuota());
+    }
+
+    @Test
+    @DisplayName("Package Switch Activation: Custom switches to Medium with 20% rollover")
+    void activateRenewedSubscription_CustomToMedium_CalculatesRolloverCorrectly() {
+        school.setPackageType(EnterprisePackage.ENTERPRISE_CUSTOM);
+        school.setRenewedForNextYear(true);
+        school.setNextPackageType(EnterprisePackage.ENTERPRISE_MEDIUM); // 1,016,750,000
+        school.setUnallocatedTokenQuota(40_000_000); // 20% rollover = 8,000,000
+
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+        when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SchoolResponse response = academicLifecycleService.activateRenewedSubscription(
+                school.getId(), LocalDate.of(2026, 9, 1));
+
+        assertEquals(EnterprisePackage.ENTERPRISE_MEDIUM, response.getPackageType());
+        // 1,016,750,000 + (40,000,000 * 20%) = 1,024,750,000
+        assertEquals(1_024_750_000, response.getTotalSchoolTokenQuota());
+        assertEquals(1_024_750_000, response.getUnallocatedTokenQuota());
+        assertNull(response.getBaseCustomTokenQuota());
+    }
+
+    @Test
+    @DisplayName("Package Switch Activation: Small switches to Custom with 20% rollover")
+    void activateRenewedSubscription_SmallToCustom_CalculatesRolloverCorrectly() {
+        school.setPackageType(EnterprisePackage.ENTERPRISE_SMALL);
+        school.setRenewedForNextYear(true);
+        school.setNextPackageType(EnterprisePackage.ENTERPRISE_CUSTOM);
+        school.setNextCustomTokenQuota(800_000_000);
+        school.setUnallocatedTokenQuota(20_000_000); // 20% rollover = 4,000,000
+
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+        when(schoolRepository.save(any(School.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SchoolResponse response = academicLifecycleService.activateRenewedSubscription(
+                school.getId(), LocalDate.of(2026, 9, 1));
+
+        assertEquals(EnterprisePackage.ENTERPRISE_CUSTOM, response.getPackageType());
+        // 800,000,000 + (20,000,000 * 20%) = 804,000,000
+        assertEquals(804_000_000, response.getTotalSchoolTokenQuota());
+        assertEquals(804_000_000, response.getUnallocatedTokenQuota());
+        assertEquals(800_000_000, response.getBaseCustomTokenQuota());
     }
 
     @Test
