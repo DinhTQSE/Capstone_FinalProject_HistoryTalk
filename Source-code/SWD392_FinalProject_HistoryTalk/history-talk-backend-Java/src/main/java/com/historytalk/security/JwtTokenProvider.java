@@ -16,14 +16,15 @@ import java.util.Map;
 @Slf4j
 public class JwtTokenProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "typ";
+    private static final String TOKEN_TYPE_ACCESS = "access";
+    private static final String ISSUER = "historytalk-api";
+
     @Value("${JWT_SECRET}")
     private String jwtSecret;
 
     @Value("${JWT_EXPIRATION_MS}")
     private long jwtExpirationInMs;
-
-    @Value("${JWT_REFRESH_EXPIRATION_MS}")
-    private long jwtRefreshExpirationInMs;
 
     private SecretKey signingKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
@@ -32,7 +33,7 @@ public class JwtTokenProvider {
     /**
      * Generate access token with extra claims (uid, role).
      * In JJWT 0.12.x, .claims(map) overrides previously set claims, so extra claims
-     * must be populated before setting the subject, issuedAt, and expiration.
+     * must be populated before setting standard claims.
      */
     public String generateAccessToken(String email, Map<String, Object> extraClaims) {
         var builder = Jwts.builder();
@@ -40,21 +41,11 @@ public class JwtTokenProvider {
             builder.claims(extraClaims);
         }
         return builder
+                .claim(TOKEN_TYPE_CLAIM, TOKEN_TYPE_ACCESS)
+                .issuer(ISSUER)
                 .subject(email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
-                .signWith(signingKey(), SignatureAlgorithm.HS512)
-                .compact();
-    }
-
-    /**
-     * Generate refresh token (subject only, longer expiry).
-     */
-    public String generateRefreshToken(String email) {
-        return Jwts.builder()
-                .subject(email)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtRefreshExpirationInMs))
                 .signWith(signingKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
@@ -85,12 +76,18 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Validate token signature and expiry.
+     * Validate access token signature, expiry, issuer, and token type.
      */
     public boolean validateToken(String token) {
         try {
-            Jwts.parser().verifyWith(signingKey()).build().parseSignedClaims(token);
-            return true;
+            Claims claims = Jwts.parser()
+                    .verifyWith(signingKey())
+                    .requireIssuer(ISSUER)
+                    .require(TOKEN_TYPE_CLAIM, TOKEN_TYPE_ACCESS)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.getSubject() != null && !claims.getSubject().isBlank();
         } catch (Exception ex) {
             log.error("Token validation failed: {}", ex.getMessage());
             return false;

@@ -19,6 +19,7 @@ import com.historytalk.repository.payment.TierRepository;
 import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.security.UserPrincipal;
+import com.historytalk.service.notification.EmailVerificationService;
 import com.historytalk.service.notification.PasswordResetEmailService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -62,9 +63,16 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final PasswordResetEmailService passwordResetEmailService;
+    private final EmailVerificationService emailVerificationService;
 
     @Value("${app.password-reset.token-expiration-minutes:30}")
     private long passwordResetTokenExpirationMinutes;
+
+    @Value("${app.email-verification.token-expiration-minutes:30}")
+    private long emailVerificationTokenExpirationMinutes = 30L;
+
+    @Value("${app.email-verification.resend-cooldown-seconds:60}")
+    private long emailVerificationResendCooldownSeconds = 60L;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -76,8 +84,23 @@ public class AuthServiceImpl implements AuthService {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("Mật khẩu và mật khẩu xác nhận không khớp");
         }
-        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new InvalidRequestException("Email của bạn đã tồn tại");
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        java.util.Optional<User> existingEmailUser = userRepository.findByEmailIgnoreCase(normalizedEmail);
+        if (existingEmailUser.isPresent()) {
+            User existing = existingEmailUser.get();
+            if (existing.getDeletedAt() != null || Boolean.TRUE.equals(existing.getEmailVerified())) {
+                throw new InvalidRequestException("Email của bạn đã tồn tại");
+            }
+            if (!existing.getUserName().equalsIgnoreCase(request.getUserName())
+                    && userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
+                throw new InvalidRequestException("Tên đăng nhập của bạn đã tồn tại");
+            }
+            existing.setUserName(request.getUserName());
+            existing.setPassword(passwordEncoder.encode(request.getPassword()));
+            String rawVerificationToken = assignEmailVerificationToken(existing);
+            User updated = userRepository.save(existing);
+            sendVerificationEmailAfterCommit(updated, rawVerificationToken);
+            return buildRegisterResponse(updated, "User registered successfully. Please verify your email before logging in.");
         }
         if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
             throw new InvalidRequestException("Tên đăng nhập của bạn đã tồn tại");
@@ -85,7 +108,9 @@ public class AuthServiceImpl implements AuthService {
 
         User user = User.builder()
                 .userName(request.getUserName())
-                .email(request.getEmail().toLowerCase())
+                .email(normalizedEmail)
+                .emailVerified(false)
+                .emailVerifiedAt(null)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(UserRole.CUSTOMER)
                 .build();
@@ -97,6 +122,7 @@ public class AuthServiceImpl implements AuthService {
             user.setLastTokenResetAt(LocalDateTime.now());
         }
 
+        String rawVerificationToken = assignEmailVerificationToken(user);
         User saved = userRepository.save(user);
 
         if (freeTierOpt.isPresent()) {
@@ -111,15 +137,10 @@ public class AuthServiceImpl implements AuthService {
             userTierRepository.save(userTier);
         }
 
-        log.info("User registered with uid: {}", saved.getUid());
+        log.info("User registered with uid: {} (pending email verification)", saved.getUid());
+        sendVerificationEmailAfterCommit(saved, rawVerificationToken);
 
-        return RegisterResponse.builder()
-                .uid(saved.getUid().toString())
-                .userName(saved.getUserName())
-                .email(saved.getEmail())
-                .role(saved.getRole().name())
-                .message("User registered successfully")
-                .build();
+        return buildRegisterResponse(saved, "User registered successfully. Please verify your email before logging in.");
     }
 
     @Override
@@ -150,6 +171,10 @@ public class AuthServiceImpl implements AuthService {
         if (user.getDeletedAt() != null
                 || user.getAccountStatus() == com.historytalk.entity.enums.AccountStatus.DEACTIVATED) {
             throw new UnauthorizedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa");
+        }
+
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new UnauthorizedException("EMAIL_NOT_VERIFIED: Tài khoản chưa được xác thực email. Vui lòng kiểm tra hộp thư để xác thực.");
         }
 
         UserPrincipal principal = new UserPrincipal(user);
@@ -228,6 +253,106 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
+    public void verifyEmail(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new UnauthorizedException("Token xác thực email không hợp lệ hoặc đã hết hạn");
+        }
+
+        User user = userRepository.findByEmailVerificationTokenHash(sha256Hex(token.trim()))
+                .orElseThrow(() -> new UnauthorizedException("Token xác thực email không hợp lệ hoặc đã hết hạn"));
+
+        if (user.getDeletedAt() != null
+                || user.getAccountStatus() == com.historytalk.entity.enums.AccountStatus.DEACTIVATED
+                || user.getEmailVerificationExpiresAt() == null
+                || user.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new UnauthorizedException("Token xác thực email không hợp lệ hoặc đã hết hạn");
+        }
+
+        user.setEmailVerified(true);
+        user.setEmailVerifiedAt(LocalDateTime.now());
+        user.setEmailVerificationTokenHash(null);
+        user.setEmailVerificationExpiresAt(null);
+        user.setEmailVerificationSentAt(null);
+        userRepository.save(user);
+
+        log.info("Email verified successfully for user {}", user.getUid());
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            throw new InvalidRequestException("Email không được để trống");
+        }
+
+        String normalizedEmail = email.trim().toLowerCase();
+        java.util.Optional<User> userOptional = userRepository.findByEmailIgnoreCase(normalizedEmail);
+        if (userOptional.isEmpty()) {
+            return;
+        }
+
+        User user = userOptional.get();
+        if (user.getDeletedAt() != null
+                || user.getAccountStatus() == com.historytalk.entity.enums.AccountStatus.DEACTIVATED
+                || Boolean.TRUE.equals(user.getEmailVerified())) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (user.getEmailVerificationSentAt() != null
+                && user.getEmailVerificationSentAt().plusSeconds(emailVerificationResendCooldownSeconds).isAfter(now)) {
+            throw new InvalidRequestException("Vui lòng đợi trước khi yêu cầu gửi lại email xác thực.");
+        }
+
+        String rawToken = assignEmailVerificationToken(user);
+        userRepository.save(user);
+        sendVerificationEmailAfterCommit(user, rawToken);
+    }
+
+    private String assignEmailVerificationToken(User user) {
+        String rawToken = generatePasswordResetToken();
+        LocalDateTime now = LocalDateTime.now();
+        user.setEmailVerificationTokenHash(sha256Hex(rawToken));
+        user.setEmailVerificationExpiresAt(now.plusMinutes(emailVerificationTokenExpirationMinutes));
+        user.setEmailVerificationSentAt(now);
+        return rawToken;
+    }
+
+    private void sendVerificationEmailAfterCommit(User user, String rawToken) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            sendVerificationEmail(user, rawToken);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendVerificationEmail(user, rawToken);
+            }
+        });
+    }
+
+    private void sendVerificationEmail(User user, String rawToken) {
+        try {
+            emailVerificationService.sendVerificationEmail(user.getEmail(), user.getUserName(), rawToken);
+        } catch (RuntimeException ex) {
+            log.warn("Could not send verification email for uid: {}", user.getUid());
+        }
+    }
+
+    private RegisterResponse buildRegisterResponse(User saved, String message) {
+        return RegisterResponse.builder()
+                .uid(saved.getUid().toString())
+                .userName(saved.getUserName())
+                .email(saved.getEmail())
+                .role(saved.getRole().name())
+                .emailVerified(Boolean.TRUE.equals(saved.getEmailVerified()))
+                .message(message)
+                .build();
+    }
+
+    @Override
     public RefreshTokenResponse refreshToken(String refreshToken) {
         return refreshToken(refreshToken, null, null);
     }
@@ -285,7 +410,9 @@ public class AuthServiceImpl implements AuthService {
 
         User user = User.builder()
                 .userName(request.getUserName())
-                .email(request.getEmail().toLowerCase())
+                .email(request.getEmail().trim().toLowerCase())
+                .emailVerified(true)
+                .emailVerifiedAt(LocalDateTime.now())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .build();
