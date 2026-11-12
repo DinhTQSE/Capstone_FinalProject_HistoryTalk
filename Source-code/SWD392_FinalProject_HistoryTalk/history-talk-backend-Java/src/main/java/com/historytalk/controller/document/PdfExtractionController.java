@@ -66,14 +66,22 @@ public class PdfExtractionController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) Integer startPage,
             @RequestParam(required = false) Integer endPage,
-            @RequestParam(required = false, defaultValue = "false") Boolean enableAiVision) throws IOException {
+            @RequestParam(required = false, defaultValue = "false") Boolean enableAiVision,
+            @RequestParam(required = false, defaultValue = "false") Boolean extractImages) throws IOException {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}, enableAiVision={}",
-                staffId, startPage, endPage, enableAiVision);
+        log.info("POST /api/v1/documents/pdf/extract by user {}, startPage={}, endPage={}, enableAiVision={}, extractImages={}",
+                staffId, startPage, endPage, enableAiVision, extractImages);
 
         String lockToken = pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
         try {
-            PdfExtractionResponse response = pdfExtractionService.extractText(file, startPage, endPage, Boolean.TRUE.equals(enableAiVision), null);
+            PdfExtractionResponse response = pdfExtractionService.extractText(
+                    file,
+                    startPage,
+                    endPage,
+                    Boolean.TRUE.equals(enableAiVision),
+                    Boolean.TRUE.equals(extractImages),
+                    null,
+                    null);
             return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
         } finally {
             pdfExtractionRateLimiter.release(staffId, lockToken);
@@ -92,10 +100,11 @@ public class PdfExtractionController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) Integer startPage,
             @RequestParam(required = false) Integer endPage,
-            @RequestParam(required = false, defaultValue = "false") Boolean enableAiVision) {
+            @RequestParam(required = false, defaultValue = "false") Boolean enableAiVision,
+            @RequestParam(required = false, defaultValue = "false") Boolean extractImages) {
         String staffId = SecurityUtils.getUserId();
-        log.info("POST /api/v1/documents/pdf/upload-and-extract (SSE stream) by user {}, startPage={}, endPage={}, enableAiVision={}",
-                staffId, startPage, endPage, enableAiVision);
+        log.info("POST /api/v1/documents/pdf/upload-and-extract (SSE stream) by user {}, startPage={}, endPage={}, enableAiVision={}, extractImages={}",
+                staffId, startPage, endPage, enableAiVision, extractImages);
 
         // Kiểm tra quota và acquire lock đồng thời với lock token riêng biệt
         String lockToken = pdfExtractionRateLimiter.acquire(staffId, Boolean.TRUE.equals(enableAiVision));
@@ -139,6 +148,7 @@ public class PdfExtractionController {
                         startPage,
                         endPage,
                         Boolean.TRUE.equals(enableAiVision),
+                        Boolean.TRUE.equals(extractImages),
                         (page, total) -> {
                             if (isAborted.get()) {
                                 throw new CancellationException("Quá trình trích xuất PDF đã bị hủy bởi client ngắt kết nối");

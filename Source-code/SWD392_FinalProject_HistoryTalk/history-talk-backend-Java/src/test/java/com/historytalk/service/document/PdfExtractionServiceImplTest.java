@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -183,6 +184,54 @@ class PdfExtractionServiceImplTest {
                 (page, total) -> cancelled.set(true),
                 cancelled::get
         )).isInstanceOf(CancellationException.class);
+    }
+
+    @Test
+    void extractText_whenExtractImagesDisabled_skipsImageExtractionAndStorageUpload() throws Exception {
+        byte[] pdfBytes = buildNativePdfBytes();
+        MockMultipartFile file = new MockMultipartFile("file", "history.pdf", "application/pdf", pdfBytes);
+
+        PdfExtractionResponse response = service.extractText(
+                file,
+                1,
+                3,
+                false,
+                false,
+                null,
+                () -> false
+        );
+
+        assertThat(response.getPageCount()).isEqualTo(3);
+        assertThat(response.getRawText()).contains(
+                "Page 1 describes how coordinated logistics and artillery positions shaped the decisive battle outcome across multiple fortified hills during the campaign."
+        );
+        assertThat(response.getRawText()).doesNotContain("![");
+        verify(supabaseDocumentStorageService, never()).uploadHistoricalImage(any(byte[].class), any(), any(Boolean.class));
+        verify(aiServiceClient, never()).describeImages(anyList());
+    }
+
+    @Test
+    void extractText_whenExtractImagesEnabledWithoutVision_uploadsImagesWithoutCallingAiVision() throws Exception {
+        byte[] pdfBytes = buildNativePdfBytes();
+        MockMultipartFile file = new MockMultipartFile("file", "history.pdf", "application/pdf", pdfBytes);
+
+        when(supabaseDocumentStorageService.uploadHistoricalImage(any(byte[].class), eq("jpg"), eq(true)))
+                .thenReturn("https://cdn.test/img-1.jpg");
+
+        PdfExtractionResponse response = service.extractText(
+                file,
+                1,
+                3,
+                false,
+                true,
+                null,
+                () -> false
+        );
+
+        assertThat(response.getPageCount()).isEqualTo(3);
+        assertThat(response.getRawText()).contains("![Hinh 1: Chien truong lich su Dien Bien Phu.](https://cdn.test/img-1.jpg)");
+        verify(supabaseDocumentStorageService).uploadHistoricalImage(any(byte[].class), eq("jpg"), eq(true));
+        verify(aiServiceClient, never()).describeImages(anyList());
     }
 
     @Test
