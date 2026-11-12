@@ -5,6 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 
 public interface PdfExtractionService {
     PdfExtractionResponse extractText(MultipartFile file) throws IOException;
@@ -15,6 +16,15 @@ public interface PdfExtractionService {
         return extractText(file, startPage, endPage, false, onProgress);
     }
     PdfExtractionResponse extractText(MultipartFile file, Integer startPage, Integer endPage, Boolean enableAiVision, BiConsumer<Integer, Integer> onProgress) throws IOException;
+    default PdfExtractionResponse extractText(
+            MultipartFile file,
+            Integer startPage,
+            Integer endPage,
+            Boolean enableAiVision,
+            BiConsumer<Integer, Integer> onProgress,
+            BooleanSupplier isCancelled) throws IOException {
+        return extractText(file, startPage, endPage, enableAiVision, onProgress);
+    }
 
     PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes) throws IOException;
     default PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage) throws IOException {

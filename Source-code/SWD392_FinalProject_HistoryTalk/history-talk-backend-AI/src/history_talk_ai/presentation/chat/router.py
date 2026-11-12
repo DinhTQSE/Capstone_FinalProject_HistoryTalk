@@ -26,6 +26,7 @@ from history_talk_ai.presentation.chat.schemas import (
 )
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
+from history_talk_ai.common.config.settings import settings
 from history_talk_ai.dataaccess.java_backend import client as java_client
 from history_talk_ai.application.chat import exam_service, service as llm_service
 from history_talk_ai.dataaccess.java_backend.client import JavaClientNotFoundError, JavaBackendError
@@ -422,19 +423,36 @@ async def proxy_context(context_id: str):
 )
 async def describe_images(body: DescribeImagesRequest):
     try:
-        results = []
-        for item in body.images:
-            desc = await llm_service.describe_historical_image(
-                image_base64=item.image_base64,
-                caption=item.caption
-            )
-            results.append(
-                DescribedImageItem(
+        if not body.images:
+            return DescribeImagesResponse(success=True, data=[])
+
+        sem = asyncio.Semaphore(max(1, settings.VISION_CONCURRENCY))
+
+        async def _describe_one(item):
+            async with sem:
+                try:
+                    desc = await llm_service.describe_historical_image(
+                        image_base64=item.image_base64,
+                        caption=item.caption,
+                    )
+                except Exception as item_exc:
+                    logger.warning(
+                        "Vision description failed for page %s: %s",
+                        item.page_number,
+                        item_exc,
+                    )
+                    desc = (
+                        f"\n[Hình ảnh trang {item.page_number}: {item.caption}]\n"
+                        if item.caption
+                        else f"\n[Hình ảnh trang {item.page_number}]\n"
+                    )
+                return DescribedImageItem(
                     page_number=item.page_number,
                     caption=item.caption,
-                    description_block=desc
+                    description_block=desc,
                 )
-            )
+
+        results = list(await asyncio.gather(*[_describe_one(item) for item in body.images]))
         return DescribeImagesResponse(success=True, data=results)
     except Exception as exc:
         raise HTTPException(
