@@ -226,6 +226,7 @@ Session không bị khóa. Người dùng sửa nội dung là gửi tiếp đư
 - [ ] Gắn nhãn "Vấn đáp" trong lịch sử theo `mode`.
 - [ ] Bỏ `---` trước khi gửi nội dung sang đọc giọng nói.
 - [x] Web: `sendExamAnswer` đã chuyển sang `chatService.sendMessageStream`, `onDone` có thêm `exam` và `examVerdict`.
+- [ ] Mobile: chưa có chế độ vấn đáp, xem [exam_streaming_fe_tasks.md](exam_streaming_fe_tasks.md).
 - [ ] Đặt timeout tạo session và gửi câu trả lời đủ dài, như API chat hiện tại (90 giây trở lên).
 
 ### Mobile

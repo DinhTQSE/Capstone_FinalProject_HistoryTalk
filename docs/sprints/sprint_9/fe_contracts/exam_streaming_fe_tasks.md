@@ -40,18 +40,31 @@ Việc web còn lại:
 - [ ] Kiểm tra nhãn Đúng / Một phần / Sai hiện ở tin vừa nhận sau khi stream xong.
 - [ ] Kiểm tra câu hỏi tiếp theo hiện thành bong bóng riêng ngay khi `---` tới.
 
-## Mobile: cần sửa
+## Mobile: chưa có chế độ vấn đáp, cần làm mới
 
-- [ ] Gửi câu trả lời vấn đáp qua `chatApi.streamMessage` thay cho `chatApi.sendMessage`.
-- [ ] `chatApi.streamMessage` phải đọc event `metadata` và trả ra `examVerdict`, `exam` (hiện đang bỏ qua `metadata`).
+App mobile hiện **chưa có vấn đáp**. `chatApi.createSession` chỉ gửi `characterId` và `contextId`, nên mọi session đều là chat thường. Vì vậy thay đổi stream ở BE **không làm hỏng gì** trên mobile. Khi làm vấn đáp thì làm luôn theo luồng stream:
+
+**Tạo session**
+- [ ] Thêm lựa chọn "Trò chuyện / Vấn đáp" và số câu (3–10) trước khi mở chat, ví dụ trong `useStartChat` (`src/features/chat/hooks/use-start-chat.ts`).
+- [ ] `chatApi.createSession` gửi thêm `mode: "EXAM"` và `examQuestionCount`. Vấn đáp luôn tạo session mới, không mở lại phiên chat gần nhất.
+- [ ] Thêm `mode`, `examQuestionCount`, `exam`, `examVerdict` vào `src/features/chat/types.ts`.
+
+**Gửi câu trả lời qua stream**
+- [ ] `chatApi.streamMessage` phải đọc event `metadata` và trả ra `examVerdict`, `exam` cùng với chữ (hiện `readTokenFromPayload` bỏ qua `metadata`).
 - [ ] Hiện chữ chạy dần. Tách bong bóng tại `---` cả khi đang stream.
 - [ ] Hiện "Nhân vật đang chấm bài..." tới khi có chữ đầu tiên.
-- [ ] Khi stream xong: gắn `examVerdict` vào tin của nhân vật, cập nhật "Câu X/Y" và điểm từ `exam`. Khi `exam.finished = true` thì khóa ô nhập và hiện điểm.
 - [ ] Event `error`: xóa phần chữ dở và tin của người học, báo lỗi, cho gửi lại.
-- [ ] Bỏ `---` trước khi đọc giọng.
 - [ ] Khóa nút gửi tới khi nhận `done`, tránh gửi 2 lần bị chấm 2 lần.
+- [ ] Bỏ `---` trước khi đọc giọng.
 
-Nếu chưa sửa kịp, mobile vẫn có thể dùng tạm `chatApi.sendMessage` như cũ, chỉ là không có chữ chạy.
+**Hiển thị**
+- [ ] "Câu X/Y" và điểm lấy từ `exam`. Số câu đang hỏi là `answeredQuestions + 1`.
+- [ ] Nhãn Đúng / Một phần / Sai từ `examVerdict` dưới tin của nhân vật.
+- [ ] Ẩn câu hỏi gợi ý trong vấn đáp.
+- [ ] Khi `exam.finished = true`: khóa ô nhập và hiện điểm. Mở lại session thì đọc `exam` từ `GET /chat/sessions/{id}/messages`.
+- [ ] Gắn nhãn "Vấn đáp" trong lịch sử theo `mode`.
+
+Web đã có đủ các phần trên, có thể tham khảo `HistoryTalk-FE/src/components/chat/chat-main.tsx` (`sendExamAnswer`).
 
 ## Lưu ý
 
