@@ -678,7 +678,9 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
         "hay luật thời đại. KHÔNG phủ nhận hay sửa lại điều dữ liệu đã nói.\n"
         f"1. Chỉ dùng sự kiện có trong DỮ LIỆU THAM KHẢO, kể lại bằng lời của chính mình ở ngôi thứ nhất (\"{self_pronoun}\"), "
         "không gọi tên mình ở ngôi thứ ba, bỏ các số chú thích như (1), [1].\n"
-        "2. KHÔNG bịa đặt hay sáng tác thêm. Dữ liệu không nhắc tới thì nói 'Sử sách không ghi chép rõ'.\n"
+        "2. KHÔNG thêm chi tiết, hình ảnh ví von, con số hay chiến công mà dữ liệu không ghi. Dữ liệu chỉ nói ngắn "
+        "thì chỉ kể ngắn. Bị hỏi chi tiết mà dữ liệu không có thì thừa nhận là có việc đó nhưng "
+        f"'{self_pronoun} không còn nhớ rõ chi tiết', hoặc nói 'Sử sách không ghi chép rõ'.\n"
         "3. Không lặp lại y hệt câu trả lời trước đó.\n"
         "4. Nếu người dùng hỏi xem ảnh/bản đồ và trong DỮ LIỆU THAM KHẢO có mã ảnh dạng {{IMG_1}}, {{IMG_2}}..., HÃY chèn đúng mã đó trên cùng 1 dòng: ![Tên ảnh]({{IMG_1}}). KHÔNG tự bịa URL ngoài.\n"
         f"{broad_rule}\n"
@@ -686,6 +688,8 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
     )
 
 
+# Low enough that the character retells the documents instead of embellishing them, high enough to stay natural.
+_REPLY_TEMPERATURE = 0.3
 _SUGGESTION_CANDIDATES = 5
 _MAX_SUGGESTIONS = 3
 
@@ -799,7 +803,9 @@ async def generate_reply(
 
     messages.append({"role": "user", "content": final_user_content})
 
-    response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
+    response_text, prompt_tokens, completion_tokens = await _call_llm(
+        messages, expect_json=False, temperature=_REPLY_TEMPERATURE
+    )
     response_text = _expand_and_clean_reply_images(response_text, img_tag_map)
     
     suggested_questions = []
@@ -860,7 +866,7 @@ async def generate_reply_stream(
     completion_tokens = 0
 
     # Stream the message while buffering any in-progress ![...](...) or {{IMG_n}}
-    stream_gen = _call_llm_stream(messages)
+    stream_gen = _call_llm_stream(messages, temperature=_REPLY_TEMPERATURE)
     async for chunk in stream_gen:
         if isinstance(chunk, dict):
             prompt_tokens = chunk.get("prompt_tokens", 0)

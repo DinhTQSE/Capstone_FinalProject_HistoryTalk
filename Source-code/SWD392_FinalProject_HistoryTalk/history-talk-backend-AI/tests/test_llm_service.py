@@ -157,7 +157,7 @@ def test_stream_forwards_chunks_without_artificial_delay(monkeypatch):
     async def fake_retrieve(question, entity_ids):
         return "", []
 
-    async def fake_stream(messages):
+    async def fake_stream(messages, temperature=None):
         yield "Ta là "
         yield "Ngô Quyền."
         yield {"prompt_tokens": 10, "completion_tokens": 5}
@@ -524,3 +524,10 @@ def test_documents_win_over_the_models_own_knowledge():
 
     assert "kể cả khi trái với hiểu biết riêng hay luật thời đại" in content
     assert content.index("ký ức của bạn") < content.index("CÂU HỎI CỦA NGƯỜI DÙNG")
+
+
+def test_short_documents_are_not_embellished():
+    content = service._build_final_user_content("Gươm ấy làm được gì?", "Ông có một thanh gươm.", "ta")
+
+    assert "KHÔNG thêm chi tiết, hình ảnh ví von" in content
+    assert "ta không còn nhớ rõ chi tiết" in content
