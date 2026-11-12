@@ -74,6 +74,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                 .userName(user.getUserName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 
@@ -121,6 +122,8 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                     .userName(user.getUserName())
                     .email(user.getEmail())
                     .role(user.getRole().name())
+                    .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                     .build();
         } catch (Exception e) {
             log.error("Google ID Token verification failed: {}", e.getMessage());

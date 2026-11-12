@@ -194,6 +194,7 @@ public class AuthServiceImpl implements AuthService {
                 .userName(user.getUserName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 
@@ -245,6 +246,7 @@ public class AuthServiceImpl implements AuthService {
         user.setPasswordResetTokenHash(null);
         user.setPasswordResetExpiresAt(null);
         user.setPasswordChangedAt(LocalDateTime.now());
+        user.setMustChangePassword(false);
         userRepository.save(user);
 
         // Hủy toàn bộ refresh token cũ của user trên mọi thiết bị
@@ -383,6 +385,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(uid)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setPasswordChangedAt(LocalDateTime.now());
+        user.setMustChangePassword(false);
         userRepository.save(user);
         refreshTokenService.revokeAllUserTokens(uid);
         log.info("User {} logged out from all devices", userId);

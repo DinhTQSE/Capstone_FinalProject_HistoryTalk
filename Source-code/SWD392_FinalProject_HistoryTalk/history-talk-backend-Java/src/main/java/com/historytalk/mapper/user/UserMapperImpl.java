@@ -36,6 +36,7 @@ public class UserMapperImpl implements UserMapper {
                         ? user.getSchool().getId().toString() : null)
                 .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
                 .schoolCode(user.getSchool() != null ? user.getSchool().getSchoolCode() : null)
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 }

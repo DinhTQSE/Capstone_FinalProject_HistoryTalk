@@ -32,4 +32,5 @@ public class UserProfileResponse {
     private String schoolId;
     private String schoolName;
     private String schoolCode;
+    private Boolean mustChangePassword;
 }
