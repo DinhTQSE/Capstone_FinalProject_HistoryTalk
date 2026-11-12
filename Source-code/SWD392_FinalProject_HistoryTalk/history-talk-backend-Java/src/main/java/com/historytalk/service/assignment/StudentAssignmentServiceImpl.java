@@ -151,6 +151,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
         switch (type) {
             case AI_CHAT_ROLEPLAY -> {
+                List<SubmissionStatus> submittedStatuses = List.of(SubmissionStatus.SUBMITTED, SubmissionStatus.LATE_SUBMITTED);
                 ChatSession chatSession;
                 if (request != null && request.getChatSessionId() != null) {
                     chatSession = chatSessionRepository.findActiveBySessionIdAndUserUid(request.getChatSessionId(), studentUid)
@@ -159,16 +160,22 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                     if (chatSession.getCharacter() != null && !chatSession.getCharacter().getCharacterId().equals(assignment.getTargetId())) {
                         throw new InvalidRequestException("PhiÃªn chat khÃ´ng pháº£i vá»›i nhÃ¢n váº­t lá»‹ch sá»­ Ä‘Æ°á»£c yÃªu cáº§u trong bÃ i táº­p");
                     }
+
+                    if (assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(chatSession.getSessionId(), submittedStatuses)) {
+                        throw new InvalidRequestException("Phiên trò chuyện này đã được sử dụng để nộp cho một bài tập khác");
+                    }
                 } else {
-                    List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacter(studentUid, assignment.getTargetId());
+                    List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacter(studentUid, assignment.getTargetId()).stream()
+                            .filter(cs -> !assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(cs.getSessionId(), submittedStatuses))
+                            .toList();
                     if (sessions.isEmpty()) {
                         throw new InvalidRequestException("Báº¡n chÆ°a cÃ³ phiÃªn trÃ² chuyá»‡n nÃ o vá»›i nhÃ¢n váº­t lá»‹ch sá»­ Ä‘Æ°á»£c yÃªu cáº§u trong bÃ i táº­p");
                     }
                     chatSession = sessions.get(0);
                 }
 
-                long userMsgCount = messageRepository.countUserMessagesInSession(chatSession.getSessionId());
-                int msgCount = (int) userMsgCount;
+                long aiMsgCount = messageRepository.countAiMessagesInSession(chatSession.getSessionId());
+                int msgCount = (int) aiMsgCount;
                 submission.setMessageCount(msgCount);
                 submission.setChatSessionId(chatSession.getSessionId());
 

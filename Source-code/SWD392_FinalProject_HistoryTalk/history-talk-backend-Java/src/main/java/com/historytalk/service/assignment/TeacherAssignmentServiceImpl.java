@@ -360,9 +360,8 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
 
         validateAndGetClassroomForTeacher(assignment.getClassroom().getId(), schoolId, teacherUid);
 
-        // Soft delete / Cancel
+        // Soft cancel: keep deletedAt null so teacher can still view CANCELLED assignments and preserved gradebook data
         assignment.setStatus(AssignmentStatus.CANCELLED);
-        assignment.setDeletedAt(LocalDateTime.now());
         assignmentRepository.save(assignment);
         log.info("Teacher {} cancelled assignment {}", teacherUid, assignmentId);
     }
