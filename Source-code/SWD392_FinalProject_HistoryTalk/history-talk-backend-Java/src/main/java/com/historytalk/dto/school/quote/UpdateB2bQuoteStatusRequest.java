@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,4 +27,8 @@ public class UpdateB2bQuoteStatusRequest {
 
     @Size(max = 2000, message = "Admin note must not exceed 2,000 characters")
     private String adminNote;
+
+    private LocalDate subscriptionStartDate;
+
+    private LocalDate subscriptionEndDate;
 }

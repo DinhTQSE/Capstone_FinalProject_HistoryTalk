@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -39,6 +40,8 @@ public class B2bQuoteResponse {
     private Integer discountPercent;
     private Long discountAmountVnd;
     private Long finalPriceVnd;
+    private LocalDate subscriptionStartDate;
+    private LocalDate subscriptionEndDate;
     private String promoCode;
     private String message;
     private B2bQuoteStatus status;
