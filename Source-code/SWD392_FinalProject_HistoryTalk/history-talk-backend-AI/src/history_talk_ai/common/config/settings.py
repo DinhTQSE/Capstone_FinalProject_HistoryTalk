@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     EXTERNAL_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     EXTERNAL_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
+    # Sent to reasoning models such as GPT on Amazon Bedrock; empty leaves the model default.
+    EXTERNAL_REASONING_EFFORT: str = "low"
 
     # Vision Model Provider ("google", "ollama")
     VISION_PROVIDER: str = "ollama"

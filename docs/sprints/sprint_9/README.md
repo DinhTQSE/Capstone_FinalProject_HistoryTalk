@@ -80,6 +80,13 @@
 * Câu hỏi đầu tiên vẫn được tạo lúc tạo session, vì lúc đó chưa có câu trả lời nào.
 * Web đã chuyển câu trả lời vấn đáp sang API stream. Mobile vẫn cần sửa, xem mục 3 của contract.
 
+### 10. Dùng LLM qua Amazon Bedrock
+* `LLM_PROVIDER=external` gọi Chat Completions kiểu OpenAI, dùng cho GPT trên Bedrock. Cấu hình: `EXTERNAL_API_BASE_URL`, `EXTERNAL_API_KEY`, `LLM_MODEL`, `EXTERNAL_REASONING_EFFORT` (mặc định `low`, để trống thì dùng mặc định của model).
+* Token đầu vào vẫn chia 10 như Ollama. Stream gửi `stream_options.include_usage` để lấy số token.
+* Model từ chối tham số nào (`temperature`, `reasoning_effort`, `response_format`, `max_completion_tokens`) thì AI service bỏ hoặc đổi tham số đó và gọi lại, các lần sau không gửi nữa.
+* Embedding `bge-m3`, reranker và giọng đọc vẫn chạy trên VM GPU, nên VM vẫn phải bật.
+* Quay lại Ollama: đặt `LLM_PROVIDER=ollama` rồi restart AI service.
+
 ---
 
 ## 🧪 KẾT QUẢ KIỂM THỬ TRÊN PRODUCTION (05/11/2026)

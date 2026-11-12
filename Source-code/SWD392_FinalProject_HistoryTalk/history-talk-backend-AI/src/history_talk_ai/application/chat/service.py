@@ -93,8 +93,7 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True, temperatu
         response.raise_for_status()
         data = response.json()
         content = data.get("message", {}).get("content", "")
-        prompt_tokens = data.get("prompt_eval_count", 0)
-        prompt_tokens = max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
+        prompt_tokens = _scale_prompt_tokens(data.get("prompt_eval_count", 0))
         completion_tokens = data.get("eval_count", 0)
         return content, prompt_tokens, completion_tokens
     except Exception as e:
@@ -139,8 +138,7 @@ async def _call_ollama_stream(messages: list[dict], temperature: float | None = 
                     if chunk:
                         yield chunk
                     if data.get("done"):
-                        prompt_tokens = data.get("prompt_eval_count", 0)
-                        prompt_tokens = max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
+                        prompt_tokens = _scale_prompt_tokens(data.get("prompt_eval_count", 0))
                         completion_tokens = data.get("eval_count", 0)
                 except json.JSONDecodeError:
                     continue
@@ -150,94 +148,139 @@ async def _call_ollama_stream(messages: list[dict], temperature: float | None = 
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def _call_external(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Make an async call to an external OpenAI-compatible API (e.g. OpenAI, Gemini, Groq)."""
+def _scale_prompt_tokens(prompt_tokens: int) -> int:
+    """Users are charged a tenth of the prompt tokens, whichever provider answered."""
+    return max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
+
+
+# Parameters the external model rejected once are left out from then on, so only the first call pays the retry.
+_EXTERNAL_OPTIONAL_PARAMS = ("temperature", "reasoning_effort", "stream_options", "response_format")
+_EXTERNAL_MAX_ADAPTATIONS = 3
+_external_dropped_params: set[str] = set()
+_external_max_tokens_key = ["max_completion_tokens"]
+
+
+def _external_headers() -> dict:
     api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
+    return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+
+def _external_url() -> str:
+    return f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions"
+
+
+def _external_payload(messages: list[dict], temperature: float | None, stream: bool, expect_json: bool) -> dict:
+    """The same request as the Ollama one, in OpenAI Chat Completions form."""
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
+        "stream": stream,
         "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
-        "max_tokens": settings.LLM_MAX_TOKENS,
-        "stream": False,
+        _external_max_tokens_key[0]: settings.LLM_MAX_TOKENS,
     }
-    
+    # Ollama runs with thinking off; a reasoning model is kept as close to that as it allows.
+    if settings.EXTERNAL_REASONING_EFFORT:
+        payload["reasoning_effort"] = settings.EXTERNAL_REASONING_EFFORT
+    if stream:
+        # Without this, OpenAI-compatible APIs send no usage when streaming and the turn would cost nothing.
+        payload["stream_options"] = {"include_usage": True}
     if expect_json:
         payload["response_format"] = {"type": "json_object"}
+    for param in _external_dropped_params:
+        payload.pop(param, None)
+    return payload
 
+
+def _adapt_external_request(error_body: str) -> bool:
+    """Adjusts future requests to a 400 naming a parameter. Returns True when the request is worth retrying."""
+    text = error_body.lower()
+    current_key = _external_max_tokens_key[0]
+    if current_key in text and current_key == "max_completion_tokens":
+        logger.warning("External LLM rejected max_completion_tokens, using max_tokens instead.")
+        _external_max_tokens_key[0] = "max_tokens"
+        return True
+    for param in _EXTERNAL_OPTIONAL_PARAMS:
+        if param in text and param not in _external_dropped_params:
+            logger.warning(f"External LLM rejected '{param}', leaving it out from now on.")
+            _external_dropped_params.add(param)
+            return True
+    return False
+
+
+async def _call_external(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
+    """Make an async call to an external OpenAI-compatible API (e.g. OpenAI on Amazon Bedrock, Gemini, Groq)."""
     try:
-        response = await ollama_client.post(
-            f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
-            json=payload,
-            headers=headers
-        )
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"].get("content", "")
-        usage = data.get("usage", {})
-        return content, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0)
+        for attempt in range(_EXTERNAL_MAX_ADAPTATIONS + 1):
+            response = await ollama_client.post(
+                _external_url(),
+                json=_external_payload(messages, temperature, stream=False, expect_json=expect_json),
+                headers=_external_headers(),
+            )
+            if response.status_code == 400 and attempt < _EXTERNAL_MAX_ADAPTATIONS and _adapt_external_request(response.text):
+                continue
+            if response.status_code >= 400:
+                logger.error(f"External LLM returned {response.status_code}: {response.text[:300]}")
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"].get("content") or ""
+            usage = data.get("usage") or {}
+            return (
+                content,
+                _scale_prompt_tokens(usage.get("prompt_tokens", 0)),
+                usage.get("completion_tokens", 0),
+            )
     except Exception as e:
         logger.error(f"Failed to call external API: {e}")
         raise
 
+
 async def _call_external_stream(messages: list[dict], temperature: float | None = None) -> tuple:
-    """Make an async call to an external API with streaming enabled."""
-    api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": settings.LLM_MODEL,
-        "messages": messages,
-        "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
-        "max_tokens": settings.LLM_MAX_TOKENS,
-        "stream": True,
-    }
-    
+    """Make an async call to an external API with streaming enabled. Yields chunks and finally returns tokens."""
     prompt_tokens = 0
     completion_tokens = 0
 
     try:
-        async with ollama_client.stream(
-            "POST",
-            f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=_LLM_TIMEOUT
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if not line or not line.startswith("data: "):
-                    continue
-                data_str = line[6:]
-                if data_str.strip() == "[DONE]":
-                    break
-                try:
-                    data = json.loads(data_str)
-                    choices = data.get("choices", [])
+        for attempt in range(_EXTERNAL_MAX_ADAPTATIONS + 1):
+            async with ollama_client.stream(
+                "POST",
+                _external_url(),
+                json=_external_payload(messages, temperature, stream=True, expect_json=False),
+                headers=_external_headers(),
+                timeout=_LLM_TIMEOUT,
+            ) as response:
+                if response.status_code >= 400:
+                    body = (await response.aread()).decode("utf-8", "replace")
+                    if response.status_code == 400 and attempt < _EXTERNAL_MAX_ADAPTATIONS and _adapt_external_request(body):
+                        continue
+                    logger.error(f"External LLM returned {response.status_code}: {body[:300]}")
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data_str = line[5:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = data.get("choices") or []
                     if choices:
-                        delta = choices[0].get("delta", {})
-                        chunk = delta.get("content", "")
+                        chunk = (choices[0].get("delta") or {}).get("content")
                         if chunk:
                             yield chunk
-                    # Some APIs send usage in the last chunk
+                    # Usage arrives in the last chunk, which has no choices.
                     usage = data.get("usage")
                     if usage:
-                        prompt_tokens = usage.get("prompt_tokens", 0)
+                        prompt_tokens = _scale_prompt_tokens(usage.get("prompt_tokens", 0))
                         completion_tokens = usage.get("completion_tokens", 0)
-                except json.JSONDecodeError:
-                    continue
+                break
     except Exception as e:
         logger.error(f"Failed to stream from external API: {e}")
         raise
-        
+
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
+
 
 def _is_broad_question(question: str) -> bool:
     """A question about a whole event needs more chunks than a question about one fact."""
