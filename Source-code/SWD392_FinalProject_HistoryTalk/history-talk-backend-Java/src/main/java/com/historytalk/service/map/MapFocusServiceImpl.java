@@ -54,12 +54,12 @@ public class MapFocusServiceImpl implements MapFocusService {
         List<MapFocus> focuses;
         if (isAdminRole(role) || isEducationalManager(role, callerId, context)) {
             // Admin or school manager: all non-deleted focuses, including inactive
-            focuses = focusRepository.findByHistoricalContext_ContextIdAndDeletedAtIsNull(
+            focuses = focusRepository.findByContextIdAndDeletedAtIsNull(
                     ctxUuid, ORDER_BY_INDEX);
         } else {
             // Guest / authenticated user: active-only
             focuses = focusRepository
-                    .findByHistoricalContext_ContextIdAndDeletedAtIsNullAndIsActiveTrue(
+                    .findByContextIdAndDeletedAtIsNullAndIsActiveTrue(
                             ctxUuid, ORDER_BY_INDEX);
         }
 
@@ -94,8 +94,8 @@ public class MapFocusServiceImpl implements MapFocusService {
         }
 
         MapFocus focus = MapFocus.builder()
-                .historicalContext(context)
-                .createdBy(creator)
+                .contextId(ctxUuid)
+                .createdBy(creator.getUid())
                 .name(request.getName().trim())
                 .description(request.getDescription())
                 .latitude(request.getLatitude())
@@ -134,7 +134,7 @@ public class MapFocusServiceImpl implements MapFocusService {
                         "Map focus not found: " + focusId));
 
         // Verify focus belongs to this context
-        if (!focus.getHistoricalContext().getContextId().equals(ctxUuid)) {
+        if (!focus.getContextId().equals(ctxUuid)) {
             throw new ResourceNotFoundException("Map focus not found: " + focusId);
         }
 
@@ -189,7 +189,7 @@ public class MapFocusServiceImpl implements MapFocusService {
 
         // Build a lookup map of all non-deleted focuses for this context
         Map<UUID, MapFocus> focusByUuid = focusRepository
-                .findByHistoricalContext_ContextIdAndDeletedAtIsNull(ctxUuid)
+                .findByContextIdAndDeletedAtIsNull(ctxUuid)
                 .stream()
                 .collect(Collectors.toMap(MapFocus::getFocusId, Function.identity()));
 
@@ -234,7 +234,7 @@ public class MapFocusServiceImpl implements MapFocusService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Map focus not found: " + focusId));
 
-        if (!focus.getHistoricalContext().getContextId().equals(ctxUuid)) {
+        if (!focus.getContextId().equals(ctxUuid)) {
             throw new ResourceNotFoundException("Map focus not found: " + focusId);
         }
 
@@ -253,7 +253,7 @@ public class MapFocusServiceImpl implements MapFocusService {
      */
     private void unsetExistingDefault(UUID ctxUuid) {
         focusRepository
-                .findByHistoricalContext_ContextIdAndIsDefaultTrueAndDeletedAtIsNull(ctxUuid)
+                .findByContextIdAndIsDefaultTrueAndDeletedAtIsNull(ctxUuid)
                 .ifPresent(existing -> {
                     existing.setIsDefault(false);
                     focusRepository.save(existing);
@@ -308,7 +308,7 @@ public class MapFocusServiceImpl implements MapFocusService {
     private MapFocusResponse mapToResponse(MapFocus focus) {
         return MapFocusResponse.builder()
                 .focusId(focus.getFocusId().toString())
-                .contextId(focus.getHistoricalContext().getContextId().toString())
+                .contextId(focus.getContextId().toString())
                 .name(focus.getName())
                 .description(focus.getDescription())
                 .latitude(focus.getLatitude())
@@ -317,7 +317,7 @@ public class MapFocusServiceImpl implements MapFocusService {
                 .orderIndex(focus.getOrderIndex())
                 .isDefault(focus.getIsDefault())
                 .isActive(focus.getIsActive())
-                .createdBy(focus.getCreatedBy().getUid().toString())
+                .createdBy(focus.getCreatedBy().toString())
                 .createdAt(focus.getCreatedAt())
                 .updatedAt(focus.getUpdatedAt())
                 .build();
