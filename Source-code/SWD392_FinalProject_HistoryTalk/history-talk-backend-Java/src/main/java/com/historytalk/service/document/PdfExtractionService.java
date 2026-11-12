@@ -23,6 +23,16 @@ public interface PdfExtractionService {
             Boolean enableAiVision,
             BiConsumer<Integer, Integer> onProgress,
             BooleanSupplier isCancelled) throws IOException {
+        return extractText(file, startPage, endPage, enableAiVision, false, onProgress, isCancelled);
+    }
+    default PdfExtractionResponse extractText(
+            MultipartFile file,
+            Integer startPage,
+            Integer endPage,
+            Boolean enableAiVision,
+            Boolean extractImages,
+            BiConsumer<Integer, Integer> onProgress,
+            BooleanSupplier isCancelled) throws IOException {
         return extractText(file, startPage, endPage, enableAiVision, onProgress);
     }
 
@@ -34,4 +44,13 @@ public interface PdfExtractionService {
         return extractTextFromBytes(pdfBytes, startPage, endPage, false, onProgress);
     }
     PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage, Boolean enableAiVision, BiConsumer<Integer, Integer> onProgress) throws IOException;
+    default PdfExtractionResponse extractTextFromBytes(
+            byte[] pdfBytes,
+            Integer startPage,
+            Integer endPage,
+            Boolean enableAiVision,
+            Boolean extractImages,
+            BiConsumer<Integer, Integer> onProgress) throws IOException {
+        return extractTextFromBytes(pdfBytes, startPage, endPage, enableAiVision, onProgress);
+    }
 }

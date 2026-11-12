@@ -274,7 +274,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     @Override
     public PdfExtractionResponse extractText(MultipartFile file, Integer startPage, Integer endPage, Boolean enableAiVision, BiConsumer<Integer, Integer> onProgress) throws IOException {
-        return extractText(file, startPage, endPage, enableAiVision, onProgress, null);
+        return extractText(file, startPage, endPage, enableAiVision, false, onProgress, null);
     }
 
     @Override
@@ -285,6 +285,18 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             Boolean enableAiVision,
             BiConsumer<Integer, Integer> onProgress,
             BooleanSupplier isCancelled) throws IOException {
+        return extractText(file, startPage, endPage, enableAiVision, false, onProgress, isCancelled);
+    }
+
+    @Override
+    public PdfExtractionResponse extractText(
+            MultipartFile file,
+            Integer startPage,
+            Integer endPage,
+            Boolean enableAiVision,
+            Boolean extractImages,
+            BiConsumer<Integer, Integer> onProgress,
+            BooleanSupplier isCancelled) throws IOException {
         validatePdfFile(file);
 
         Path tempFile = null;
@@ -292,7 +304,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             tempFile = Files.createTempFile("pdf-extraction-", ".pdf");
             file.transferTo(tempFile.toFile());
 
-            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, onProgress, isCancelled);
+            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, extractImages, onProgress, isCancelled);
         } finally {
             if (tempFile != null) {
                 try {
@@ -306,21 +318,32 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
 
     @Override
     public PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes) throws IOException {
-        return extractTextFromBytes(pdfBytes, null, null, false, null);
+        return extractTextFromBytes(pdfBytes, null, null, false, false, null);
     }
 
     @Override
     public PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage) throws IOException {
-        return extractTextFromBytes(pdfBytes, startPage, endPage, false, null);
+        return extractTextFromBytes(pdfBytes, startPage, endPage, false, false, null);
     }
 
     @Override
     public PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage, BiConsumer<Integer, Integer> onProgress) throws IOException {
-        return extractTextFromBytes(pdfBytes, startPage, endPage, false, onProgress);
+        return extractTextFromBytes(pdfBytes, startPage, endPage, false, false, onProgress);
     }
 
     @Override
     public PdfExtractionResponse extractTextFromBytes(byte[] pdfBytes, Integer startPage, Integer endPage, Boolean enableAiVision, BiConsumer<Integer, Integer> onProgress) throws IOException {
+        return extractTextFromBytes(pdfBytes, startPage, endPage, enableAiVision, false, onProgress);
+    }
+
+    @Override
+    public PdfExtractionResponse extractTextFromBytes(
+            byte[] pdfBytes,
+            Integer startPage,
+            Integer endPage,
+            Boolean enableAiVision,
+            Boolean extractImages,
+            BiConsumer<Integer, Integer> onProgress) throws IOException {
         if (pdfBytes == null || pdfBytes.length == 0) {
             throw new InvalidRequestException("PDF bytes cannot be empty");
         }
@@ -334,7 +357,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             tempFile = Files.createTempFile("pdf-extraction-", ".pdf");
             Files.write(tempFile, pdfBytes);
 
-            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, onProgress, null);
+            return extractTextFromFile(tempFile.toFile(), startPage, endPage, enableAiVision, extractImages, onProgress, null);
         } finally {
             if (tempFile != null) {
                 try {
@@ -351,10 +374,12 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             Integer reqStartPage,
             Integer reqEndPage,
             Boolean enableAiVision,
+            Boolean extractImages,
             BiConsumer<Integer, Integer> onProgress,
             BooleanSupplier isCancelled) throws IOException {
         boolean visionEnabled = Boolean.TRUE.equals(enableAiVision);
-        log.info("=== PDF Extraction Started (enableAiVision={}) ===", visionEnabled);
+        boolean shouldExtractImages = Boolean.TRUE.equals(extractImages) || visionEnabled;
+        log.info("=== PDF Extraction Started (extractImages={}, enableAiVision={}) ===", shouldExtractImages, visionEnabled);
         log.info("File: {}, reqStartPage: {}, reqEndPage: {}", pdfFile.getName(), reqStartPage, reqEndPage);
 
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
@@ -419,18 +444,23 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                 }
 
                 List<PdfLayoutProcessor.ExtractedLine> extractedLines = layoutStripper.getCollectedLines();
-                Map<Integer, List<PdfLayoutProcessor.ExtractedLine>> linesByPage = new HashMap<>();
-                for (PdfLayoutProcessor.ExtractedLine line : extractedLines) {
-                    linesByPage.computeIfAbsent(line.pageNumber(), k -> new ArrayList<>()).add(line);
+                List<PdfLayoutProcessor.PageImagePlacement> imagePlacements = List.of();
+
+                if (shouldExtractImages) {
+                    Map<Integer, List<PdfLayoutProcessor.ExtractedLine>> linesByPage = new HashMap<>();
+                    for (PdfLayoutProcessor.ExtractedLine line : extractedLines) {
+                        linesByPage.computeIfAbsent(line.pageNumber(), k -> new ArrayList<>()).add(line);
+                    }
+
+                    // 2. Extract images once (with MD5 cache + parallel JPEG encode/upload + spatial caption matching)
+                    List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(
+                            document, startPage, endPage, linesByPage, isCancelled);
+
+                    // 3. Build image placements (optionally enriched via bounded parallel Vision AI batches)
+                    imagePlacements = buildImagePlacements(allImages, visionEnabled, isCancelled);
+                } else {
+                    log.info("=== NATIVE EXTRACTION (IMAGE EXTRACTION DISABLED) ===");
                 }
-
-                // 2. Extract images once (with MD5 cache + parallel JPEG encode/upload + spatial caption matching)
-                List<ExtractedHistoricalImage> allImages = extractAllHistoricalImages(
-                        document, startPage, endPage, linesByPage, isCancelled);
-
-                // 3. Build image placements (optionally enriched via bounded parallel Vision AI batches)
-                List<PdfLayoutProcessor.PageImagePlacement> imagePlacements = buildImagePlacements(
-                        allImages, visionEnabled, isCancelled);
 
                 // 4. Filter cross-page headers/footers, reflow paragraphs, and place images cleanly at paragraph boundaries
                 finalResultText = PdfLayoutProcessor.reconstructMarkdown(extractedLines, imagePlacements);
