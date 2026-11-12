@@ -149,9 +149,8 @@ Gọi đồng bộ có thể mất tới 4 phút với `mode=full`, nên **luôn
 ---
 
 ## 8. Việc FE cần làm
-- [ ] Đổi dữ liệu giả trong `src/features/story/mock-data.ts` sang các API trên.
-- [ ] Nút "Tạo bằng AI": gọi với `async: true`, hỏi job tới khi xong, hiện `stage` và `progress`, có nút huỷ.
-- [ ] Hiện `warnings` trong editor và gắn nhãn "Cần kiểm chứng" cho bước có `sources` rỗng.
-- [ ] Xử lý `404` của job (hết hạn) và `422` "chưa có tài liệu".
-- [ ] Ẩn các nút AI với `SYSTEM_ADMIN` và `SCHOOL_ADMIN`.
-- [ ] Lưu kịch bản và lược đồ: phần lưu xuống Java (mục A.9 của đặc tả) **chưa làm**, sẽ có contract riêng.
+- [x] Web, lược đồ: nút "Tạo bằng AI" trong `BattleMapEditor` (content admin, teacher). Lập kế hoạch dạng job, đặt điểm mốc lên ảnh (có nút "AI đoán vị trí"), `compileBattlePlan` vẽ ký hiệu và thêm giai đoạn, hoàn tác được bằng Ctrl+Z.
+- [x] Web, kịch bản: nút "AI soạn" trong editor `/staff/stories` với 4 mode (tạo cả kịch bản, viết tiếp, thêm câu hỏi, viết lại). Bối cảnh và nhân vật kể chọn từ dữ liệu thật vì AI cần tài liệu của bối cảnh; nhân vật thật được thêm vào danh sách nhân vật của editor.
+- [ ] Editor kịch bản chưa có chỗ hiện `sources` của từng bước và nhãn "Cần kiểm chứng" (kiểu dữ liệu node chưa có trường này).
+- [ ] Lưu kịch bản: phần lưu xuống Java (mục A.9 của đặc tả) **chưa làm**, kịch bản vẫn chỉ lưu trên trình duyệt. Sẽ có contract riêng.
+- [ ] Mobile: chưa có.

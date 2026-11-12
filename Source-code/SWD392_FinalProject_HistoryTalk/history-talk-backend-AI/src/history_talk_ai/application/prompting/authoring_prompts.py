@@ -66,6 +66,8 @@ _STORY_REWRITE = """\
 Viết lại bước sau theo yêu cầu: "{instruction}".
 {step}
 Giữ nguyên id, type, speaker, next. Chỉ đổi "text" (và "expression" nếu cần). Vẫn đúng với TÀI LIỆU.
+Giữ đúng giọng của speaker: "narrator" kể ở ngôi thứ ba, KHÔNG xưng "ta" và không nói thay nhân vật;
+nhân vật thì nói ở ngôi thứ nhất như quy tắc trên.
 Trả về JSON có "steps" gồm đúng 1 bước này và "startId" là id của nó.
 """
 
