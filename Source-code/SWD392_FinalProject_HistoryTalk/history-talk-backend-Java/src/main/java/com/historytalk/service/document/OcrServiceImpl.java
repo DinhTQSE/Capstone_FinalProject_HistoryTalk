@@ -365,7 +365,7 @@ public class OcrServiceImpl implements OcrService {
                     if (text.isEmpty()) {
                         continue;
                     }
-                    float approxFontSize = Math.max(8f, box.height * 0.72f);
+                    // Leave fontSize=0 for OCR lines because pixel box height varies by Vietnamese diacritics
                     result.add(new PdfLayoutProcessor.ExtractedLine(
                             pageNumber,
                             pageWidth,
@@ -374,7 +374,7 @@ public class OcrServiceImpl implements OcrService {
                             box.x + box.width,
                             box.y,
                             box.y + box.height,
-                            approxFontSize,
+                            0f,
                             text
                     ));
                 }
