@@ -142,11 +142,12 @@ class TokenBoostRequestServiceImplTest {
     @Test
     @DisplayName("US-SP7-17: Student creates daily token boost request successfully")
     void createBoostRequest_Success() {
-        when(userRepository.findById(student.getUid())).thenReturn(Optional.of(student));
+        when(userRepository.findByIdForUpdate(student.getUid())).thenReturn(Optional.of(student));
         when(classStudentRepository.findActiveClassroomsByStudentUid(student.getUid()))
                 .thenReturn(List.of(classroom));
-        when(tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatus(
-                student.getUid(), LocalDate.now(), TokenBoostRequestStatus.PENDING))
+        when(tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatusIn(
+                org.mockito.ArgumentMatchers.eq(student.getUid()), org.mockito.ArgumentMatchers.eq(LocalDate.now()),
+                org.mockito.ArgumentMatchers.anyCollection()))
                 .thenReturn(false);
         when(tokenBoostRequestRepository.save(any(TokenBoostRequest.class))).thenAnswer(inv -> {
             TokenBoostRequest r = inv.getArgument(0);
@@ -170,11 +171,12 @@ class TokenBoostRequestServiceImplTest {
     @Test
     @DisplayName("US-SP7-17: Duplicate PENDING request on same day throws DataConflictException")
     void createBoostRequest_DuplicatePendingToday_ThrowsConflict() {
-        when(userRepository.findById(student.getUid())).thenReturn(Optional.of(student));
+        when(userRepository.findByIdForUpdate(student.getUid())).thenReturn(Optional.of(student));
         when(classStudentRepository.findActiveClassroomsByStudentUid(student.getUid()))
                 .thenReturn(List.of(classroom));
-        when(tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatus(
-                student.getUid(), LocalDate.now(), TokenBoostRequestStatus.PENDING))
+        when(tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatusIn(
+                org.mockito.ArgumentMatchers.eq(student.getUid()), org.mockito.ArgumentMatchers.eq(LocalDate.now()),
+                org.mockito.ArgumentMatchers.anyCollection()))
                 .thenReturn(true);
 
         CreateTokenBoostRequestDto dto = CreateTokenBoostRequestDto.builder()
@@ -204,7 +206,7 @@ class TokenBoostRequestServiceImplTest {
                 .build();
 
         when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
-        when(tokenBoostRequestRepository.findById(reqId)).thenReturn(Optional.of(pendingReq));
+        when(tokenBoostRequestRepository.findByIdForUpdate(reqId)).thenReturn(Optional.of(pendingReq));
         when(tokenBoostRequestRepository.save(any(TokenBoostRequest.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ReviewTokenBoostRequestDto reviewDto = ReviewTokenBoostRequestDto.builder()
@@ -279,7 +281,7 @@ class TokenBoostRequestServiceImplTest {
                 .build();
 
         when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
-        when(tokenBoostRequestRepository.findById(reqId)).thenReturn(Optional.of(pendingReq));
+        when(tokenBoostRequestRepository.findByIdForUpdate(reqId)).thenReturn(Optional.of(pendingReq));
         when(tokenBoostRequestRepository.save(any(TokenBoostRequest.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // 1. Attempting direct APPROVE fails because teacher only has 500 left
@@ -328,7 +330,7 @@ class TokenBoostRequestServiceImplTest {
                 .build();
 
         when(userRepository.findById(otherTeacher.getUid())).thenReturn(Optional.of(otherTeacher));
-        when(tokenBoostRequestRepository.findById(reqId)).thenReturn(Optional.of(pendingReq));
+        when(tokenBoostRequestRepository.findByIdForUpdate(reqId)).thenReturn(Optional.of(pendingReq));
 
         ReviewTokenBoostRequestDto reviewDto = ReviewTokenBoostRequestDto.builder()
                 .action("APPROVE")
@@ -336,5 +338,78 @@ class TokenBoostRequestServiceImplTest {
 
         assertThrows(AccessDeniedException.class,
                 () -> tokenBoostRequestService.reviewBoostRequest(otherTeacherPrincipal, reqId, reviewDto));
+    }
+
+    @Test
+    @DisplayName("MSG38: a second request on the same day is refused even after the first one was approved")
+    void createBoostRequest_SecondRequestSameDayAfterApproval_ThrowsConflictAndChecksApprovedStatus() {
+        when(userRepository.findByIdForUpdate(student.getUid())).thenReturn(Optional.of(student));
+        when(classStudentRepository.findActiveClassroomsByStudentUid(student.getUid()))
+                .thenReturn(List.of(classroom));
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<java.util.Collection<TokenBoostRequestStatus>> statuses =
+                org.mockito.ArgumentCaptor.forClass(java.util.Collection.class);
+        when(tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatusIn(
+                org.mockito.ArgumentMatchers.eq(student.getUid()), org.mockito.ArgumentMatchers.eq(LocalDate.now()),
+                statuses.capture()))
+                .thenReturn(true);
+
+        CreateTokenBoostRequestDto dto = CreateTokenBoostRequestDto.builder()
+                .requestedTokens(500)
+                .reason("Xin thêm lần 2 sau khi đã được duyệt")
+                .build();
+
+        DataConflictException ex = assertThrows(DataConflictException.class,
+                () -> tokenBoostRequestService.createBoostRequest(studentPrincipal, dto));
+        assertTrue(ex.getMessage().contains("Mỗi ngày chỉ được gửi một yêu cầu"));
+        assertTrue(statuses.getValue().containsAll(List.of(
+                TokenBoostRequestStatus.PENDING, TokenBoostRequestStatus.PENDING_ADMIN, TokenBoostRequestStatus.APPROVED)));
+        assertFalse(statuses.getValue().contains(TokenBoostRequestStatus.REJECTED));
+        verify(tokenBoostRequestRepository, never()).save(any(TokenBoostRequest.class));
+    }
+
+    @Test
+    @DisplayName("Teacher cannot approve more tokens than the student asked for")
+    void reviewBoostRequest_ApproveMoreThanRequested_ThrowsAndGrantsNothing() {
+        UUID reqId = UUID.randomUUID();
+        TokenBoostRequest pendingReq = TokenBoostRequest.builder()
+                .id(reqId).school(school).classroom(classroom).student(student).requester(student)
+                .requesterRole(UserRole.SCHOOL_STUDENT).requestedTokens(500)
+                .status(TokenBoostRequestStatus.PENDING).requestDate(LocalDate.now())
+                .build();
+        when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
+        when(tokenBoostRequestRepository.findByIdForUpdate(reqId)).thenReturn(Optional.of(pendingReq));
+
+        ReviewTokenBoostRequestDto reviewDto = ReviewTokenBoostRequestDto.builder()
+                .action("APPROVE").approvedTokens(2000).build();
+
+        InvalidRequestException ex = assertThrows(InvalidRequestException.class,
+                () -> tokenBoostRequestService.reviewBoostRequest(teacherPrincipal, reqId, reviewDto));
+        assertTrue(ex.getMessage().contains("không được vượt quá số token đã xin"));
+        assertEquals(TokenBoostRequestStatus.PENDING, pendingReq.getStatus());
+        assertEquals(0, student.getDailyBonusTokens());
+    }
+
+    @Test
+    @DisplayName("ESCALATE keeps the amount the student asked for and stores a readable default note")
+    void reviewBoostRequest_EscalateIgnoresApprovedTokens() {
+        UUID reqId = UUID.randomUUID();
+        TokenBoostRequest pendingReq = TokenBoostRequest.builder()
+                .id(reqId).school(school).classroom(classroom).student(student).requester(student)
+                .requesterRole(UserRole.SCHOOL_STUDENT).requestedTokens(300)
+                .status(TokenBoostRequestStatus.PENDING).requestDate(LocalDate.now())
+                .build();
+        when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
+        when(tokenBoostRequestRepository.findByIdForUpdate(reqId)).thenReturn(Optional.of(pendingReq));
+        when(tokenBoostRequestRepository.save(any(TokenBoostRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReviewTokenBoostRequestDto escalateDto = ReviewTokenBoostRequestDto.builder()
+                .action("ESCALATE").approvedTokens(40000).build();
+
+        TokenBoostRequestResponse resp = tokenBoostRequestService.reviewBoostRequest(teacherPrincipal, reqId, escalateDto);
+
+        assertEquals(TokenBoostRequestStatus.PENDING_ADMIN, resp.getStatus());
+        assertEquals(300, resp.getRequestedTokens());
+        assertTrue(resp.getTeacherReviewNote().startsWith("Giáo viên đã hết hạn mức ngày"));
     }
 }

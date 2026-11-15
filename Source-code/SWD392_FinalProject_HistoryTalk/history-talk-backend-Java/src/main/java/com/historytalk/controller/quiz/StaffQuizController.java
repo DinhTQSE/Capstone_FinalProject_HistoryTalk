@@ -144,7 +144,7 @@ public class StaffQuizController {
 
     /**
      * PUT /staff/quizzes/:quizId/questions/:questionId
-     * Partial update â€” all fields optional.
+     * Partial update — all fields optional.
      */
     @PutMapping("/{quizId}/questions/{questionId}")
     @Operation(summary = "Update question", description = "Partially update a question. All fields are optional.")
@@ -229,8 +229,8 @@ public class StaffQuizController {
 
     /**
      * GET /staff/quizzes/sessions[?userId=...]
-     * Without userId  â†’ returns all users' completed sessions (paginated).
-     * With    userId  â†’ returns that specific user's completed sessions (paginated).
+     * Without userId  → returns all users' completed sessions (paginated).
+     * With    userId  → returns that specific user's completed sessions (paginated).
      */
     @GetMapping("/sessions")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
@@ -266,7 +266,7 @@ public class StaffQuizController {
             @PathVariable String sessionId) {
 
         log.info("GET /api/v1/staff/quizzes/sessions/{}", sessionId);
-        // userId = null â†’ admin mode, skip ownership check
+        // userId = null → admin mode, skip ownership check
         QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, null);
         return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
     }

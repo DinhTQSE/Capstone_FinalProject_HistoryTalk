@@ -22,4 +22,15 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getMessage()).isEqualTo("Invalid email or password");
         assertThat(response.getBody().getTimestamp()).isNotNull();
     }
+
+    @Test
+    void handleMaxUploadSize_returns413WithMessageInsteadOfEmptyBody() {
+        ResponseEntity<ErrorResponse> response = handler.handleMaxUploadSize(
+                new org.springframework.web.multipart.MaxUploadSizeExceededException(50L * 1024 * 1024));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().isSuccess()).isFalse();
+        assertThat(response.getBody().getMessage()).contains("50MB");
+    }
 }

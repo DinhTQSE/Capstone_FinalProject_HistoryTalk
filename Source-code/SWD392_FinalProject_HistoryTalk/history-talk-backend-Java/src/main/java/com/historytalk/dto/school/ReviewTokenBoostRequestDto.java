@@ -14,12 +14,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ReviewTokenBoostRequestDto {
 
-    @NotBlank(message = "Action must be APPROVE or REJECT")
+    @NotBlank(message = "Thao tác phải là APPROVE, REJECT hoặc ESCALATE")
     private String action;
 
-    @Min(value = 100, message = "Approved tokens must be at least 100")
+    @Min(value = 100, message = "Số token duyệt tối thiểu là 100")
     private Integer approvedTokens;
 
-    @Size(max = 500, message = "Review note must not exceed 500 characters")
+    @Size(max = 500, message = "Ghi chú tối đa 500 ký tự")
     private String reviewNote;
 }

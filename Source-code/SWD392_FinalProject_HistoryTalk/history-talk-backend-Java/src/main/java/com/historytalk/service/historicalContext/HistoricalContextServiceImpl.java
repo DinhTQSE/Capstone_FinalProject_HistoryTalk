@@ -19,6 +19,7 @@ import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.security.ContentAccessPolicy;
 import com.historytalk.service.map.MapPinService;
 import com.historytalk.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final MapPinService mapPinService;
         private final ObjectMapper objectMapper;
         private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
+        private final ContentAccessPolicy contentAccessPolicy;
         private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
     
     /**
@@ -90,28 +92,9 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
-        if (!isStaffOrAdmin(role)
-                && (!Boolean.TRUE.equals(context.getIsPublished()) || context.getDeletedAt() != null)) {
+        // Drafts, deleted rows and other schools' local content are hidden (reported as not found)
+        if (!contentAccessPolicy.canView(context, role)) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
-        }
-
-        // School-owned isolation check: local content cannot be viewed by outsiders
-        if (context.getSchool() != null && !isStaffOrAdmin(role)) {
-            String userId = SecurityUtils.getUserId();
-            UUID userSchoolId = null;
-            if (userId != null) {
-                try {
-                    userSchoolId = userRepository.findById(UUID.fromString(userId))
-                            .map(User::getSchool)
-                            .map(com.historytalk.entity.school.School::getId)
-                            .orElse(null);
-                } catch (Exception ex) {
-                    log.debug("Error retrieving user school: {}", ex.getMessage());
-                }
-            }
-            if (userSchoolId == null || !userSchoolId.equals(context.getSchool().getId())) {
-                throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
-            }
         }
         
         return mapToResponse(context);
@@ -133,6 +116,11 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
 
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
+        // Global contexts are created by content staff only; teachers use /teacher/local-contents
+        if (!isStaffOrAdmin(user.getRole() != null ? user.getRole().name() : null)) {
+            throw new InvalidRequestException("Bạn không có quyền tạo bối cảnh lịch sử");
+        }
 
         HistoricalContext context = HistoricalContext.builder()
                 .name(request.getName())
@@ -219,7 +207,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         if (request.getIsPublished() != null) {
             context.setIsPublished(request.getIsPublished());
         }
-        // battleMap: use a special sentinel check â€” only update when the key is
+        // battleMap: use a special sentinel check — only update when the key is
         // explicitly present in the request (non-absent). Since Jackson maps
         // absent JSON keys to null, we treat null as "do not change" here.
         // To explicitly clear the battle map, the client sends {"battleMap": null}
@@ -403,12 +391,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         }
 
         private boolean isStaffOrAdmin(String role) {
-            return role != null && (
-                    "CONTENT_ADMIN".equalsIgnoreCase(role)
-                            || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                            || "STAFF".equalsIgnoreCase(role)
-                            || "ADMIN".equalsIgnoreCase(role) || "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role)
-            );
+            return ContentAccessPolicy.isStaff(role);
         }
 
         private ContentStatus buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt) {
@@ -421,9 +404,9 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             return ContentStatus.ACTIVE;
         }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ────────────────────────────────────────────────────────────────────────
     // battleMap JSON helpers
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ────────────────────────────────────────────────────────────────────────
 
     private static final Set<String> VALID_BATTLE_MAP_MODES = Set.of("custom", "image");
 

@@ -13,6 +13,7 @@ import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.security.ContentAccessPolicy;
 import com.historytalk.service.historicalContext.strategy.DocumentProcessorFactory;
 import com.historytalk.service.historicalContext.strategy.DocumentProcessorStrategy;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
     private final DocumentProcessorFactory documentProcessorFactory;
     private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
     private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
+    private final ContentAccessPolicy contentAccessPolicy;
     
     /**
      * Get all documents
@@ -56,6 +58,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         boolean includeDeleted = isStaffOrAdmin(userRole);
         return documentRepository.findAllActive(EntityType.CHARACTER, includeDeleted)
             .stream()
+            .filter(contentAccessPolicy.documentFilter(userRole))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -70,6 +73,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         return documentRepository.findByEntityIdAndEntityTypeOrderByUploadDateDesc(
             UUID.fromString(characterId), EntityType.CHARACTER, includeDeleted)
             .stream()
+            .filter(contentAccessPolicy.documentFilter(userRole))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -84,6 +88,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         return documentRepository.findByUploadedByUidAndEntityTypeOrderByUploadDateDesc(
             UUID.fromString(userId), EntityType.CHARACTER, includeDeleted)
             .stream()
+            .filter(contentAccessPolicy.documentFilter(userRole))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -97,6 +102,7 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         boolean includeDeleted = isStaffOrAdmin(userRole);
         return documentRepository.search(normalize(search), EntityType.CHARACTER, includeDeleted)
             .stream()
+            .filter(contentAccessPolicy.documentFilter(userRole))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -114,7 +120,8 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
             throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
         }
 
-        if (!isStaffOrAdmin(userRole) && doc.getDeletedAt() != null) {
+        // Deleted documents and documents of drafts / other schools' local content are hidden
+        if (!contentAccessPolicy.canView(doc, userRole)) {
             throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
         }
 
@@ -261,11 +268,6 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && (
-                "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                        || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role) || "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role)
-        );
+        return ContentAccessPolicy.isStaff(role);
     }
 }

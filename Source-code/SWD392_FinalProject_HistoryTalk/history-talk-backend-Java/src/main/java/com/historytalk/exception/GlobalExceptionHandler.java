@@ -59,6 +59,19 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex);
     }
 
+    /** Upload larger than spring.servlet.multipart.max-file-size (MSG26) – previously a 413 with an empty body. */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .errorCode(HttpStatus.PAYLOAD_TOO_LARGE.value())
+                .message("Dung lượng file vượt quá giới hạn tối đa 50MB")
+                .status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(errorResponse);
+    }
+
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
         ErrorResponse errorResponse = ErrorResponse.builder()
