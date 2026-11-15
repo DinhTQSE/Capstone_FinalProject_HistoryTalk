@@ -14,6 +14,7 @@ import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.MessageRepository;
 import com.historytalk.repository.QuizSessionRepository;
@@ -133,7 +134,7 @@ class StudentAssignmentServiceImplTest {
                 .thenReturn(Optional.of(submission));
         when(chatSessionRepository.findActiveBySessionIdAndUserUid(chatSessionId, studentUid))
                 .thenReturn(Optional.of(chatSession));
-        when(messageRepository.countUserMessagesInSession(chatSessionId)).thenReturn(4L); // 4/5 tin nhắn -> 8.00 điểm
+        when(messageRepository.countAiMessagesInSession(chatSessionId)).thenReturn(4L); // 4/5 tin nhắn -> 8.00 điểm
 
         SubmitAssignmentRequest req = SubmitAssignmentRequest.builder()
                 .chatSessionId(chatSessionId)
@@ -354,7 +355,7 @@ class StudentAssignmentServiceImplTest {
                 .thenReturn(Optional.of(submission));
         when(chatSessionRepository.findByUserAndCharacter(studentUid, characterId))
                 .thenReturn(List.of(chatSession));
-        when(messageRepository.countUserMessagesInSession(chatSessionId)).thenReturn(5L);
+        when(messageRepository.countAiMessagesInSession(chatSessionId)).thenReturn(5L);
 
         StudentSubmissionResponse resp = studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal);
 
@@ -414,5 +415,107 @@ class StudentAssignmentServiceImplTest {
         assertNotNull(resp);
         assertEquals(SubmissionStatus.SUBMITTED, resp.getStatus());
         assertEquals(new BigDecimal("8.00"), resp.getScore());
+    }
+
+    @Test
+    @DisplayName("Chặn nộp lại phiên chat đã được sử dụng cho bài tập khác")
+    void testSubmitAssignment_AiChat_BlocksReusedChatSession() {
+        UUID characterId = UUID.randomUUID();
+        UUID chatSessionId = UUID.randomUUID();
+
+        Character character = new Character();
+        character.setCharacterId(characterId);
+
+        ChatSession chatSession = ChatSession.builder()
+                .sessionId(chatSessionId)
+                .character(character)
+                .user(student)
+                .build();
+
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
+                .targetId(characterId)
+                .minRequirement(5)
+                .deadline(LocalDateTime.now().plusDays(1))
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        SubmitAssignmentRequest req = new SubmitAssignmentRequest();
+        req.setChatSessionId(chatSessionId);
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+        when(chatSessionRepository.findActiveBySessionIdAndUserUid(chatSessionId, studentUid))
+                .thenReturn(Optional.of(chatSession));
+        when(assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(eq(chatSessionId), any()))
+                .thenReturn(true);
+
+        assertThrows(InvalidRequestException.class, () ->
+                studentAssignmentService.submitAssignment(assignmentId, req, studentPrincipal));
+    }
+
+    @Test
+    @DisplayName("Auto-resolve AI Chat bỏ qua phiên đã nộp ở bài khác và chọn phiên mới")
+    void testSubmitAssignment_AiChat_AutoResolveSkipsSubmittedSession() {
+        UUID characterId = UUID.randomUUID();
+        UUID usedSessionId = UUID.randomUUID();
+        UUID freshSessionId = UUID.randomUUID();
+
+        Character character = new Character();
+        character.setCharacterId(characterId);
+
+        ChatSession usedSession = ChatSession.builder()
+                .sessionId(usedSessionId)
+                .character(character)
+                .user(student)
+                .build();
+
+        ChatSession freshSession = ChatSession.builder()
+                .sessionId(freshSessionId)
+                .character(character)
+                .user(student)
+                .build();
+
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
+                .targetId(characterId)
+                .minRequirement(3)
+                .deadline(LocalDateTime.now().plusDays(1))
+                .status(AssignmentStatus.ACTIVE)
+                .build();
+
+        AssignmentSubmission submission = AssignmentSubmission.builder()
+                .id(UUID.randomUUID())
+                .assignment(assignment)
+                .student(student)
+                .status(SubmissionStatus.IN_PROGRESS)
+                .build();
+
+        when(assignmentSubmissionRepository.findByAssignmentIdAndStudentUid(assignmentId, studentUid))
+                .thenReturn(Optional.of(submission));
+        when(chatSessionRepository.findByUserAndCharacter(studentUid, characterId))
+                .thenReturn(List.of(usedSession, freshSession));
+        when(assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(eq(usedSessionId), any()))
+                .thenReturn(true);
+        when(assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(eq(freshSessionId), any()))
+                .thenReturn(false);
+        when(messageRepository.countAiMessagesInSession(freshSessionId)).thenReturn(3L);
+
+        StudentSubmissionResponse resp = studentAssignmentService.submitAssignment(assignmentId, null, studentPrincipal);
+
+        assertNotNull(resp);
+        assertEquals(SubmissionStatus.SUBMITTED, resp.getStatus());
+        assertEquals(3, resp.getMessageCount());
+        assertEquals(new BigDecimal("10.00"), resp.getScore());
+        assertEquals(freshSessionId, submission.getChatSessionId());
     }
 }

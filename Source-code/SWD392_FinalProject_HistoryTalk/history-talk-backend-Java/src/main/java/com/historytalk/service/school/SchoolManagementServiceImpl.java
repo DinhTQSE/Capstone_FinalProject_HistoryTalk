@@ -132,8 +132,19 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         int totalQuota = resolvePackageTokens(request.getPackageType());
         java.time.LocalDate today = java.time.LocalDate.now();
         int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
-        java.time.LocalDate subStart = java.time.LocalDate.of(academicStartYear, 9, 1);
-        java.time.LocalDate subEnd = java.time.LocalDate.of(academicStartYear + 1, 5, 31);
+
+        if (request.getSubscriptionStartDate() != null && request.getSubscriptionEndDate() != null) {
+            if (!request.getSubscriptionEndDate().isAfter(request.getSubscriptionStartDate())) {
+                throw new InvalidRequestException("Ngày kết thúc gói/năm học phải sau ngày bắt đầu.");
+            }
+        }
+
+        java.time.LocalDate subStart = request.getSubscriptionStartDate() != null
+                ? request.getSubscriptionStartDate()
+                : java.time.LocalDate.of(academicStartYear, 9, 1);
+        java.time.LocalDate subEnd = request.getSubscriptionEndDate() != null
+                ? request.getSubscriptionEndDate()
+                : java.time.LocalDate.of(academicStartYear + 1, 5, 31);
         int defaultDailyQuota = request.getPackageType() != null ? request.getPackageType().getDefaultDailyQuota() : 5000;
         int defaultDailyTeacherQuota = request.getPackageType() != null ? request.getPackageType().getDefaultDailyTeacherQuota() : 5000;
 

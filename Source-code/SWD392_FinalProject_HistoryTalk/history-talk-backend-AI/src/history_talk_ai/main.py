@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from history_talk_ai.common.config.settings import settings
 from history_talk_ai.common.metrics import PrometheusMetricsMiddleware, metrics_endpoint
+from history_talk_ai.presentation.authoring import router as authoring_router
 from history_talk_ai.presentation.chat import router as chat_router
 
 app = FastAPI(
@@ -43,6 +44,7 @@ app.add_middleware(
 )
 
 app.include_router(chat_router.router)
+app.include_router(authoring_router.router)
 
 
 @app.get("/health", tags=["Health"])

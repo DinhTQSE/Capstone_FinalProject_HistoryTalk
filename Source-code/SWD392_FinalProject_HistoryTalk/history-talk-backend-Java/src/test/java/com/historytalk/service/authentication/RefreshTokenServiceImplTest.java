@@ -86,6 +86,7 @@ class RefreshTokenServiceImplTest {
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(existingToken));
+        when(refreshTokenRepository.markRevokedIfActive(existingToken.getTokenId())).thenReturn(1);
         when(jwtService.generateAccessToken(eq(user.getEmail()), anyMap())).thenReturn("new-access-token");
         when(jwtService.getAccessTokenExpirationMs()).thenReturn(900000L);
 

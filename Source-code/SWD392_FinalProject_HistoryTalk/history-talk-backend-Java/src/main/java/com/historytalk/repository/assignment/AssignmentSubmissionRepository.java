@@ -34,6 +34,8 @@ public interface AssignmentSubmissionRepository extends JpaRepository<Assignment
 
     List<AssignmentSubmission> findByAssignmentIdAndStatus(UUID assignmentId, SubmissionStatus status);
 
+    boolean existsByChatSessionIdAndStatusIn(UUID chatSessionId, Collection<SubmissionStatus> statuses);
+
     @Query(
             value = "SELECT s FROM AssignmentSubmission s " +
                     "JOIN FETCH s.assignment a " +

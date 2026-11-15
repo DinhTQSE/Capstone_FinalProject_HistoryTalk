@@ -2,6 +2,7 @@ package com.historytalk.repository.payment;
 
 import com.historytalk.entity.enums.PaymentFulfillmentStatus;
 import com.historytalk.entity.enums.PaymentOrderStatus;
+import com.historytalk.entity.enums.PaymentOrderType;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.repository.dashboard.DashboardPeriodRevenueProjection;
 import com.historytalk.repository.dashboard.DashboardStatusCountProjection;
@@ -72,7 +73,8 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Query(value = """
         SELECT o FROM PaymentOrder o
         JOIN FETCH o.user u
-        JOIN FETCH o.tier t
+        LEFT JOIN FETCH o.tier t
+        LEFT JOIN FETCH o.school s
         WHERE o.deletedAt IS NULL
           AND (:status IS NULL OR o.status = :status)
           AND (:userId IS NULL OR u.uid = :userId)
@@ -87,6 +89,26 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     Page<PaymentOrder> findAllForAdmin(
             @Param("status") PaymentOrderStatus status,
             @Param("userId") UUID userId,
+            Pageable pageable
+    );
+
+    @Query(value = """
+        SELECT o FROM PaymentOrder o
+        LEFT JOIN FETCH o.school s
+        WHERE o.school.id = :schoolId
+          AND o.orderType = :orderType
+          AND o.deletedAt IS NULL
+        ORDER BY o.createdAt DESC
+    """,
+    countQuery = """
+        SELECT COUNT(o) FROM PaymentOrder o
+        WHERE o.school.id = :schoolId
+          AND o.orderType = :orderType
+          AND o.deletedAt IS NULL
+    """)
+    Page<PaymentOrder> findBySchoolIdAndOrderTypeOrderByCreatedAtDesc(
+            @Param("schoolId") UUID schoolId,
+            @Param("orderType") PaymentOrderType orderType,
             Pageable pageable
     );
 

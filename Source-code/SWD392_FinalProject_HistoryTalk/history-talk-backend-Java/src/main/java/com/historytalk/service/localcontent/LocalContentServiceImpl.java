@@ -85,6 +85,9 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final com.historytalk.repository.DocumentMediaMetadataRepository mediaMetadataRepository;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.historytalk.repository.assignment.AssignmentRepository assignmentRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.historytalk.service.document.PdfExtractionService pdfExtractionService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -177,6 +180,10 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         User teacher = resolveUser(principal);
         HistoricalContext ctx = findLocalContextOwned(contextId, school.getId(), teacher.getUid());
+        ensureNotReferencedByAssignment(
+                com.historytalk.entity.enums.AssignmentType.CONTEXT_READING,
+                ctx.getContextId(),
+                "Không thể xóa bối cảnh vì đang có bài tập giao cho học sinh sử dụng. Vui lòng hủy bài tập trước.");
         ctx.setDeletedAt(LocalDateTime.now());
         localContextRepo.save(ctx);
         log.info("Teacher {} soft-deleted local context {}", teacher.getUid(), ctx.getContextId());
@@ -331,6 +338,10 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         User teacher = resolveUser(principal);
         Character character = findLocalCharacterOwned(characterId, school.getId(), teacher.getUid());
+        ensureNotReferencedByAssignment(
+                com.historytalk.entity.enums.AssignmentType.AI_CHAT_ROLEPLAY,
+                character.getCharacterId(),
+                "Không thể xóa nhân vật vì đang có bài tập giao cho học sinh sử dụng. Vui lòng hủy bài tập trước.");
         character.setDeletedAt(LocalDateTime.now());
         localCharacterRepo.save(character);
         log.info("Teacher {} soft-deleted local character {}", teacher.getUid(), character.getCharacterId());
@@ -1523,9 +1534,24 @@ public class LocalContentServiceImpl implements LocalContentService {
         getLocalQuizById(quizId, principal); // validates school ownership
         var quiz = quizRepository.findById(UUID.fromString(quizId))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found"));
-        quiz.setIsPublished(!Boolean.TRUE.equals(quiz.getIsPublished()));
+        boolean nextPublished = !Boolean.TRUE.equals(quiz.getIsPublished());
+        if (!nextPublished) {
+            ensureNotReferencedByAssignment(
+                    com.historytalk.entity.enums.AssignmentType.QUIZ_TEST,
+                    quiz.getQuizId(),
+                    "Không thể ẩn bộ đề vì đang có bài tập giao cho học sinh sử dụng. Vui lòng hủy bài tập trước.");
+        }
+        quiz.setIsPublished(nextPublished);
         quizRepository.save(quiz);
         return quizService.getQuizByIdForStaff(quizId);
+    }
+
+    private void ensureNotReferencedByAssignment(
+            com.historytalk.entity.enums.AssignmentType type, UUID targetId, String message) {
+        if (assignmentRepository != null && assignmentRepository.existsByAssignmentTypeAndTargetIdAndStatusNotAndDeletedAtIsNull(
+                type, targetId, com.historytalk.entity.enums.AssignmentStatus.CANCELLED)) {
+            throw new InvalidRequestException(message);
+        }
     }
 
     @Override

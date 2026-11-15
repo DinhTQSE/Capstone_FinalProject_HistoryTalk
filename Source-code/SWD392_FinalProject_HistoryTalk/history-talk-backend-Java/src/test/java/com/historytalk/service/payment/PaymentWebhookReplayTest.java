@@ -10,6 +10,7 @@ import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.user.User;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.repository.payment.PaymentOrderRepository;
 import com.historytalk.repository.payment.PaymentTransactionRepository;
 import com.historytalk.repository.payment.UserTierRepository;
@@ -54,6 +55,8 @@ class PaymentWebhookReplayTest {
     private UserTierRepository userTierRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private SchoolRepository schoolRepository;
 
     private PaymentWebhookService webhookService;
     private PaymentOrder order;
@@ -107,7 +110,7 @@ class PaymentWebhookReplayTest {
         lenient().when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         PaymentFulfillmentService fulfillmentService =
-                new PaymentFulfillmentService(paymentOrderRepository, userTierRepository, userRepository);
+                new PaymentFulfillmentService(paymentOrderRepository, userTierRepository, userRepository, schoolRepository);
         webhookService = new PaymentWebhookService(
                 paymentOrderRepository, paymentTransactionRepository, fulfillmentService, new ObjectMapper());
     }

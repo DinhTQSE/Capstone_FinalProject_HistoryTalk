@@ -12,6 +12,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -68,6 +69,18 @@ public class B2bQuoteRequest {
     private Integer numberOfTeachers;
 
     @Builder.Default
+    @Column(name = "academic_weeks")
+    private Integer academicWeeks = 35;
+
+    @Builder.Default
+    @Column(name = "student_days_per_week")
+    private Integer studentDaysPerWeek = 4;
+
+    @Builder.Default
+    @Column(name = "teacher_days_per_week")
+    private Integer teacherDaysPerWeek = 6;
+
+    @Builder.Default
     @Column(name = "student_daily_token_limit", nullable = false)
     private Integer studentDailyTokenLimit = 5000;
 
@@ -97,6 +110,12 @@ public class B2bQuoteRequest {
 
     @Column(name = "final_price_vnd", nullable = false)
     private Long finalPriceVnd;
+
+    @Column(name = "subscription_start_date")
+    private LocalDate subscriptionStartDate;
+
+    @Column(name = "subscription_end_date")
+    private LocalDate subscriptionEndDate;
 
     @Column(name = "promo_code", length = 50)
     private String promoCode;

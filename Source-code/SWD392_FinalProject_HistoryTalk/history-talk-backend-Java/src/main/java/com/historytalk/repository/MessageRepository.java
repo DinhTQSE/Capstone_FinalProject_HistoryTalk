@@ -26,6 +26,9 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chatSession.sessionId = :sessionId AND m.isFromAi = false AND m.deletedAt IS NULL")
     long countUserMessagesInSession(@Param("sessionId") UUID sessionId);
 
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chatSession.sessionId = :sessionId AND m.isFromAi = true AND m.deletedAt IS NULL")
+    long countAiMessagesInSession(@Param("sessionId") UUID sessionId);
+
     @Query("""
             SELECT m.chatSession.sessionId, COUNT(m)
             FROM Message m

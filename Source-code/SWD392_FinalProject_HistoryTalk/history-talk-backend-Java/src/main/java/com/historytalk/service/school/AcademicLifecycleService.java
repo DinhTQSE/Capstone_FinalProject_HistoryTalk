@@ -17,6 +17,9 @@ public interface AcademicLifecycleService {
 
     SchoolResponse renewSchoolSubscription(UUID schoolId, RenewSchoolSubscriptionRequest request);
 
+    SchoolResponse renewSchoolSubscriptionForSchoolAdmin(
+            UserPrincipal schoolAdminPrincipal, RenewSchoolSubscriptionRequest request);
+
     SchoolResponse activateRenewedSubscription(UUID schoolId, LocalDate referenceDate);
 
     SchoolResponse topUpSchoolTokens(UUID schoolId, TopUpSchoolTokensRequest request);

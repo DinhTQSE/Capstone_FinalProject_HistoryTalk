@@ -32,9 +32,10 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
 
     List<Character> findByCreatedByUidOrderByNameAsc(UUID uid);
 
-    boolean existsByNameIgnoreCase(String name);
+    /** Name uniqueness is checked among global characters only, so local characters may reuse a global name. */
+    boolean existsByNameIgnoreCaseAndSchoolIsNull(String name);
 
-    boolean existsByNameIgnoreCaseAndCharacterIdNot(String name, UUID characterId);
+    boolean existsByNameIgnoreCaseAndSchoolIsNullAndCharacterIdNot(String name, UUID characterId);
 
     @Query(value = """
             SELECT DISTINCT c FROM Character c

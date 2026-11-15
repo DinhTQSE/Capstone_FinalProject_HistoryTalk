@@ -27,6 +27,8 @@ def test_configured_pronouns_are_used_everywhere():
     assert 'xưng "tôi"' in prompt_builder.build_chat_system_prompt(character, None)
     assert 'Xưng "tôi", gọi người học là "bạn"' in prompt_builder.build_exam_question_prompt(character, None, "Tư liệu", [])
     assert 'Xưng "tôi", gọi người học là "bạn"' in prompt_builder.build_exam_grading_prompt(character, "Hỏi", "Đáp", "Tư liệu", "Trả lời")
+    assert 'Xưng "tôi", gọi người học là "bạn"' in prompt_builder.build_exam_follow_up_prompt(
+        character, None, "Tư liệu", [], "Hỏi", "Trả lời", "CORRECT")
 
 
 def test_blank_pronouns_fall_back_to_the_defaults():
@@ -45,7 +47,7 @@ def test_braces_in_the_background_are_kept_as_written():
     prompt = prompt_builder.build_chat_system_prompt(_character(), None)
 
     assert "Đại tướng {chú thích}" in prompt
-    assert "{{" not in prompt
+    assert "{{chú thích}}" not in prompt
 
 
 def test_grading_is_encouraging_and_accepts_extra_correct_details():

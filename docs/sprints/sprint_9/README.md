@@ -9,6 +9,8 @@
 ## 📂 TÀI LIỆU
 
 * 📦 **[chat_exam_mode_api_contract.md](fe_contracts/chat_exam_mode_api_contract.md):** API, việc FE cần làm và các thay đổi hành vi của chat. **FE đọc file này để tích hợp.**
+* 📝 **[exam_streaming_fe_tasks.md](fe_contracts/exam_streaming_fe_tasks.md):** Việc FE web và mobile cần sửa khi vấn đáp chuyển sang chạy chữ.
+* 🎬 **[ai_story_battle_map_api_contract.md](fe_contracts/ai_story_battle_map_api_contract.md):** API AI sinh kịch bản kể chuyện, kế hoạch lược đồ trận đánh và đoán vị trí điểm mốc trên ảnh.
 * 📑 **[b2b_custom_plan_and_quote_flow_api_contract.md](fe_contracts/b2b_custom_plan_and_quote_flow_api_contract.md):** API Contract cho Bảng giá B2B Customize, Live Quote Calculator, Form Đăng ký Báo giá (Humy.ai style) và Cổng System Admin duyệt báo giá khởi tạo trường học.
 * 🏫 **[b2b_subscription_pricing_and_quote_specification.md](business_flows/b2b_subscription_pricing_and_quote_specification.md):** Đặc tả chi tiết Unit Economics, bảng giá toàn bộ gói B2C & B2B (đã nới lỏng quota Học sinh/Giáo viên), công thức tính giá Customize B2B Plan, luồng đăng ký `Request a Quote` (tham khảo Humy.ai) và kế hoạch Unit/Integration Test cho Report 5.
 
@@ -18,7 +20,7 @@
 
 ### 1. Chế độ vấn đáp (commit `f311b94`, `1422df3`)
 * Session có thêm `mode` (`CHAT` hoặc `EXAM`) và `examQuestionCount`.
-* AI service có thêm `POST /v1/ai/exam/question` và `POST /v1/ai/exam/grade`. Hai API này chỉ Java gọi, FE không gọi trực tiếp.
+* AI service có thêm `POST /v1/ai/exam/question` và `POST /v1/ai/exam/grade` (sau đó `exam/grade` được thay bằng stream, xem mục 9). Các API này chỉ Java gọi, FE không gọi trực tiếp.
 * Đáp án và tư liệu của câu đang hỏi không bao giờ trả về client.
 * Bỏ việc nhân vật ngẫu nhiên hỏi ngược trong chat thường.
 * Migration: `V20261105100000__add_exam_mode_to_chat.sql`.
@@ -71,6 +73,34 @@
 * Luật RAG được rút gọn. Tiểu sử chỉ giữ 200 ký tự đầu của mỗi bối cảnh. Bỏ `_esc` làm nhân đôi dấu ngoặc nhọn.
 * Token đầu vào vẫn được chia 10 khi trừ token của người dùng.
 
+### 9. Vấn đáp chạy chữ và hỏi nối tiếp câu trả lời
+* AI service thay `POST /v1/ai/exam/grade` bằng `POST /v1/ai/exam/turn/stream`: stream lời nhận xét, rồi `---` và câu hỏi tiếp theo. Chỉ Java gọi API này.
+* Câu tiếp theo không sinh sẵn. AI tìm tư liệu bằng câu vừa hỏi và câu trả lời của người học, rồi đặt câu hỏi nối tiếp. Trả lời sai thì hỏi một ý liên quan dễ hơn.
+* Model ghi `KẾT QUẢ: ...` ở dòng đầu khi chấm, và `ĐÁP ÁN: ...` sau câu hỏi. AI service giữ hai phần này lại, nên kết quả chấm và đáp án không lọt vào stream.
+* Java chuyển tiếp chữ cho client, lưu lượt vấn đáp khi stream xong rồi gửi `metadata` (`examVerdict`, `exam`). `POST /chat/messages` dùng chung luồng này nhưng chờ xong mới trả về.
+* Câu hỏi đầu tiên vẫn được tạo lúc tạo session, vì lúc đó chưa có câu trả lời nào.
+* Web đã chuyển câu trả lời vấn đáp sang API stream. Mobile vẫn cần sửa, xem mục 3 của contract.
+
+### 10. Dùng LLM qua Amazon Bedrock
+* `LLM_PROVIDER=external` gọi Chat Completions kiểu OpenAI, dùng cho GPT trên Bedrock. Cấu hình: `EXTERNAL_API_BASE_URL`, `EXTERNAL_API_KEY`, `LLM_MODEL`, `EXTERNAL_REASONING_EFFORT` (mặc định `low`, để trống thì dùng mặc định của model).
+* Token đầu vào vẫn chia 10 như Ollama. Stream gửi `stream_options.include_usage` để lấy số token.
+* Model từ chối tham số nào (`temperature`, `reasoning_effort`, `response_format`, `max_completion_tokens`) thì AI service bỏ hoặc đổi tham số đó và gọi lại, các lần sau không gửi nữa.
+* Embedding `bge-m3`, reranker và giọng đọc vẫn chạy trên VM GPU, nên VM vẫn phải bật.
+* Quay lại Ollama: đặt `LLM_PROVIDER=ollama` rồi restart AI service.
+
+### 11. Vấn đáp về cuộc trò chuyện
+* Tạo session vấn đáp với `sourceSessionId` của một session chat: câu hỏi lấy từ các đoạn tư liệu nhân vật đã dùng trong cuộc chat đó, câu nối tiếp ưu tiên đoạn gần với câu trả lời của người học.
+* Session chat giữ nguyên, vấn đáp xong web có nút "Quay lại phỏng vấn". Chi tiết ở mục 9 của contract.
+* Migration: `V20261112140000__add_source_session_to_chat_session.sql`.
+* Bỏ được nhãn "Lời nhận xét:" khi model ghi khác "NHẬN XÉT:".
+
+### 12. AI soạn kịch bản kể chuyện và lược đồ trận đánh
+* AI service: `POST /v1/ai/story/generate` (4 mode), `/battle-map/plan`, `/battle-map/locate-anchors`, `GET`/`DELETE /jobs/{id}`. Sinh dài chạy dạng job trong bộ nhớ, giữ 30 phút.
+* Viết từ tối đa 12 đoạn tài liệu của bối cảnh và nhân vật, bắt trích `sources`, kiểm tra theo luật của editor, sai thì cho model sửa 1 lần, vẫn sai thì trả kèm `warnings`.
+* Đoán vị trí điểm mốc dùng `qwen3.8:27b` (có thị giác) trên server GPU, cấu hình bằng `LOCATE_MODEL`.
+* Java: proxy `/api/v1/ai-authoring/**` cho `CONTENT_ADMIN` và `TEACHER`, tự gắn dữ liệu bối cảnh và nhân vật, tắt open-in-view cho đường dẫn này.
+* Chưa có phần lưu kịch bản xuống Java.
+
 ---
 
 ## 🧪 KẾT QUẢ KIỂM THỬ TRÊN PRODUCTION (05/11/2026)
@@ -95,7 +125,7 @@
 * [ ] FE web và mobile tích hợp vấn đáp và xử lý lỗi `INAPPROPRIATE_CONTENT`.
 * [ ] Mobile chuyển giọng đọc sang `POST /chat/tts`, trang quản lý nhân vật thêm chọn giọng, và đặt giọng nữ cho nhân vật nữ.
 * [ ] Giảm thời gian tới chữ đầu tiên: rút ngắn prompt, đo log `Chat stream timing`.
-* [ ] Giảm thời gian mỗi lượt vấn đáp: sinh sẵn câu hỏi khi tạo session.
+* [ ] Đo lại thời gian tới chữ đầu tiên của vấn đáp sau khi chuyển sang stream.
 * [ ] Chỉnh prompt chấm: bớt khắt khe, giọng khích lệ, không hỏi kiểu "Theo ngươi".
 * [ ] Lời chào cố định, tránh sai sử khi tự sinh.
 * [ ] Lọc nội dung nhạy cảm, lạc đề và prompt injection bằng LLM (hiện chỉ có lọc từ tục).

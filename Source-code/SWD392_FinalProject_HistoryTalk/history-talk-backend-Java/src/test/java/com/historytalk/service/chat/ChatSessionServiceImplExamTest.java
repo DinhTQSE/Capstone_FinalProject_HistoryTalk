@@ -42,6 +42,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -94,7 +95,7 @@ class ChatSessionServiceImplExamTest {
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(characterRepository.findById(characterId)).thenReturn(Optional.of(character));
-        when(chatSessionRepository.save(any(ChatSession.class))).thenAnswer(invocation -> {
+        lenient().when(chatSessionRepository.save(any(ChatSession.class))).thenAnswer(invocation -> {
             ChatSession session = invocation.getArgument(0);
             session.setSessionId(UUID.randomUUID());
             return session;
@@ -186,6 +187,41 @@ class ChatSessionServiceImplExamTest {
 
         assertThat(response.getMode()).isEqualTo("CHAT");
         assertThat(response.getExamQuestionCount()).isNull();
+        verify(examSessionService, never()).startExam(any());
+    }
+
+    @Test
+    void examCanBeStartedFromTheLearnersChatWithTheSameCharacter() {
+        UUID chatId = UUID.randomUUID();
+        ChatSession chat = ChatSession.builder()
+                .sessionId(chatId)
+                .mode(ChatSessionMode.CHAT)
+                .character(Character.builder().characterId(characterId).build())
+                .build();
+        when(chatSessionRepository.findActiveBySessionIdAndUserUid(chatId, userId)).thenReturn(Optional.of(chat));
+        ReflectionTestUtils.setField(request, "mode", ChatSessionMode.EXAM);
+        ReflectionTestUtils.setField(request, "sourceSessionId", chatId.toString());
+        when(examSessionService.startExam(any(UUID.class))).thenReturn(Message.builder().content("Câu hỏi 1?").build());
+
+        ChatSessionResponse response = chatSessionService.createSession(userId.toString(), "USER", request);
+
+        assertThat(response.getSourceSessionId()).isEqualTo(chatId.toString());
+    }
+
+    @Test
+    void examCannotBeStartedFromAnotherCharactersChat() {
+        UUID chatId = UUID.randomUUID();
+        ChatSession chat = ChatSession.builder()
+                .sessionId(chatId)
+                .mode(ChatSessionMode.CHAT)
+                .character(Character.builder().characterId(UUID.randomUUID()).build())
+                .build();
+        when(chatSessionRepository.findActiveBySessionIdAndUserUid(chatId, userId)).thenReturn(Optional.of(chat));
+        ReflectionTestUtils.setField(request, "mode", ChatSessionMode.EXAM);
+        ReflectionTestUtils.setField(request, "sourceSessionId", chatId.toString());
+
+        assertThatThrownBy(() -> chatSessionService.createSession(userId.toString(), "USER", request))
+                .isInstanceOf(InvalidRequestException.class);
         verify(examSessionService, never()).startExam(any());
     }
 

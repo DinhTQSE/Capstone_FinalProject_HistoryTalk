@@ -12,8 +12,6 @@ public interface JwtService {
 
     String generateAccessToken(String email, Map<String, Object> extraClaims);
 
-    String generateRefreshToken(String email);
-
     String extractEmail(String token);
 
     Claims extractAllClaims(String token);

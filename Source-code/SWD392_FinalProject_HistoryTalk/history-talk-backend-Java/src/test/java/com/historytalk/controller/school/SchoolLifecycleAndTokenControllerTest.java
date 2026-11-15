@@ -111,6 +111,35 @@ class SchoolLifecycleAndTokenControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/school-admin/subscription/renew returns 200 OK")
+    void schoolAdminRenewSubscription_Returns200() throws Exception {
+        RenewSchoolSubscriptionRequest request = RenewSchoolSubscriptionRequest.builder()
+                .packageType(EnterprisePackage.ENTERPRISE_CUSTOM)
+                .customTokenQuota(1_500_000_000)
+                .referenceDate(LocalDate.of(2026, 5, 10))
+                .build();
+
+        SchoolResponse mockResponse = SchoolResponse.builder()
+                .id(UUID.randomUUID())
+                .name("THPT Chu Văn An")
+                .renewedForNextYear(true)
+                .nextPackageType(EnterprisePackage.ENTERPRISE_CUSTOM)
+                .nextCustomTokenQuota(1_500_000_000)
+                .status(SchoolStatus.ACTIVE)
+                .build();
+
+        when(academicLifecycleService.renewSchoolSubscriptionForSchoolAdmin(any(), any())).thenReturn(mockResponse);
+
+        mockMvc.perform(post("/api/v1/school-admin/subscription/renew")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.renewedForNextYear").value(true))
+                .andExpect(jsonPath("$.data.nextPackageType").value("ENTERPRISE_CUSTOM"))
+                .andExpect(jsonPath("$.data.nextCustomTokenQuota").value(1500000000));
+    }
+
+    @Test
     @DisplayName("POST /api/v1/admin/schools/{id}/top-up returns 200 OK")
     void topUpSchoolTokens_Returns200() throws Exception {
         UUID schoolId = UUID.randomUUID();

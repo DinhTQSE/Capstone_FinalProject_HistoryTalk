@@ -248,6 +248,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .title(isExam ? "Vấn đáp với " + character.getName() : "")
                 .mode(isExam ? ChatSessionMode.EXAM : ChatSessionMode.CHAT)
                 .examQuestionCount(isExam ? resolveExamQuestionCount(user, request) : null)
+                .sourceSessionId(isExam ? resolveSourceSession(user, character, request) : null)
                 .build();
 
         ChatSession saved = chatSessionRepository.save(session);
@@ -318,7 +319,28 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .messageCount(messageCount)
                 .mode(session.getMode().name())
                 .examQuestionCount(session.getExamQuestionCount())
+                .sourceSessionId(session.getSourceSessionId() != null ? session.getSourceSessionId().toString() : null)
                 .build();
+    }
+
+    /** The chat an exam is started from must be the learner's own conversation with the same character. */
+    private UUID resolveSourceSession(User user, Character character, CreateChatSessionRequest request) {
+        if (request.getSourceSessionId() == null || request.getSourceSessionId().isBlank()) {
+            return null;
+        }
+        UUID sourceId;
+        try {
+            sourceId = UUID.fromString(request.getSourceSessionId());
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException("Phiên trò chuyện nguồn không hợp lệ.");
+        }
+        ChatSession source = chatSessionRepository.findActiveBySessionIdAndUserUid(sourceId, user.getUid())
+                .orElseThrow(() -> new InvalidRequestException("Không tìm thấy phiên trò chuyện để vấn đáp."));
+        if (source.getMode() != ChatSessionMode.CHAT
+                || !character.getCharacterId().equals(source.getCharacter().getCharacterId())) {
+            throw new InvalidRequestException("Chỉ vấn đáp được từ cuộc trò chuyện với cùng nhân vật.");
+        }
+        return sourceId;
     }
 
     /**

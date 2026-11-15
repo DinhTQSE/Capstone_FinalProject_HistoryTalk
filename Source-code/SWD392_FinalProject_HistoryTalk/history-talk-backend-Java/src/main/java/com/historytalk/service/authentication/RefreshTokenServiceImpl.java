@@ -2,6 +2,7 @@ package com.historytalk.service.authentication;
 
 import com.historytalk.dto.authentication.RefreshTokenResponse;
 import com.historytalk.entity.authentication.RefreshToken;
+import com.historytalk.entity.enums.AccountStatus;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.authentication.RefreshTokenRepository;
@@ -85,13 +86,19 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
 
         User user = oldToken.getUser();
-        if (user.getDeletedAt() != null) {
+        if (user.getDeletedAt() != null || user.getAccountStatus() == AccountStatus.DEACTIVATED) {
             throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
         }
 
         // 3. Xoay vòng token hợp lệ: Hủy token cũ
         oldToken.setRevoked(true);
-        refreshTokenRepository.save(oldToken);
+        int updated = refreshTokenRepository.markRevokedIfActive(oldToken.getTokenId());
+        if (updated == 0) {
+            log.warn("SECURITY ALERT: Phát hiện race condition / tái sử dụng Refresh Token! FamilyId: {}, User: {}",
+                    oldToken.getFamilyId(), user.getEmail());
+            refreshTokenRepository.revokeFamily(oldToken.getFamilyId());
+            throw new UnauthorizedException("Cảnh báo an ninh: Refresh token đã bị thu hồi trước đó. Toàn bộ phiên làm việc liên quan đã bị hủy.");
+        }
 
         // 4. Sinh token mới kế thừa cùng familyId
         String newRawRefreshToken = generateSecureRandomToken();

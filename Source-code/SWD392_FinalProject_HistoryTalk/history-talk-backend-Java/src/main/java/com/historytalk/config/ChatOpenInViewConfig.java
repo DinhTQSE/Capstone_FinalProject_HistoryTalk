@@ -9,9 +9,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Keeps open-in-view for the whole API except chat. Open-in-view holds a database connection for the
- * entire request, and chat requests wait seconds to minutes for the LLM while the pool is small.
- * Chat services therefore open their own short transactions around database work.
+ * Keeps open-in-view for the whole API except chat and AI authoring. Open-in-view holds a database connection for the
+ * entire request, and these requests wait seconds to minutes for the LLM while the pool is small.
+ * Their services therefore open their own short transactions around database work.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -24,7 +24,7 @@ public class ChatOpenInViewConfig implements WebMvcConfigurer {
         entityManagerFactory.ifAvailable(factory -> {
             OpenEntityManagerInViewInterceptor interceptor = new OpenEntityManagerInViewInterceptor();
             interceptor.setEntityManagerFactory(factory);
-            registry.addWebRequestInterceptor(interceptor).excludePathPatterns("/api/v1/chat/**");
+            registry.addWebRequestInterceptor(interceptor).excludePathPatterns("/api/v1/chat/**", "/api/v1/ai-authoring/**");
         });
     }
 }

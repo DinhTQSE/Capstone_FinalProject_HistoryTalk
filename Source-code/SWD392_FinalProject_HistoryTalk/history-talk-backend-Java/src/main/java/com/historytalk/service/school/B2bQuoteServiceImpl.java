@@ -135,14 +135,57 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
 
         EnterprisePackage resolvedPkg = resolvePackageType(request.getSelectedPackage(), students, teachers);
 
-        long totalStudentTokens = students * STUDENT_TOKENS_PER_YEAR;
-        long totalTeacherTokens = teachers * TEACHER_TOKENS_PER_YEAR;
+        if (request.getSubscriptionStartDate() != null && request.getSubscriptionEndDate() != null) {
+            if (!request.getSubscriptionEndDate().isAfter(request.getSubscriptionStartDate())) {
+                throw new InvalidRequestException("Ngày kết thúc năm học/gói phải sau ngày bắt đầu.");
+            }
+        }
+
+        LocalDate subStart = request.getSubscriptionStartDate();
+        LocalDate subEnd = request.getSubscriptionEndDate();
+        if (subStart == null || subEnd == null) {
+            LocalDate today = LocalDate.now();
+            int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
+            subStart = LocalDate.of(academicStartYear, 9, 1);
+            subEnd = LocalDate.of(academicStartYear + 1, 5, 31);
+        }
+
+        int academicWeeks = request.getAcademicWeeks() != null
+                ? request.getAcademicWeeks()
+                : ACADEMIC_WEEKS_PER_YEAR;
+
+        int studentDailyLimit = request.getStudentDailyTokenLimit() != null
+                ? request.getStudentDailyTokenLimit()
+                : STUDENT_DAILY_TOKEN_LIMIT;
+
+        int teacherDailyLimit = request.getTeacherDailyTokenLimit() != null
+                ? request.getTeacherDailyTokenLimit()
+                : TEACHER_DAILY_TOKEN_LIMIT;
+
+        int studentDaysPerWeek = request.getStudentDaysPerWeek() != null
+                ? request.getStudentDaysPerWeek()
+                : STUDENT_ACTIVE_DAYS_PER_WEEK;
+
+        int teacherDaysPerWeek = request.getTeacherDaysPerWeek() != null
+                ? request.getTeacherDaysPerWeek()
+                : TEACHER_ACTIVE_DAYS_PER_WEEK;
+
+        long studentTokensPerYear = (long) studentDailyLimit * studentDaysPerWeek * academicWeeks;
+        long teacherTokensPerYear = (long) teacherDailyLimit * teacherDaysPerWeek * academicWeeks;
+
+        long totalStudentTokens = (long) students * studentTokensPerYear;
+        long totalTeacherTokens = (long) teachers * teacherTokensPerYear;
         long totalTokenPool = totalStudentTokens + totalTeacherTokens;
 
         // Exact arithmetic: totalTokenPool * 0.15 VND = totalTokenPool * 15 / 100
         long aiTokenCostVnd = (totalTokenPool * 15L) / 100L;
-        long studentDbCost = students * STUDENT_DB_AND_QUIZ_FEE_VND;
-        long teacherLmsCost = teachers * TEACHER_LMS_AND_STORAGE_FEE_VND;
+
+        // DB & LMS base cost prorated according to academic weeks (standard 35 weeks)
+        long studentDbFeeProrated = Math.round((double) STUDENT_DB_AND_QUIZ_FEE_VND * academicWeeks / ACADEMIC_WEEKS_PER_YEAR);
+        long teacherLmsFeeProrated = Math.round((double) TEACHER_LMS_AND_STORAGE_FEE_VND * academicWeeks / ACADEMIC_WEEKS_PER_YEAR);
+
+        long studentDbCost = (long) students * studentDbFeeProrated;
+        long teacherLmsCost = (long) teachers * teacherLmsFeeProrated;
         long dbAndLmsCostVnd = studentDbCost + teacherLmsCost;
 
         long subtotalVnd = aiTokenCostVnd + dbAndLmsCostVnd;
@@ -159,23 +202,28 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
 
         long discountAmountVnd = (subtotalVnd * discountPercent) / 100L;
         long finalPriceVnd = subtotalVnd - discountAmountVnd;
-        long avgMonthlyPerStudent = students > 0 ? finalPriceVnd / ((long) students * ACADEMIC_MONTHS_PER_YEAR) : 0L;
+
+        int cycleMonths = (int) Math.max(1, java.time.temporal.ChronoUnit.DAYS.between(subStart, subEnd) / 30);
+        long avgMonthlyPerStudent = students > 0 ? finalPriceVnd / ((long) students * cycleMonths) : 0L;
 
         return B2bQuoteCalculationResponse.builder()
                 .selectedPackage(resolvedPkg)
                 .numberOfStudents(students)
                 .numberOfTeachers(teachers)
-                .studentDailyTokenLimit(STUDENT_DAILY_TOKEN_LIMIT)
-                .teacherDailyTokenLimit(TEACHER_DAILY_TOKEN_LIMIT)
-                .studentTokensPerYear(STUDENT_TOKENS_PER_YEAR)
-                .teacherTokensPerYear(TEACHER_TOKENS_PER_YEAR)
+                .academicWeeks(academicWeeks)
+                .studentDaysPerWeek(studentDaysPerWeek)
+                .teacherDaysPerWeek(teacherDaysPerWeek)
+                .studentDailyTokenLimit(studentDailyLimit)
+                .teacherDailyTokenLimit(teacherDailyLimit)
+                .studentTokensPerYear(studentTokensPerYear)
+                .teacherTokensPerYear(teacherTokensPerYear)
                 .totalStudentTokens(totalStudentTokens)
                 .totalTeacherTokens(totalTeacherTokens)
                 .totalTokenPool(totalTokenPool)
                 .tokenUnitPriceVnd(TOKEN_UNIT_PRICE_VND)
                 .aiTokenCostVnd(aiTokenCostVnd)
-                .studentDbAndQuizFeeVnd(STUDENT_DB_AND_QUIZ_FEE_VND)
-                .teacherLmsAndStorageFeeVnd(TEACHER_LMS_AND_STORAGE_FEE_VND)
+                .studentDbAndQuizFeeVnd(studentDbFeeProrated)
+                .teacherLmsAndStorageFeeVnd(teacherLmsFeeProrated)
                 .dbAndLmsCostVnd(dbAndLmsCostVnd)
                 .subtotalVnd(subtotalVnd)
                 .discountPercent(discountPercent)
@@ -183,17 +231,41 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .finalPriceVnd(finalPriceVnd)
                 .averageMonthlyCostPerStudentVnd(avgMonthlyPerStudent)
                 .promoCodeApplied(appliedPromo)
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
                 .build();
     }
 
     @Override
     @Transactional
     public B2bQuoteResponse submitQuoteRequest(SubmitB2bQuoteRequest request) {
+        LocalDate subStart = request.getSubscriptionStartDate();
+        LocalDate subEnd = request.getSubscriptionEndDate();
+        if (subStart != null && subEnd != null) {
+            if (!subEnd.isAfter(subStart)) {
+                throw new InvalidRequestException("Ngày kết thúc năm học/gói phải sau ngày bắt đầu.");
+            }
+        } else if (subStart != null || subEnd != null) {
+            throw new InvalidRequestException("Vui lòng cung cấp đầy đủ cả ngày bắt đầu và ngày kết thúc chu kỳ gói.");
+        } else {
+            LocalDate today = LocalDate.now();
+            int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
+            subStart = LocalDate.of(academicStartYear, 9, 1);
+            subEnd = LocalDate.of(academicStartYear + 1, 5, 31);
+        }
+
         B2bQuoteCalculationResponse calc = calculateQuote(CalculateB2bQuoteRequest.builder()
                 .selectedPackage(request.getSelectedPackage())
                 .numberOfStudents(request.getNumberOfStudents())
                 .numberOfTeachers(request.getNumberOfTeachers())
+                .academicWeeks(request.getAcademicWeeks())
+                .studentDailyTokenLimit(request.getStudentDailyTokenLimit())
+                .teacherDailyTokenLimit(request.getTeacherDailyTokenLimit())
+                .studentDaysPerWeek(request.getStudentDaysPerWeek())
+                .teacherDaysPerWeek(request.getTeacherDaysPerWeek())
                 .promoCode(request.getPromoCode())
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
                 .build());
 
         String quoteCode = generateUniqueQuoteCode();
@@ -215,6 +287,9 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .selectedPackage(calc.getSelectedPackage())
                 .numberOfStudents(calc.getNumberOfStudents())
                 .numberOfTeachers(calc.getNumberOfTeachers())
+                .academicWeeks(calc.getAcademicWeeks())
+                .studentDaysPerWeek(calc.getStudentDaysPerWeek())
+                .teacherDaysPerWeek(calc.getTeacherDaysPerWeek())
                 .studentDailyTokenLimit(calc.getStudentDailyTokenLimit())
                 .teacherDailyTokenLimit(calc.getTeacherDailyTokenLimit())
                 .totalTokenPool(calc.getTotalTokenPool())
@@ -224,6 +299,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .discountPercent(calc.getDiscountPercent())
                 .discountAmountVnd(calc.getDiscountAmountVnd())
                 .finalPriceVnd(calc.getFinalPriceVnd())
+                .subscriptionStartDate(subStart)
+                .subscriptionEndDate(subEnd)
                 .promoCode(calc.getPromoCodeApplied())
                 .message(request.getMessage() != null ? request.getMessage().trim() : null)
                 .status(B2bQuoteStatus.PENDING)
@@ -289,6 +366,57 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
             quote.setFinalPriceVnd(quote.getSubtotalVnd() - discountAmount);
         }
 
+        if (request.getSubscriptionStartDate() != null && request.getSubscriptionEndDate() != null) {
+            if (!request.getSubscriptionEndDate().isAfter(request.getSubscriptionStartDate())) {
+                throw new InvalidRequestException("Ngày kết thúc năm học/gói phải sau ngày bắt đầu.");
+            }
+            quote.setSubscriptionStartDate(request.getSubscriptionStartDate());
+            quote.setSubscriptionEndDate(request.getSubscriptionEndDate());
+        }
+
+        if (request.getAcademicWeeks() != null) {
+            quote.setAcademicWeeks(request.getAcademicWeeks());
+        }
+        if (request.getStudentDailyTokenLimit() != null) {
+            quote.setStudentDailyTokenLimit(request.getStudentDailyTokenLimit());
+        }
+        if (request.getTeacherDailyTokenLimit() != null) {
+            quote.setTeacherDailyTokenLimit(request.getTeacherDailyTokenLimit());
+        }
+        if (request.getStudentDaysPerWeek() != null) {
+            quote.setStudentDaysPerWeek(request.getStudentDaysPerWeek());
+        }
+        if (request.getTeacherDaysPerWeek() != null) {
+            quote.setTeacherDaysPerWeek(request.getTeacherDaysPerWeek());
+        }
+
+        // Recompute quote if customization fields changed
+        if (request.getAcademicWeeks() != null || request.getStudentDailyTokenLimit() != null
+                || request.getTeacherDailyTokenLimit() != null || request.getStudentDaysPerWeek() != null
+                || request.getTeacherDaysPerWeek() != null) {
+            B2bQuoteCalculationResponse reCalc = calculateQuote(CalculateB2bQuoteRequest.builder()
+                    .selectedPackage(quote.getSelectedPackage())
+                    .numberOfStudents(quote.getNumberOfStudents())
+                    .numberOfTeachers(quote.getNumberOfTeachers())
+                    .academicWeeks(quote.getAcademicWeeks())
+                    .studentDailyTokenLimit(quote.getStudentDailyTokenLimit())
+                    .teacherDailyTokenLimit(quote.getTeacherDailyTokenLimit())
+                    .studentDaysPerWeek(quote.getStudentDaysPerWeek())
+                    .teacherDaysPerWeek(quote.getTeacherDaysPerWeek())
+                    .promoCode(quote.getPromoCode())
+                    .subscriptionStartDate(quote.getSubscriptionStartDate())
+                    .subscriptionEndDate(quote.getSubscriptionEndDate())
+                    .build());
+
+            quote.setTotalTokenPool(reCalc.getTotalTokenPool());
+            quote.setAiTokenCostVnd(reCalc.getAiTokenCostVnd());
+            quote.setDbAndLmsCostVnd(reCalc.getDbAndLmsCostVnd());
+            quote.setSubtotalVnd(reCalc.getSubtotalVnd());
+            long disc = (reCalc.getSubtotalVnd() * quote.getDiscountPercent()) / 100L;
+            quote.setDiscountAmountVnd(disc);
+            quote.setFinalPriceVnd(reCalc.getSubtotalVnd() - disc);
+        }
+
         quote.setStatus(request.getStatus());
         if (request.getAdminNote() != null) {
             quote.setAdminNote(request.getAdminNote().trim());
@@ -322,6 +450,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                         .contactEmail(quote.getContactEmail())
                         .contactPhone(quote.getContactPhone())
                         .packageType(quote.getSelectedPackage())
+                        .subscriptionStartDate(quote.getSubscriptionStartDate())
+                        .subscriptionEndDate(quote.getSubscriptionEndDate())
                         .localHistoryPolicyAccepted(true)
                         .build());
 
@@ -331,10 +461,17 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         int exactPool = (int) Math.min(Integer.MAX_VALUE, quote.getTotalTokenPool());
         schoolEntity.setTotalSchoolTokenQuota(exactPool);
         schoolEntity.setUnallocatedTokenQuota(exactPool);
+        schoolEntity.setBaseCustomTokenQuota(exactPool);
         schoolEntity.setDefaultDailyStudentQuota(quote.getStudentDailyTokenLimit());
         schoolEntity.setDefaultDailyTeacherQuota(quote.getTeacherDailyTokenLimit());
         schoolEntity.setMaxStudents(quote.getNumberOfStudents());
         schoolEntity.setMaxTeachers(quote.getNumberOfTeachers());
+        if (quote.getSubscriptionStartDate() != null) {
+            schoolEntity.setSubscriptionStartDate(quote.getSubscriptionStartDate());
+        }
+        if (quote.getSubscriptionEndDate() != null) {
+            schoolEntity.setSubscriptionEndDate(quote.getSubscriptionEndDate());
+        }
         schoolEntity.setStatus(SchoolStatus.ACTIVE);
         schoolRepository.save(schoolEntity);
 
@@ -343,6 +480,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         createdSchool.setDefaultDailyStudentQuota(quote.getStudentDailyTokenLimit());
         createdSchool.setDefaultDailyTeacherQuota(quote.getTeacherDailyTokenLimit());
         createdSchool.setRecommendedStudents(quote.getNumberOfStudents());
+        createdSchool.setSubscriptionStartDate(schoolEntity.getSubscriptionStartDate());
+        createdSchool.setSubscriptionEndDate(schoolEntity.getSubscriptionEndDate());
 
         String fullName = (quote.getLastName() + " " + quote.getFirstName()).trim();
         SchoolAdminResponse schoolAdmin = schoolManagementService.createSchoolAdmin(
@@ -471,6 +610,9 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .selectedPackage(q.getSelectedPackage())
                 .numberOfStudents(q.getNumberOfStudents())
                 .numberOfTeachers(q.getNumberOfTeachers())
+                .academicWeeks(q.getAcademicWeeks())
+                .studentDaysPerWeek(q.getStudentDaysPerWeek())
+                .teacherDaysPerWeek(q.getTeacherDaysPerWeek())
                 .studentDailyTokenLimit(q.getStudentDailyTokenLimit())
                 .teacherDailyTokenLimit(q.getTeacherDailyTokenLimit())
                 .totalTokenPool(q.getTotalTokenPool())
@@ -480,6 +622,8 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .discountPercent(q.getDiscountPercent())
                 .discountAmountVnd(q.getDiscountAmountVnd())
                 .finalPriceVnd(q.getFinalPriceVnd())
+                .subscriptionStartDate(q.getSubscriptionStartDate())
+                .subscriptionEndDate(q.getSubscriptionEndDate())
                 .promoCode(q.getPromoCode())
                 .message(q.getMessage())
                 .status(q.getStatus())
