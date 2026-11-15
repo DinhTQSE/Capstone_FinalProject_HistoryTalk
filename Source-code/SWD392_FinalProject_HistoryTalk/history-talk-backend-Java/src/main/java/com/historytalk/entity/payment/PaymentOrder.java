@@ -49,6 +49,10 @@ public class PaymentOrder {
     @Column(name = "amount", nullable = false)
     private Integer amount;
 
+    /** Prorated credit (VND) from the replaced subscription; null for a plain purchase */
+    @Column(name = "upgrade_credit_amount")
+    private Integer upgradeCreditAmount;
+
     /** Payment link ID from gateway (e.g. PayOS) */
     @Column(name = "payment_link_id", length = 255)
     private String paymentLinkId;
