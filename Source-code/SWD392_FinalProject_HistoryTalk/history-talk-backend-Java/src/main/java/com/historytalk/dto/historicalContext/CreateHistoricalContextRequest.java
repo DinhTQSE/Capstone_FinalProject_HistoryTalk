@@ -69,6 +69,13 @@ public class CreateHistoricalContextRequest {
     @JsonProperty("battleMap")
     private Object battleMap;
 
+    /**
+     * Optional. Story script object (version, title, narratorId, status, updatedAt, nodes[], edges[]).
+     * If null, no story is stored. Validated in service before persisting.
+     */
+    @JsonProperty("storyScript")
+    private Object storyScript;
+
     @JsonProperty("isPublished")
     private Boolean isPublished = false;
 
