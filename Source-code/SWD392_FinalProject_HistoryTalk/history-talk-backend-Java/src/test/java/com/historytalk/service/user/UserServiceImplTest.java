@@ -7,7 +7,10 @@ import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
 import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.enums.UserRole;
+import com.historytalk.entity.payment.Tier;
+import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.user.User;
+import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.mapper.user.UserMapperImpl;
@@ -43,6 +46,9 @@ class UserServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private UserTierRepository userTierRepository;
 
     @Spy
     private UserMapperImpl userMapper;
@@ -161,5 +167,32 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> userService.adminUpdateUser(userId.toString(), AdminUpdateUserRequest.builder().build()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 ;
+    }
+
+    @Test
+    void dailyTopUpAfterUpgradeDayCountsOnlyTheNewPaidPlan() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .uid(userId)
+                .userName("customer")
+                .email("customer@example.com")
+                .role(UserRole.CUSTOMER)
+                .token(13_000)
+                .lastTokenResetAt(LocalDateTime.now().minusDays(1))
+                .build();
+        Tier pro = Tier.builder().tierId(UUID.randomUUID()).title("pro").amount(99_000)
+                .noMonth(1).limitedToken(10_000).build();
+        UserTier proSub = UserTier.builder().id(UUID.randomUUID()).user(user).tier(pro)
+                .startTime(LocalDateTime.now().minusDays(1)).endTime(LocalDateTime.now().plusDays(29))
+                .isActive(true).build();
+        // the old Plus plan was deactivated by fulfillment, so only Pro is still active
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userTierRepository.findCurrentActiveByUid(any(), any())).thenReturn(Optional.of(proSub));
+        when(userTierRepository.findAllActiveByUid(any(), any())).thenReturn(List.of(proSub));
+
+        userService.getMyProfile(userId.toString());
+
+        assertThat(user.getToken()).isEqualTo(23_000);   // +10,000, not +15,000
     }
 }

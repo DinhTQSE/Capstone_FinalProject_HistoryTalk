@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -74,7 +75,9 @@ public class PaymentFulfillmentService {
                 throw new IllegalStateException("Order tier is missing or deleted");
             }
 
-            // User can have multiple active subscriptions (removed IllegalStateException block)
+            // Only one paid subscription may be active: the new one replaces any active paid plan (mid-period upgrade).
+            // Free-tier rows (amount = 0) stay active.
+            deactivateActivePaidSubscriptions(user, now);
 
             UserTier newSub = UserTier.builder()
                     .user(user)
@@ -100,6 +103,22 @@ public class PaymentFulfillmentService {
             log.error("Payment order {} fulfillment failed: {}", order.getOrderCode(), ex.getMessage());
             return false;
         }
+    }
+
+    private void deactivateActivePaidSubscriptions(User user, LocalDateTime now) {
+        List<UserTier> activePaid = userTierRepository.findAllActiveByUid(user.getUid(), now).stream()
+                .filter(ut -> ut.getTier() != null && ut.getTier().getAmount() != null && ut.getTier().getAmount() > 0)
+                .toList();
+        if (activePaid.isEmpty()) {
+            return;
+        }
+        activePaid.forEach(ut -> {
+            ut.setIsActive(false);
+            ut.setEndTime(now);
+        });
+        userTierRepository.saveAll(activePaid);
+        log.info("Deactivated {} active paid subscription(s) of user {} replaced by a new purchase",
+                activePaid.size(), user.getUid());
     }
 
     private void markProcessing(PaymentOrder order, LocalDateTime now) {
