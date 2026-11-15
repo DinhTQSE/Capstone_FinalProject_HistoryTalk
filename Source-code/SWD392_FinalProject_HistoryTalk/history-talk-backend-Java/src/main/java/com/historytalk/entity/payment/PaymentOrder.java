@@ -49,6 +49,11 @@ public class PaymentOrder {
     @Column(name = "amount", nullable = false)
     private Integer amount;
 
+    /** Active paid subscription this order replaces (mid-period upgrade); null for a plain purchase */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "upgrade_from_user_tier_id")
+    private UserTier upgradeFromUserTier;
+
     /** Prorated credit (VND) from the replaced subscription; null for a plain purchase */
     @Column(name = "upgrade_credit_amount")
     private Integer upgradeCreditAmount;

@@ -8,6 +8,7 @@ import com.historytalk.dto.payment.PaymentHistoryResponse;
 import com.historytalk.dto.payment.PayOSReturnRequest;
 import com.historytalk.dto.payment.PayOSReturnResponse;
 import com.historytalk.dto.payment.TierResponse;
+import com.historytalk.dto.payment.UpgradeQuoteResponse;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.Tier;
@@ -33,7 +34,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -48,31 +48,18 @@ public class PaymentService {
     private final TierRepository tierRepository;
     private final PaymentOrderRepository paymentOrderRepository;
     private final UserTierRepository userTierRepository;
+    private final TierUpgradeCalculator tierUpgradeCalculator;
 
     @Transactional
     public CreatePaymentResponse createPayOSCheckout(UUID uid, String tierId) throws Exception {
         User user = userRepository.findById(uid)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uid));
 
-        Tier tier = tierRepository.findById(UUID.fromString(tierId))
-                .orElseThrow(() -> new ResourceNotFoundException("Tier not found: " + tierId));
+        Tier tier = loadPurchasableTier(tierId);
 
-        if (!Boolean.TRUE.equals(tier.getIsActive()) || tier.getDeletedAt() != null) {
-            throw new InvalidRequestException("Tier is inactive or deleted");
-        }
-
-        if (tier.getAmount() == null || tier.getAmount() <= 0) {
-            throw new InvalidRequestException("Free tier does not require payment");
-        }
-
-        LocalDateTime guardNow = LocalDateTime.now();
-        Optional<UserTier> activePaid = userTierRepository.findCurrentActiveByUid(uid, guardNow);
-        if (activePaid.isPresent() && activePaid.get().getTier().getAmount() > 0) {
-            throw new InvalidRequestException(
-                    "You already have an active '" + activePaid.get().getTier().getTitle()
-                            + "' subscription that expires on " + activePaid.get().getEndTime()
-                            + ". Subscriptions cannot be stacked, upgraded, or cancelled mid-period.");
-        }
+        // Mid-period upgrade: the unused part of the active paid plan is deducted from the price.
+        // Downgrades and same-plan purchases are rejected by the calculator.
+        UpgradeQuote quote = resolveQuote(uid, tier, LocalDateTime.now());
 
         Instant expiredAtInstant = Instant.now().plus(15, ChronoUnit.MINUTES);
         long payosExpiredAt = expiredAtInstant.getEpochSecond();
@@ -88,7 +75,9 @@ public class PaymentService {
                 .user(user)
                 .tier(tier)
                 .orderCode(orderCode)
-                .amount(tier.getAmount())
+                .amount(quote.amountToPay())
+                .upgradeFromUserTier(quote.replacedSubscription())
+                .upgradeCreditAmount(quote.replacedSubscription() != null ? quote.creditAmount() : null)
                 .description(description)
                 .status(PaymentOrderStatus.PENDING)
                 .expiredAt(expiredAtDb)
@@ -99,7 +88,7 @@ public class PaymentService {
 
         CreatePaymentLinkRequest request = CreatePaymentLinkRequest.builder()
                 .orderCode(orderCode)
-                .amount(tier.getAmount().longValue())
+                .amount((long) quote.amountToPay())
                 .description(description)
                 .returnUrl(payOSConfig.getReturnUrl())
                 .cancelUrl(payOSConfig.getCancelUrl())
@@ -113,7 +102,8 @@ public class PaymentService {
         order.setQrCode(paymentLink.getQrCode());
 
         paymentOrderRepository.save(order);
-        log.info("Created PayOS checkout: orderCode={}, user={}, tier={}", orderCode, uid, tier.getTitle());
+        log.info("Created PayOS checkout: orderCode={}, user={}, tier={}, amount={}, upgradeCredit={}",
+                orderCode, uid, tier.getTitle(), quote.amountToPay(), quote.creditAmount());
 
         return CreatePaymentResponse.builder()
                 .orderId(order.getOrderId().toString())
@@ -122,9 +112,58 @@ public class PaymentService {
                 .checkoutUrl(order.getCheckoutUrl())
                 .qrCode(order.getQrCode())
                 .amount(order.getAmount())
+                .originalAmount(quote.originalAmount())
+                .upgradeCreditAmount(quote.creditAmount())
                 .status(order.getStatus().name())
                 .expiredAt(order.getExpiredAt() != null ? order.getExpiredAt().toString() : null)
                 .build();
+    }
+
+    /**
+     * Previews the price of buying a tier for the user, including the prorated credit
+     * from the active paid plan when this is a mid-period upgrade. Saves nothing.
+     */
+    @Transactional(readOnly = true)
+    public UpgradeQuoteResponse getUpgradeQuote(UUID uid, String tierId) {
+        Tier tier = loadPurchasableTier(tierId);
+        UpgradeQuote quote = resolveQuote(uid, tier, LocalDateTime.now());
+        UserTier current = quote.replacedSubscription();
+
+        return UpgradeQuoteResponse.builder()
+                .currentTierId(current != null ? current.getTier().getTierId().toString() : null)
+                .currentTierTitle(current != null ? current.getTier().getTitle() : null)
+                .currentTierNoMonth(current != null ? current.getTier().getNoMonth() : null)
+                .currentEndTime(current != null ? current.getEndTime().toString() : null)
+                .targetTierId(tier.getTierId().toString())
+                .targetTierTitle(tier.getTitle())
+                .targetTierNoMonth(tier.getNoMonth())
+                .originalAmount(quote.originalAmount())
+                .creditAmount(quote.creditAmount())
+                .amountToPay(quote.amountToPay())
+                .upgrade(current != null)
+                .build();
+    }
+
+    private Tier loadPurchasableTier(String tierId) {
+        Tier tier = tierRepository.findById(UUID.fromString(tierId))
+                .orElseThrow(() -> new ResourceNotFoundException("Tier not found: " + tierId));
+
+        if (!Boolean.TRUE.equals(tier.getIsActive()) || tier.getDeletedAt() != null) {
+            throw new InvalidRequestException("Tier is inactive or deleted");
+        }
+
+        if (tier.getAmount() == null || tier.getAmount() <= 0) {
+            throw new InvalidRequestException("Free tier does not require payment");
+        }
+        return tier;
+    }
+
+    /** Only an active paid plan (amount > 0) is upgraded; a free plan means a plain full-price purchase. */
+    private UpgradeQuote resolveQuote(UUID uid, Tier target, LocalDateTime now) {
+        UserTier currentPaid = userTierRepository.findCurrentActiveByUid(uid, now)
+                .filter(ut -> ut.getTier() != null && ut.getTier().getAmount() != null && ut.getTier().getAmount() > 0)
+                .orElse(null);
+        return tierUpgradeCalculator.quote(currentPaid, target, now);
     }
 
     @Transactional(readOnly = true)
