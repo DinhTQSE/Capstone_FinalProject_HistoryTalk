@@ -20,7 +20,14 @@ public class CreatePaymentResponse {
 
     private String qrCode;
 
+    /** Amount actually charged (originalAmount - upgradeCreditAmount) */
     private Integer amount;
+
+    /** List price of the purchased tier */
+    private Integer originalAmount;
+
+    /** Prorated credit from the replaced paid plan; 0 for a plain purchase */
+    private Integer upgradeCreditAmount;
 
     private String status;
 
