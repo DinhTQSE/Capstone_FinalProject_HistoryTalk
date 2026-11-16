@@ -9,6 +9,7 @@ import com.historytalk.dto.user.UserProfileResponse;
 import com.historytalk.dto.user.BulkRestoreUsersResponse;
 import com.historytalk.dto.user.UserDashboardResponse;
 import com.historytalk.entity.enums.Gender;
+import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.payment.Tier;
 import com.historytalk.entity.payment.UserTier;
 import com.historytalk.entity.quiz.QuizSession;
@@ -23,6 +24,7 @@ import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
 import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.service.authentication.RefreshTokenService;
+import com.historytalk.service.school.token.DailyTokenAllowanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -51,6 +53,7 @@ public class UserServiceImpl implements UserService {
     private final QuizSessionRepository quizSessionRepository;
     private final QuestionRepository questionRepository;
     private final MessageRepository messageRepository;
+    private final DailyTokenAllowanceService dailyTokenAllowanceService;
 
     @Override
     @Transactional
@@ -63,6 +66,13 @@ public class UserServiceImpl implements UserService {
         Optional<UserTier> activeSubOpt = userTierRepository.findCurrentActiveByUid(uid, now);
         Tier activeTier = activeSubOpt.map(UserTier::getTier).orElse(null);
         LocalDateTime subEndTime = activeSubOpt.map(UserTier::getEndTime).orElse(null);
+
+        // School teachers/students run on the school's daily allowance; tier top-ups would also mark the day as
+        // reset without clearing yesterday's usage and bonus.
+        if (user.getSchool() != null && (user.getRole() == UserRole.TEACHER || user.getRole() == UserRole.SCHOOL_STUDENT)) {
+            dailyTokenAllowanceService.refreshDailyAllowance(user);
+            return userMapper.toProfileResponse(user, activeTier, subEndTime);
+        }
 
         // Daily token top-up based on ALL currently active tiers
         LocalDate today = LocalDate.now();

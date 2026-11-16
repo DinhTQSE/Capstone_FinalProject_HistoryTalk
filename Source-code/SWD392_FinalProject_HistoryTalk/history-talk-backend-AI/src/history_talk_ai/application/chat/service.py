@@ -1101,7 +1101,13 @@ async def process_document(request: ProcessDocumentRequest):
             "embedding": embedding,
             "sequence_number": idx + 1
         })
-        
+
+    # Embedding service (Ollama/GPU) down: fail so the Java backend retries instead of keeping a half-indexed doc.
+    if len(records) < len(chunks):
+        raise RuntimeError(
+            f"Generated embeddings for {len(records)}/{len(chunks)} chunks of document {request.doc_id}"
+        )
+
     if records:
         # Bulk insert in batches of 100 to avoid request size limits
         batch_size = 100

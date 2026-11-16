@@ -15,6 +15,8 @@ import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.mapper.user.UserMapperImpl;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.service.school.token.DailyTokenAllowanceService;
+import com.historytalk.entity.school.School;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -36,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +52,9 @@ class UserServiceImplTest {
 
     @Mock
     private UserTierRepository userTierRepository;
+
+    @Mock
+    private DailyTokenAllowanceService dailyTokenAllowanceService;
 
     @Spy
     private UserMapperImpl userMapper;
@@ -194,5 +200,27 @@ class UserServiceImplTest {
         userService.getMyProfile(userId.toString());
 
         assertThat(user.getToken()).isEqualTo(23_000);   // +10,000, not +15,000
+    }
+
+    @Test
+    void schoolStudentProfileUsesDailyAllowanceInsteadOfTierTopUp() {
+        UUID userId = UUID.randomUUID();
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
+        User student = User.builder()
+                .uid(userId)
+                .userName("hs")
+                .email("hs@example.com")
+                .role(UserRole.SCHOOL_STUDENT)
+                .school(School.builder().id(UUID.randomUUID()).build())
+                .lastTokenResetAt(yesterday)
+                .build();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(student));
+
+        userService.getMyProfile(userId.toString());
+
+        // The profile read must not mark the day as reset on its own, or yesterday's bonus survives.
+        verify(dailyTokenAllowanceService).refreshDailyAllowance(student);
+        verify(userTierRepository, never()).findAllActiveByUid(any(), any());
+        assertThat(student.getLastTokenResetAt()).isEqualTo(yesterday);
     }
 }

@@ -95,4 +95,22 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     long countActive();
 
     List<Document> findByEntityIdAndEntityType(UUID entityId, EntityType entityType);
+
+    /**
+     * Live documents with text but no vector chunk, i.e. the AI indexing call failed or the AI service was down.
+     * Documents touched after {@code settledBefore} are skipped so in-flight async indexing is not duplicated.
+     */
+    @Query(value = """
+            SELECT d.* FROM document d
+            WHERE d.deleted_at IS NULL
+              AND d.content IS NOT NULL AND btrim(d.content) <> ''
+              AND COALESCE(d.updated_at, d.uploaded_at) < :settledBefore
+              AND NOT EXISTS (SELECT 1 FROM vector_chunk vc
+                              WHERE vc.doc_id = d.doc_id AND vc.deleted_at IS NULL)
+            ORDER BY COALESCE(d.updated_at, d.uploaded_at) DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Document> findUnindexedDocuments(
+            @Param("settledBefore") java.time.LocalDateTime settledBefore,
+            @Param("limit") int limit);
 }

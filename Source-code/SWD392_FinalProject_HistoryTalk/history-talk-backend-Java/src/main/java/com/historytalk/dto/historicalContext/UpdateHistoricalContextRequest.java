@@ -31,12 +31,15 @@ public class UpdateHistoricalContextRequest {
     private EventCategory category;
 
     @JsonProperty("year")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer year;
 
     @JsonProperty("startYear")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer startYear;
 
     @JsonProperty("endYear")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer endYear;
 
     @JsonProperty("isBC")

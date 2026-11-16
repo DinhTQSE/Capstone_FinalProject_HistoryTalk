@@ -73,7 +73,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         }
 
         Classroom classroom = activeClassrooms.get(0);
-        LocalDate today = LocalDate.now();
+        LocalDate today = TokenDay.today();
 
         // MSG38: one request per day; only a rejected request lets the student ask again the same day
         if (tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatusIn(
@@ -138,7 +138,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + request.getClassroomId()));
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = TokenDay.today();
         TokenBoostRequest ticket = TokenBoostRequest.builder()
                 .school(school)
                 .classroom(targetClassroom)
@@ -194,7 +194,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         int tokensToGrant = request.getTokens();
         transferFromTeacherAllowanceToStudent(teacher, student, teacherClass, school, tokensToGrant);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = TokenDay.today();
         String reason = (request.getReason() != null && !request.getReason().isBlank())
                 ? request.getReason().trim()
                 : "Giáo viên cấp trực tiếp token từ hạn mức giáo viên trong ngày";
@@ -440,10 +440,8 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                     tokensToGrant, availablePool));
         }
 
-        LocalDate today = LocalDate.now();
-
         // Prepare teacher daily allowance
-        if (teacher.getLastTokenResetAt() == null || teacher.getLastTokenResetAt().toLocalDate().isBefore(today)) {
+        if (TokenDay.isNewDay(teacher.getLastTokenResetAt())) {
             teacher.setDailyTokensUsed(0);
             teacher.setDailyBonusTokens(0);
             teacher.setLastTokenResetAt(LocalDateTime.now());
@@ -476,8 +474,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
     private void grantDailyBonusFromSchoolPool(
             User targetUser, Classroom classroom, School school, int tokensToGrant, int availablePool) {
-        LocalDate today = LocalDate.now();
-        if (targetUser.getLastTokenResetAt() == null || targetUser.getLastTokenResetAt().toLocalDate().isBefore(today)) {
+        if (TokenDay.isNewDay(targetUser.getLastTokenResetAt())) {
             targetUser.setDailyTokensUsed(0);
             targetUser.setDailyBonusTokens(0);
         }
