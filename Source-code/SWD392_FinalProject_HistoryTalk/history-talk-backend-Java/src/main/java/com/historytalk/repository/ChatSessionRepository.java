@@ -52,32 +52,45 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     List<ChatSession> findAllByUserUid(@Param("userId") UUID userId,
                                        @Param("includeDeleted") boolean includeDeleted);
 
-    @Query("SELECT COUNT(cs) FROM ChatSession cs")
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL")
     long countCurrent();
 
-    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL")
-    long countActive();
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.lastMessageAt IS NOT NULL AND cs.lastMessageAt >= :cutoff")
+    long countActiveSince(@Param("cutoff") LocalDateTime cutoff);
+
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.user.role IN :roles")
+    long countCurrentByRoles(@Param("roles") java.util.Collection<com.historytalk.entity.enums.UserRole> roles);
+
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.lastMessageAt IS NOT NULL AND cs.lastMessageAt >= :cutoff AND cs.user.role IN :roles")
+    long countActiveSinceByRoles(@Param("cutoff") LocalDateTime cutoff,
+                                 @Param("roles") java.util.Collection<com.historytalk.entity.enums.UserRole> roles);
 
     List<ChatSession> findByCharacterCharacterId(UUID characterId);
 
     List<ChatSession> findByHistoricalContextContextId(UUID contextId);
 
-    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.createdAt >= :from AND cs.createdAt < :to")
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.createdAt >= :from AND cs.createdAt < :to")
     long countCreatedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.createdAt >= :from AND cs.createdAt < :to AND cs.user.role IN :roles")
+    long countCreatedBetweenByRoles(@Param("from") LocalDateTime from,
+                                    @Param("to") LocalDateTime to,
+                                    @Param("roles") java.util.Collection<com.historytalk.entity.enums.UserRole> roles);
 
     @Query(value = """
             SELECT to_char(
                 CASE
-                    WHEN :bucket = 'month' THEN date_trunc('month', created_at)
-                    WHEN :bucket = 'week' THEN date_trunc('week', created_at)
-                    ELSE date_trunc('day', created_at)
+                    WHEN :bucket = 'month' THEN date_trunc('month', cs.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', cs.created_at)
+                    ELSE date_trunc('day', cs.created_at)
                 END,
                 'YYYY-MM-DD'
             ) AS period,
             COUNT(*) AS count
-            FROM chat_session
-            WHERE created_at >= :from
-              AND created_at < :to
+            FROM chat_session cs
+            WHERE cs.deleted_at IS NULL
+              AND cs.created_at >= :from
+              AND cs.created_at < :to
             GROUP BY 1
             ORDER BY 1
             """, nativeQuery = true)
@@ -85,4 +98,30 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', cs.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', cs.created_at)
+                    ELSE date_trunc('day', cs.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM chat_session cs
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.role IN (:roles)
+              AND cs.created_at >= :from
+              AND cs.created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countSessionsByPeriodAndRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("roles") java.util.Collection<String> roles);
 }

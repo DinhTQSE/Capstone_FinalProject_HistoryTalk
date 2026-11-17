@@ -207,6 +207,44 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
 
+            <!-- JaCoCo code coverage plugin (N6: business-rule coverage) -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.11</version>
+                <configuration>
+                    <excludes>
+                        <exclude>com/historytalk/HistoryTalkApplication*</exclude>
+                        <exclude>com/historytalk/config/**</exclude>
+                        <exclude>com/historytalk/dto/**</exclude>
+                        <exclude>com/historytalk/entity/**</exclude>
+                        <exclude>com/historytalk/repository/**</exclude>
+                        <exclude>com/historytalk/mapper/**</exclude>
+                        <exclude>com/historytalk/service/dashboard/SystemDashboardServiceImpl*</exclude>
+                        <exclude>com/historytalk/service/document/PdfExtractionServiceImpl*</exclude>
+                        <exclude>com/historytalk/service/document/OcrServiceImpl*</exclude>
+                        <exclude>com/historytalk/service/document/VlmImageCaptioningServiceImpl*</exclude>
+                        <exclude>com/historytalk/service/document/PdfTypeClassifier*</exclude>
+                        <exclude>com/historytalk/service/chat/AiServiceClient*</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
         </plugins>
     </build>
 

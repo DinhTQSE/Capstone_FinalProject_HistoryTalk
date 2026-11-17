@@ -62,6 +62,7 @@ public class DashboardQuizAnalyticsResponse {
     @Builder
     public static class TopWrongQuestion {
         private String questionId;
+        private String questionContent;
         private String quizId;
         private String quizTitle;
         private long wrongAnswers;

@@ -108,7 +108,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("UPDATE User u SET u.token = COALESCE(u.token, 0) + :tokensToAdd WHERE u.uid = :userId")
     int addTokens(@Param("userId") UUID userId, @Param("tokensToAdd") Integer tokensToAdd);
 
-    @Query("SELECT COUNT(u) FROM User u")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL")
     long countAllUsers();
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL")
@@ -124,11 +124,26 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.role = :role")
     long countActiveUsersByRole(@Param("role") UserRole role);
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt >= :from AND u.createdAt < :to")
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.role IN :roles")
+    long countActiveUsersByRoles(@Param("roles") java.util.Collection<UserRole> roles);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NOT NULL AND u.role IN :roles")
+    long countDeletedUsersByRoles(@Param("roles") java.util.Collection<UserRole> roles);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.createdAt >= :from AND u.createdAt < :to")
     long countCreatedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.role IN :roles AND u.createdAt >= :from AND u.createdAt < :to")
+    long countCreatedBetweenByRoles(@Param("from") LocalDateTime from,
+                                    @Param("to") LocalDateTime to,
+                                    @Param("roles") java.util.Collection<UserRole> roles);
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.lastActiveDate >= :from")
     long countRecentlyActiveUsers(@Param("from") LocalDateTime from);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.deletedAt IS NULL AND u.role IN :roles AND u.lastActiveDate >= :from")
+    long countRecentlyActiveUsersByRoles(@Param("from") LocalDateTime from,
+                                           @Param("roles") java.util.Collection<UserRole> roles);
 
     @Query(value = """
             SELECT to_char(
@@ -141,7 +156,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             ) AS period,
             COUNT(*) AS count
             FROM "user"
-            WHERE created_at >= :from
+            WHERE deleted_at IS NULL
+              AND created_at >= :from
               AND created_at < :to
             GROUP BY 1
             ORDER BY 1
@@ -150,6 +166,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', created_at)
+                    ELSE date_trunc('day', created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM "user"
+            WHERE deleted_at IS NULL
+              AND role IN (:roles)
+              AND created_at >= :from
+              AND created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countNewUsersByPeriodAndRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("roles") java.util.Collection<String> roles);
 
     @Query(value = """
             SELECT to_char(
@@ -175,6 +215,31 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             @Param("bucket") String bucket);
 
     @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', last_active_date)
+                    WHEN :bucket = 'week' THEN date_trunc('week', last_active_date)
+                    ELSE date_trunc('day', last_active_date)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM "user"
+            WHERE deleted_at IS NULL
+              AND role IN (:roles)
+              AND last_active_date IS NOT NULL
+              AND last_active_date >= :from
+              AND last_active_date < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countActiveUsersByPeriodAndRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("roles") java.util.Collection<String> roles);
+
+    @Query(value = """
             SELECT COALESCE(SUM(COALESCE(u.token, 0)), 0) AS "remainingTokens",
                    COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
                    COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
@@ -183,6 +248,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
               AND u.role = 'CUSTOMER'
             """, nativeQuery = true)
     DashboardTokenBalanceSummaryProjection getTokenBalanceSummary();
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(u.token, 0)), 0) AS "remainingTokens",
+                   COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
+                   COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
+            FROM "user" u
+            WHERE u.deleted_at IS NULL
+              AND u.role IN (:roles)
+            """, nativeQuery = true)
+    DashboardTokenBalanceSummaryProjection getTokenBalanceSummaryByRoles(@Param("roles") java.util.Collection<String> roles);
 
     @Query(value = """
             WITH ranked_tiers AS (
@@ -195,8 +270,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                   AND ut.end_time > CURRENT_TIMESTAMP
                   AND t.deleted_at IS NULL
             )
-            SELECT CAST(t.tier_id AS text) AS "tierId",
-                   COALESCE(t.title, 'free') AS "tierTitle",
+            SELECT MIN(CAST(t.tier_id AS text)) AS "tierId",
+                   LOWER(COALESCE(t.title, 'free')) AS "tierTitle",
                    COUNT(u.uid) AS users,
                    COALESCE(SUM(COALESCE(u.token, 0)), 0) AS "remainingTokens",
                    COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
@@ -211,7 +286,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             WHERE u.deleted_at IS NULL
               AND u.role = 'CUSTOMER'
               AND t.deleted_at IS NULL
-            GROUP BY t.tier_id, t.title
+            GROUP BY LOWER(COALESCE(t.title, 'free'))
             ORDER BY users DESC, "tierTitle" ASC
             """, nativeQuery = true)
     List<DashboardTokenBalanceByTierProjection> countTokenBalanceByTier();

@@ -15,23 +15,55 @@ import java.time.LocalDate;
 
 public interface SystemDashboardService {
 
-    DashboardOverviewResponse getOverview();
+    default DashboardOverviewResponse getOverview() {
+        return getOverview("ALL");
+    }
 
-    DashboardUserAnalyticsResponse getUserAnalytics(LocalDate from, LocalDate to, String granularity);
+    DashboardOverviewResponse getOverview(String scope);
 
-    DashboardContentSummaryResponse getContentSummary();
+    default DashboardUserAnalyticsResponse getUserAnalytics(LocalDate from, LocalDate to, String granularity) {
+        return getUserAnalytics(from, to, granularity, "ALL");
+    }
 
-    DashboardChatActivityResponse getChatActivity(LocalDate from, LocalDate to, String granularity);
+    DashboardUserAnalyticsResponse getUserAnalytics(LocalDate from, LocalDate to, String granularity, String scope);
+
+    default DashboardContentSummaryResponse getContentSummary() {
+        return getContentSummary("ALL");
+    }
+
+    DashboardContentSummaryResponse getContentSummary(String scope);
+
+    default DashboardChatActivityResponse getChatActivity(LocalDate from, LocalDate to, String granularity) {
+        return getChatActivity(from, to, granularity, "ALL");
+    }
+
+    DashboardChatActivityResponse getChatActivity(LocalDate from, LocalDate to, String granularity, String scope);
 
     DashboardSystemHealthResponse getSystemHealth();
 
-    DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity);
+    default DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity) {
+        return getRevenue(from, to, granularity, "ALL");
+    }
 
-    DashboardPaymentResponse getPayments(LocalDate from, LocalDate to, String granularity);
+    DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity, String scope);
+
+    default DashboardPaymentResponse getPayments(LocalDate from, LocalDate to, String granularity) {
+        return getPayments(from, to, granularity, "ALL");
+    }
+
+    DashboardPaymentResponse getPayments(LocalDate from, LocalDate to, String granularity, String scope);
 
     DashboardTierAnalyticsResponse getTiers(LocalDate from, LocalDate to, String granularity);
 
-    DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity);
+    default DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity) {
+        return getQuiz(from, to, granularity, "ALL");
+    }
 
-    DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity);
+    DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity, String scope);
+
+    default DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity) {
+        return getTokens(from, to, granularity, "ALL");
+    }
+
+    DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity, String scope);
 }

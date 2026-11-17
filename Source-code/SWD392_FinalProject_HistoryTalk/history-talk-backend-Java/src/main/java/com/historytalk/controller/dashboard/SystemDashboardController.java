@@ -40,10 +40,11 @@ public class SystemDashboardController {
 
     @GetMapping("/overview")
     @Operation(summary = "Get dashboard overview", description = "Returns first-screen System Admin dashboard cards")
-    public ResponseEntity<ApiResponse<DashboardOverviewResponse>> getOverview() {
-        log.info("GET /api/v1/system-admin/dashboard/overview");
+    public ResponseEntity<ApiResponse<DashboardOverviewResponse>> getOverview(
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/overview - scope: {}", scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getOverview(),
+                dashboardService.getOverview(scope),
                 "Dashboard overview retrieved successfully"
         ));
     }
@@ -53,21 +54,23 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<DashboardUserAnalyticsResponse>> getUserAnalytics(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "day") String granularity) {
-        log.info("GET /api/v1/system-admin/dashboard/users - from: {}, to: {}, granularity: {}",
-                from, to, granularity);
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/users - from: {}, to: {}, granularity: {}, scope: {}",
+                from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getUserAnalytics(from, to, granularity),
+                dashboardService.getUserAnalytics(from, to, granularity, scope),
                 "User analytics retrieved successfully"
         ));
     }
 
     @GetMapping("/content")
     @Operation(summary = "Get content summary", description = "Returns historical context, character, and document inventory")
-    public ResponseEntity<ApiResponse<DashboardContentSummaryResponse>> getContentSummary() {
-        log.info("GET /api/v1/system-admin/dashboard/content");
+    public ResponseEntity<ApiResponse<DashboardContentSummaryResponse>> getContentSummary(
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/content - scope: {}", scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getContentSummary(),
+                dashboardService.getContentSummary(scope),
                 "Content summary retrieved successfully"
         ));
     }
@@ -77,11 +80,12 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<DashboardChatActivityResponse>> getChatActivity(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "day") String granularity) {
-        log.info("GET /api/v1/system-admin/dashboard/chat-activity - from: {}, to: {}, granularity: {}",
-                from, to, granularity);
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/chat-activity - from: {}, to: {}, granularity: {}, scope: {}",
+                from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getChatActivity(from, to, granularity),
+                dashboardService.getChatActivity(from, to, granularity, scope),
                 "Chat activity retrieved successfully"
         ));
     }
@@ -101,11 +105,12 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<DashboardRevenueResponse>> getRevenue(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "day") String granularity) {
-        log.info("GET /api/v1/system-admin/dashboard/revenue - from: {}, to: {}, granularity: {}",
-                from, to, granularity);
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/revenue - from: {}, to: {}, granularity: {}, scope: {}",
+                from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getRevenue(from, to, granularity),
+                dashboardService.getRevenue(from, to, granularity, scope),
                 "Revenue analytics retrieved successfully"
         ));
     }
@@ -115,11 +120,12 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<DashboardPaymentResponse>> getPayments(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "day") String granularity) {
-        log.info("GET /api/v1/system-admin/dashboard/payments - from: {}, to: {}, granularity: {}",
-                from, to, granularity);
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/payments - from: {}, to: {}, granularity: {}, scope: {}",
+                from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getPayments(from, to, granularity),
+                dashboardService.getPayments(from, to, granularity, scope),
                 "Payment analytics retrieved successfully"
         ));
     }
@@ -143,11 +149,12 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<DashboardQuizAnalyticsResponse>> getQuiz(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "day") String granularity) {
-        log.info("GET /api/v1/system-admin/dashboard/quiz - from: {}, to: {}, granularity: {}",
-                from, to, granularity);
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/quiz - from: {}, to: {}, granularity: {}, scope: {}",
+                from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getQuiz(from, to, granularity),
+                dashboardService.getQuiz(from, to, granularity, scope),
                 "Quiz analytics retrieved successfully"
         ));
     }
@@ -157,11 +164,12 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<DashboardTokenUsageResponse>> getTokens(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "day") String granularity) {
-        log.info("GET /api/v1/system-admin/dashboard/tokens - from: {}, to: {}, granularity: {}",
-                from, to, granularity);
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @RequestParam(required = false, defaultValue = "ALL") String scope) {
+        log.info("GET /api/v1/system-admin/dashboard/tokens - from: {}, to: {}, granularity: {}, scope: {}",
+                from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
-                dashboardService.getTokens(from, to, granularity),
+                dashboardService.getTokens(from, to, granularity, scope),
                 "Token usage analytics retrieved successfully"
         ));
     }

@@ -14,6 +14,8 @@ public class DashboardContentSummaryResponse {
     private InventoryStats historicalContexts;
     private InventoryStats characters;
     private DocumentStats documents;
+    private InventoryStats localHistoricalContexts;
+    private InventoryStats localCharacters;
 
     @Data
     @NoArgsConstructor

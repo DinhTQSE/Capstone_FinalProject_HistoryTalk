@@ -136,11 +136,30 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             """)
     List<Object[]> countCompletedByQuizIds(@Param("quizIds") Collection<UUID> quizIds);
 
-    @Query("SELECT COUNT(s) FROM QuizSession s WHERE s.deletedAt IS NULL")
+    @Query("SELECT COUNT(s) FROM QuizSession s WHERE s.deletedAt IS NULL AND s.quiz.deletedAt IS NULL")
     long countStartedSessions();
 
-    @Query("SELECT COUNT(s) FROM QuizSession s WHERE s.deletedAt IS NULL AND s.endTime IS NOT NULL")
+    @Query("SELECT COUNT(s) FROM QuizSession s WHERE s.deletedAt IS NULL AND s.quiz.deletedAt IS NULL AND s.endTime IS NOT NULL")
     long countCompletedSessions();
+
+    @Query("""
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.deletedAt IS NULL
+              AND s.quiz.deletedAt IS NULL
+              AND ((:isLocal = false AND s.quiz.historicalContext.school IS NULL)
+                   OR (:isLocal = true AND s.quiz.historicalContext.school IS NOT NULL))
+            """)
+    long countStartedSessionsByScope(@Param("isLocal") boolean isLocal);
+
+    @Query("""
+            SELECT COUNT(s) FROM QuizSession s
+            WHERE s.deletedAt IS NULL
+              AND s.quiz.deletedAt IS NULL
+              AND s.endTime IS NOT NULL
+              AND ((:isLocal = false AND s.quiz.historicalContext.school IS NULL)
+                   OR (:isLocal = true AND s.quiz.historicalContext.school IS NOT NULL))
+            """)
+    long countCompletedSessionsByScope(@Param("isLocal") boolean isLocal);
 
     @Query(value = """
             SELECT COALESCE(AVG(
@@ -152,6 +171,8 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
                 END
             ), 0.0)
             FROM quiz_session qs
+            JOIN quiz q ON q.quiz_id = qs.quiz_id AND q.deleted_at IS NULL
+            JOIN historical_context hc ON hc.context_id = q.context_id AND hc.deleted_at IS NULL
             JOIN (
                 SELECT qq.quiz_id, COUNT(*) AS question_count
                 FROM quiz_question qq
@@ -165,20 +186,48 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     Double averageScorePercentage();
 
     @Query(value = """
+            SELECT COALESCE(AVG(
+                CASE
+                    WHEN qs.end_time IS NOT NULL
+                     AND qs.score IS NOT NULL
+                     AND qc.question_count > 0
+                    THEN qs.score * 100.0 / qc.question_count
+                END
+            ), 0.0)
+            FROM quiz_session qs
+            JOIN quiz q ON q.quiz_id = qs.quiz_id AND q.deleted_at IS NULL
+            JOIN historical_context hc ON hc.context_id = q.context_id AND hc.deleted_at IS NULL
+            JOIN (
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
+            ) qc ON qc.quiz_id = qs.quiz_id
+            WHERE qs.deleted_at IS NULL
+              AND qs.end_time IS NOT NULL
+              AND ((:isLocal = false AND hc.school_id IS NULL)
+                   OR (:isLocal = true AND hc.school_id IS NOT NULL))
+            """, nativeQuery = true)
+    Double averageScorePercentageByScope(@Param("isLocal") boolean isLocal);
+
+    @Query(value = """
             SELECT to_char(
                 CASE
-                    WHEN :bucket = 'month' THEN date_trunc('month', created_at)
-                    WHEN :bucket = 'week' THEN date_trunc('week', created_at)
-                    ELSE date_trunc('day', created_at)
+                    WHEN :bucket = 'month' THEN date_trunc('month', qs.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', qs.created_at)
+                    ELSE date_trunc('day', qs.created_at)
                 END,
                 'YYYY-MM-DD'
             ) AS period,
             COUNT(*) AS started,
-            COUNT(*) FILTER (WHERE end_time IS NOT NULL) AS completed
-            FROM quiz_session
-            WHERE deleted_at IS NULL
-              AND created_at >= :from
-              AND created_at < :to
+            COUNT(*) FILTER (WHERE qs.end_time IS NOT NULL) AS completed
+            FROM quiz_session qs
+            JOIN quiz q ON q.quiz_id = qs.quiz_id AND q.deleted_at IS NULL
+            JOIN historical_context hc ON hc.context_id = q.context_id AND hc.deleted_at IS NULL
+            WHERE qs.deleted_at IS NULL
+              AND qs.created_at >= :from
+              AND qs.created_at < :to
             GROUP BY 1
             ORDER BY 1
             """, nativeQuery = true)
@@ -186,6 +235,34 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', qs.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', qs.created_at)
+                    ELSE date_trunc('day', qs.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS started,
+            COUNT(*) FILTER (WHERE qs.end_time IS NOT NULL) AS completed
+            FROM quiz_session qs
+            JOIN quiz q ON q.quiz_id = qs.quiz_id AND q.deleted_at IS NULL
+            JOIN historical_context hc ON hc.context_id = q.context_id AND hc.deleted_at IS NULL
+            WHERE qs.deleted_at IS NULL
+              AND qs.created_at >= :from
+              AND qs.created_at < :to
+              AND ((:isLocal = false AND hc.school_id IS NULL)
+                   OR (:isLocal = true AND hc.school_id IS NOT NULL))
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardQuizTrendProjection> countSessionsByPeriodAndScope(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("isLocal") boolean isLocal);
 
     long countByUser_UidAndEndTimeIsNotNullAndDeletedAtIsNull(UUID uid);
 

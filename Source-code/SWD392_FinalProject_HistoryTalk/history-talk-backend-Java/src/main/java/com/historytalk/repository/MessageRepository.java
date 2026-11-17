@@ -49,28 +49,43 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             """)
     List<Object[]> findLatestMessageContentBySessionIds(@Param("sessionIds") Collection<UUID> sessionIds);
 
-    @Query("SELECT COUNT(m) FROM Message m")
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL")
     long countCurrent();
 
-    @Query("SELECT COUNT(m) FROM Message m WHERE m.isFromAi = :isFromAi")
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.isFromAi = :isFromAi AND m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL")
     long countByAiFlag(@Param("isFromAi") boolean isFromAi);
 
-    @Query("SELECT COUNT(m) FROM Message m WHERE m.createdAt >= :from AND m.createdAt < :to")
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.createdAt >= :from AND m.createdAt < :to AND m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL")
     long countCreatedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL AND m.chatSession.user.role IN :roles")
+    long countCurrentByRoles(@Param("roles") Collection<com.historytalk.entity.enums.UserRole> roles);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.isFromAi = :isFromAi AND m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL AND m.chatSession.user.role IN :roles")
+    long countByAiFlagAndRoles(@Param("isFromAi") boolean isFromAi,
+                               @Param("roles") Collection<com.historytalk.entity.enums.UserRole> roles);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.createdAt >= :from AND m.createdAt < :to AND m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL AND m.chatSession.user.role IN :roles")
+    long countCreatedBetweenByRoles(@Param("from") LocalDateTime from,
+                                    @Param("to") LocalDateTime to,
+                                    @Param("roles") Collection<com.historytalk.entity.enums.UserRole> roles);
 
     @Query(value = """
             SELECT to_char(
                 CASE
-                    WHEN :bucket = 'month' THEN date_trunc('month', created_at)
-                    WHEN :bucket = 'week' THEN date_trunc('week', created_at)
-                    ELSE date_trunc('day', created_at)
+                    WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
+                    ELSE date_trunc('day', m.created_at)
                 END,
                 'YYYY-MM-DD'
             ) AS period,
             COUNT(*) AS count
-            FROM message
-            WHERE created_at >= :from
-              AND created_at < :to
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND m.created_at >= :from
+              AND m.created_at < :to
             GROUP BY 1
             ORDER BY 1
             """, nativeQuery = true)
@@ -80,34 +95,85 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             @Param("bucket") String bucket);
 
     @Query(value = """
-            SELECT COALESCE(SUM(CASE WHEN is_from_ai = FALSE THEN COALESCE(token, 0) ELSE 0 END), 0) AS "promptTokens",
-                   COALESCE(SUM(CASE WHEN is_from_ai = TRUE THEN COALESCE(token, 0) ELSE 0 END), 0) AS "completionTokens",
-                   COALESCE(SUM(COALESCE(token, 0)), 0) AS "totalTokens"
-            FROM message
-            WHERE deleted_at IS NULL
-              AND created_at >= :from
-              AND created_at < :to
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
+                    ELSE date_trunc('day', m.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.role IN (:roles)
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countMessagesByPeriodAndRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("roles") Collection<String> roles);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND m.created_at >= :from
+              AND m.created_at < :to
             """, nativeQuery = true)
     DashboardTokenSummaryProjection sumTokensBetween(
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to);
 
     @Query(value = """
+            SELECT COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.role IN (:roles)
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            """, nativeQuery = true)
+    DashboardTokenSummaryProjection sumTokensBetweenByRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("roles") Collection<String> roles);
+
+    @Query(value = """
             SELECT to_char(
                 CASE
-                    WHEN :bucket = 'month' THEN date_trunc('month', created_at)
-                    WHEN :bucket = 'week' THEN date_trunc('week', created_at)
-                    ELSE date_trunc('day', created_at)
+                    WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
+                    ELSE date_trunc('day', m.created_at)
                 END,
                 'YYYY-MM-DD'
             ) AS period,
-            COALESCE(SUM(CASE WHEN is_from_ai = FALSE THEN COALESCE(token, 0) ELSE 0 END), 0) AS "promptTokens",
-            COALESCE(SUM(CASE WHEN is_from_ai = TRUE THEN COALESCE(token, 0) ELSE 0 END), 0) AS "completionTokens",
-            COALESCE(SUM(COALESCE(token, 0)), 0) AS "totalTokens"
-            FROM message
-            WHERE deleted_at IS NULL
-              AND created_at >= :from
-              AND created_at < :to
+            COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+            COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+            COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND m.created_at >= :from
+              AND m.created_at < :to
             GROUP BY 1
             ORDER BY 1
             """, nativeQuery = true)
@@ -115,6 +181,36 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
+                    ELSE date_trunc('day', m.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+            COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+            COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.role IN (:roles)
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardTokenTrendProjection> sumTokensByPeriodByRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("roles") Collection<String> roles);
 
     @Query(value = """
             SELECT CAST(u.uid AS text) AS uid,
@@ -174,11 +270,62 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             JOIN chat_session cs ON cs.session_id = m.session_id AND cs.deleted_at IS NULL
             JOIN character c ON c.character_id = cs.character_id AND c.deleted_at IS NULL
             WHERE m.deleted_at IS NULL
+              AND c.school_id IS NULL
             GROUP BY c.character_id, c.name, c.title, c.image_url
             ORDER BY "totalMessages" DESC
             LIMIT :limit
             """, nativeQuery = true)
     List<com.historytalk.repository.dashboard.DashboardTopCharacterProjection> findTopCharactersForDashboard(@Param("limit") int limit);
+
+    @Query(value = """
+            SELECT CAST(c.character_id AS text) AS "characterId",
+                   c.name AS name,
+                   COALESCE(c.title, '') AS title,
+                   COALESCE(c.image_url, '') AS "imageUrl",
+                   COUNT(m.message_id) AS "totalMessages",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN 1 ELSE 0 END), 0) AS "userMessages",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN 1 ELSE 0 END), 0) AS "aiMessages"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id AND cs.deleted_at IS NULL
+            JOIN character c ON c.character_id = cs.character_id AND c.deleted_at IS NULL
+            WHERE m.deleted_at IS NULL
+              AND c.school_id IS NOT NULL
+            GROUP BY c.character_id, c.name, c.title, c.image_url
+            ORDER BY "totalMessages" DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<com.historytalk.repository.dashboard.DashboardTopCharacterProjection> findTopLocalCharactersForDashboard(@Param("limit") int limit);
+
+    @Query(value = """
+            SELECT CAST(u.uid AS text) AS uid,
+                   u.user_name AS "userName",
+                   u.email AS email,
+                   CAST(NULL AS text) AS "tierId",
+                   COALESCE(CAST(u.role AS text), 'B2B') AS "tierTitle",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens",
+                   COALESCE(u.token, 0) AS "remainingTokens"
+            FROM "user" u
+            JOIN chat_session cs
+              ON cs.uid = u.uid
+             AND cs.deleted_at IS NULL
+            JOIN message m
+              ON m.session_id = cs.session_id
+             AND m.deleted_at IS NULL
+             AND m.created_at >= :from
+             AND m.created_at < :to
+            WHERE u.deleted_at IS NULL
+              AND u.role IN (:roles)
+            GROUP BY u.uid, u.user_name, u.email, u.role, u.token
+            ORDER BY "totalTokens" DESC, "promptTokens" DESC, u.user_name ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<DashboardTopTokenUserProjection> findTopTokenUsersByRoles(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("roles") Collection<String> roles,
+            @Param("limit") int limit);
 
     @Query(value = """
             SELECT COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",

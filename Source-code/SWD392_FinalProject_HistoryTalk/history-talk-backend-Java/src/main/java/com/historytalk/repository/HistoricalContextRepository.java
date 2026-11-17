@@ -88,12 +88,21 @@ public interface HistoricalContextRepository extends JpaRepository<HistoricalCon
                """)
        int restoreById(@Param("contextId") UUID contextId);
 
-       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NULL")
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NULL AND hc.deletedAt IS NULL")
        long countCurrent();
 
-       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NULL AND hc.isPublished = true")
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NULL AND hc.deletedAt IS NULL AND hc.isPublished = true")
        long countPublished();
 
        @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NULL AND hc.deletedAt IS NULL AND hc.isPublished = true")
        long countActive();
+
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NOT NULL AND hc.deletedAt IS NULL")
+       long countLocalCurrent();
+
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NOT NULL AND hc.deletedAt IS NULL AND hc.isPublished = true")
+       long countLocalPublished();
+
+       @Query("SELECT COUNT(hc) FROM HistoricalContext hc WHERE hc.school IS NOT NULL AND hc.deletedAt IS NULL AND hc.isPublished = true")
+       long countLocalActive();
 }

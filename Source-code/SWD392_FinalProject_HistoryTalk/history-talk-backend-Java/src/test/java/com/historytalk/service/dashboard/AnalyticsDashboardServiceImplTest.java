@@ -173,7 +173,7 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals("THPT Chu Văn An", response.getSchoolName());
         assertEquals("CVA", response.getSchoolCode());
         assertEquals(com.historytalk.entity.enums.EnterprisePackage.ENTERPRISE_SMALL, response.getPackageType());
-        assertEquals(350, response.getRecommendedStudents());
+        assertEquals(600, response.getRecommendedStudents());
         assertEquals(com.historytalk.entity.enums.SchoolStatus.ACTIVE, response.getStatus());
         assertEquals(java.time.LocalDate.of(2025, 9, 1), response.getSubscriptionStartDate());
         assertEquals(java.time.LocalDate.of(2026, 5, 31), response.getSubscriptionEndDate());
