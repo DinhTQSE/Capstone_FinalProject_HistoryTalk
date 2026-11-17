@@ -45,7 +45,14 @@ def test_braces_in_the_background_are_kept_as_written():
     prompt = prompt_builder.build_chat_system_prompt(_character(), None)
 
     assert "Đại tướng {chú thích}" in prompt
-    assert "{{" not in prompt
+    assert "{{chú thích}}" not in prompt
+
+
+def test_image_placeholder_rule_is_included_in_chat_prompt():
+    prompt = prompt_builder.build_chat_system_prompt(_character(), None)
+
+    assert "{{IMG_1}}" in prompt
+    assert "![Mô tả ngắn]({{IMG_1}})" in prompt
 
 
 def test_grading_is_encouraging_and_accepts_extra_correct_details():

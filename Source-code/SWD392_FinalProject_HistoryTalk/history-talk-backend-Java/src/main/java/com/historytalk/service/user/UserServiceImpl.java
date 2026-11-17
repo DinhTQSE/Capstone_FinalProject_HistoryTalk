@@ -101,10 +101,10 @@ public class UserServiceImpl implements UserService {
     public void changeMyPassword(String userId, ChangePasswordRequest request) {
         User user = loadActiveUser(userId);
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            throw new InvalidRequestException("Máº­t kháº©u hiá»‡n táº¡i khÃ´ng chÃ­nh xÃ¡c");
+            throw new InvalidRequestException("Mật khẩu hiện tại không chính xác");
         }
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new InvalidRequestException("Máº­t kháº©u má»›i vÃ  máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p");
+            throw new InvalidRequestException("Mật khẩu mới và mật khẩu xác nhận không khớp");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
@@ -316,7 +316,7 @@ public class UserServiceImpl implements UserService {
     private User loadActiveUser(String userId) {
         User user = loadUser(userId);
         if (user.getDeletedAt() != null) {
-            throw new InvalidRequestException("TÃ i khoáº£n ngÆ°á»i dÃ¹ng Ä‘Ã£ bá»‹ vÃ´ hiá»‡u hÃ³a");
+            throw new InvalidRequestException("Tài khoản người dùng đã bị vô hiệu hóa");
         }
         return user;
     }
@@ -331,7 +331,7 @@ public class UserServiceImpl implements UserService {
                                     String address, String avatarUrl) {
         if (StringUtils.hasText(userName) && !userName.equalsIgnoreCase(user.getUserName())) {
             if (userRepository.existsByUserNameIgnoreCase(userName)) {
-                throw new InvalidRequestException("TÃªn Ä‘Äƒng nháº­p Ä‘Ã£ tá»“n táº¡i");
+                throw new InvalidRequestException("Tên đăng nhập đã tồn tại");
             }
             user.setUserName(userName.trim());
         }

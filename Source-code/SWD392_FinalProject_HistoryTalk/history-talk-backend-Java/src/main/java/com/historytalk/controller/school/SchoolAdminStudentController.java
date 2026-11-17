@@ -71,7 +71,7 @@ public class SchoolAdminStudentController {
     @Operation(summary = "Download CSV template for student import (US-SP5-04)")
     public ResponseEntity<byte[]> downloadTemplate() {
         String csvContent = "\uFEFFstudent_code,full_name,email,dob,gender,phone_number,password,additional_token\n"
-                + "HS001,Nguyá»…n VÄƒn An,an.nguyen@example.com,2008-01-15,MALE,0901234567,,0\n";
+                + "HS001,Nguyễn Văn An,an.nguyen@example.com,2008-01-15,MALE,0901234567,,0\n";
         byte[] bytes = csvContent.getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"student_import_template.csv\"")
@@ -201,19 +201,19 @@ public class SchoolAdminStudentController {
                 return null;
             }
             return userRepository.findById(UUID.fromString(principal.getUid()))
-                    .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
+                    .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p vá»›i tÃ i khoáº£n Quáº£n trá»‹ viÃªn TrÆ°á»ng");
+            throw new UnauthorizedException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
         }
         if (userRepository == null) {
-            throw new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng");
+            throw new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         if (user.getSchool() == null) {
-            throw new InvalidRequestException("TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i báº¥t ká»³ trÆ°á»ng há»c nÃ o");
+            throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");
         }
         return user;
     }

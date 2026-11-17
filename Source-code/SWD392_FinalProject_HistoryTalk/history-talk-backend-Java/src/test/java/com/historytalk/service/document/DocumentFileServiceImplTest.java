@@ -91,7 +91,7 @@ class DocumentFileServiceImplTest {
 
         assertThatThrownBy(() -> service.uploadPdfFile(UUID.randomUUID().toString(), file, UUID.randomUUID().toString(), "USER"))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("permission");
+                .hasMessageContaining("không có quyền");
 
         verifyNoInteractions(documentRepository, storageService);
     }
@@ -109,7 +109,7 @@ class DocumentFileServiceImplTest {
 
         assertThatThrownBy(() -> service.uploadPdfFile(docId.toString(), file, UUID.randomUUID().toString(), "CONTENT_ADMIN"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Document not found");
+                .hasMessageContaining("Không tìm thấy tài liệu");
 
         verify(storageService, never()).uploadPdf(any(), any(), any(), any());
     }
@@ -160,7 +160,7 @@ class DocumentFileServiceImplTest {
 
         assertThatThrownBy(() -> service.downloadPdfFile(docId.toString(), UUID.randomUUID().toString(), "CONTENT_ADMIN"))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("uploaded PDF");
+                .hasMessageContaining("file PDF");
 
         verify(storageService, never()).downloadPdf(any());
     }
