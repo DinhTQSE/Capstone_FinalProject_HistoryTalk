@@ -32,7 +32,7 @@ public class QuizController {
 
     /**
      * GET /quizzes
-     * Public endpoint â€” returns array (not paginated).
+     * Public endpoint — returns array (not paginated).
      * playCount is per-user if authenticated, 0 if not.
      */
     @GetMapping
@@ -49,7 +49,7 @@ public class QuizController {
 
     /**
      * GET /quizzes/:quizId
-     * Public endpoint â€” returns QuizSet shape.
+     * Public endpoint — returns QuizSet shape.
      */
     @GetMapping("/{quizId}")
     @Operation(summary = "Get quiz details", description = "Retrieve quiz detail. playCount reflects this user's completions (0 if unauthenticated).")

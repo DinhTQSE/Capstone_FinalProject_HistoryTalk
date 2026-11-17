@@ -19,17 +19,22 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
     /**
      * Customer — published quizzes only, optional title search (ILIKE).
+     * Global quizzes (school IS NULL) are visible to everyone; local quizzes only to their school.
      */
     @Query("""
             SELECT q FROM Quiz q
-            LEFT JOIN FETCH q.historicalContext
+            LEFT JOIN FETCH q.historicalContext hc
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
-            AND (:contextId IS NULL OR q.historicalContext.contextId = :contextId)
+            AND (:contextId IS NULL OR hc.contextId = :contextId)
+            AND (hc.school IS NULL OR (:schoolId IS NOT NULL AND hc.school.id = :schoolId))
             AND q.isPublished = true
             AND q.deletedAt IS NULL
             ORDER BY q.title ASC
             """)
-    List<Quiz> findAllActiveForCustomer(@Param("search") String search, @Param("contextId") UUID contextId);
+    List<Quiz> findAllActiveForCustomer(
+            @Param("search") String search,
+            @Param("contextId") UUID contextId,
+            @Param("schoolId") UUID schoolId);
 
     /**
      * Customer — single published quiz by ID.
@@ -46,7 +51,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     /**
      * Staff — paginated list with optional search and era filter.
      * era is filtered on historicalContext.era (not on Quiz directly).
-     * Shows all non-deleted quizzes regardless of isPublished.
+     * Platform admins (schoolId = null) see global quizzes; school staff see global + their own school's quizzes.
      */
     @Query(value = """
             SELECT q FROM Quiz q
@@ -55,6 +60,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
             AND (:era IS NULL OR hc.era = :era)
             AND (:includeDeleted = true OR q.deletedAt IS NULL)
+            AND (hc.school IS NULL OR (:schoolId IS NOT NULL AND hc.school.id = :schoolId))
             """,
             countQuery = """
             SELECT COUNT(q) FROM Quiz q
@@ -62,11 +68,13 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
             WHERE (CAST(:search AS string) IS NULL OR q.title ILIKE CONCAT('%', CAST(:search AS string), '%'))
             AND (:era IS NULL OR hc.era = :era)
             AND (:includeDeleted = true OR q.deletedAt IS NULL)
+            AND (hc.school IS NULL OR (:schoolId IS NOT NULL AND hc.school.id = :schoolId))
             """)
     Page<Quiz> findAllForStaff(
             @Param("search") String search,
             @Param("era") EventEra era,
             @Param("includeDeleted") boolean includeDeleted,
+            @Param("schoolId") UUID schoolId,
             Pageable pageable);
 
     @Query(value = """
@@ -85,14 +93,36 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     Page<Quiz> findByContextIdAndDeletedAtIsNull(@Param("contextId") UUID contextId, Pageable pageable);
 
     /**
-     * Duplicate title check for new quiz creation.
+     * Duplicate title check within tenant scope (global when schoolId is null, or same school) for active quizzes.
      */
-    boolean existsByTitleIgnoreCase(String title);
+    @Query("""
+            SELECT CASE WHEN COUNT(q) > 0 THEN true ELSE false END
+            FROM Quiz q
+            JOIN q.historicalContext hc
+            WHERE LOWER(q.title) = LOWER(:title)
+              AND q.deletedAt IS NULL
+              AND ((:schoolId IS NULL AND hc.school IS NULL)
+                   OR (:schoolId IS NOT NULL AND hc.school.id = :schoolId))
+            """)
+    boolean existsActiveByTitleInScope(@Param("title") String title, @Param("schoolId") UUID schoolId);
 
     /**
-     * Duplicate title check for quiz update (exclude self).
+     * Duplicate title check within tenant scope for quiz update (exclude self).
      */
-    boolean existsByTitleIgnoreCaseAndQuizIdNot(String title, UUID quizId);
+    @Query("""
+            SELECT CASE WHEN COUNT(q) > 0 THEN true ELSE false END
+            FROM Quiz q
+            JOIN q.historicalContext hc
+            WHERE LOWER(q.title) = LOWER(:title)
+              AND q.quizId <> :quizId
+              AND q.deletedAt IS NULL
+              AND ((:schoolId IS NULL AND hc.school IS NULL)
+                   OR (:schoolId IS NOT NULL AND hc.school.id = :schoolId))
+            """)
+    boolean existsActiveByTitleInScopeAndQuizIdNot(
+            @Param("title") String title,
+            @Param("schoolId") UUID schoolId,
+            @Param("quizId") UUID quizId);
 
     @Query("SELECT q FROM Quiz q LEFT JOIN FETCH q.historicalContext LEFT JOIN FETCH q.createdBy WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
     List<Quiz> findAllDeleted();

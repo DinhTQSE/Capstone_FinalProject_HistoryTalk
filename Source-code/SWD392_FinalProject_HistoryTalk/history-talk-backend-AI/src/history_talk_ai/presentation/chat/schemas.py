@@ -70,9 +70,10 @@ class ExamQuestionRequest(BaseModel):
     contextData: Optional[HistoricalContextData] = None
     askedQuestions: List[str] = Field(default_factory=list, description="Questions already asked in this session")
     usedSources: List[str] = Field(default_factory=list, description="Source excerpts already used in this session")
+    sourcePool: List[str] = Field(default_factory=list, description="Excerpts of the chat the exam was started from")
 
 
-class ExamGradeRequest(BaseModel):
+class ExamTurnRequest(BaseModel):
     characterId: str
     contextId: Optional[str] = None
     characterData: Optional[CharacterData] = None
@@ -81,6 +82,10 @@ class ExamGradeRequest(BaseModel):
     expectedAnswer: str
     sourceExcerpt: str
     answer: str = Field(..., min_length=1, max_length=4000)
+    askedQuestions: List[str] = Field(default_factory=list, description="Questions already asked in this session")
+    usedSources: List[str] = Field(default_factory=list, description="Source excerpts already used in this session")
+    askNext: bool = Field(True, description="False on the last question, which ends the exam")
+    sourcePool: List[str] = Field(default_factory=list, description="Excerpts of the chat the exam was started from")
 
 
 class SpeechRequest(BaseModel):
@@ -130,17 +135,6 @@ class ExamQuestionResponseData(BaseModel):
 class ExamQuestionResponse(BaseModel):
     success: bool = True
     data: ExamQuestionResponseData
-
-
-class ExamGradeResponseData(BaseModel):
-    verdict: Literal["CORRECT", "PARTIAL", "INCORRECT"]
-    feedback: str
-    tokenUsage: TokenUsage = Field(default_factory=TokenUsage)
-
-
-class ExamGradeResponse(BaseModel):
-    success: bool = True
-    data: ExamGradeResponseData
 
 
 class ErrorResponse(BaseModel):

@@ -15,14 +15,18 @@ import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.quiz.QuizQuestionId;
 import com.historytalk.entity.quiz.QuizSession;
+import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
+import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizQuestionRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.security.AuthenticatedPrincipal;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,7 +36,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -82,7 +91,7 @@ class QuizServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10);
         Quiz quiz = activeQuiz();
 
-        when(quizRepository.findAllForStaff(eq("history"), any(), eq(false), eq(pageable)))
+        when(quizRepository.findAllForStaff(eq("history"), any(), eq(false), isNull(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(quiz), pageable, 1));
         when(questionRepository.findActiveByQuizIds(List.of(quiz.getQuizId()))).thenReturn(List.of());
 
@@ -91,7 +100,7 @@ class QuizServiceImplTest {
 
         assertThat(response.getContent()).hasSize(1);
         ArgumentCaptor<Boolean> includeDeletedCaptor = ArgumentCaptor.forClass(Boolean.class);
-        verify(quizRepository).findAllForStaff(eq("history"), any(), includeDeletedCaptor.capture(), eq(pageable));
+        verify(quizRepository).findAllForStaff(eq("history"), any(), includeDeletedCaptor.capture(), isNull(), eq(pageable));
         assertThat(includeDeletedCaptor.getValue()).isFalse();
     }
 
@@ -169,7 +178,7 @@ class QuizServiceImplTest {
                 .questions(List.of(questionRequest("Câu 1"), questionRequest("Câu 2")))
                 .build();
 
-        when(quizRepository.existsByTitleIgnoreCase("Bạch Đằng")).thenReturn(false);
+        when(quizRepository.existsActiveByTitleInScope(eq("Bạch Đằng"), isNull())).thenReturn(false);
         when(userRepository.findById(template.getCreatedBy().getUid())).thenReturn(Optional.of(template.getCreatedBy()));
         when(historicalContextRepository.findById(template.getHistoricalContext().getContextId()))
                 .thenReturn(Optional.of(template.getHistoricalContext()));
@@ -357,5 +366,109 @@ class QuizServiceImplTest {
                 .createdBy(creator)
                 .isPublished(true)
                 .build();
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void customerCannotViewOrStartOtherSchoolLocalQuiz() {
+        UUID schoolAId = UUID.randomUUID();
+        UUID schoolBId = UUID.randomUUID();
+        Quiz schoolAQuiz = localQuiz(schoolAId);
+
+        User schoolBStudent = User.builder()
+                .uid(UUID.randomUUID())
+                .school(School.builder().id(schoolBId).build())
+                .build();
+
+        when(quizRepository.findActiveById(schoolAQuiz.getQuizId())).thenReturn(Optional.of(schoolAQuiz));
+        when(userRepository.findById(schoolBStudent.getUid())).thenReturn(Optional.of(schoolBStudent));
+
+        assertThatThrownBy(() -> quizService.getQuizByIdForCustomer(schoolAQuiz.getQuizId().toString(), schoolBStudent.getUid()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        assertThatThrownBy(() -> quizService.startQuiz(schoolAQuiz.getQuizId().toString(), schoolBStudent.getUid(), null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void teacherCanViewGlobalQuizInStaffButCannotModifyOrDeleteIt() {
+        UUID schoolAId = UUID.randomUUID();
+        User teacherA = User.builder()
+                .uid(UUID.randomUUID())
+                .school(School.builder().id(schoolAId).build())
+                .build();
+        setAuthPrincipal(teacherA.getUid(), "TEACHER");
+
+        Quiz globalQuiz = activeQuiz();
+        when(quizRepository.findById(globalQuiz.getQuizId())).thenReturn(Optional.of(globalQuiz));
+        when(userRepository.findById(teacherA.getUid())).thenReturn(Optional.of(teacherA));
+        when(questionRepository.findActiveByQuizId(globalQuiz.getQuizId())).thenReturn(List.of());
+
+        QuizStaffResponse viewed = quizService.getQuizByIdForStaff(globalQuiz.getQuizId().toString());
+        assertThat(viewed.getQuizId()).isEqualTo(globalQuiz.getQuizId().toString());
+
+        assertThatThrownBy(() -> quizService.softDeleteQuiz(globalQuiz.getQuizId().toString()))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> quizService.deleteQuiz(globalQuiz.getQuizId().toString()))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void teacherCannotViewOrModifyOtherSchoolLocalQuiz() {
+        UUID schoolAId = UUID.randomUUID();
+        UUID schoolBId = UUID.randomUUID();
+        User teacherA = User.builder()
+                .uid(UUID.randomUUID())
+                .school(School.builder().id(schoolAId).build())
+                .build();
+        setAuthPrincipal(teacherA.getUid(), "TEACHER");
+
+        Quiz schoolBQuiz = localQuiz(schoolBId);
+        when(quizRepository.findById(schoolBQuiz.getQuizId())).thenReturn(Optional.of(schoolBQuiz));
+        when(userRepository.findById(teacherA.getUid())).thenReturn(Optional.of(teacherA));
+
+        assertThatThrownBy(() -> quizService.getQuizByIdForStaff(schoolBQuiz.getQuizId().toString()))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> quizService.softDeleteQuiz(schoolBQuiz.getQuizId().toString()))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void getQuizByIdForStaffRejectsSoftDeletedQuiz() {
+        Quiz deletedQuiz = activeQuiz();
+        deletedQuiz.setDeletedAt(LocalDateTime.now());
+
+        when(quizRepository.findById(deletedQuiz.getQuizId())).thenReturn(Optional.of(deletedQuiz));
+
+        assertThatThrownBy(() -> quizService.getQuizByIdForStaff(deletedQuiz.getQuizId().toString()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    private Quiz localQuiz(UUID schoolId) {
+        School school = School.builder().id(schoolId).build();
+        User creator = User.builder().uid(UUID.randomUUID()).userName("teacher").school(school).build();
+        HistoricalContext context = HistoricalContext.builder()
+                .contextId(UUID.randomUUID())
+                .name("Local Context")
+                .school(school)
+                .createdBy(creator)
+                .build();
+        return Quiz.builder()
+                .quizId(UUID.randomUUID())
+                .title("Local School Quiz")
+                .historicalContext(context)
+                .createdBy(creator)
+                .isPublished(true)
+                .build();
+    }
+
+    private void setAuthPrincipal(UUID uid, String role) {
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal("test@school.edu", uid.toString(), role);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of()));
     }
 }

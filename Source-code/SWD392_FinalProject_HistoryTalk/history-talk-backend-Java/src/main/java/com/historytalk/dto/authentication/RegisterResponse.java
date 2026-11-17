@@ -15,5 +15,6 @@ public class RegisterResponse {
     private String userName;
     private String email;
     private String role;
+    private Boolean emailVerified;
     private String message;
 }

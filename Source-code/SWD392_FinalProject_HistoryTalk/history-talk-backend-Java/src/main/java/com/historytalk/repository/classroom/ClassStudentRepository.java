@@ -83,8 +83,8 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
                    u.email AS "email",
                    COALESCE(SUM(CASE WHEN m.deleted_at IS NULL THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "tokensUsedTotal",
                    COALESCE(SUM(CASE WHEN m.deleted_at IS NULL AND m.created_at >= :todayStart THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "tokensUsedToday",
-                   COALESCE(u.daily_tokens_used, 0) AS "dailyTokensUsed",
-                   COALESCE(u.daily_bonus_tokens, 0) AS "dailyBonusTokens",
+                   CASE WHEN u.last_token_reset_at >= :todayStart THEN COALESCE(u.daily_tokens_used, 0) ELSE 0 END AS "dailyTokensUsed",
+                   CASE WHEN u.last_token_reset_at >= :todayStart THEN COALESCE(u.daily_bonus_tokens, 0) ELSE 0 END AS "dailyBonusTokens",
                    COUNT(DISTINCT m.message_id) AS "messageCount",
                    MAX(m.created_at) AS "lastActiveAt"
             FROM class_student cs
@@ -99,7 +99,7 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, UUID
                    OR (u.student_code IS NOT NULL AND u.student_code ILIKE CONCAT('%', CAST(:search AS text), '%'))
                    OR u.user_name ILIKE CONCAT('%', CAST(:search AS text), '%')
                    OR u.email ILIKE CONCAT('%', CAST(:search AS text), '%'))
-            GROUP BY u.uid, u.student_code, u.full_name, u.user_name, u.email, u.daily_tokens_used, u.daily_bonus_tokens
+            GROUP BY u.uid, u.student_code, u.full_name, u.user_name, u.email, u.daily_tokens_used, u.daily_bonus_tokens, u.last_token_reset_at
             ORDER BY "tokensUsedTotal" DESC
             """,
             countQuery = """

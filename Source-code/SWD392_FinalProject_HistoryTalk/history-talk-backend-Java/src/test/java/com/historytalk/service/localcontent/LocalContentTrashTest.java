@@ -8,7 +8,7 @@ import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
-import com.historytalk.exception.UnauthorizedException;
+import com.historytalk.exception.ForbiddenException;
 import com.historytalk.repository.ClassLocalContentRepository;
 import com.historytalk.repository.DocumentMediaMetadataRepository;
 import com.historytalk.repository.LocalCharacterRepository;
@@ -95,7 +95,7 @@ class LocalContentTrashTest {
 
         assertThatThrownBy(() -> localContentService.restoreLocalContext(
                 trashedContext.getContextId().toString(), otherTeacherPrincipal))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class);
         assertThat(trashedContext.getDeletedAt()).isNotNull();
     }
 
@@ -106,7 +106,7 @@ class LocalContentTrashTest {
 
         assertThatThrownBy(() -> localContentService.permanentDeleteLocalContext(
                 trashedContext.getContextId().toString(), otherTeacherPrincipal))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class);
         verify(localContextRepo, never()).delete(any(HistoricalContext.class));
     }
 
@@ -144,6 +144,6 @@ class LocalContentTrashTest {
 
         assertThatThrownBy(() -> localContentService.restoreLocalCharacter(
                 trashedCharacter.getCharacterId().toString(), otherTeacherPrincipal))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class);
     }
 }

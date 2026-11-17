@@ -82,6 +82,15 @@ public class HistoricalContext {
     @Column(name = "battle_map", columnDefinition = "jsonb")
     private String battleMap;
 
+    /**
+     * Nullable JSON story script (version, title, narratorId, status, updatedAt, nodes[], edges[]).
+     * Validated in the service layer; only CONTENT_ADMIN / SYSTEM_ADMIN may write it.
+     * Learners only receive it once its status is "published".
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "story_script", columnDefinition = "jsonb")
+    private String storyScript;
+
     @Column(name = "video_url", length = 500)
     private String videoUrl;
 

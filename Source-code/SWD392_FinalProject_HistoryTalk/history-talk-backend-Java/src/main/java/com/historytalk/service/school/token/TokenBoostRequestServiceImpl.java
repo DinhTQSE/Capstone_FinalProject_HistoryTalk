@@ -59,7 +59,8 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         UserPrincipal principal = resolvePrincipal(studentPrincipal);
         UUID studentUid = UUID.fromString(principal.getUid());
 
-        User student = userRepository.findById(studentUid)
+        // Lock the student row so parallel submissions cannot both pass the one-request-per-day check
+        User student = userRepository.findByIdForUpdate(studentUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản học sinh"));
 
         if (student.getRole() != UserRole.SCHOOL_STUDENT || student.getSchool() == null) {
@@ -72,11 +73,15 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         }
 
         Classroom classroom = activeClassrooms.get(0);
-        LocalDate today = LocalDate.now();
+        LocalDate today = TokenDay.today();
 
-        if (tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatus(
-                studentUid, today, TokenBoostRequestStatus.PENDING)) {
-            throw new DataConflictException("Bạn đã có một yêu cầu xin thêm token đang chờ duyệt trong ngày hôm nay.");
+        // MSG38: one request per day; only a rejected request lets the student ask again the same day
+        if (tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatusIn(
+                studentUid, today, java.util.List.of(
+                        TokenBoostRequestStatus.PENDING,
+                        TokenBoostRequestStatus.PENDING_ADMIN,
+                        TokenBoostRequestStatus.APPROVED))) {
+            throw new DataConflictException("Bạn đã gửi yêu cầu xin thêm token trong ngày hôm nay. Mỗi ngày chỉ được gửi một yêu cầu.");
         }
 
         TokenBoostRequest boostRequest = TokenBoostRequest.builder()
@@ -133,7 +138,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + request.getClassroomId()));
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = TokenDay.today();
         TokenBoostRequest ticket = TokenBoostRequest.builder()
                 .school(school)
                 .classroom(targetClassroom)
@@ -189,7 +194,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         int tokensToGrant = request.getTokens();
         transferFromTeacherAllowanceToStudent(teacher, student, teacherClass, school, tokensToGrant);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = TokenDay.today();
         String reason = (request.getReason() != null && !request.getReason().isBlank())
                 ? request.getReason().trim()
                 : "Giáo viên cấp trực tiếp token từ hạn mức giáo viên trong ngày";
@@ -312,7 +317,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         User reviewer = userRepository.findById(reviewerUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người duyệt"));
 
-        TokenBoostRequest boostRequest = tokenBoostRequestRepository.findById(requestId)
+        TokenBoostRequest boostRequest = tokenBoostRequestRepository.findByIdForUpdate(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu xin thêm token với ID: " + requestId));
 
         if (principal.getSchoolId() == null || !principal.getSchoolId().equals(boostRequest.getSchool().getId())) {
@@ -344,6 +349,11 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
             if (tokensToGrant <= 0) {
                 throw new InvalidRequestException("Số lượng token duyệt cấp phải lớn hơn 0.");
+            }
+            if (boostRequest.getRequestedTokens() != null && tokensToGrant > boostRequest.getRequestedTokens()) {
+                throw new InvalidRequestException(String.format(
+                        "Số token duyệt (%,d) không được vượt quá số token đã xin (%,d).",
+                        tokensToGrant, boostRequest.getRequestedTokens()));
             }
 
             School school = boostRequest.getSchool();
@@ -386,9 +396,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
             if (principal.getRole() != UserRole.TEACHER) {
                 throw new InvalidRequestException("Chỉ Giáo viên mới sử dụng thao tác chuyển tiếp (ESCALATE) ticket lên School Admin.");
             }
-            if (reviewDto.getApprovedTokens() != null && reviewDto.getApprovedTokens() > 0) {
-                boostRequest.setRequestedTokens(reviewDto.getApprovedTokens());
-            }
+            // The amount stays what the requester asked for; the School Admin may approve less, never more
             boostRequest.setStatus(TokenBoostRequestStatus.PENDING_ADMIN);
             boostRequest.setTeacherReviewedBy(reviewer);
             boostRequest.setTeacherReviewNote(reviewDto.getReviewNote() != null
@@ -432,10 +440,8 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                     tokensToGrant, availablePool));
         }
 
-        LocalDate today = LocalDate.now();
-
         // Prepare teacher daily allowance
-        if (teacher.getLastTokenResetAt() == null || teacher.getLastTokenResetAt().toLocalDate().isBefore(today)) {
+        if (TokenDay.isNewDay(teacher.getLastTokenResetAt())) {
             teacher.setDailyTokensUsed(0);
             teacher.setDailyBonusTokens(0);
             teacher.setLastTokenResetAt(LocalDateTime.now());
@@ -468,8 +474,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
     private void grantDailyBonusFromSchoolPool(
             User targetUser, Classroom classroom, School school, int tokensToGrant, int availablePool) {
-        LocalDate today = LocalDate.now();
-        if (targetUser.getLastTokenResetAt() == null || targetUser.getLastTokenResetAt().toLocalDate().isBefore(today)) {
+        if (TokenDay.isNewDay(targetUser.getLastTokenResetAt())) {
             targetUser.setDailyTokensUsed(0);
             targetUser.setDailyBonusTokens(0);
         }

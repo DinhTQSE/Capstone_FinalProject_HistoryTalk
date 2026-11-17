@@ -35,6 +35,9 @@ class DocumentFileServiceImplTest {
     @Mock
     private SupabaseDocumentStorageService storageService;
 
+    @Mock
+    private com.historytalk.security.ContentAccessPolicy contentAccessPolicy;
+
     @InjectMocks
     private DocumentFileServiceImpl service;
 
@@ -160,7 +163,7 @@ class DocumentFileServiceImplTest {
 
         assertThatThrownBy(() -> service.downloadPdfFile(docId.toString(), UUID.randomUUID().toString(), "CONTENT_ADMIN"))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("file PDF");
+                .hasMessageContaining("không có file PDF");
 
         verify(storageService, never()).downloadPdf(any());
     }
@@ -179,6 +182,7 @@ class DocumentFileServiceImplTest {
                 .build();
 
         when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(contentAccessPolicy.canView(document, "CONTENT_ADMIN")).thenReturn(true);
         when(storageService.createSignedPdfUrl(document.getFileUrl(), 300, docId + ".pdf"))
                 .thenReturn(new DocumentPdfUrl("https://example.supabase.co/signed.pdf", 300));
 
@@ -187,5 +191,24 @@ class DocumentFileServiceImplTest {
         assertThat(response.url()).isEqualTo("https://example.supabase.co/signed.pdf");
         assertThat(response.expiresIn()).isEqualTo(300);
         verify(storageService).createSignedPdfUrl("documents/context/" + entityId + "/" + docId + ".pdf", 300, docId + ".pdf");
+    }
+
+    @Test
+    void createPdfUrlHidesDocumentTheCallerCannotRead() {
+        UUID docId = UUID.randomUUID();
+        Document document = Document.builder()
+                .docId(docId)
+                .entityId(UUID.randomUUID())
+                .entityType(EntityType.CONTEXT)
+                .fileUrl("documents/context/x/" + docId + ".pdf")
+                .documentType(DocumentType.PDF)
+                .build();
+
+        when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(contentAccessPolicy.canView(document, "SCHOOL_STUDENT")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createPdfUrl(docId.toString(), UUID.randomUUID().toString(), "SCHOOL_STUDENT"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(storageService);
     }
 }

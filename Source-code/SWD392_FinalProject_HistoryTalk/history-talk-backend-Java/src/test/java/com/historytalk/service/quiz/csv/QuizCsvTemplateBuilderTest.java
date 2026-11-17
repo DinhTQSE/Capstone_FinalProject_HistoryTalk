@@ -38,6 +38,23 @@ class QuizCsvTemplateBuilderTest {
     }
 
     @Test
+    void templateStartsWithGuidanceComments() {
+        String content = new String(builder.build(), StandardCharsets.UTF_8).substring(1); // drop BOM char
+
+        assertThat(content).startsWith("# ");
+        assertThat(content).contains("ĐẾM TỪ 0");
+    }
+
+    @Test
+    void templateHeaderHasNoTitleOrContextId() {
+        String content = new String(builder.build(), StandardCharsets.UTF_8).substring(1);
+        String header = content.lines().filter(line -> !line.startsWith("#")).findFirst().orElseThrow();
+
+        assertThat(header).isEqualTo("level,questionType,questionContent,option1,option2,option3,option4,"
+                + "option5,option6,correctAnswer,caseSensitive,trimWhitespace,explanation");
+    }
+
+    @Test
     void templateRoundTripsThroughReaderAndParser() {
         QuizCsvRowParser parser = new QuizCsvRowParser(List.of(
                 new MultipleChoiceCsvParser(objectMapper),
@@ -55,7 +72,7 @@ class QuizCsvTemplateBuilderTest {
             assertThatCode(() -> validator.validate(request.getQuestionType(), request.getQuestionData()))
                     .doesNotThrowAnyException();
         }
-        assertThat(records).extracting(r -> r.get("title")).containsOnly(records.get(0).get("title"));
+        assertThat(records).hasSize(3);
         // One quiz whose questions each carry their own difficulty
         assertThat(requests).extracting(QuestionRequest::getDifficulty).containsExactly(
                 QuestionDifficulty.EASY, QuestionDifficulty.MEDIUM, QuestionDifficulty.HARD);

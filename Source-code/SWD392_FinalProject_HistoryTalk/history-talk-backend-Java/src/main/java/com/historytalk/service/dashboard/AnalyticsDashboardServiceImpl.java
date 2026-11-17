@@ -31,6 +31,7 @@ import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.utils.SecurityUtils;
+import com.historytalk.service.school.token.TokenDay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -39,7 +40,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.management.ManagementFactory;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -94,7 +94,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         double studentPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByStudents * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
         double teacherPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByTeachers * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         List<ClassroomTokenUsageProjection> topClassProjections = classroomRepository.findTopClassroomsByTokenUsage(finalSchoolId, todayStart, 5);
         List<ClassroomTokenUsageSummaryDto> topClassrooms = (topClassProjections != null) ? topClassProjections.stream()
                 .map(p -> ClassroomTokenUsageSummaryDto.builder()
@@ -210,7 +210,6 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         List<UUID> studentUids = classStudentRepository.findEnrolledStudentUids(classId);
         long studentCount = studentUids.size();
 
-        LocalDate today = LocalDate.now();
         List<TeacherClassroomDashboardResponse.StudentAnalyticsItem> studentItems = new ArrayList<>();
         long totalAiMessages = 0L;
         if (!studentUids.isEmpty()) {
@@ -230,8 +229,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 long aiMessages = messageCountMap.getOrDefault(student.getUid(), 0L);
                 totalAiMessages += aiMessages;
 
-                boolean isSameDay = student.getLastTokenResetAt() != null
-                        && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
+                boolean isSameDay = !TokenDay.isNewDay(student.getLastTokenResetAt());
                 int usedToday = isSameDay && student.getDailyTokensUsed() != null
                         ? Math.max(0, student.getDailyTokensUsed())
                         : 0;
@@ -318,13 +316,11 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             }
         }
 
-        LocalDate today = LocalDate.now();
-        boolean isSameDay = student.getLastTokenResetAt() != null
-                && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
+        boolean isSameDay = !TokenDay.isNewDay(student.getLastTokenResetAt());
         int bonusToday = isSameDay && student.getDailyBonusTokens() != null
                 ? Math.max(0, student.getDailyBonusTokens())
                 : 0;
-        long queriedTokensUsedToday = messageRepository.sumTokensUsedByUserSince(studentUid, today.atStartOfDay());
+        long queriedTokensUsedToday = messageRepository.sumTokensUsedByUserSince(studentUid, TokenDay.startOfToday());
         int trackedUsedToday = isSameDay && student.getDailyTokensUsed() != null
                 ? Math.max(0, student.getDailyTokensUsed())
                 : 0;
@@ -623,7 +619,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             throw new ResourceNotFoundException("School not found with id: " + resolvedSchoolId);
         }
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
         long schoolTotal = messageRepository.sumTokensUsedBySchoolStudents(resolvedSchoolId)
@@ -692,7 +688,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 ? Math.max(0, school.getUnallocatedTokenQuota())
                 : 0;
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
         Pageable safePageable = (pageable != null)
@@ -747,7 +743,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         User teacher = userRepository.findById(teacherUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with id: " + teacherUid));
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         List<ClassroomTokenUsageProjection> projections = classroomRepository.findClassroomsTokenUsageForTeacher(
                 schoolId, teacherUid, todayStart);
 

@@ -14,6 +14,8 @@ import com.historytalk.dto.authentication.RegisterResponse;
 import com.historytalk.dto.authentication.RegisterStaffRequest;
 import com.historytalk.dto.authentication.RegisterStaffResponse;
 import com.historytalk.dto.authentication.ResetPasswordRequest;
+import com.historytalk.dto.authentication.ResendVerificationRequest;
+import com.historytalk.dto.authentication.VerifyEmailRequest;
 import com.historytalk.service.authentication.AuthService;
 import com.historytalk.service.authentication.GoogleOAuthService;
 import com.historytalk.utils.SecurityUtils;
@@ -58,6 +60,26 @@ public class AuthController {
         RegisterResponse data = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(data, "User registered successfully"));
+    }
+
+    @PostMapping("/verify-email")
+    @Operation(summary = "Verify email", description = "Verify a newly registered user's email address using the verification token.")
+    public ResponseEntity<ApiResponse<?>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request) {
+
+        log.info("POST /api/v1/auth/verify-email");
+        authService.verifyEmail(request.getToken());
+        return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully"));
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Resend email verification", description = "Resend verification link if the account exists and is not yet verified.")
+    public ResponseEntity<ApiResponse<?>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request) {
+
+        log.info("POST /api/v1/auth/resend-verification");
+        authService.resendVerificationEmail(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null, "If the account exists and is not verified, a verification email has been sent"));
     }
 
     @PostMapping("/register-content-admin")

@@ -9,6 +9,7 @@ import com.historytalk.dto.payment.PaymentHistoryResponse;
 import com.historytalk.dto.payment.PayOSReturnRequest;
 import com.historytalk.dto.payment.PayOSReturnResponse;
 import com.historytalk.dto.payment.TierResponse;
+import com.historytalk.dto.payment.UpgradeQuoteResponse;
 import com.historytalk.entity.enums.PaymentOrderStatus;
 import com.historytalk.service.payment.PaymentService;
 import com.historytalk.utils.SecurityUtils;
@@ -29,7 +30,7 @@ public class PaymentController {
 
     /**
      * Creates a PayOS payment link for the given tier.
-     * Requires authentication â€” the user's uid is read from the JWT via
+     * Requires authentication — the user's uid is read from the JWT via
      * SecurityUtils.
      */
     @PostMapping("/checkout")
@@ -38,6 +39,19 @@ public class PaymentController {
         UUID uid = UUID.fromString(SecurityUtils.getUserId());
         CreatePaymentResponse response = paymentService.createPayOSCheckout(uid, request.getTierId());
         return ResponseEntity.ok(ApiResponse.success(response, "Payment checkout created successfully"));
+    }
+
+    /**
+     * Previews the price of buying the given tier. If the user has an active paid plan and the
+     * target is a higher level (or a longer plan of the same level), the unused part of the
+     * current plan is deducted as credit. Downgrades return 400.
+     */
+    @GetMapping("/upgrade-quote")
+    @PreAuthorize("hasAnyRole('CUSTOMER','SCHOOL_ADMIN')")
+    public ResponseEntity<ApiResponse<UpgradeQuoteResponse>> getUpgradeQuote(@RequestParam String tierId) {
+        UUID uid = UUID.fromString(SecurityUtils.getUserId());
+        UpgradeQuoteResponse response = paymentService.getUpgradeQuote(uid, tierId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Upgrade quote calculated successfully"));
     }
 
     /**
@@ -71,7 +85,7 @@ public class PaymentController {
 
     /**
      * Lists all active tiers available for purchase.
-     * Public â€” no authentication required.
+     * Public — no authentication required.
      */
     @GetMapping("/tiers")
     public ResponseEntity<ApiResponse<List<TierResponse>>> listTiers() {
@@ -87,7 +101,7 @@ public class PaymentController {
      * must POST them here so the backend can update the order status for the UI
      * without waiting for the async webhook.
      *
-     * Requires authentication â€” the order ownership is validated against the
+     * Requires authentication — the order ownership is validated against the
      * authenticated user's uid so that users cannot update each other's orders.
      *
      * This endpoint does NOT upgrade the user's tier; that remains exclusively

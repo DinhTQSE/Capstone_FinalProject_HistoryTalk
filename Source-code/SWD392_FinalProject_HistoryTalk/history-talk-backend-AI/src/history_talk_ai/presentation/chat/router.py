@@ -10,12 +10,10 @@ from history_talk_ai.presentation.chat.schemas import (
     ChatRequest,
     ChatResponse,
     ChatResponseData,
-    ExamGradeRequest,
-    ExamGradeResponse,
-    ExamGradeResponseData,
     ExamQuestionRequest,
     ExamQuestionResponse,
     ExamQuestionResponseData,
+    ExamTurnRequest,
     GenerateTitleRequest,
     GenerateTitleResponse,
     GenerateTitleResponseData,
@@ -28,6 +26,7 @@ from history_talk_ai.presentation.chat.schemas import (
 )
 from history_talk_ai.dataaccess.java_backend.character_schema import CharacterData
 from history_talk_ai.dataaccess.java_backend.historical_context_schema import HistoricalContextData
+from history_talk_ai.common.config.settings import settings
 from history_talk_ai.dataaccess.java_backend import client as java_client
 from history_talk_ai.application.chat import exam_service, service as llm_service
 from history_talk_ai.dataaccess.java_backend.client import JavaClientNotFoundError, JavaBackendError
@@ -245,6 +244,7 @@ async def exam_question(body: ExamQuestionRequest) -> ExamQuestionResponse:
             context=context,
             asked_questions=body.askedQuestions,
             used_sources=body.usedSources,
+            source_pool=body.sourcePool,
         )
     except exam_service.ExamSourceUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
@@ -268,46 +268,48 @@ async def exam_question(body: ExamQuestionRequest) -> ExamQuestionResponse:
     )
 
 
-# ── POST /v1/ai/exam/grade ───────────────────────────────────────────────────
+# ── POST /v1/ai/exam/turn/stream ─────────────────────────────────────────────
 
 @router.post(
-    "/exam/grade",
-    response_model=ExamGradeResponse,
-    summary="Grade a learner's oral-exam answer against the source excerpt",
+    "/exam/turn/stream",
+    summary="Grade an oral-exam answer and ask a follow-up question, streamed",
+    description=(
+        "Streams the feedback, then the bubble separator and a next question built on the learner's answer. "
+        "The final metadata event holds the verdict and the next answer key, which must not reach the learner."
+    ),
 )
-async def exam_grade(body: ExamGradeRequest) -> ExamGradeResponse:
-    character, _ = await _resolve_character_and_context(
+async def exam_turn_stream(body: ExamTurnRequest):
+    character, context = await _resolve_character_and_context(
         body.characterId,
         body.contextId,
         body.characterData,
         body.contextData,
     )
 
-    try:
-        verdict, feedback, prompt_tokens, completion_tokens = await exam_service.grade_exam_answer(
-            character=character,
-            question=body.question,
-            expected_answer=body.expectedAnswer,
-            source=body.sourceExcerpt,
-            answer=body.answer,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"LLM error: {exc}",
-        )
+    async def event_generator():
+        try:
+            stream = exam_service.stream_exam_turn(
+                character=character,
+                context=context,
+                question=body.question,
+                expected_answer=body.expectedAnswer,
+                source=body.sourceExcerpt,
+                answer=body.answer,
+                asked_questions=body.askedQuestions,
+                used_sources=body.usedSources,
+                ask_next=body.askNext,
+                source_pool=body.sourcePool,
+            )
+            async for chunk in stream:
+                if isinstance(chunk, dict):
+                    yield f"data: {json.dumps({'type': 'metadata', 'data': chunk})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
+        except Exception as exc:
+            logger.error(f"Exam turn stream failed: {exc}")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Dịch vụ AI đang gặp sự cố. Vui lòng thử lại sau.'})}\n\n"
 
-    return ExamGradeResponse(
-        data=ExamGradeResponseData(
-            verdict=verdict,
-            feedback=feedback,
-            tokenUsage=TokenUsage(
-                promptTokens=prompt_tokens,
-                completionTokens=completion_tokens,
-                totalTokens=prompt_tokens + completion_tokens,
-            ),
-        )
-    )
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ── POST /v1/ai/tts ───────────────────────────────────────────────────────────
@@ -423,19 +425,36 @@ async def proxy_context(context_id: str):
 )
 async def describe_images(body: DescribeImagesRequest):
     try:
-        results = []
-        for item in body.images:
-            desc = await llm_service.describe_historical_image(
-                image_base64=item.image_base64,
-                caption=item.caption
-            )
-            results.append(
-                DescribedImageItem(
+        if not body.images:
+            return DescribeImagesResponse(success=True, data=[])
+
+        sem = asyncio.Semaphore(max(1, settings.VISION_CONCURRENCY))
+
+        async def _describe_one(item):
+            async with sem:
+                try:
+                    desc = await llm_service.describe_historical_image(
+                        image_base64=item.image_base64,
+                        caption=item.caption,
+                    )
+                except Exception as item_exc:
+                    logger.warning(
+                        "Vision description failed for page %s: %s",
+                        item.page_number,
+                        item_exc,
+                    )
+                    desc = (
+                        f"\n[Hình ảnh trang {item.page_number}: {item.caption}]\n"
+                        if item.caption
+                        else f"\n[Hình ảnh trang {item.page_number}]\n"
+                    )
+                return DescribedImageItem(
                     page_number=item.page_number,
                     caption=item.caption,
-                    description_block=desc
+                    description_block=desc,
                 )
-            )
+
+        results = list(await asyncio.gather(*[_describe_one(item) for item in body.images]))
         return DescribeImagesResponse(success=True, data=results)
     except Exception as exc:
         raise HTTPException(

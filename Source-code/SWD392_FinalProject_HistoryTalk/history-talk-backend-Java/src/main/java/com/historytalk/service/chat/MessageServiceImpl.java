@@ -9,11 +9,13 @@ import com.historytalk.dto.chat.SendMessageResponse;
 import com.historytalk.entity.chat.ChatSession;
 import com.historytalk.entity.chat.Message;
 import com.historytalk.entity.enums.ChatSessionMode;
-
+import com.historytalk.entity.enums.SubmissionStatus;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.SystemException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.MessageRepository;
+import com.historytalk.repository.assignment.AssignmentSubmissionRepository;
 import com.historytalk.service.chat.AiServiceClient;
 import com.historytalk.service.chat.AiServiceClient.AiChatResult;
 import com.historytalk.service.chat.AiServiceClient.CharacterPayload;
@@ -58,6 +60,9 @@ public class MessageServiceImpl implements MessageService {
     private final ExamSessionService examSessionService;
     private final ChatTokenCharger chatTokenCharger;
     private final TransactionTemplate transactionTemplate;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AssignmentSubmissionRepository assignmentSubmissionRepository;
 
     // ── GET /chat/sessions/{id}/messages ──────────────────────────────────
 
@@ -189,7 +194,7 @@ public class MessageServiceImpl implements MessageService {
         PreparedTurn turn = transactionTemplate.execute(status -> prepareTurn(userId, request));
 
         if (turn.exam()) {
-            return streamExamTurn(examSessionService.submitAnswer(turn.sessionId(), request));
+            return streamExamTurn(turn.sessionId(), request);
         }
 
         SseEmitter emitter = new SseEmitter(180000L); // 3 minutes timeout
@@ -307,6 +312,11 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat session not found with ID: " + request.getSessionId()));
 
+        if (assignmentSubmissionRepository != null && assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(
+                session.getSessionId(), List.of(SubmissionStatus.SUBMITTED, SubmissionStatus.LATE_SUBMITTED))) {
+            throw new InvalidRequestException("Phiên trò chuyện này đã được dùng để nộp bài tập, không thể gửi thêm tin nhắn mới");
+        }
+
         verifyUserTokenAndSubscriptionBeforeChat(session.getUser());
 
         if (session.getMode() == ChatSessionMode.EXAM) {
@@ -412,33 +422,55 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * Exam turns are generated as a whole because the reply depends on the parsed grade. They are still
-     * sent as the stream events clients already handle, so the streaming endpoint keeps working in exam mode.
+     * Streams the feedback and the follow-up question as they are written. The answer key of the next
+     * question only travels between the AI service and Java, so it never reaches the client.
      */
-    private SseEmitter streamExamTurn(ExamTurnResult turn) {
-        MessageResponse assistant = mapToMessageResponse(turn.assistantMessage());
-
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("suggestedQuestions", Collections.emptyList());
-        metadata.put("promptTokens", turn.promptTokens());
-        metadata.put("completionTokens", turn.completionTokens());
-        metadata.put("quotes_used", assistant.getQuotes());
-        metadata.put("examVerdict", assistant.getExamVerdict());
-        metadata.put("exam", turn.progress());
-
+    private SseEmitter streamExamTurn(UUID sessionId, SendMessageRequest request) {
         SseEmitter emitter = new SseEmitter(180000L);
-        try {
-            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(
-                    Map.of("type", "text", "data", assistant.getContent()))));
-            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(
-                    Map.of("type", "metadata", "data", metadata))));
-            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(
-                    Map.of("type", "done", "remainingTokens", turn.remainingTokens()))));
-            emitter.complete();
-        } catch (IOException e) {
-            emitter.completeWithError(e);
-        }
+
+        examSessionService.streamAnswer(sessionId, request, new ExamSessionService.ExamStreamListener() {
+            @Override
+            public void onText(String text) {
+                send(emitter, Map.of("type", "text", "data", text));
+            }
+
+            @Override
+            public void onComplete(ExamTurnResult turn) {
+                MessageResponse assistant = mapToMessageResponse(turn.assistantMessage());
+
+                Map<String, Object> metadata = new LinkedHashMap<>();
+                metadata.put("suggestedQuestions", Collections.emptyList());
+                metadata.put("promptTokens", turn.promptTokens());
+                metadata.put("completionTokens", turn.completionTokens());
+                metadata.put("quotes_used", assistant.getQuotes());
+                metadata.put("examVerdict", assistant.getExamVerdict());
+                metadata.put("exam", turn.progress());
+
+                send(emitter, Map.of("type", "metadata", "data", metadata));
+                send(emitter, Map.of("type", "done", "remainingTokens", turn.remainingTokens()));
+                emitter.complete();
+            }
+
+            @Override
+            public void onError(RuntimeException error) {
+                send(emitter, Map.of("type", "error", "message", error.getMessage() != null
+                        ? error.getMessage()
+                        : "Dịch vụ AI không trả lời. Vui lòng thử lại."));
+                send(emitter, Map.of("type", "done"));
+                emitter.complete();
+            }
+        });
+
         return emitter;
+    }
+
+    /** The client may have left mid-stream; the turn is still saved, so a failed send is only logged. */
+    private void send(SseEmitter emitter, Map<String, ?> event) {
+        try {
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(event)));
+        } catch (IOException | IllegalStateException e) {
+            log.debug("Exam stream event not delivered: {}", e.getMessage());
+        }
     }
 
     private void verifyUserTokenAndSubscriptionBeforeChat(com.historytalk.entity.user.User user) {

@@ -19,6 +19,14 @@ public interface TokenBoostRequestRepository extends JpaRepository<TokenBoostReq
     boolean existsByStudent_UidAndRequestDateAndStatus(
             UUID studentUid, LocalDate requestDate, TokenBoostRequestStatus status);
 
+    boolean existsByStudent_UidAndRequestDateAndStatusIn(
+            UUID studentUid, LocalDate requestDate, java.util.Collection<TokenBoostRequestStatus> statuses);
+
+    /** Row lock so two reviewers (or a double click) cannot process the same ticket twice. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM TokenBoostRequest r WHERE r.id = :id")
+    java.util.Optional<TokenBoostRequest> findByIdForUpdate(@Param("id") UUID id);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"classroom", "student", "requester", "teacherReviewedBy", "adminReviewedBy", "reviewedBy"})
     List<TokenBoostRequest> findByStudent_UidOrderByCreatedAtDesc(UUID studentUid);
 

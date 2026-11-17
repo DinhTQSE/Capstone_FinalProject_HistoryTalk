@@ -1,5 +1,6 @@
 package com.historytalk.config;
 
+import com.historytalk.repository.UserRepository;
 import com.historytalk.security.JwtAuthenticationFilter;
 import com.historytalk.security.JwtTokenProvider;
 import com.historytalk.security.oauth2.OAuth2AuthenticationFailureHandler;
@@ -53,6 +54,7 @@ import java.util.stream.Collectors;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler;
@@ -63,7 +65,7 @@ public class SecurityConfig {
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtTokenProvider);
+        return new JwtAuthenticationFilter(jwtTokenProvider, userRepository);
     }
 
     @Bean

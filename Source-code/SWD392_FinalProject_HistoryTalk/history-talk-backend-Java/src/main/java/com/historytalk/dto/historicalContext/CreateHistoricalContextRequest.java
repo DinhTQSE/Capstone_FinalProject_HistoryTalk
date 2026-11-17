@@ -35,13 +35,16 @@ public class CreateHistoricalContextRequest {
     private EventCategory category;
 
     @JsonProperty("year")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     @NotNull(message = "Yêu cầu năm diễn ra")
     private Integer year;
 
     @JsonProperty("startYear")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer startYear;
 
     @JsonProperty("endYear")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer endYear;
 
     @JsonProperty("isBC")
@@ -68,6 +71,13 @@ public class CreateHistoricalContextRequest {
      */
     @JsonProperty("battleMap")
     private Object battleMap;
+
+    /**
+     * Optional. Story script object (version, title, narratorId, status, updatedAt, nodes[], edges[]).
+     * If null, no story is stored. Validated in service before persisting.
+     */
+    @JsonProperty("storyScript")
+    private Object storyScript;
 
     @JsonProperty("isPublished")
     private Boolean isPublished = false;

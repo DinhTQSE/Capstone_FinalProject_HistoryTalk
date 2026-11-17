@@ -1,5 +1,8 @@
 package com.historytalk.service.authentication;
 
+import com.historytalk.dto.authentication.LoginRequest;
+import com.historytalk.dto.authentication.RegisterRequest;
+import com.historytalk.dto.authentication.RegisterResponse;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
@@ -7,6 +10,7 @@ import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.payment.TierRepository;
 import com.historytalk.repository.payment.UserTierRepository;
+import com.historytalk.service.notification.EmailVerificationService;
 import com.historytalk.service.notification.PasswordResetEmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +66,9 @@ class AuthServiceImplTest {
     @Mock
     private PasswordResetEmailService passwordResetEmailService;
 
+    @Mock
+    private EmailVerificationService emailVerificationService;
+
     private AuthServiceImpl authService;
 
     @BeforeEach
@@ -74,9 +81,12 @@ class AuthServiceImplTest {
                 authenticationManager,
                 jwtService,
                 refreshTokenService,
-                passwordResetEmailService
+                passwordResetEmailService,
+                emailVerificationService
         );
         ReflectionTestUtils.setField(authService, "passwordResetTokenExpirationMinutes", 30L);
+        ReflectionTestUtils.setField(authService, "emailVerificationTokenExpirationMinutes", 30L);
+        ReflectionTestUtils.setField(authService, "emailVerificationResendCooldownSeconds", 60L);
     }
 
     @Test
@@ -243,6 +253,93 @@ class AuthServiceImplTest {
 
         verify(userRepository, never()).findByPasswordResetTokenHash(any());
         verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void registerCreatesUnverifiedUserAndSendsVerificationEmail() {
+        RegisterRequest request = new RegisterRequest("newuser", "NewUser@Gmail.com", "secret123", "secret123");
+        when(userRepository.findByEmailIgnoreCase("newuser@gmail.com")).thenReturn(Optional.empty());
+        when(userRepository.existsByUserNameIgnoreCase("newuser")).thenReturn(false);
+        when(tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("secret123")).thenReturn("encoded-secret");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setUid(UUID.randomUUID());
+            return u;
+        });
+
+        RegisterResponse response = authService.register(request);
+
+        assertThat(response.getEmail()).isEqualTo("newuser@gmail.com");
+        assertThat(response.getEmailVerified()).isFalse();
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User saved = userCaptor.getValue();
+        assertThat(saved.getEmailVerified()).isFalse();
+        assertThat(saved.getEmailVerificationTokenHash()).hasSize(64);
+        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now());
+
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailVerificationService)
+                .sendVerificationEmail(eq("newuser@gmail.com"), eq("newuser"), tokenCaptor.capture());
+        assertThat(saved.getEmailVerificationTokenHash()).isEqualTo(sha256Hex(tokenCaptor.getValue()));
+    }
+
+    @Test
+    void loginRejectsUnverifiedUser() {
+        User user = user("unverified", "unverified@gmail.com");
+        user.setEmailVerified(false);
+        when(userRepository.findByEmailIgnoreCase("unverified@gmail.com")).thenReturn(Optional.of(user));
+
+        LoginRequest request = new LoginRequest("unverified@gmail.com", "encoded-password");
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "Chrome"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("EMAIL_NOT_VERIFIED");
+    }
+
+    @Test
+    void verifyEmailMarksUserVerifiedAndClearsToken() {
+        String rawToken = "valid-verify-token";
+        User user = user("customer", "customer@gmail.com");
+        user.setEmailVerified(false);
+        user.setEmailVerificationTokenHash(sha256Hex(rawToken));
+        user.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(15));
+        when(userRepository.findByEmailVerificationTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
+
+        authService.verifyEmail(rawToken);
+
+        assertThat(user.getEmailVerified()).isTrue();
+        assertThat(user.getEmailVerifiedAt()).isNotNull();
+        assertThat(user.getEmailVerificationTokenHash()).isNull();
+        assertThat(user.getEmailVerificationExpiresAt()).isNull();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void verifyEmailRejectsExpiredToken() {
+        String rawToken = "expired-verify-token";
+        User user = user("customer", "customer@gmail.com");
+        user.setEmailVerified(false);
+        user.setEmailVerificationTokenHash(sha256Hex(rawToken));
+        user.setEmailVerificationExpiresAt(LocalDateTime.now().minusMinutes(1));
+        when(userRepository.findByEmailVerificationTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.verifyEmail(rawToken))
+                .isInstanceOf(UnauthorizedException.class);
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void resendVerificationEmailRespectsCooldown() {
+        User user = user("customer", "customer@gmail.com");
+        user.setEmailVerified(false);
+        user.setEmailVerificationSentAt(LocalDateTime.now().minusSeconds(10));
+        when(userRepository.findByEmailIgnoreCase("customer@gmail.com")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.resendVerificationEmail("customer@gmail.com"))
+                .isInstanceOf(InvalidRequestException.class);
+        verify(emailVerificationService, never()).sendVerificationEmail(any(), any(), any());
     }
 
     private User user(String userName, String email) {

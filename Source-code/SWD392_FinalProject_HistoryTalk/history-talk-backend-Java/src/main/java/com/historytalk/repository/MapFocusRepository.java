@@ -18,28 +18,28 @@ public interface MapFocusRepository extends JpaRepository<MapFocus, UUID> {
      * Public / user-facing: active, non-deleted focuses for a context.
      * Sorted by order_index ascending.
      */
-    List<MapFocus> findByHistoricalContext_ContextIdAndDeletedAtIsNullAndIsActiveTrue(
+    List<MapFocus> findByContextIdAndDeletedAtIsNullAndIsActiveTrue(
             UUID contextId, Sort sort);
 
     /**
      * Admin-facing: all non-deleted focuses (including inactive) for a context.
      * Sorted by order_index ascending.
      */
-    List<MapFocus> findByHistoricalContext_ContextIdAndDeletedAtIsNull(
+    List<MapFocus> findByContextIdAndDeletedAtIsNull(
             UUID contextId, Sort sort);
 
     /**
      * Find the current default focus for a context.
      * Used before flipping is_default when a new default is being set.
      */
-    Optional<MapFocus> findByHistoricalContext_ContextIdAndIsDefaultTrueAndDeletedAtIsNull(
+    Optional<MapFocus> findByContextIdAndIsDefaultTrueAndDeletedAtIsNull(
             UUID contextId);
 
     /**
      * Load all non-deleted focuses for a context (no sort needed).
-     * Used for cascade soft-delete and reorder validation.
+     * Used for reorder validation.
      */
-    List<MapFocus> findByHistoricalContext_ContextIdAndDeletedAtIsNull(UUID contextId);
+    List<MapFocus> findByContextIdAndDeletedAtIsNull(UUID contextId);
 
     /**
      * Existence check for a single non-deleted focus.
@@ -53,7 +53,7 @@ public interface MapFocusRepository extends JpaRepository<MapFocus, UUID> {
     @Query("""
             SELECT MAX(f.orderIndex)
             FROM MapFocus f
-            WHERE f.historicalContext.contextId = :contextId
+            WHERE f.contextId = :contextId
             AND f.deletedAt IS NULL
             """)
     Integer findMaxOrderIndexByContextId(@Param("contextId") UUID contextId);

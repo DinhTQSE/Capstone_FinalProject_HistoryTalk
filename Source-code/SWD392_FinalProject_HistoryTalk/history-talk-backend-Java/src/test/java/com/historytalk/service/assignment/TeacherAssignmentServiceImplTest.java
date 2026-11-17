@@ -439,4 +439,26 @@ class TeacherAssignmentServiceImplTest {
                 teacherAssignmentService.createAssignment(req, teacherPrincipal));
         assertTrue(ex.getMessage().contains("không thuộc trường của bạn"));
     }
+
+    @Test
+    @DisplayName("Hủy bài tập chuyển status sang CANCELLED và giữ deletedAt là null để GV xem lại được")
+    void testCancelAssignment_KeepsDeletedAtNullAndSetsCancelledStatus() {
+        UUID assignmentId = UUID.randomUUID();
+        Assignment assignment = Assignment.builder()
+                .id(assignmentId)
+                .classroom(classroom)
+                .status(AssignmentStatus.ACTIVE)
+                .deletedAt(null)
+                .build();
+
+        when(assignmentRepository.findByIdAndDeletedAtIsNull(assignmentId)).thenReturn(Optional.of(assignment));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId))
+                .thenReturn(Optional.of(classroom));
+
+        teacherAssignmentService.cancelAssignment(assignmentId, teacherPrincipal);
+
+        assertEquals(AssignmentStatus.CANCELLED, assignment.getStatus());
+        assertNull(assignment.getDeletedAt());
+        verify(assignmentRepository).save(assignment);
+    }
 }

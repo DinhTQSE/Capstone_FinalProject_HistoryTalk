@@ -10,7 +10,7 @@ import com.historytalk.entity.character.Character;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.InvalidRequestException;
-import com.historytalk.exception.UnauthorizedException;
+import com.historytalk.exception.ForbiddenException;
 import com.historytalk.repository.ClassLocalContentRepository;
 import com.historytalk.repository.LocalCharacterRepository;
 import com.historytalk.repository.LocalContextRepository;
@@ -161,7 +161,7 @@ class StudentLocalContentTest {
                 .thenReturn(List.of(Classroom.builder().id(UUID.randomUUID()).build()));
 
         assertThatThrownBy(() -> localContentService.getPublishedLocalContextById(contextId.toString(), studentPrincipal))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
@@ -173,10 +173,10 @@ class StudentLocalContentTest {
 
         assertThatThrownBy(() -> localContentService.getStudentPublishedLocalContexts(
                 "", foreignClassId, 1, 10, studentPrincipal))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> localContentService.getStudentPublishedLocalCharacters(
                 "", foreignClassId, 1, 10, studentPrincipal))
-                .isInstanceOf(UnauthorizedException.class);
+                .isInstanceOf(ForbiddenException.class);
         verify(localContextRepo, never()).findVisibleToStudent(any(), anyBoolean(), anyList(), anyString(), any());
     }
 

@@ -12,6 +12,8 @@ import com.historytalk.dto.quiz.quizdata.MatchingPair;
 import com.historytalk.dto.quiz.quizdata.MatchingQuestionData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceAnswerData;
 import com.historytalk.dto.quiz.quizdata.MultipleChoiceQuestionData;
+import com.historytalk.entity.enums.AssignmentStatus;
+import com.historytalk.entity.enums.AssignmentType;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventEra;
 import com.historytalk.entity.enums.QuestType;
@@ -24,11 +26,14 @@ import com.historytalk.entity.quiz.QuizAnswerDetail;
 import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.quiz.QuizQuestionId;
 import com.historytalk.entity.quiz.QuizSession;
+import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import com.historytalk.exception.ResourceNotFoundException;
+import com.historytalk.utils.SecurityUtils;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizAnswerDetailRepository;
@@ -36,6 +41,7 @@ import com.historytalk.repository.QuizQuestionRepository;
 import com.historytalk.repository.QuizRepository;
 import com.historytalk.repository.QuizSessionRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.repository.assignment.AssignmentRepository;
 import com.historytalk.service.gamification.GamificationService;
 import com.historytalk.service.quiz.csv.QuizCsvFileReader;
 import com.historytalk.service.quiz.csv.QuizCsvRowParser;
@@ -50,7 +56,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +81,9 @@ public class QuizServiceImpl implements QuizService {
     private final GamificationService gamificationService;
     private final QuizQuestionRepository quizQuestionRepository;
     private final QuestionDataValidator questionDataValidator;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AssignmentRepository assignmentRepository;
     private final QuizCsvFileReader quizCsvFileReader;
     private final QuizCsvRowParser quizCsvRowParser;
 
@@ -93,7 +101,8 @@ public class QuizServiceImpl implements QuizService {
                 log.warn("Invalid contextId format: {}", contextId);
             }
         }
-        List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search), contextUuid);
+        UUID schoolId = resolveUserSchoolId(userId);
+        List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search), contextUuid, schoolId);
         if (quizzes.isEmpty()) {
             return List.of();
         }
@@ -116,6 +125,7 @@ public class QuizServiceImpl implements QuizService {
         UUID uuid = parseUuid(quizId, "quizId");
         Quiz quiz = quizRepository.findActiveById(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanReadQuizForCustomer(quiz, resolveUserSchoolId(userId), quizId);
         long playCount = userId != null
                 ? quizSessionRepository.countCompletedByQuizAndUser(uuid, userId)
                 : 0L;
@@ -131,6 +141,8 @@ public class QuizServiceImpl implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        UUID userSchoolId = user.getSchool() != null ? user.getSchool().getId() : null;
+        assertCanReadQuizForCustomer(quiz, userSchoolId, quizId);
 
         QuizSession session = QuizSession.builder()
                 .quiz(quiz)
@@ -367,9 +379,10 @@ public class QuizServiceImpl implements QuizService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable, String role) {
-        log.info("getAllQuizzesForStaff: search={}, era={}", search, era);
+        log.info("getAllQuizzesForStaff: search={}, era={}, role={}", search, era, role);
         EventEra eraEnum = parseEra(era);
-        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, false, pageable);
+        UUID schoolId = resolveCurrentStaffSchoolId(role);
+        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, false, schoolId, pageable);
         return mapToStaffPaginatedResponse(page);
     }
 
@@ -379,6 +392,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("getQuizByIdForStaff: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanReadQuizForStaff(quiz, quizId);
         return mapToStaffResponse(quiz);
     }
 
@@ -387,15 +401,17 @@ public class QuizServiceImpl implements QuizService {
     public QuizStaffResponse createQuiz(CreateQuizRequest request, UUID userId) {
         log.info("createQuiz: title={}, userId={}", request.getTitle(), userId);
 
-        if (quizRepository.existsByTitleIgnoreCase(request.getTitle())) {
-            throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + request.getTitle());
-        }
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         HistoricalContext context = historicalContextRepository.findById(parseUuid(request.getContextId(), "contextId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
+
+        assertCanCreateQuizInContext(context, user);
+        UUID scopeSchoolId = resolveContextSchoolId(context);
+        if (quizRepository.existsActiveByTitleInScope(request.getTitle(), scopeSchoolId)) {
+            throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + request.getTitle());
+        }
 
         Quiz quiz = Quiz.builder()
                 .title(request.getTitle())
@@ -422,21 +438,25 @@ public class QuizServiceImpl implements QuizService {
         log.info("updateQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
+
+        HistoricalContext targetContext = quiz.getHistoricalContext();
+        if (request.getContextId() != null && !request.getContextId().isBlank()) {
+            targetContext = historicalContextRepository
+                    .findById(parseUuid(request.getContextId(), "contextId"))
+                    .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
+            assertCanMoveQuizToContext(quiz, targetContext);
+            quiz.setHistoricalContext(targetContext);
+        }
 
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             String newTitle = request.getTitle().trim();
+            UUID scopeSchoolId = resolveContextSchoolId(targetContext);
             if (!newTitle.equalsIgnoreCase(quiz.getTitle()) &&
-                    quizRepository.existsByTitleIgnoreCaseAndQuizIdNot(newTitle, quiz.getQuizId())) {
+                    quizRepository.existsActiveByTitleInScopeAndQuizIdNot(newTitle, scopeSchoolId, quiz.getQuizId())) {
                 throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + newTitle);
             }
             quiz.setTitle(newTitle);
-        }
-
-        if (request.getContextId() != null && !request.getContextId().isBlank()) {
-            HistoricalContext context = historicalContextRepository
-                    .findById(parseUuid(request.getContextId(), "contextId"))
-                    .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
-            quiz.setHistoricalContext(context);
         }
 
         if (request.getIsPublished() != null) {
@@ -453,6 +473,8 @@ public class QuizServiceImpl implements QuizService {
         log.info("deleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
+        ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quizRepository.delete(quiz);
     }
 
@@ -462,8 +484,17 @@ public class QuizServiceImpl implements QuizService {
         log.info("softDeleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
+        ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quiz.setDeletedAt(LocalDateTime.now());
         quizRepository.save(quiz);
+    }
+
+    private void ensureQuizNotReferencedByAssignment(UUID quizId) {
+        if (assignmentRepository != null && assignmentRepository.existsByAssignmentTypeAndTargetIdAndStatusNotAndDeletedAtIsNull(
+                AssignmentType.QUIZ_TEST, quizId, AssignmentStatus.CANCELLED)) {
+            throw new InvalidRequestException("Không thể xóa bộ đề vì đang có bài tập giao cho học sinh sử dụng. Vui lòng hủy bài tập trước.");
+        }
     }
 
     @Override
@@ -472,6 +503,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("addQuestion: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
         Question question = questionRepository.save(buildQuestion(request));
         linkQuestion(quiz, question, quizQuestionRepository.findMaxOrderIndex(quiz.getQuizId()) + 1);
         return mapToQuestionResponse(question);
@@ -481,10 +513,11 @@ public class QuizServiceImpl implements QuizService {
     @Transactional
     public void updateQuestion(String quizId, String questionId, QuestionRequest request) {
         log.info("updateQuestion: quizId={}, questionId={}", quizId, questionId);
-        // Validate quiz exists
+        // Validate quiz exists and caller has write permission
         UUID quizUuid = parseUuid(quizId, "quizId");
-        quizRepository.findById(quizUuid)
+        Quiz quiz = quizRepository.findById(quizUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
 
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
@@ -524,153 +557,92 @@ public class QuizServiceImpl implements QuizService {
     // ==================== Import ====================
 
     /**
-     * Bulk-import quizzes from a CSV file.
+     * Import one quiz from a CSV of question rows. The quiz title and context come from the
+     * upload form, not from the file.
      *
-     * <p>CSV format (header required):
-     * <pre>title,contextId,level,questionType,questionContent,option1..option6,correctAnswer,caseSensitive,trimWhitespace,explanation</pre>
-     * Required columns: title, contextId, level, questionContent. questionType defaults to
-     * MULTIPLE_CHOICE, so the legacy 4-option format still imports unchanged. {@code level} is
-     * each question's own difficulty.
+     * <p>CSV format (header required; lines starting with '#' are comments):
+     * <pre>level,questionType,questionContent,option1..option6,correctAnswer,caseSensitive,trimWhitespace,explanation</pre>
+     * Required columns: level, questionContent. questionType defaults to MULTIPLE_CHOICE.
+     * Legacy {@code title}/{@code contextId} columns, if present, are ignored.
      *
-     * <p>Rows sharing the same {@code title} are grouped into one quiz and may mix question
-     * types and difficulties, but must share contextId.
-     * A single {@code @Transactional} session is used for the entire call so that
-     * all repository calls share the same Hibernate session and configured DB schema.
-     * Per-quiz isolation is handled by the try/catch in the processing loop.
+     * <p>All-or-nothing: title and context are checked before the file is read, then every row
+     * is parsed and validated. If any row is invalid, a single 400 lists every bad row and
+     * nothing is saved. The quiz is created as a draft.
      */
     @Override
     @Transactional
-    public QuizImportResponse importQuizzesFromCsv(MultipartFile file, UUID userId) {
-        log.info("importQuizzesFromCsv: filename={}, size={}",
+    public QuizStaffResponse importQuizFromCsv(MultipartFile file, String contextId, String title, UUID userId) {
+        log.info("importQuizFromCsv: contextId={}, filename={}, size={}", contextId,
                 file != null ? file.getOriginalFilename() : null, file != null ? file.getSize() : 0);
 
-        // ── 1. Read file (encoding, BOM, headers) and group by title ──────────
-        Map<String, List<CSVRecord>> grouped = new LinkedHashMap<>();
-        for (CSVRecord record : quizCsvFileReader.read(file)) {
-            String title = record.isSet("title") ? record.get("title").trim() : "";
-            if (title.isBlank()) {
-                continue; // skip rows with no title
-            }
-            grouped.computeIfAbsent(title, k -> new ArrayList<>()).add(record);
+        // ── 1. Form fields (checked before the file so nothing is parsed for a doomed request) ──
+        String quizTitle = title == null ? "" : title.trim();
+        if (quizTitle.isEmpty()) {
+            throw new InvalidRequestException("Tên quiz không được để trống");
         }
-
-        if (grouped.isEmpty()) {
-            throw new InvalidRequestException("File CSV không chứa hàng dữ liệu hợp lệ nào");
-        }
-
-        // ── 2. Process each quiz group ────────────────────────────────────────
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
-
-        int totalAttempted = grouped.size();
-        int successCount = 0;
-        int skippedCount = 0;
-        List<String> errors = new ArrayList<>();
-        List<QuizStaffResponse> imported = new ArrayList<>();
-
-        for (Map.Entry<String, List<CSVRecord>> entry : grouped.entrySet()) {
-            String title = entry.getKey();
-            List<CSVRecord> rows = entry.getValue();
-
-            try {
-                QuizStaffResponse created = saveQuizGroup(title, rows, user);
-                imported.add(created);
-                successCount++;
-            } catch (DataConflictException e) {
-                errors.add("Quiz '" + title + "' skipped — duplicate title: " + e.getMessage());
-                skippedCount++;
-            } catch (InvalidRequestException e) {
-                errors.add("Quiz '" + title + "' skipped — validation error: " + e.getMessage());
-                skippedCount++;
-            } catch (ResourceNotFoundException e) {
-                errors.add("Quiz '" + title + "' skipped — " + e.getMessage());
-                skippedCount++;
-            } catch (Exception e) {
-                log.error("Unexpected error saving quiz group '{}'", title, e);
-                errors.add("Quiz '" + title + "' skipped — unexpected error: " + e.getMessage());
-                skippedCount++;
-            }
-        }
-
-        log.info("importQuizzesFromCsv complete: attempted={} success={} skipped={}",
-                totalAttempted, successCount, skippedCount);
-
-        return QuizImportResponse.builder()
-                .totalQuizzesAttempted(totalAttempted)
-                .successCount(successCount)
-                .skippedCount(skippedCount)
-                .errors(errors)
-                .imported(imported)
-                .build();
-    }
-
-    /**
-     * Validates and persists one quiz group (quiz + questions).
-     * Every row is parsed and validated before anything is saved, so one bad row
-     * never leaves a half-imported quiz behind.
-     * Called from within the outer {@code @Transactional} session in
-     * {@link #importQuizzesFromCsv}, so all DB access shares the same
-     * Hibernate session and schema context.
-     */
-    private QuizStaffResponse saveQuizGroup(String title, List<CSVRecord> rows, User user) {
-        CSVRecord first = rows.get(0);
-
-        // Checked up front: a DB length violation would mark the shared transaction rollback-only
-        if (title.length() > QUIZ_TITLE_MAX_LENGTH) {
-            throw new InvalidRequestException("title dài " + title.length() + " ký tự, tối đa "
+        // Checked up front: a DB length violation would mark the transaction rollback-only
+        if (quizTitle.length() > QUIZ_TITLE_MAX_LENGTH) {
+            throw new InvalidRequestException("title dài " + quizTitle.length() + " ký tự, tối đa "
                     + QUIZ_TITLE_MAX_LENGTH + " ký tự");
         }
 
-        String contextIdStr = first.get("contextId").trim();
-        for (CSVRecord row : rows.subList(1, rows.size())) {
-            if (!contextIdStr.equals(row.get("contextId").trim())) {
-                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row)
-                        + ": contextId khác với dòng đầu của quiz '" + title + "'");
-            }
-        }
+        String contextIdStr = contextId == null ? "" : contextId.trim();
         UUID contextUuid;
         try {
             contextUuid = UUID.fromString(contextIdStr);
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException("contextId không phải là UUID hợp lệ: '" + contextIdStr + "'");
         }
-
         HistoricalContext context = historicalContextRepository.findById(contextUuid)
                 .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "HistoricalContext not found for contextId: " + contextIdStr));
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextIdStr));
 
-        // Duplicate-title check
-        if (quizRepository.existsByTitleIgnoreCase(title)) {
-            throw new DataConflictException("Quiz với tiêu đề '" + title + "' already exists");
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        assertCanCreateQuizInContext(context, user);
+
+        UUID scopeSchoolId = resolveContextSchoolId(context);
+        if (quizRepository.existsActiveByTitleInScope(quizTitle, scopeSchoolId)) {
+            throw new DataConflictException("Quiz với tiêu đề '" + quizTitle + "' đã tồn tại");
         }
 
-        // Parse and validate every question before persisting anything
+        // ── 2. Parse and validate every row, collecting all errors ──────────────
         List<QuestionRequest> questionRequests = new ArrayList<>();
-        for (CSVRecord row : rows) {
-            QuestionRequest request = quizCsvRowParser.parse(row);
+        List<String> errors = new ArrayList<>();
+        for (CSVRecord row : quizCsvFileReader.read(file)) {
             try {
-                questionDataValidator.validate(request.getQuestionType(), request.getQuestionData());
+                // Parser errors are already prefixed with the question label
+                QuestionRequest request = quizCsvRowParser.parse(row);
+                try {
+                    questionDataValidator.validate(request.getQuestionType(), request.getQuestionData());
+                } catch (InvalidRequestException e) {
+                    throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
+                }
+                questionRequests.add(request);
             } catch (InvalidRequestException e) {
-                throw new InvalidRequestException(QuizCsvFileReader.lineLabel(row) + ": " + e.getMessage());
+                errors.add(e.getMessage());
             }
-            questionRequests.add(request);
+        }
+        if (!errors.isEmpty()) {
+            throw new InvalidRequestException("File có " + errors.size() + " câu hỏi lỗi, chưa lưu câu nào:\n"
+                    + String.join("\n", errors));
         }
 
-        // Build and save the Quiz entity (draft by default)
-        Quiz quiz = Quiz.builder()
-                .title(title)
+        // ── 3. Save the draft quiz and its questions in file order ──────────────
+        Quiz quiz = quizRepository.save(Quiz.builder()
+                .title(quizTitle)
                 .historicalContext(context)
                 .createdBy(user)
                 .isPublished(false)
-                .build();
-        quiz = quizRepository.save(quiz);
+                .build());
 
         int orderIndex = 0;
         for (QuestionRequest request : questionRequests) {
             linkQuestion(quiz, questionRepository.save(buildQuestion(request)), orderIndex++);
         }
 
+        log.info("importQuizFromCsv complete: quizId={} questions={}", quiz.getQuizId(), questionRequests.size());
         return mapToStaffResponse(quiz);
     }
 
@@ -1098,6 +1070,7 @@ public class QuizServiceImpl implements QuizService {
 
         Quiz quiz = quizRepository.findById(quizUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
         Question question = questionRepository.findById(questionUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
@@ -1128,8 +1101,9 @@ public class QuizServiceImpl implements QuizService {
         UUID quizUuid = parseUuid(quizId, "quizId");
         UUID questionUuid = parseUuid(questionId, "questionId");
 
-        quizRepository.findById(quizUuid)
+        Quiz quiz = quizRepository.findById(quizUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+        assertCanModifyQuiz(quiz);
         questionRepository.findById(questionUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
 
@@ -1150,6 +1124,111 @@ public class QuizServiceImpl implements QuizService {
 
     private String normalize(String search) {
         return (search == null || search.isBlank()) ? null : search.trim();
+    }
+
+    // ==================== Multi-Tenant Isolation Helpers ====================
+
+    private UUID resolveUserSchoolId(UUID userId) {
+        if (userId == null) {
+            return null;
+        }
+        return userRepository.findById(userId)
+                .map(User::getSchool)
+                .map(School::getId)
+                .orElse(null);
+    }
+
+    private UUID resolveContextSchoolId(HistoricalContext context) {
+        return (context != null && context.getSchool() != null) ? context.getSchool().getId() : null;
+    }
+
+    private UUID resolveQuizSchoolId(Quiz quiz) {
+        return quiz != null ? resolveContextSchoolId(quiz.getHistoricalContext()) : null;
+    }
+
+    private boolean isSchoolScopedStaffRole(String role) {
+        return "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role);
+    }
+
+    private UUID resolveCurrentStaffSchoolId(String role) {
+        if (!isSchoolScopedStaffRole(role)) {
+            return null;
+        }
+        String uid = SecurityUtils.getUserId();
+        if (uid == null) {
+            return null;
+        }
+        UUID schoolId = resolveUserSchoolId(UUID.fromString(uid));
+        if (schoolId == null) {
+            throw new AccessDeniedException("Tài khoản trường học chưa được gán vào trường nào");
+        }
+        return schoolId;
+    }
+
+    private void assertCanReadQuizForCustomer(Quiz quiz, UUID userSchoolId, String quizId) {
+        UUID quizSchoolId = resolveQuizSchoolId(quiz);
+        if (quizSchoolId != null && !quizSchoolId.equals(userSchoolId)) {
+            throw new ResourceNotFoundException("Quiz not found: " + quizId);
+        }
+    }
+
+    private void assertCanReadQuizForStaff(Quiz quiz, String quizId) {
+        if (quiz.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Quiz not found: " + quizId);
+        }
+        String role = SecurityUtils.getRoleName();
+        if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
+            UUID userSchoolId = resolveCurrentStaffSchoolId(role);
+            UUID quizSchoolId = resolveQuizSchoolId(quiz);
+            if (quizSchoolId != null && !quizSchoolId.equals(userSchoolId)) {
+                throw new AccessDeniedException("Bạn không có quyền xem bộ đề của trường khác");
+            }
+        }
+    }
+
+    private void assertCanModifyQuiz(Quiz quiz) {
+        if (quiz.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Quiz not found: " + quiz.getQuizId());
+        }
+        String role = SecurityUtils.getRoleName();
+        if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
+            UUID userSchoolId = resolveCurrentStaffSchoolId(role);
+            UUID quizSchoolId = resolveQuizSchoolId(quiz);
+            if (quizSchoolId == null) {
+                throw new AccessDeniedException("Bạn không có quyền chỉnh sửa hoặc xóa bộ đề Global của hệ thống");
+            }
+            if (!quizSchoolId.equals(userSchoolId)) {
+                throw new AccessDeniedException("Bạn không có quyền chỉnh sửa hoặc xóa bộ đề của trường khác");
+            }
+        }
+    }
+
+    private void assertCanCreateQuizInContext(HistoricalContext context, User user) {
+        String role = SecurityUtils.getRoleName();
+        UUID contextSchoolId = resolveContextSchoolId(context);
+        if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
+            UUID userSchoolId = user.getSchool() != null ? user.getSchool().getId() : null;
+            if (userSchoolId == null) {
+                throw new AccessDeniedException("Tài khoản trường học chưa được gán vào trường nào");
+            }
+            if (contextSchoolId == null) {
+                throw new AccessDeniedException("Bạn không có quyền tạo bộ đề trong bối cảnh Global của hệ thống");
+            }
+            if (!contextSchoolId.equals(userSchoolId)) {
+                throw new AccessDeniedException("Bạn không có quyền tạo bộ đề cho trường khác");
+            }
+        }
+    }
+
+    private void assertCanMoveQuizToContext(Quiz quiz, HistoricalContext targetContext) {
+        UUID currentSchoolId = resolveQuizSchoolId(quiz);
+        UUID targetSchoolId = resolveContextSchoolId(targetContext);
+        if (currentSchoolId == null && targetSchoolId != null) {
+            throw new InvalidRequestException("Không thể chuyển bộ đề Global sang bối cảnh nội bộ của trường");
+        }
+        if (currentSchoolId != null && !currentSchoolId.equals(targetSchoolId)) {
+            throw new AccessDeniedException("Không thể chuyển bộ đề sang bối cảnh của trường khác hoặc Global");
+        }
     }
 
     private EventEra parseEra(String era) {

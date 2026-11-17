@@ -38,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vn.payos.PayOS;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
@@ -74,6 +75,9 @@ class PaymentServiceTest {
 
     @Mock
     private UserTierRepository userTierRepository;
+
+    @Spy
+    private TierUpgradeCalculator tierUpgradeCalculator = new TierUpgradeCalculator();
 
     @InjectMocks
     private PaymentService paymentService;
@@ -139,7 +143,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("WF-05 / DS-05b (MSG30): Customer with active paid subscription is blocked from purchasing another tier")
+    @DisplayName("WF-05 / DS-05b (MSG30): Customer with active paid subscription is blocked from re-purchasing the same tier (only upgrades allowed)")
     void createPayOSCheckout_ActivePaidSubscriptionExists_ThrowsInvalidRequestException() {
         UserTier activePaid = UserTier.builder()
                 .user(customer)
@@ -154,7 +158,7 @@ class PaymentServiceTest {
 
         assertThatThrownBy(() -> paymentService.createPayOSCheckout(userId, tierId.toString()))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("already have an active");
+                .hasMessageContaining("only upgrade to a higher plan");
 
         verify(paymentOrderRepository, never()).save(any());
     }

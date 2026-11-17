@@ -44,6 +44,8 @@ services:
     environment:
       - AI_SERVICE_URL=http://historytalk-ai:8001
       - MONITORING_ALLOWED_IPS=127.0.0.1,0:0:0:0:0:0:0:1,172.16.0.0/12,172.17.0.0/16,172.18.0.0/16,10.0.0.0/8,192.168.0.0/16
+      - OMP_THREAD_LIMIT=1
+      - TESSERACT_DPI=150
     logging:
       driver: "json-file"
       options:
@@ -52,7 +54,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: '2.0'
           memory: 1500M
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/Historical-tell/actuator/health || exit 1"]

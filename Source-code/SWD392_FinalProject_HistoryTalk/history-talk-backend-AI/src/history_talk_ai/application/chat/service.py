@@ -64,8 +64,17 @@ def _vision_ollama_url(path: str) -> str:
     base_url = settings.VISION_OLLAMA_BASE_URL.strip() if settings.VISION_OLLAMA_BASE_URL else settings.OLLAMA_BASE_URL.strip()
     return f"{base_url.rstrip('/')}{path}"
 
-async def _call_ollama(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens)"""
+async def _call_ollama(
+    messages: list[dict],
+    expect_json: bool = True,
+    temperature: float | None = None,
+    json_schema: dict | None = None,
+    max_tokens: int | None = None,
+) -> tuple[str, int, int]:
+    """
+    Make an async call to the Ollama endpoint. Returns (content, prompt_tokens, completion_tokens).
+    A JSON schema, when given, constrains the output to it instead of to any JSON.
+    """
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
@@ -73,14 +82,14 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True, temperatu
         "think": False,
         "options": {
             "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
-            "num_predict": settings.LLM_MAX_TOKENS,
+            "num_predict": max_tokens or settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
             "repeat_penalty": 1.15,
         }
     }
     
     if expect_json:
-        payload["format"] = "json"
+        payload["format"] = json_schema or "json"
 
     auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
 
@@ -93,15 +102,14 @@ async def _call_ollama(messages: list[dict], expect_json: bool = True, temperatu
         response.raise_for_status()
         data = response.json()
         content = data.get("message", {}).get("content", "")
-        prompt_tokens = data.get("prompt_eval_count", 0)
-        prompt_tokens = max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
+        prompt_tokens = _scale_prompt_tokens(data.get("prompt_eval_count", 0))
         completion_tokens = data.get("eval_count", 0)
         return content, prompt_tokens, completion_tokens
     except Exception as e:
         logger.error(f"Failed to call Ollama: {e}")
         raise
 
-async def _call_ollama_stream(messages: list[dict]) -> tuple:
+async def _call_ollama_stream(messages: list[dict], temperature: float | None = None) -> tuple:
     """Make an async call to the Ollama endpoint with streaming enabled. Yields chunks and finally returns tokens."""
     payload = {
         "model": settings.LLM_MODEL,
@@ -109,7 +117,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         "stream": True,
         "think": False,
         "options": {
-            "temperature": settings.LLM_TEMPERATURE,
+            "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
             "num_predict": settings.LLM_MAX_TOKENS,
             "num_ctx": 8192,
             "repeat_penalty": 1.15,
@@ -139,8 +147,7 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
                     if chunk:
                         yield chunk
                     if data.get("done"):
-                        prompt_tokens = data.get("prompt_eval_count", 0)
-                        prompt_tokens = max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
+                        prompt_tokens = _scale_prompt_tokens(data.get("prompt_eval_count", 0))
                         completion_tokens = data.get("eval_count", 0)
                 except json.JSONDecodeError:
                     continue
@@ -150,94 +157,150 @@ async def _call_ollama_stream(messages: list[dict]) -> tuple:
         
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
 
-async def _call_external(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Make an async call to an external OpenAI-compatible API (e.g. OpenAI, Gemini, Groq)."""
+def _scale_prompt_tokens(prompt_tokens: int) -> int:
+    """Users are charged a tenth of the prompt tokens, whichever provider answered."""
+    return max(1, prompt_tokens // 10) if prompt_tokens > 0 else 0
+
+
+# Parameters the external model rejected once are left out from then on, so only the first call pays the retry.
+_EXTERNAL_OPTIONAL_PARAMS = ("temperature", "reasoning_effort", "stream_options", "response_format")
+_EXTERNAL_MAX_ADAPTATIONS = 3
+_external_dropped_params: set[str] = set()
+_external_max_tokens_key = ["max_completion_tokens"]
+
+
+def _external_headers() -> dict:
     api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
+    return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+
+def _external_url() -> str:
+    return f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions"
+
+
+def _external_payload(
+    messages: list[dict], temperature: float | None, stream: bool, expect_json: bool, max_tokens: int | None = None
+) -> dict:
+    """The same request as the Ollama one, in OpenAI Chat Completions form."""
     payload = {
         "model": settings.LLM_MODEL,
         "messages": messages,
+        "stream": stream,
         "temperature": settings.LLM_TEMPERATURE if temperature is None else temperature,
-        "max_tokens": settings.LLM_MAX_TOKENS,
-        "stream": False,
+        _external_max_tokens_key[0]: max_tokens or settings.LLM_MAX_TOKENS,
     }
-    
+    # Ollama runs with thinking off; a reasoning model is kept as close to that as it allows.
+    if settings.EXTERNAL_REASONING_EFFORT:
+        payload["reasoning_effort"] = settings.EXTERNAL_REASONING_EFFORT
+    if stream:
+        # Without this, OpenAI-compatible APIs send no usage when streaming and the turn would cost nothing.
+        payload["stream_options"] = {"include_usage": True}
     if expect_json:
         payload["response_format"] = {"type": "json_object"}
+    for param in _external_dropped_params:
+        payload.pop(param, None)
+    return payload
 
+
+def _adapt_external_request(error_body: str) -> bool:
+    """Adjusts future requests to a 400 naming a parameter. Returns True when the request is worth retrying."""
+    text = error_body.lower()
+    current_key = _external_max_tokens_key[0]
+    if current_key in text and current_key == "max_completion_tokens":
+        logger.warning("External LLM rejected max_completion_tokens, using max_tokens instead.")
+        _external_max_tokens_key[0] = "max_tokens"
+        return True
+    for param in _EXTERNAL_OPTIONAL_PARAMS:
+        if param in text and param not in _external_dropped_params:
+            logger.warning(f"External LLM rejected '{param}', leaving it out from now on.")
+            _external_dropped_params.add(param)
+            return True
+    return False
+
+
+async def _call_external(
+    messages: list[dict],
+    expect_json: bool = True,
+    temperature: float | None = None,
+    json_schema: dict | None = None,
+    max_tokens: int | None = None,
+) -> tuple[str, int, int]:
+    """
+    Make an async call to an external OpenAI-compatible API (e.g. OpenAI on Amazon Bedrock, Gemini, Groq).
+    Not every model takes a JSON schema, so callers describe the shape in the prompt and validate the reply.
+    """
     try:
-        response = await ollama_client.post(
-            f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
-            json=payload,
-            headers=headers
-        )
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"].get("content", "")
-        usage = data.get("usage", {})
-        return content, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0)
+        for attempt in range(_EXTERNAL_MAX_ADAPTATIONS + 1):
+            response = await ollama_client.post(
+                _external_url(),
+                json=_external_payload(messages, temperature, stream=False, expect_json=expect_json, max_tokens=max_tokens),
+                headers=_external_headers(),
+            )
+            if response.status_code == 400 and attempt < _EXTERNAL_MAX_ADAPTATIONS and _adapt_external_request(response.text):
+                continue
+            if response.status_code >= 400:
+                logger.error(f"External LLM returned {response.status_code}: {response.text[:300]}")
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"].get("content") or ""
+            usage = data.get("usage") or {}
+            return (
+                content,
+                _scale_prompt_tokens(usage.get("prompt_tokens", 0)),
+                usage.get("completion_tokens", 0),
+            )
     except Exception as e:
         logger.error(f"Failed to call external API: {e}")
         raise
 
-async def _call_external_stream(messages: list[dict]) -> tuple:
-    """Make an async call to an external API with streaming enabled."""
-    api_key = settings.EXTERNAL_API_KEY or settings.GOOGLE_API_KEY
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": settings.LLM_MODEL,
-        "messages": messages,
-        "temperature": settings.LLM_TEMPERATURE,
-        "max_tokens": settings.LLM_MAX_TOKENS,
-        "stream": True,
-    }
-    
+
+async def _call_external_stream(messages: list[dict], temperature: float | None = None) -> tuple:
+    """Make an async call to an external API with streaming enabled. Yields chunks and finally returns tokens."""
     prompt_tokens = 0
     completion_tokens = 0
 
     try:
-        async with ollama_client.stream(
-            "POST",
-            f"{settings.EXTERNAL_API_BASE_URL.rstrip('/')}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=_LLM_TIMEOUT
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if not line or not line.startswith("data: "):
-                    continue
-                data_str = line[6:]
-                if data_str.strip() == "[DONE]":
-                    break
-                try:
-                    data = json.loads(data_str)
-                    choices = data.get("choices", [])
+        for attempt in range(_EXTERNAL_MAX_ADAPTATIONS + 1):
+            async with ollama_client.stream(
+                "POST",
+                _external_url(),
+                json=_external_payload(messages, temperature, stream=True, expect_json=False),
+                headers=_external_headers(),
+                timeout=_LLM_TIMEOUT,
+            ) as response:
+                if response.status_code >= 400:
+                    body = (await response.aread()).decode("utf-8", "replace")
+                    if response.status_code == 400 and attempt < _EXTERNAL_MAX_ADAPTATIONS and _adapt_external_request(body):
+                        continue
+                    logger.error(f"External LLM returned {response.status_code}: {body[:300]}")
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data_str = line[5:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = data.get("choices") or []
                     if choices:
-                        delta = choices[0].get("delta", {})
-                        chunk = delta.get("content", "")
+                        chunk = (choices[0].get("delta") or {}).get("content")
                         if chunk:
                             yield chunk
-                    # Some APIs send usage in the last chunk
+                    # Usage arrives in the last chunk, which has no choices.
                     usage = data.get("usage")
                     if usage:
-                        prompt_tokens = usage.get("prompt_tokens", 0)
+                        prompt_tokens = _scale_prompt_tokens(usage.get("prompt_tokens", 0))
                         completion_tokens = usage.get("completion_tokens", 0)
-                except json.JSONDecodeError:
-                    continue
+                break
     except Exception as e:
         logger.error(f"Failed to stream from external API: {e}")
         raise
-        
+
     yield {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}
+
 
 def _is_broad_question(question: str) -> bool:
     """A question about a whole event needs more chunks than a question about one fact."""
@@ -250,33 +313,38 @@ def _contains_cjk(text: str) -> bool:
     return _CJK_PATTERN.search(text) is not None
 
 
-async def _call_provider(messages: list[dict], expect_json: bool, temperature: float | None) -> tuple[str, int, int]:
+async def _call_provider(messages: list[dict], expect_json: bool, temperature: float | None, **options) -> tuple[str, int, int]:
     if settings.LLM_PROVIDER.lower() in ("external", "google"):
-        return await _call_external(messages, expect_json, temperature)
-    return await _call_ollama(messages, expect_json, temperature)
+        return await _call_external(messages, expect_json, temperature, **options)
+    return await _call_ollama(messages, expect_json, temperature, **options)
 
 
-async def _call_llm(messages: list[dict], expect_json: bool = True, temperature: float | None = None) -> tuple[str, int, int]:
-    """Call the configured provider, retrying once if the reply leaks Chinese into a Vietnamese conversation."""
-    content, prompt_tokens, completion_tokens = await _call_provider(messages, expect_json, temperature)
+async def _call_llm(
+    messages: list[dict], expect_json: bool = True, temperature: float | None = None, **options
+) -> tuple[str, int, int]:
+    """
+    Call the configured provider, retrying once if the reply leaks Chinese into a Vietnamese conversation.
+    options are json_schema and max_tokens, passed on to the provider.
+    """
+    content, prompt_tokens, completion_tokens = await _call_provider(messages, expect_json, temperature, **options)
 
     # Sources may legitimately quote Hán characters, in which case the reply may quote them too.
     if not _contains_cjk(content) or any(_contains_cjk(m.get("content", "")) for m in messages):
         return content, prompt_tokens, completion_tokens
 
     logger.warning("LLM reply contains Chinese characters, retrying once.")
-    content, retry_prompt_tokens, retry_completion_tokens = await _call_provider(messages, expect_json, temperature)
+    content, retry_prompt_tokens, retry_completion_tokens = await _call_provider(messages, expect_json, temperature, **options)
     if _contains_cjk(content):
         raise ValueError("LLM reply still contains Chinese characters after retrying.")
     return content, prompt_tokens + retry_prompt_tokens, completion_tokens + retry_completion_tokens
 
-async def _call_llm_stream(messages: list[dict]) -> tuple:
+async def _call_llm_stream(messages: list[dict], temperature: float | None = None) -> tuple:
     """Router to stream from either Ollama or External API based on settings."""
     if settings.LLM_PROVIDER.lower() in ("external", "google"):
-        async for chunk in _call_external_stream(messages):
+        async for chunk in _call_external_stream(messages, temperature):
             yield chunk
     else:
-        async for chunk in _call_ollama_stream(messages):
+        async for chunk in _call_ollama_stream(messages, temperature):
             yield chunk
 
 class _PcmDownsampler:
@@ -421,6 +489,82 @@ async def get_embedding_from_ollama(text: str, max_retries: int = 3) -> List[flo
     logger.error("All attempts to get embedding from Ollama failed.")
     return []
 
+
+async def get_embeddings_batch(
+    texts: List[str],
+    batch_size: int = 32,
+    max_retries: int = 3,
+) -> List[List[float]]:
+    """Batch-generate embedding vectors via Ollama /api/embed with per-item fallback."""
+    if not texts:
+        return []
+
+    results: List[List[float]] = [[] for _ in texts]
+    non_empty_indices = [i for i, t in enumerate(texts) if t and t.strip()]
+    if not non_empty_indices:
+        return results
+
+    auth = (settings.OLLAMA_USERNAME, settings.OLLAMA_PASSWORD) if settings.OLLAMA_USERNAME else None
+    effective_batch_size = max(1, batch_size)
+    batches = [
+        non_empty_indices[i:i + effective_batch_size]
+        for i in range(0, len(non_empty_indices), effective_batch_size)
+    ]
+    batch_sem = asyncio.Semaphore(4)
+
+    async def fallback_single(indices: List[int]) -> List[List[float]]:
+        single_sem = asyncio.Semaphore(10)
+
+        async def _one(idx: int) -> List[float]:
+            async with single_sem:
+                return await get_embedding_from_ollama(texts[idx], max_retries=max_retries)
+
+        return await asyncio.gather(*[_one(idx) for idx in indices])
+
+    async def process_batch(indices: List[int]) -> tuple[List[int], List[List[float]]]:
+        batch_texts = [texts[idx] for idx in indices]
+        embed_payload = {"model": "bge-m3", "input": batch_texts}
+        async with batch_sem:
+            for attempt in range(max_retries):
+                try:
+                    response = await ollama_client.post(
+                        _ollama_url("/api/embed"),
+                        json=embed_payload,
+                        auth=auth,
+                    )
+                    if response.status_code == 404:
+                        logger.info("Ollama /api/embed not available; falling back to /api/embeddings")
+                        return indices, await fallback_single(indices)
+                    response.raise_for_status()
+                    data = response.json()
+                    embeddings = data.get("embeddings", [])
+                    if isinstance(embeddings, list) and len(embeddings) == len(indices):
+                        normalized = [
+                            emb if isinstance(emb, list) else []
+                            for emb in embeddings
+                        ]
+                        return indices, normalized
+                    raise ValueError(
+                        f"Unexpected embeddings length: got {len(embeddings) if isinstance(embeddings, list) else type(embeddings)}, expected {len(indices)}"
+                    )
+                except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                    logger.error(f"Cannot reach the LLM server for batch embedding: {e}")
+                    return indices, [[] for _ in indices]
+                except Exception as e:
+                    logger.warning(f"Ollama batch embedding attempt {attempt + 1}/{max_retries} failed: {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1.0 * (attempt + 1))
+
+        logger.warning("Batch embedding retries exhausted; falling back to single-item embeddings for batch.")
+        return indices, await fallback_single(indices)
+
+    batch_outputs = await asyncio.gather(*[process_batch(b) for b in batches])
+    for indices, embeddings in batch_outputs:
+        for idx, emb in zip(indices, embeddings):
+            results[idx] = emb
+
+    return results
+
 async def retrieve_history_context(user_question: str, entity_ids: List[str]) -> tuple[str, List[str]]:
     """Retrieve history context from Supabase VectorChunk and rerank via the LLM server."""
     query_vector = await get_embedding_from_ollama(user_question)
@@ -555,9 +699,13 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
     return (
         f"[DỮ LIỆU THAM KHẢO CHO CÂU HỎI NÀY]:\n{rag_context}\n\n"
         "LỆNH:\n"
+        "0. DỮ LIỆU THAM KHẢO là ký ức của bạn: coi là đúng và kể lại theo đó, kể cả khi trái với hiểu biết riêng "
+        "hay luật thời đại. KHÔNG phủ nhận hay sửa lại điều dữ liệu đã nói.\n"
         f"1. Chỉ dùng sự kiện có trong DỮ LIỆU THAM KHẢO, kể lại bằng lời của chính mình ở ngôi thứ nhất (\"{self_pronoun}\"), "
         "không gọi tên mình ở ngôi thứ ba, bỏ các số chú thích như (1), [1].\n"
-        "2. KHÔNG bịa đặt hay sáng tác thêm. Dữ liệu không nhắc tới thì nói 'Sử sách không ghi chép rõ'.\n"
+        "2. KHÔNG thêm chi tiết, hình ảnh ví von, con số hay chiến công mà dữ liệu không ghi. Dữ liệu chỉ nói ngắn "
+        "thì chỉ kể ngắn. Bị hỏi chi tiết mà dữ liệu không có thì thừa nhận là có việc đó nhưng "
+        f"'{self_pronoun} không còn nhớ rõ chi tiết', hoặc nói 'Sử sách không ghi chép rõ'.\n"
         "3. Không lặp lại y hệt câu trả lời trước đó.\n"
         "4. Nếu người dùng hỏi xem ảnh/bản đồ và trong DỮ LIỆU THAM KHẢO có mã ảnh dạng {{IMG_1}}, {{IMG_2}}..., HÃY chèn đúng mã đó trên cùng 1 dòng: ![Tên ảnh]({{IMG_1}}). KHÔNG tự bịa URL ngoài.\n"
         f"{broad_rule}\n"
@@ -565,6 +713,8 @@ def _build_final_user_content(user_message: str, rag_context: str, self_pronoun:
     )
 
 
+# Low enough that the character retells the documents instead of embellishing them, high enough to stay natural.
+_REPLY_TEMPERATURE = 0.3
 _SUGGESTION_CANDIDATES = 5
 _MAX_SUGGESTIONS = 3
 
@@ -678,7 +828,9 @@ async def generate_reply(
 
     messages.append({"role": "user", "content": final_user_content})
 
-    response_text, prompt_tokens, completion_tokens = await _call_llm(messages, expect_json=False)
+    response_text, prompt_tokens, completion_tokens = await _call_llm(
+        messages, expect_json=False, temperature=_REPLY_TEMPERATURE
+    )
     response_text = _expand_and_clean_reply_images(response_text, img_tag_map)
     
     suggested_questions = []
@@ -739,7 +891,7 @@ async def generate_reply_stream(
     completion_tokens = 0
 
     # Stream the message while buffering any in-progress ![...](...) or {{IMG_n}}
-    stream_gen = _call_llm_stream(messages)
+    stream_gen = _call_llm_stream(messages, temperature=_REPLY_TEMPERATURE)
     async for chunk in stream_gen:
         if isinstance(chunk, dict):
             prompt_tokens = chunk.get("prompt_tokens", 0)
@@ -875,12 +1027,7 @@ async def _semantic_chunking(content: str, max_chunk_chars: int = 1200) -> List[
     if len(sentences) <= 2 or len(content) <= 500:
         return [content]
 
-    sem = asyncio.Semaphore(10)
-    async def get_emb(s):
-        async with sem:
-            return await get_embedding_from_ollama(s)
-
-    embeddings = await asyncio.gather(*[get_emb(s) for s in sentences])
+    embeddings = await get_embeddings_batch(sentences)
 
     valid_sentences = []
     valid_embeddings = []
@@ -936,16 +1083,9 @@ async def process_document(request: ProcessDocumentRequest):
     content = request.content
     chunks = await _semantic_chunking(content)
     
-    # Generate embeddings concurrently for speed, but limit concurrency to avoid overwhelming Ollama
-    sem = asyncio.Semaphore(15) # Process maximum 15 chunks at a time
-
-    async def get_embedding_with_context(idx, chunk_text):
-        async with sem:
-            emb = await get_embedding_from_ollama(chunk_text)
-            return idx, chunk_text, emb
-
-    tasks = [get_embedding_with_context(idx, text) for idx, text in enumerate(chunks)]
-    results = await asyncio.gather(*tasks)
+    # Batch-generate embeddings for all document chunks (much lower HTTP overhead than per-chunk calls)
+    chunk_embeddings = await get_embeddings_batch(chunks)
+    results = [(idx, text, chunk_embeddings[idx]) for idx, text in enumerate(chunks)]
 
     records = []
     for idx, chunk_text, embedding in results:
@@ -961,7 +1101,13 @@ async def process_document(request: ProcessDocumentRequest):
             "embedding": embedding,
             "sequence_number": idx + 1
         })
-        
+
+    # Embedding service (Ollama/GPU) down: fail so the Java backend retries instead of keeping a half-indexed doc.
+    if len(records) < len(chunks):
+        raise RuntimeError(
+            f"Generated embeddings for {len(records)}/{len(chunks)} chunks of document {request.doc_id}"
+        )
+
     if records:
         # Bulk insert in batches of 100 to avoid request size limits
         batch_size = 100

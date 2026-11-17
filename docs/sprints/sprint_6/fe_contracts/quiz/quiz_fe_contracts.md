@@ -383,21 +383,38 @@
 ---
 
 ### POST `/staff/quizzes/import`
-> `Content-Type: multipart/form-data`, key = `file`
+> `Content-Type: multipart/form-data`. Mỗi lần gọi tạo **đúng 1 quiz** (trạng thái nháp).
+> ⚠️ Breaking change (12/11/2026): không còn import nhiều quiz trong một file. Response cũ `totalQuizzesAttempted / successCount / skippedCount / errors / imported` đã bị bỏ.
 
-**Response 200:**
-```json
-{
-  "status": "success",
-  "data": {
-    "totalQuizzesAttempted": 5,
-    "successCount": 4,
-    "skippedCount": 1,
-    "errors": ["Quiz 'Test Quiz' skipped — duplicate title: ..."],
-    "imported": [ /* mảng QuizStaffResponse */ ]
-  }
-}
-```
+**Request (multipart parts):**
+
+| Part | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `file` | file `.csv` | ✅ | UTF-8, dấu phẩy; mỗi dòng dữ liệu là 1 câu hỏi |
+| `contextId` | string (UUID) | ✅ | Lấy từ dropdown chọn bối cảnh |
+| `title` | string | ✅ | Tên quiz, tối đa 255 ký tự, không trùng quiz đã có |
+
+**Cột CSV** (đúng thứ tự trong template):
+`level,questionType,questionContent,option1,option2,option3,option4,option5,option6,correctAnswer,caseSensitive,trimWhitespace,explanation`
+- Bắt buộc: `level` (EASY / MEDIUM / HARD), `questionContent`. `questionType` để trống = MULTIPLE_CHOICE.
+- MULTIPLE_CHOICE: `correctAnswer` là số thứ tự đáp án **đếm từ 0** (option1 = 0), nhiều đáp án ngăn bằng `|` (vd `0|2`).
+- FILL_IN_BLANK: để trống option; `correctAnswer` = các đáp án chấp nhận ngăn bằng `|`.
+- MATCHING: mỗi option là `Vế trái => Vế phải`; để trống `correctAnswer`.
+- Dòng bắt đầu bằng `#` là ghi chú, bị bỏ qua; dòng chỉ toàn dấu phẩy (ô Excel đã xoá) cũng bị bỏ qua. Cột `title`/`contextId` nếu còn trong file cũ cũng bị bỏ qua.
+- Template: `GET /staff/quizzes/import/template`; file mẫu có hướng dẫn: `quiz_import_template.csv` (cùng thư mục).
+
+**Response 200:** `QuizStaffResponse` của quiz vừa tạo (`isPublished = false`).
+
+**Lỗi:**
+
+| HTTP | Khi nào | `message` |
+|---|---|---|
+| 400 | `title` rỗng hoặc > 255 ký tự; `contextId` không phải UUID; file sai định dạng / không phải UTF-8 / thiếu cột | Mô tả lỗi |
+| 400 | Có câu hỏi sai | `File có N câu hỏi lỗi, chưa lưu câu nào:\nCâu hỏi 2: ...\nCâu hỏi 5: ...` → FE hiển thị giữ xuống dòng (`white-space: pre-line`) |
+| 404 | Bối cảnh không tồn tại hoặc đã xoá | `Không tìm thấy bối cảnh lịch sử với ID: ...` |
+| 409 | Trùng tên quiz | `Quiz với tiêu đề '...' đã tồn tại` |
+
+Không có lưu một phần: chỉ cần 1 câu hỏi lỗi thì không quiz nào được tạo.
 
 ---
 
