@@ -20,6 +20,8 @@ public class DashboardOverviewResponse {
     private ContentOverview content;
     private ChatOverview chat;
     private List<TopCharacterOverview> topCharacters;
+    private List<TopCharacterOverview> topGlobalCharacters;
+    private List<TopCharacterOverview> topLocalCharacters;
     private SystemHealthOverview systemHealth;
 
     @Data
@@ -57,6 +59,9 @@ public class DashboardOverviewResponse {
         private long customers;
         private long contentAdmins;
         private long systemAdmins;
+        private long schoolAdmins;
+        private long teachers;
+        private long schoolStudents;
     }
 
     @Data

@@ -97,7 +97,7 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     @Query("SELECT q FROM Quiz q LEFT JOIN FETCH q.historicalContext LEFT JOIN FETCH q.createdBy WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
     List<Quiz> findAllDeleted();
 
-    @Query("SELECT COUNT(q) FROM Quiz q")
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL")
     long countAllQuizzes();
 
     @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.isPublished = true")
@@ -108,6 +108,66 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
     @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NOT NULL")
     long countDeletedQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NULL")
+    long countGlobalQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NULL AND q.isPublished = true")
+    long countGlobalPublishedQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NULL AND q.isPublished = false")
+    long countGlobalDraftQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NOT NULL")
+    long countLocalQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NOT NULL AND q.isPublished = true")
+    long countLocalPublishedQuizzes();
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NOT NULL AND q.isPublished = false")
+    long countLocalDraftQuizzes();
+
+    @Query(value = """
+            SELECT CAST(q.quiz_id AS text) AS "quizId",
+                   q.title AS title,
+                   CAST(NULL AS varchar) AS level,
+                   COUNT(qs.session_id) AS "startedSessions",
+                   COUNT(qs.session_id) FILTER (WHERE qs.end_time IS NOT NULL) AS "completedSessions",
+                   COALESCE(AVG(
+                       CASE
+                           WHEN qs.end_time IS NOT NULL
+                            AND qs.score IS NOT NULL
+                            AND qc.question_count > 0
+                           THEN qs.score * 100.0 / qc.question_count
+                       END
+                   ), 0.0) AS "averageScorePercentage"
+            FROM quiz q
+            JOIN historical_context hc ON hc.context_id = q.context_id AND hc.deleted_at IS NULL
+            LEFT JOIN (
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
+            ) qc ON qc.quiz_id = q.quiz_id
+            LEFT JOIN quiz_session qs
+              ON qs.quiz_id = q.quiz_id
+             AND qs.deleted_at IS NULL
+             AND qs.created_at >= :from
+             AND qs.created_at < :to
+            WHERE q.deleted_at IS NULL
+              AND (:isLocal IS NULL
+                   OR (:isLocal = false AND hc.school_id IS NULL)
+                   OR (:isLocal = true AND hc.school_id IS NOT NULL))
+            GROUP BY q.quiz_id, q.title
+            ORDER BY "completedSessions" DESC, "startedSessions" DESC, q.title ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<DashboardTopQuizProjection> findTopQuizzesForDashboardByScope(
+            @Param("from") java.time.LocalDateTime from,
+            @Param("to") java.time.LocalDateTime to,
+            @Param("isLocal") Boolean isLocal,
+            @Param("limit") int limit);
 
     @Query(value = """
             SELECT CAST(q.quiz_id AS text) AS "quizId",

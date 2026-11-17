@@ -88,7 +88,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @Param("entityType") EntityType entityType,
             @Param("includeDeleted") boolean includeDeleted);
 
-    @Query("SELECT COUNT(d) FROM Document d")
+    @Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL")
     long countCurrent();
 
     @Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL")
