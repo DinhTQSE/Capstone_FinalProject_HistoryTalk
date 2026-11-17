@@ -47,6 +47,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -91,7 +93,7 @@ class QuizServiceImplImportTest {
         context = HistoricalContext.builder().contextId(contextId).name("Điện Biên Phủ 1954").build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().uid(userId).userName("staff").build()));
         when(historicalContextRepository.findById(contextId)).thenReturn(Optional.of(context));
-        when(quizRepository.existsByTitleIgnoreCase(any())).thenReturn(false);
+        when(quizRepository.existsActiveByTitleInScope(any(), isNull())).thenReturn(false);
         when(quizRepository.save(any(Quiz.class))).thenAnswer(inv -> {
             Quiz quiz = inv.getArgument(0);
             quiz.setQuizId(UUID.randomUUID());
@@ -210,7 +212,7 @@ class QuizServiceImplImportTest {
 
     @Test
     void duplicateTitleIsRejected() {
-        when(quizRepository.existsByTitleIgnoreCase(TITLE)).thenReturn(true);
+        when(quizRepository.existsActiveByTitleInScope(eq(TITLE), isNull())).thenReturn(true);
 
         assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0")))
                 .isInstanceOf(DataConflictException.class);
