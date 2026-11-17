@@ -36,7 +36,7 @@ public class SystemTrashController {
     public ResponseEntity<ApiResponse<List<TrashItemResponse>>> getDeletedCharacters() {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.getDeletedCharacters(),
-                "Trashed characters retrieved successfully"));
+                "Lấy danh sách nhân vật trong thùng rác thành công"));
     }
 
     @GetMapping("/historical-contexts")
@@ -44,7 +44,7 @@ public class SystemTrashController {
     public ResponseEntity<ApiResponse<List<TrashItemResponse>>> getDeletedContexts() {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.getDeletedContexts(),
-                "Trashed historical contexts retrieved successfully"));
+                "Lấy danh sách bối cảnh lịch sử trong thùng rác thành công"));
     }
 
     @GetMapping("/quizzes")
@@ -52,7 +52,7 @@ public class SystemTrashController {
     public ResponseEntity<ApiResponse<List<TrashItemResponse>>> getDeletedQuizzes() {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.getDeletedQuizzes(),
-                "Trashed quizzes retrieved successfully"));
+                "Lấy danh sách quiz trong thùng rác thành công"));
     }
 
     @PatchMapping("/characters/restore")
@@ -61,7 +61,7 @@ public class SystemTrashController {
             @Valid @RequestBody BulkTrashActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.restoreCharacters(request.getIds()),
-                "Character restore completed"));
+                "Hoàn tất khôi phục nhân vật"));
     }
 
     @PatchMapping("/historical-contexts/restore")
@@ -70,7 +70,7 @@ public class SystemTrashController {
             @Valid @RequestBody BulkTrashActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.restoreContexts(request.getIds()),
-                "Historical context restore completed"));
+                "Hoàn tất khôi phục bối cảnh lịch sử"));
     }
 
     @PatchMapping("/quizzes/restore")
@@ -79,7 +79,7 @@ public class SystemTrashController {
             @Valid @RequestBody BulkTrashActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.restoreQuizzes(request.getIds()),
-                "Quiz restore completed"));
+                "Hoàn tất khôi phục quiz"));
     }
 
     @DeleteMapping("/characters")
@@ -88,7 +88,7 @@ public class SystemTrashController {
             @Valid @RequestBody BulkTrashActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.hardDeleteCharacters(request.getIds()),
-                "Character hard delete completed"));
+                "Hoàn tất xóa vĩnh viễn nhân vật"));
     }
 
     @DeleteMapping("/historical-contexts")
@@ -97,7 +97,7 @@ public class SystemTrashController {
             @Valid @RequestBody BulkTrashActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.hardDeleteContexts(request.getIds()),
-                "Historical context hard delete completed"));
+                "Hoàn tất xóa vĩnh viễn bối cảnh lịch sử"));
     }
 
     @DeleteMapping("/quizzes")
@@ -106,6 +106,6 @@ public class SystemTrashController {
             @Valid @RequestBody BulkTrashActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 trashService.hardDeleteQuizzes(request.getIds()),
-                "Quiz hard delete completed"));
+                "Hoàn tất xóa vĩnh viễn quiz"));
     }
 }

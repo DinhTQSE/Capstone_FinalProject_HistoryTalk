@@ -49,7 +49,7 @@ public class SchoolAdminTeacherController {
         UUID schoolId = resolveSchoolId(principal);
         TeacherResponse response = teacherManagementService.createTeacher(request, schoolId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Teacher account created successfully"));
+                .body(ApiResponse.success(response, "Tạo tài khoản giáo viên thành công"));
     }
 
     @GetMapping
@@ -80,7 +80,7 @@ public class SchoolAdminTeacherController {
 
         PaginatedResponse<TeacherResponse> response = teacherManagementService.getTeachers(
                 schoolId, search, active, pageable);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Teachers retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách giáo viên thành công"));
     }
 
     @PutMapping("/{id}")
@@ -93,7 +93,7 @@ public class SchoolAdminTeacherController {
         
         UUID schoolId = resolveSchoolId(principal);
         TeacherResponse response = teacherManagementService.updateTeacher(id, schoolId, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Teacher profile updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật hồ sơ giáo viên thành công"));
     }
 
     @PutMapping("/{id}/status")
@@ -108,8 +108,8 @@ public class SchoolAdminTeacherController {
         TeacherResponse response = teacherManagementService.updateTeacherStatus(
                 id, schoolId, request.getActive());
         String msg = Boolean.TRUE.equals(request.getActive()) 
-                ? "Teacher account activated successfully" 
-                : "Teacher account deactivated successfully";
+                ? "Kích hoạt tài khoản giáo viên thành công" 
+                : "Vô hiệu hóa tài khoản giáo viên thành công";
         return ResponseEntity.ok(ApiResponse.success(response, msg));
     }
 
@@ -122,7 +122,7 @@ public class SchoolAdminTeacherController {
         
         UUID schoolId = resolveSchoolId(principal);
         teacherManagementService.deleteTeacher(id, schoolId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Teacher account deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa tài khoản giáo viên thành công"));
     }
 
     @PostMapping("/{id}/reset-password")
@@ -134,7 +134,7 @@ public class SchoolAdminTeacherController {
         
         UUID schoolId = resolveSchoolId(principal);
         ResetPasswordResponse response = teacherManagementService.resetTeacherPassword(id, schoolId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Teacher password reset successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đặt lại mật khẩu giáo viên thành công"));
     }
 
     private UUID resolveSchoolId(UserPrincipal principal) {

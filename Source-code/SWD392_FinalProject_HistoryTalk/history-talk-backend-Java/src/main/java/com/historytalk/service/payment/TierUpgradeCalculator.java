@@ -82,15 +82,15 @@ public class TierUpgradeCalculator {
         Tier current = currentPaidSub.getTier();
         if (!isUpgrade(current, target)) {
             throw new InvalidRequestException(
-                    "You can only upgrade to a higher plan (or a longer plan of the same level). Current plan: '"
+                    "Bạn chỉ có thể nâng cấp lên gói cao hơn (hoặc gói dài hạn hơn cùng cấp). Gói hiện tại: '"
                             + (current != null ? current.getTitle() : "unknown") + "'.");
         }
 
         int credit = credit(currentPaidSub, now);
         if (credit >= price) {
             throw new InvalidRequestException(
-                    "Your remaining credit of " + credit + " VND already covers '" + target.getTitle()
-                            + "'. Please choose a longer plan.");
+                    "Giá trị còn lại của gói hiện tại (" + credit + " VND) đã đủ để chi trả cho gói '" + target.getTitle()
+                            + "'. Vui lòng chọn gói dài hạn hơn.");
         }
         return new UpgradeQuote(currentPaidSub, price, credit, price - credit);
     }

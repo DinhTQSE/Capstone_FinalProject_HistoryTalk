@@ -30,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -119,7 +120,7 @@ class StudentAssignmentServiceImplTest {
                 .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
                 .targetId(characterId)
                 .minRequirement(5) // Cần 5 tin nhắn để đạt 10 điểm
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -171,14 +172,14 @@ class StudentAssignmentServiceImplTest {
                 .quiz(quiz)
                 .user(student)
                 .score(4.0f) // Đúng 4/5 câu -> 8.00 điểm
-                .endTime(LocalDateTime.now())
+                .endTime(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         Assignment assignment = Assignment.builder()
                 .id(assignmentId)
                 .assignmentType(AssignmentType.QUIZ_TEST)
                 .targetId(quizId)
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -212,7 +213,7 @@ class StudentAssignmentServiceImplTest {
                 .id(assignmentId)
                 .assignmentType(AssignmentType.CONTEXT_READING)
                 .minRequirement(60) // Tiêu chuẩn 60 giây
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -220,7 +221,7 @@ class StudentAssignmentServiceImplTest {
                 .id(UUID.randomUUID())
                 .assignment(assignment)
                 .student(student)
-                .startedAt(LocalDateTime.now().minusSeconds(45)) // Đã đọc 45s
+                .startedAt(LocalDateTime.now(ZoneOffset.UTC).minusSeconds(45)) // Đã đọc 45s
                 .status(SubmissionStatus.IN_PROGRESS)
                 .build();
 
@@ -242,7 +243,7 @@ class StudentAssignmentServiceImplTest {
                 .id(assignmentId)
                 .assignmentType(AssignmentType.CONTEXT_READING)
                 .minRequirement(60)
-                .deadline(LocalDateTime.now().minusHours(2)) // Đã quá hạn 2 tiếng
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).minusHours(2)) // Đã quá hạn 2 tiếng
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -250,7 +251,7 @@ class StudentAssignmentServiceImplTest {
                 .id(UUID.randomUUID())
                 .assignment(assignment)
                 .student(student)
-                .startedAt(LocalDateTime.now().minusSeconds(60))
+                .startedAt(LocalDateTime.now(ZoneOffset.UTC).minusSeconds(60))
                 .status(SubmissionStatus.IN_PROGRESS)
                 .build();
 
@@ -294,7 +295,7 @@ class StudentAssignmentServiceImplTest {
                 .sessionId(quizSessionId)
                 .quiz(quiz)
                 .user(otherStudent) // Thuộc học sinh khác!
-                .endTime(LocalDateTime.now())
+                .endTime(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         Assignment assignment = Assignment.builder()
@@ -340,7 +341,7 @@ class StudentAssignmentServiceImplTest {
                 .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
                 .targetId(characterId)
                 .minRequirement(5)
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -387,14 +388,14 @@ class StudentAssignmentServiceImplTest {
                 .quiz(quiz)
                 .user(student)
                 .score(4.0f)
-                .endTime(LocalDateTime.now())
+                .endTime(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         Assignment assignment = Assignment.builder()
                 .id(assignmentId)
                 .assignmentType(AssignmentType.QUIZ_TEST)
                 .targetId(quizId)
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -437,7 +438,7 @@ class StudentAssignmentServiceImplTest {
                 .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
                 .targetId(characterId)
                 .minRequirement(5)
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 
@@ -489,7 +490,7 @@ class StudentAssignmentServiceImplTest {
                 .assignmentType(AssignmentType.AI_CHAT_ROLEPLAY)
                 .targetId(characterId)
                 .minRequirement(3)
-                .deadline(LocalDateTime.now().plusDays(1))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(1))
                 .status(AssignmentStatus.ACTIVE)
                 .build();
 

@@ -70,14 +70,14 @@ public class TrashServiceImpl implements TrashService {
         return apply(ids, id -> characterRepository.findById(id)
                 .map(character -> {
                     if (character.getDeletedAt() == null) {
-                        return result(id, NOT_TRASHED, "Character is not in trash");
+                        return result(id, NOT_TRASHED, "Nhân vật không nằm trong thùng rác");
                     }
                     character.setDeletedAt(null);
                     documentRepository.findByEntityIdAndEntityType(character.getCharacterId(), EntityType.CHARACTER)
                             .forEach(doc -> doc.setDeletedAt(null));
-                    return result(id, RESTORED, "Character restored");
+                    return result(id, RESTORED, "Đã khôi phục nhân vật");
                 })
-                .orElseGet(() -> result(id, NOT_FOUND, "Character not found")));
+                .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy nhân vật")));
     }
 
     @Override
@@ -86,14 +86,14 @@ public class TrashServiceImpl implements TrashService {
         return apply(ids, id -> contextRepository.findById(id)
                 .map(context -> {
                     if (context.getDeletedAt() == null) {
-                        return result(id, NOT_TRASHED, "Historical context is not in trash");
+                        return result(id, NOT_TRASHED, "Bối cảnh lịch sử không nằm trong thùng rác");
                     }
                     context.setDeletedAt(null);
                     documentRepository.findByEntityIdAndEntityType(context.getContextId(), EntityType.CONTEXT)
                             .forEach(doc -> doc.setDeletedAt(null));
-                    return result(id, RESTORED, "Historical context restored");
+                    return result(id, RESTORED, "Đã khôi phục bối cảnh lịch sử");
                 })
-                .orElseGet(() -> result(id, NOT_FOUND, "Historical context not found")));
+                .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy bối cảnh lịch sử")));
     }
 
     @Override
@@ -102,12 +102,12 @@ public class TrashServiceImpl implements TrashService {
         return apply(ids, id -> quizRepository.findById(id)
                 .map(quiz -> {
                     if (quiz.getDeletedAt() == null) {
-                        return result(id, NOT_TRASHED, "Quiz is not in trash");
+                        return result(id, NOT_TRASHED, "Quiz không nằm trong thùng rác");
                     }
                     quiz.setDeletedAt(null);
-                    return result(id, RESTORED, "Quiz restored");
+                    return result(id, RESTORED, "Đã khôi phục quiz");
                 })
-                .orElseGet(() -> result(id, NOT_FOUND, "Quiz not found")));
+                .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy quiz")));
     }
 
     @Override
@@ -116,12 +116,12 @@ public class TrashServiceImpl implements TrashService {
         return apply(ids, id -> characterRepository.findById(id)
                 .map(character -> {
                     if (character.getDeletedAt() == null) {
-                        return result(id, NOT_TRASHED, "Character is not in trash");
+                        return result(id, NOT_TRASHED, "Nhân vật không nằm trong thùng rác");
                     }
                     hardDeleteCharacter(character);
-                    return result(id, HARD_DELETED, "Character permanently deleted");
+                    return result(id, HARD_DELETED, "Đã xóa vĩnh viễn nhân vật");
                 })
-                .orElseGet(() -> result(id, NOT_FOUND, "Character not found")));
+                .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy nhân vật")));
     }
 
     @Override
@@ -130,12 +130,12 @@ public class TrashServiceImpl implements TrashService {
         return apply(ids, id -> contextRepository.findById(id)
                 .map(context -> {
                     if (context.getDeletedAt() == null) {
-                        return result(id, NOT_TRASHED, "Historical context is not in trash");
+                        return result(id, NOT_TRASHED, "Bối cảnh lịch sử không nằm trong thùng rác");
                     }
                     hardDeleteContext(context);
-                    return result(id, HARD_DELETED, "Historical context permanently deleted");
+                    return result(id, HARD_DELETED, "Đã xóa vĩnh viễn bối cảnh lịch sử");
                 })
-                .orElseGet(() -> result(id, NOT_FOUND, "Historical context not found")));
+                .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy bối cảnh lịch sử")));
     }
 
     @Override
@@ -144,12 +144,12 @@ public class TrashServiceImpl implements TrashService {
         return apply(ids, id -> quizRepository.findById(id)
                 .map(quiz -> {
                     if (quiz.getDeletedAt() == null) {
-                        return result(id, NOT_TRASHED, "Quiz is not in trash");
+                        return result(id, NOT_TRASHED, "Quiz không nằm trong thùng rác");
                     }
                     quizRepository.delete(quiz);
-                    return result(id, HARD_DELETED, "Quiz permanently deleted");
+                    return result(id, HARD_DELETED, "Đã xóa vĩnh viễn quiz");
                 })
-                .orElseGet(() -> result(id, NOT_FOUND, "Quiz not found")));
+                .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy quiz")));
     }
 
     private void hardDeleteCharacter(Character character) {

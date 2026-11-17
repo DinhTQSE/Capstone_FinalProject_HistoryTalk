@@ -63,7 +63,7 @@ public class SchoolAdminLocalContentController {
 
         PaginatedResponse<LocalContentResponse> response =
                 localContentService.getSchoolLocalContexts(search, scope, status, page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "School local contexts retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách bối cảnh địa phương của trường thành công"));
     }
 
     @PutMapping("/contexts/{contextId}/status")
@@ -86,7 +86,7 @@ public class SchoolAdminLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.approveLocalContext(contextId, request, principal);
-        String message = buildApprovalMessage("context", request);
+        String message = buildApprovalMessage("bối cảnh", request);
         return ResponseEntity.ok(ApiResponse.success(response, message));
     }
 
@@ -100,7 +100,7 @@ public class SchoolAdminLocalContentController {
 
         List<HistoricalContextDocumentResponse> docs =
                 localContentService.getLocalContextDocuments(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+        return ResponseEntity.ok(ApiResponse.success(docs, "Lấy danh sách tài liệu thành công — " + docs.size() + " kết quả"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -122,7 +122,7 @@ public class SchoolAdminLocalContentController {
 
         PaginatedResponse<LocalContentResponse> response =
                 localContentService.getSchoolLocalCharacters(search, scope, status, page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "School local characters retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách nhân vật địa phương của trường thành công"));
     }
 
     @PutMapping("/characters/{characterId}/status")
@@ -142,7 +142,7 @@ public class SchoolAdminLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.approveLocalCharacter(characterId, request, principal);
-        String message = buildApprovalMessage("character", request);
+        String message = buildApprovalMessage("nhân vật", request);
         return ResponseEntity.ok(ApiResponse.success(response, message));
     }
 
@@ -156,17 +156,17 @@ public class SchoolAdminLocalContentController {
 
         List<HistoricalContextDocumentResponse> docs =
                 localContentService.getLocalCharacterDocuments(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+        return ResponseEntity.ok(ApiResponse.success(docs, "Lấy danh sách tài liệu thành công — " + docs.size() + " kết quả"));
     }
 
     // ── Helper ───────────────────────────────────────────────────────────────
 
     private String buildApprovalMessage(String type, UpdateLocalContentStatusRequest req) {
         return switch (req.getStatus()) {
-            case ACTIVE        -> "Local " + type + " published successfully. School assumes full content responsibility.";
-            case DRAFT         -> "Local " + type + " reverted to DRAFT.";
-            case INACTIVE      -> "Local " + type + " set to INACTIVE.";
-            case PENDING_REVIEW -> "Local " + type + " status set to PENDING_REVIEW.";
+            case ACTIVE        -> "Đã xuất bản " + type + " địa phương. Nhà trường chịu toàn bộ trách nhiệm về nội dung.";
+            case DRAFT         -> "Đã chuyển " + type + " địa phương về trạng thái DRAFT.";
+            case INACTIVE      -> "Đã chuyển " + type + " địa phương sang trạng thái INACTIVE.";
+            case PENDING_REVIEW -> "Đã chuyển " + type + " địa phương sang trạng thái PENDING_REVIEW.";
         };
     }
 }

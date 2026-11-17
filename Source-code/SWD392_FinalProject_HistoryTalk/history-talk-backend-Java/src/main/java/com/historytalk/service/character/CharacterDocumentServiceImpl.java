@@ -129,10 +129,10 @@ public class CharacterDocumentServiceImpl implements CharacterDocumentService {
         log.info("Creating document: {} by user: {}", request.getTitle(), userId);
 
         Character character = characterRepository.findById(UUID.fromString(request.getCharacterId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Not found resource with ID: "+request.getCharacterId().toString()));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài nguyên với ID: "+request.getCharacterId().toString()));
 
         User user = userRepository.findById(UUID.fromString(userId))
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: "+userId));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: "+userId));
 
         DocumentType type = request.getType() != null ? request.getType() : DocumentType.TEXT;
         DocumentProcessorStrategy processor = documentProcessorFactory.getStrategy(type);

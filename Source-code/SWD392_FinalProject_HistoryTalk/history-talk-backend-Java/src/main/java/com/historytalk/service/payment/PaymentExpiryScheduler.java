@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -40,7 +41,7 @@ public class PaymentExpiryScheduler {
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void expirePendingOrders() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         log.info("Payment order expiry scheduler running. now={}", now);
 
         List<PaymentOrder> expiredOrders = paymentOrderRepository
@@ -71,7 +72,7 @@ public class PaymentExpiryScheduler {
     @Scheduled(fixedDelay = 300_000)
     @Transactional
     public void expireUserTierSubscriptions() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         List<UserTier> expired = userTierRepository.findExpiredPaidSubscriptions(now);
 
         if (expired.isEmpty()) {

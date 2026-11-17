@@ -109,7 +109,7 @@ class DocumentFileServiceImplTest {
 
         assertThatThrownBy(() -> service.uploadPdfFile(docId.toString(), file, UUID.randomUUID().toString(), "CONTENT_ADMIN"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Document not found");
+                .hasMessageContaining("Không tìm thấy tài liệu");
 
         verify(storageService, never()).uploadPdf(any(), any(), any(), any());
     }

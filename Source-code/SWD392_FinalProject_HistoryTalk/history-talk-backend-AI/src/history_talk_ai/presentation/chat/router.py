@@ -68,7 +68,7 @@ async def _resolve_character_and_context(
         except JavaBackendError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Java backend error: {exc.message}",
+                detail=f"Lỗi từ Java backend: {exc.message}",
             )
     elif need_character:
         try:
@@ -121,7 +121,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"LLM error: {exc}",
+            detail=f"Lỗi mô hình ngôn ngữ (LLM): {exc}",
         )
     
     token_usage = TokenUsage(
@@ -207,7 +207,7 @@ async def generate_title(body: GenerateTitleRequest) -> GenerateTitleResponse:
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"LLM error: {exc}",
+            detail=f"Lỗi mô hình ngôn ngữ (LLM): {exc}",
         )
 
     token_usage = TokenUsage(
@@ -251,7 +251,7 @@ async def exam_question(body: ExamQuestionRequest) -> ExamQuestionResponse:
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"LLM error: {exc}",
+            detail=f"Lỗi mô hình ngôn ngữ (LLM): {exc}",
         )
 
     return ExamQuestionResponse(
@@ -357,11 +357,11 @@ async def tts_stream(body: SpeechRequest) -> StreamingResponse:
 async def process_document(body: ProcessDocumentRequest):
     try:
         await llm_service.process_document(body)
-        return {"success": True, "message": f"Document {body.doc_id} processed successfully."}
+        return {"success": True, "message": f"Xử lý tài liệu {body.doc_id} thành công."}
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Document processing error: {exc}",
+            detail=f"Lỗi xử lý tài liệu: {exc}",
         )
 
 
@@ -373,11 +373,11 @@ async def process_document(body: ProcessDocumentRequest):
 async def delete_document(doc_id: str):
     try:
         await llm_service.delete_document(doc_id)
-        return {"success": True, "message": f"Document {doc_id} chunks deleted successfully."}
+        return {"success": True, "message": f"Đã xóa các đoạn dữ liệu của tài liệu {doc_id}."}
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Document deletion error: {exc}",
+            detail=f"Lỗi xóa tài liệu: {exc}",
         )
 
 # ── GET /v1/ai/character/{id} — diagnostic ────────────────────────────────────
@@ -459,5 +459,5 @@ async def describe_images(body: DescribeImagesRequest):
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Image description error: {exc}",
+            detail=f"Lỗi mô tả hình ảnh: {exc}",
         )

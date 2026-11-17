@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class VerifyEmailRequest {
 
-    @NotBlank(message = "Verification token is required")
+    @NotBlank(message = "Mã xác thực không được để trống")
     private String token;
 }

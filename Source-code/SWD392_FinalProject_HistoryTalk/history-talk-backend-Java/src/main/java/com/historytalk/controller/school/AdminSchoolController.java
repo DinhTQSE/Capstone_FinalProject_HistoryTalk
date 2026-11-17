@@ -40,7 +40,7 @@ public class AdminSchoolController {
     public ResponseEntity<ApiResponse<SchoolResponse>> createSchool(@Valid @RequestBody CreateSchoolRequest request) {
         SchoolResponse response = schoolManagementService.createSchool(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "School and token quota initialized successfully"));
+                .body(ApiResponse.success(response, "Khởi tạo trường học và hạn mức token thành công"));
     }
 
     @GetMapping("/schools")
@@ -66,7 +66,7 @@ public class AdminSchoolController {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page - 1), Math.max(1, size), Sort.by(direction, safeSortBy));
 
         PaginatedResponse<SchoolResponse> response = schoolManagementService.getSchools(search, pageable);
-        return ResponseEntity.ok(com.historytalk.dto.PaginatedApiResponse.of(response, "Schools retrieved successfully"));
+        return ResponseEntity.ok(com.historytalk.dto.PaginatedApiResponse.of(response, "Lấy danh sách trường học thành công"));
     }
 
     @GetMapping("/schools/{id}")
@@ -74,7 +74,7 @@ public class AdminSchoolController {
     @Operation(summary = "Get school details by ID")
     public ResponseEntity<ApiResponse<SchoolResponse>> getSchoolById(@PathVariable UUID id) {
         SchoolResponse response = schoolManagementService.getSchoolById(id);
-        return ResponseEntity.ok(ApiResponse.success(response, "School details retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy chi tiết trường học thành công"));
     }
 
     @PostMapping("/school-admins")
@@ -83,7 +83,7 @@ public class AdminSchoolController {
     public ResponseEntity<ApiResponse<SchoolAdminResponse>> createSchoolAdmin(@Valid @RequestBody CreateSchoolAdminRequest request) {
         SchoolAdminResponse response = schoolManagementService.createSchoolAdmin(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "School Admin account created successfully"));
+                .body(ApiResponse.success(response, "Tạo tài khoản quản trị trường thành công"));
     }
 
     @GetMapping("/schools/{schoolId}/school-admins")
@@ -106,7 +106,7 @@ public class AdminSchoolController {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page - 1), Math.max(1, size), Sort.by(direction, safeSortBy));
 
         PaginatedResponse<SchoolAdminResponse> response = schoolManagementService.getSchoolAdmins(schoolId, search, active, pageable);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "School Admins retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách quản trị trường thành công"));
     }
 
     @PutMapping("/school-admins/{id}")
@@ -116,7 +116,7 @@ public class AdminSchoolController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateSchoolAdminRequest request) {
         SchoolAdminResponse response = schoolManagementService.updateSchoolAdmin(id, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "School Admin updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật quản trị trường thành công"));
     }
 
     @PutMapping("/school-admins/{id}/status")
@@ -126,7 +126,7 @@ public class AdminSchoolController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateSchoolAdminStatusRequest request) {
         SchoolAdminResponse response = schoolManagementService.updateSchoolAdminStatus(id, request.getActive());
-        return ResponseEntity.ok(ApiResponse.success(response, "School Admin status updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật trạng thái quản trị trường thành công"));
     }
 
     @DeleteMapping("/school-admins/{id}")
@@ -134,7 +134,7 @@ public class AdminSchoolController {
     @Operation(summary = "Soft delete School Admin account (US-SP5-02)")
     public ResponseEntity<ApiResponse<Void>> deleteSchoolAdmin(@PathVariable UUID id) {
         schoolManagementService.deleteSchoolAdmin(id);
-        return ResponseEntity.ok(ApiResponse.success(null, "School Admin account deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa tài khoản quản trị trường thành công"));
     }
 
     @PostMapping("/school-admins/{id}/reset-password")
@@ -142,6 +142,6 @@ public class AdminSchoolController {
     @Operation(summary = "Reset School Admin password (US-SP5-02)")
     public ResponseEntity<ApiResponse<ResetPasswordResponse>> resetSchoolAdminPassword(@PathVariable UUID id) {
         ResetPasswordResponse response = schoolManagementService.resetSchoolAdminPassword(id);
-        return ResponseEntity.ok(ApiResponse.success(response, "School Admin password reset successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đặt lại mật khẩu quản trị trường thành công"));
     }
 }

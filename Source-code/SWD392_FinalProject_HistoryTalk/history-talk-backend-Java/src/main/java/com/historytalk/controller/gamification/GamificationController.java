@@ -39,7 +39,7 @@ public class GamificationController {
         String userId = SecurityUtils.getUserId();
         log.info("GET /api/v1/gamification/today - user: {}", userId);
         TodayGamificationResponse data = gamificationService.getTodayState(userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Gamification state retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy trạng thái thành tích thành công"));
     }
 
     @GetMapping("/study-days")
@@ -49,13 +49,13 @@ public class GamificationController {
                description = "Returns an array of date strings for each day the user checked in during the requested month.")
     public ResponseEntity<ApiResponse<List<String>>> getStudyDays(
             @Parameter(description = "Năm cần xem lịch (ví dụ: 2026)", example = "2026")
-            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getYear()}") @Min(2000) @Max(2100) int year,
+            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now(T(java.time.ZoneOffset).UTC).getYear()}") @Min(2000) @Max(2100) int year,
             @Parameter(description = "Tháng cần xem lịch (1–12)", example = "9")
-            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getMonthValue()}") @Min(1) @Max(12) int month) {
+            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now(T(java.time.ZoneOffset).UTC).getMonthValue()}") @Min(1) @Max(12) int month) {
         String userId = SecurityUtils.getUserId();
         log.info("GET /api/v1/gamification/study-days - user: {}, year: {}, month: {}", userId, year, month);
         List<String> days = gamificationService.getStudyDays(userId, year, month);
-        return ResponseEntity.ok(ApiResponse.success(days, "Study days retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(days, "Lấy danh sách ngày học thành công"));
     }
 
     @PostMapping("/claim")
@@ -67,6 +67,6 @@ public class GamificationController {
         String userId = SecurityUtils.getUserId();
         log.info("POST /api/v1/gamification/claim - questId: {}", request.getQuestId());
         ClaimQuestResponse data = gamificationService.claimQuestReward(userId, request.getQuestId());
-        return ResponseEntity.ok(ApiResponse.success(data, "Quest reward claimed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Nhận thưởng nhiệm vụ thành công"));
     }
 }

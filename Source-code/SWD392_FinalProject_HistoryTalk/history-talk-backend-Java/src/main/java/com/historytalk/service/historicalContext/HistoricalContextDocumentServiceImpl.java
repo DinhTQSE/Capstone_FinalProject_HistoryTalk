@@ -143,10 +143,10 @@ public class HistoricalContextDocumentServiceImpl implements HistoricalContextDo
         log.info("Creating document: {} by user: {}", request.getTitle(), userId);
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(request.getContextId()))
-            .orElseThrow(() -> new ResourceNotFoundException("Not found resource with ID: "+request.getContextId().toString()));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài nguyên với ID: "+request.getContextId().toString()));
 
         User user = userRepository.findById(UUID.fromString(userId))
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: "+userId));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: "+userId));
 
         DocumentType type = request.getType() != null ? request.getType() : DocumentType.TEXT;
         DocumentProcessorStrategy processor = documentProcessorFactory.getStrategy(type);

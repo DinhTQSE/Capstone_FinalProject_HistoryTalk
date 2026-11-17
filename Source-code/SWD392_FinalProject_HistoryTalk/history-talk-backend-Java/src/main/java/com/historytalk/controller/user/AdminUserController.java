@@ -46,7 +46,7 @@ public class AdminUserController {
         log.info("GET /api/v1/admin/users - page: {}, size: {}", page, size);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.listUsers(page, size),
-                "Users retrieved successfully"
+                "Lấy danh sách người dùng thành công"
         ));
     }
 
@@ -56,7 +56,7 @@ public class AdminUserController {
         log.info("GET /api/v1/admin/users/{}", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.getUserById(userId),
-                "User retrieved successfully"
+                "Lấy thông tin người dùng thành công"
         ));
     }
 
@@ -68,7 +68,7 @@ public class AdminUserController {
         log.info("PATCH /api/v1/admin/users/{}", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.adminUpdateUser(userId, request),
-                "User updated successfully"
+                "Cập nhật người dùng thành công"
         ));
     }
 
@@ -80,7 +80,7 @@ public class AdminUserController {
         log.info("PATCH /api/v1/admin/users/{}/role", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.updateUserRole(userId, request),
-                "User role updated successfully"
+                "Cập nhật vai trò người dùng thành công"
         ));
     }
 
@@ -90,7 +90,7 @@ public class AdminUserController {
         String adminId = SecurityUtils.getUserId();
         log.info("PATCH /api/v1/admin/users/{}/deactivate - by {}", userId, adminId);
         authService.softDeleteUser(userId, adminId);
-        return ResponseEntity.ok(ApiResponse.success(null, "User account deactivated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Vô hiệu hóa tài khoản người dùng thành công"));
     }
 
     @PatchMapping("/{userId}/restore")
@@ -99,7 +99,7 @@ public class AdminUserController {
         log.info("PATCH /api/v1/admin/users/{}/restore", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.restoreUser(userId),
-                "User account restored successfully"
+                "Khôi phục tài khoản người dùng thành công"
         ));
     }
 
@@ -110,7 +110,7 @@ public class AdminUserController {
         log.info("PATCH /api/v1/admin/users/restore/batch");
         return ResponseEntity.ok(ApiResponse.success(
                 userService.restoreUsersBatch(request.getUserIds()),
-                "Batch user restoration completed"
+                "Hoàn tất khôi phục hàng loạt người dùng"
         ));
     }
 
@@ -121,7 +121,7 @@ public class AdminUserController {
         int count = userService.restoreAllUsers();
         return ResponseEntity.ok(ApiResponse.success(
                 count,
-                "All deactivated users restored successfully (" + count + " users restored)"
+                "Đã khôi phục tất cả người dùng bị vô hiệu hóa (" + count + " người dùng)"
         ));
     }
 }

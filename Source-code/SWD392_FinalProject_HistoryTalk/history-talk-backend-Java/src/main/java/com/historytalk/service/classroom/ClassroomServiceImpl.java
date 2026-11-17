@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -49,11 +50,11 @@ public class ClassroomServiceImpl implements ClassroomService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("User does not belong to any school tenant");
+            throw new AccessDeniedException("Người dùng không thuộc trường học nào");
         }
 
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
 
         String trimmedClassName = request.getClassName().trim();
 
@@ -70,7 +71,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         if (userPrincipal.getRole() == UserRole.TEACHER) {
             // Náº¿u Teacher tá»± táº¡o lá»›p thÃ¬ máº·c Ä‘á»‹nh gÃ¡n cho chÃ­nh mÃ¬nh
             teacher = userRepository.findById(UUID.fromString(userPrincipal.getUid()))
-                    .orElseThrow(() -> new ResourceNotFoundException("Teacher not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên"));
         } else if (userPrincipal.getRole() == UserRole.SCHOOL_ADMIN) {
             if (request.getTeacherId() != null) {
                 teacher = validateAndGetTeacher(request.getTeacherId(), schoolId);
@@ -105,7 +106,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("User does not belong to any school tenant");
+            throw new AccessDeniedException("Người dùng không thuộc trường học nào");
         }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
@@ -169,7 +170,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("User does not belong to any school tenant");
+            throw new AccessDeniedException("Người dùng không thuộc trường học nào");
         }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
@@ -197,7 +198,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("User does not belong to any school tenant");
+            throw new AccessDeniedException("Người dùng không thuộc trường học nào");
         }
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
@@ -238,7 +239,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("User does not belong to any school tenant");
+            throw new AccessDeniedException("Người dùng không thuộc trường học nào");
         }
         UUID teacherUid = UUID.fromString(userPrincipal.getUid());
 
@@ -296,7 +297,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         UserPrincipal userPrincipal = resolvePrincipal(principal);
         UUID schoolId = userPrincipal.getSchoolId();
         if (schoolId == null) {
-            throw new AccessDeniedException("User does not belong to any school tenant");
+            throw new AccessDeniedException("Người dùng không thuộc trường học nào");
         }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
@@ -305,7 +306,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             throw new AccessDeniedException("Chá»‰ School Admin má»›i cÃ³ quyá»n xÃ³a lá»›p há»c!");
         }
 
-        classroom.setDeletedAt(LocalDateTime.now());
+        classroom.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         classroom.setStatus("DELETED");
         classroomRepository.save(classroom);
         log.info("Soft-deleted classroom {} by School Admin {}", classroom.getClassCode(), userPrincipal.getUid());
@@ -326,19 +327,19 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     private Classroom findClassroomInTenant(UUID id, UUID schoolId) {
         return classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(id, schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + id));
     }
 
     private User validateAndGetTeacher(UUID teacherId, UUID schoolId) {
         User teacher = userRepository.findById(teacherId)
-                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with ID: " + teacherId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getRole() != UserRole.TEACHER) {
-            throw new InvalidRequestException("User " + teacher.getUserName() + " is not a Teacher");
+            throw new InvalidRequestException("Người dùng " + teacher.getUserName() + " không phải là giáo viên");
         }
 
         if (teacher.getSchool() == null || !schoolId.equals(teacher.getSchool().getId())) {
-            throw new InvalidRequestException("Teacher does not belong to the school");
+            throw new InvalidRequestException("Giáo viên không thuộc trường học này");
         }
 
         return teacher;

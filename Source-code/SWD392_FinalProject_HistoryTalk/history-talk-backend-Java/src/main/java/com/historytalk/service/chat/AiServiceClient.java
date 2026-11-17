@@ -342,7 +342,7 @@ public class AiServiceClient {
                                 errorBody = lines.collect(java.util.stream.Collectors.joining("\n"));
                             } catch (Exception ignored) {}
                             aiMetricsService.recordRequest(metric, "failure");
-                            onError.accept(new SystemException("AI streaming failed with status " + response.statusCode() + ". Body: " + errorBody));
+                            onError.accept(new SystemException("Luồng phản hồi AI thất bại với mã trạng thái " + response.statusCode() + ". Nội dung: " + errorBody));
                             return;
                         }
                         try (Stream<String> lines = response.body()) {

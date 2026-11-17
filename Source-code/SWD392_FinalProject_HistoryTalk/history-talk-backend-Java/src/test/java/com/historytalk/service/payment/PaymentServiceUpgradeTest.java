@@ -27,6 +27,7 @@ import org.mockito.quality.Strictness;
 import vn.payos.PayOS;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -159,7 +160,7 @@ class PaymentServiceUpgradeTest {
 
     /** Active subscription bought for {@code paid} VND, exactly half-way through a 30-day period. */
     private UserTier activeHalfway(Tier tier, int paid) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         return UserTier.builder()
                 .id(UUID.randomUUID())
                 .user(user)

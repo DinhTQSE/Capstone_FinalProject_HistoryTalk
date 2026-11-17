@@ -24,6 +24,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,7 +74,7 @@ class LocalContentTrashTest {
                 .name("Khoi nghia Hai Ba Trung")
                 .school(school)
                 .createdBy(author)
-                .deletedAt(LocalDateTime.now())
+                .deletedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
     }
 
@@ -137,7 +138,7 @@ class LocalContentTrashTest {
                 .name("Hai Ba Trung")
                 .school(school)
                 .createdBy(author)
-                .deletedAt(LocalDateTime.now())
+                .deletedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
         when(localCharacterRepo.findTrashedByIdAndSchool(trashedCharacter.getCharacterId(), school.getId()))
                 .thenReturn(Optional.of(trashedCharacter));

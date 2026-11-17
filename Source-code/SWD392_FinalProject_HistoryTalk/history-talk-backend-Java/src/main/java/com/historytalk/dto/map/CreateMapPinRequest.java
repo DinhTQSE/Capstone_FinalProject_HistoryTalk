@@ -8,7 +8,7 @@ import lombok.Data;
 public class CreateMapPinRequest {
 
     /** Marker popup title. Required for all pin types. */
-    @NotBlank(message = "Label is required")
+    @NotBlank(message = "Nhãn không được để trống")
     private String label;
 
     /**
@@ -24,14 +24,14 @@ public class CreateMapPinRequest {
     private String pinType;
 
     /** WGS-84 latitude. */
-    @NotNull(message = "Latitude is required")
+    @NotNull(message = "Vĩ độ không được để trống")
     private Double latitude;
 
     /** WGS-84 longitude. */
-    @NotNull(message = "Longitude is required")
+    @NotNull(message = "Kinh độ không được để trống")
     private Double longitude;
 
     /** The exact year on the context timeline this pin belongs to. */
-    @NotNull(message = "Pin year is required")
+    @NotNull(message = "Năm của map pin không được để trống")
     private Integer pinYear;
 }

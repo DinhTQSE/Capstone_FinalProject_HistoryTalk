@@ -41,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.management.ManagementFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -79,7 +80,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         UUID finalSchoolId = resolvedSchoolId;
         log.info("Fetching School Admin Dashboard for schoolId: {}", finalSchoolId);
         School school = schoolRepository.findById(finalSchoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + finalSchoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + finalSchoolId));
 
         long totalClassrooms = classroomRepository.countBySchoolIdAndDeletedAtIsNull(finalSchoolId);
         long totalTeachers = userRepository.countBySchoolIdAndRole(finalSchoolId, UserRole.TEACHER);
@@ -94,7 +95,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         double studentPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByStudents * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
         double teacherPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByTeachers * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
         List<ClassroomTokenUsageProjection> topClassProjections = classroomRepository.findTopClassroomsByTokenUsage(finalSchoolId, todayStart, 5);
         List<ClassroomTokenUsageSummaryDto> topClassrooms = (topClassProjections != null) ? topClassProjections.stream()
                 .map(p -> ClassroomTokenUsageSummaryDto.builder()
@@ -186,7 +187,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         log.info("Fetching Teacher Classroom Dashboard for classId: {} by teacher: {}", classId, teacherUid);
 
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classId, schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with id: " + classId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + classId));
 
         if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
             throw new AccessDeniedException("Báº¡n khÃ´ng cÃ³ quyá»n xem dá»¯ liá»‡u cá»§a lá»›p há»c nÃ y!");
@@ -210,7 +211,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         List<UUID> studentUids = classStudentRepository.findEnrolledStudentUids(classId);
         long studentCount = studentUids.size();
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         List<TeacherClassroomDashboardResponse.StudentAnalyticsItem> studentItems = new ArrayList<>();
         long totalAiMessages = 0L;
         if (!studentUids.isEmpty()) {
@@ -302,7 +303,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         log.info("Fetching Student Personal Dashboard for studentUid: {}", studentUid);
 
         User student = userRepository.findById(studentUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + studentUid));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh với ID: " + studentUid));
 
         School school = student.getSchool();
         String schoolName = school != null ? school.getName() : "";
@@ -318,7 +319,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             }
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         boolean isSameDay = student.getLastTokenResetAt() != null
                 && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
         int bonusToday = isSameDay && student.getDailyBonusTokens() != null
@@ -386,9 +387,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         log.info("Fetching Customer B2C Dashboard for userUid: {}", userUid);
 
         User user = userRepository.findById(userUid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userUid));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userUid));
 
-        Optional<UserTier> activeTier = userTierRepository.findCurrentActiveByUid(userUid, LocalDateTime.now());
+        Optional<UserTier> activeTier = userTierRepository.findCurrentActiveByUid(userUid, LocalDateTime.now(ZoneOffset.UTC));
         String currentTier = activeTier.map(ut -> ut.getTier() != null ? ut.getTier().getTitle() : "FREE").orElse("FREE");
         LocalDateTime tierExpiresAt = activeTier.map(UserTier::getEndTime).orElse(null);
         int currentTokens = user.getToken() != null ? user.getToken() : 0;
@@ -511,9 +512,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                         .build();
 
         // 3. Top 10 Wrong Questions
-        LocalDateTime oneYearAgo = LocalDateTime.now().minusYears(1);
+        LocalDateTime oneYearAgo = LocalDateTime.now(ZoneOffset.UTC).minusYears(1);
         List<DashboardTopWrongQuestionProjection> wrongProjections =
-                quizAnswerDetailRepository.findTopWrongQuestionsForDashboard(oneYearAgo, LocalDateTime.now(), 10);
+                quizAnswerDetailRepository.findTopWrongQuestionsForDashboard(oneYearAgo, LocalDateTime.now(ZoneOffset.UTC), 10);
         List<SystemAdminComprehensiveDashboardResponse.TopWrongQuestionItem> topWrong = wrongProjections.stream()
                 .map(q -> SystemAdminComprehensiveDashboardResponse.TopWrongQuestionItem.builder()
                         .questionId(q.getQuestionId())
@@ -620,10 +621,10 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             throw new InvalidRequestException("TÃ i khoáº£n Quáº£n trá»‹ viÃªn chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i trÆ°á»ng há»c nÃ o.");
         }
         if (!schoolRepository.existsById(resolvedSchoolId)) {
-            throw new ResourceNotFoundException("School not found with id: " + resolvedSchoolId);
+            throw new ResourceNotFoundException("Không tìm thấy trường học với ID: " + resolvedSchoolId);
         }
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
         long schoolTotal = messageRepository.sumTokensUsedBySchoolStudents(resolvedSchoolId)
@@ -673,7 +674,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         UUID schoolId = resolved.getSchoolId();
 
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with id: " + classroomId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + classroomId));
 
         if (resolved.getRole() == UserRole.TEACHER) {
             UUID teacherUid = UUID.fromString(resolved.getUid());
@@ -692,7 +693,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 ? Math.max(0, school.getUnallocatedTokenQuota())
                 : 0;
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
         Pageable safePageable = (pageable != null)
@@ -745,9 +746,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         UUID schoolId = resolved.getSchoolId();
 
         User teacher = userRepository.findById(teacherUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with id: " + teacherUid));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherUid));
 
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
         List<ClassroomTokenUsageProjection> projections = classroomRepository.findClassroomsTokenUsageForTeacher(
                 schoolId, teacherUid, todayStart);
 

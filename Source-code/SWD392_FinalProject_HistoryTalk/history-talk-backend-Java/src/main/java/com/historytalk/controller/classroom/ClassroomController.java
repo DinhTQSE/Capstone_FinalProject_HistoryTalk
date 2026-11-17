@@ -42,7 +42,7 @@ public class ClassroomController {
 
         ClassroomResponse response = classroomService.createClassroom(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Classroom created successfully"));
+                .body(ApiResponse.success(response, "Tạo lớp học thành công"));
     }
 
     @PutMapping("/classrooms/{id}")
@@ -54,7 +54,7 @@ public class ClassroomController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         ClassroomResponse response = classroomService.updateClassroom(id, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Classroom updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật lớp học thành công"));
     }
 
     @GetMapping("/classrooms/{id}")
@@ -65,7 +65,7 @@ public class ClassroomController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         ClassroomResponse response = classroomService.getClassroomById(id, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Classroom details retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy chi tiết lớp học thành công"));
     }
 
     @DeleteMapping("/classrooms/{id}")
@@ -76,7 +76,7 @@ public class ClassroomController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         classroomService.deleteClassroom(id, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Classroom deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa lớp học thành công"));
     }
 
     @GetMapping("/school-admin/classrooms")
@@ -91,7 +91,7 @@ public class ClassroomController {
 
         PaginatedResponse<ClassroomResponse> response = classroomService.getSchoolClassrooms(
                 search, gradeLevel, academicYear, pageable, principal);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "School classrooms retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách lớp học của trường thành công"));
     }
 
     @GetMapping("/teacher/classrooms")
@@ -104,7 +104,7 @@ public class ClassroomController {
 
         PaginatedResponse<ClassroomResponse> response = classroomService.getTeacherClassrooms(
                 academicYear, pageable, principal);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Teacher classrooms retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách lớp học của giáo viên thành công"));
     }
 
     @GetMapping("/student/classrooms")
@@ -114,6 +114,6 @@ public class ClassroomController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         List<ClassroomResponse> response = classroomService.getStudentClassrooms(principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student classrooms retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách lớp học của học sinh thành công"));
     }
 }

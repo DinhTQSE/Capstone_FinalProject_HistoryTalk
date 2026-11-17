@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -77,7 +78,7 @@ class CharacterSpeechServiceImplTest {
 
     @Test
     void deletedCharacterCannotSpeak() {
-        stubCharacter(Character.builder().characterId(characterId).name("Ngô Quyền").deletedAt(LocalDateTime.now()).build());
+        stubCharacter(Character.builder().characterId(characterId).name("Ngô Quyền").deletedAt(LocalDateTime.now(ZoneOffset.UTC)).build());
 
         assertThatThrownBy(() -> service.synthesize(characterId.toString(), "Xin chào."))
                 .isInstanceOf(ResourceNotFoundException.class);

@@ -18,34 +18,34 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UpdateB2bQuoteStatusRequest {
 
-    @NotNull(message = "Target status is required")
+    @NotNull(message = "Trạng thái đích không được để trống")
     private B2bQuoteStatus status;
 
-    @Min(value = 0, message = "Custom discount percent must be between 0 and 100")
-    @Max(value = 100, message = "Custom discount percent must be between 0 and 100")
+    @Min(value = 0, message = "Phần trăm giảm giá tùy chỉnh phải từ 0 đến 100")
+    @Max(value = 100, message = "Phần trăm giảm giá tùy chỉnh phải từ 0 đến 100")
     private Integer customDiscountPercent;
 
-    @Size(max = 2000, message = "Admin note must not exceed 2,000 characters")
+    @Size(max = 2000, message = "Ghi chú của quản trị viên không được vượt quá 2.000 ký tự")
     private String adminNote;
 
-    @Min(value = 1, message = "Academic weeks must be at least 1")
-    @Max(value = 52, message = "Academic weeks cannot exceed 52")
+    @Min(value = 1, message = "Số tuần học tối thiểu là 1")
+    @Max(value = 52, message = "Số tuần học không được vượt quá 52")
     private Integer academicWeeks;
 
-    @Min(value = 100, message = "Student daily token limit must be at least 100")
-    @Max(value = 100000, message = "Student daily token limit cannot exceed 100,000")
+    @Min(value = 100, message = "Hạn mức token hằng ngày của học sinh tối thiểu là 100")
+    @Max(value = 100000, message = "Hạn mức token hằng ngày của học sinh không được vượt quá 100.000")
     private Integer studentDailyTokenLimit;
 
-    @Min(value = 100, message = "Teacher daily token limit must be at least 100")
-    @Max(value = 100000, message = "Teacher daily token limit cannot exceed 100,000")
+    @Min(value = 100, message = "Hạn mức token hằng ngày của giáo viên tối thiểu là 100")
+    @Max(value = 100000, message = "Hạn mức token hằng ngày của giáo viên không được vượt quá 100.000")
     private Integer teacherDailyTokenLimit;
 
-    @Min(value = 1, message = "Student days per week must be between 1 and 7")
-    @Max(value = 7, message = "Student days per week must be between 1 and 7")
+    @Min(value = 1, message = "Số ngày học mỗi tuần của học sinh phải từ 1 đến 7")
+    @Max(value = 7, message = "Số ngày học mỗi tuần của học sinh phải từ 1 đến 7")
     private Integer studentDaysPerWeek;
 
-    @Min(value = 1, message = "Teacher days per week must be between 1 and 7")
-    @Max(value = 7, message = "Teacher days per week must be between 1 and 7")
+    @Min(value = 1, message = "Số ngày dạy mỗi tuần của giáo viên phải từ 1 đến 7")
+    @Max(value = 7, message = "Số ngày dạy mỗi tuần của giáo viên phải từ 1 đến 7")
     private Integer teacherDaysPerWeek;
 
     private LocalDate subscriptionStartDate;

@@ -41,6 +41,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -105,7 +106,7 @@ class QuestionBankServiceImplTest {
         Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
         QuizSession session = QuizSession.builder()
                 .sessionId(sessionId).quiz(quiz).user(user)
-                .startTime(LocalDateTime.now()).build();
+                .startTime(LocalDateTime.now(ZoneOffset.UTC)).build();
 
         when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
         when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
@@ -145,7 +146,7 @@ class QuestionBankServiceImplTest {
         Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
         QuizSession session = QuizSession.builder()
                 .sessionId(sessionId).quiz(quiz).user(user)
-                .startTime(LocalDateTime.now()).build();
+                .startTime(LocalDateTime.now(ZoneOffset.UTC)).build();
 
         when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
         when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
@@ -188,7 +189,7 @@ class QuestionBankServiceImplTest {
         Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
         QuizSession session = QuizSession.builder()
                 .sessionId(sessionId).quiz(quiz).user(user)
-                .startTime(LocalDateTime.now()).build();
+                .startTime(LocalDateTime.now(ZoneOffset.UTC)).build();
 
         when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
         when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
@@ -229,7 +230,7 @@ class QuestionBankServiceImplTest {
         Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
         QuizSession session = QuizSession.builder()
                 .sessionId(sessionId).quiz(quiz).user(user)
-                .startTime(LocalDateTime.now()).build();
+                .startTime(LocalDateTime.now(ZoneOffset.UTC)).build();
 
         when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
         when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
@@ -278,7 +279,7 @@ class QuestionBankServiceImplTest {
         Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
         QuizSession session = QuizSession.builder()
                 .sessionId(sessionId).quiz(quiz).user(user)
-                .startTime(LocalDateTime.now()).build();
+                .startTime(LocalDateTime.now(ZoneOffset.UTC)).build();
 
         when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
         when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));
@@ -326,7 +327,7 @@ class QuestionBankServiceImplTest {
         Quiz quiz = Quiz.builder().quizId(quizId).title("T").build();
         QuizSession session = QuizSession.builder()
                 .sessionId(sessionId).quiz(quiz).user(user)
-                .startTime(LocalDateTime.now()).build();
+                .startTime(LocalDateTime.now(ZoneOffset.UTC)).build();
 
         when(quizSessionRepository.findBySessionId(sessionId)).thenReturn(Optional.of(session));
         when(questionRepository.findActiveByQuizId(quizId)).thenReturn(List.of(question));

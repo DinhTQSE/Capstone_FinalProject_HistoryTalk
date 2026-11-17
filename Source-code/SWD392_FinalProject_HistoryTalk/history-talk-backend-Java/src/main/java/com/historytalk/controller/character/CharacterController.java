@@ -41,7 +41,7 @@ public class CharacterController {
         log.info("GET /v1/characters - search: {}, era: {}, page: {}, limit: {}", search, era, page, limit);
         String role = SecurityUtils.getRoleName();
         PaginatedResponse<CharacterResponse> result = characterService.getAllCharacters(search, era != null ? era.toString() : null, page, limit, role);
-        return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(result, "Lấy danh sách nhân vật thành công"));
     }
 
     @GetMapping("/{characterId}")
@@ -50,7 +50,7 @@ public class CharacterController {
         log.info("GET /v1/characters/{}", characterId);
         String role = SecurityUtils.getRoleName();
         CharacterResponse result = characterService.getCharacterById(characterId, role);
-        return ResponseEntity.ok(ApiResponse.success(result, "Character retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(result, "Lấy thông tin nhân vật thành công"));
     }
 
     @GetMapping("/context/{contextId}")
@@ -59,7 +59,7 @@ public class CharacterController {
         log.info("GET /v1/characters/context/{}", contextId);
         String role = SecurityUtils.getRoleName();
         List<CharacterResponse> result = characterService.getCharactersByContext(contextId, role);
-        return ResponseEntity.ok(ApiResponse.success(result, "Characters retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(result, "Lấy danh sách nhân vật thành công"));
     }
 
     @PostMapping
@@ -72,7 +72,7 @@ public class CharacterController {
         String staffId = SecurityUtils.getUserId();
         CharacterResponse result = characterService.createCharacter(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(result, "Character created successfully"));
+                .body(ApiResponse.success(result, "Tạo nhân vật thành công"));
     }
 
     @PutMapping("/{characterId}")
@@ -86,7 +86,7 @@ public class CharacterController {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         CharacterResponse result = characterService.updateCharacter(characterId, request, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(result, "Character updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(result, "Cập nhật nhân vật thành công"));
     }
 
     @DeleteMapping("/{characterId}")
@@ -99,7 +99,7 @@ public class CharacterController {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         characterService.deleteCharacter(characterId, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Character deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa nhân vật thành công"));
     }
 
     @PatchMapping("/{characterId}/soft-delete")
@@ -112,7 +112,7 @@ public class CharacterController {
         String staffId = SecurityUtils.getUserId();
         String staffRole = SecurityUtils.getRoleName();
         characterService.softDeleteCharacter(characterId, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Character soft-deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã chuyển nhân vật vào thùng rác"));
     }
 
     @PostMapping("/{characterId}/contexts/{contextId}")
@@ -126,7 +126,7 @@ public class CharacterController {
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
         characterService.addContextToCharacter(characterId, contextId, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Context mapped to character successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Gắn bối cảnh với nhân vật thành công"));
     }
 
     @DeleteMapping("/{characterId}/contexts/{contextId}")
@@ -140,7 +140,7 @@ public class CharacterController {
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
         characterService.removeContextFromCharacter(characterId, contextId, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Context unmapped from character successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Gỡ bối cảnh khỏi nhân vật thành công"));
     }
 
     @GetMapping("/{characterId}/contexts")
@@ -150,7 +150,7 @@ public class CharacterController {
         log.info("GET /v1/characters/{}/contexts", characterId);
         String role = SecurityUtils.getRoleName();
         List<CharacterResponse.ContextInfo> contexts = characterService.getContextsOfCharacter(characterId, role);
-        return ResponseEntity.ok(ApiResponse.success(contexts, "Character contexts retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(contexts, "Lấy danh sách bối cảnh của nhân vật thành công"));
     }
 
     /**
@@ -163,6 +163,6 @@ public class CharacterController {
         log.info("GET /v1/characters/{}/documents", characterId);
         String role = SecurityUtils.getRoleName();
         var documents = characterDocumentService.getDocumentsByCharacterId(characterId, role);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Character documents retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy danh sách tài liệu của nhân vật thành công"));
     }
 }

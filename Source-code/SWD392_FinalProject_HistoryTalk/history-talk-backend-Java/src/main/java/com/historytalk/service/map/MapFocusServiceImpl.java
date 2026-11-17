@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,7 @@ public class MapFocusServiceImpl implements MapFocusService {
         requireAdminOrSchoolManager(role, callerId, context);
 
         User creator = userRepository.findById(UUID.fromString(callerId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + callerId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + callerId));
 
         // Auto-assign order_index as max + 1 (0 if no existing focuses)
         Integer maxIndex = focusRepository.findMaxOrderIndexByContextId(ctxUuid);
@@ -131,11 +132,11 @@ public class MapFocusServiceImpl implements MapFocusService {
 
         MapFocus focus = focusRepository.findByFocusIdAndDeletedAtIsNull(focusUuid)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Map focus not found: " + focusId));
+                        "Không tìm thấy điểm focus bản đồ: " + focusId));
 
         // Verify focus belongs to this context
         if (!focus.getContextId().equals(ctxUuid)) {
-            throw new ResourceNotFoundException("Map focus not found: " + focusId);
+            throw new ResourceNotFoundException("Không tìm thấy điểm focus bản đồ: " + focusId);
         }
 
         // Apply non-null fields
@@ -199,7 +200,7 @@ public class MapFocusServiceImpl implements MapFocusService {
             MapFocus focus = focusByUuid.get(focusUuid);
             if (focus == null) {
                 throw new ResourceNotFoundException(
-                        "Map focus not found or does not belong to this context: "
+                        "Không tìm thấy điểm focus bản đồ hoặc điểm này không thuộc bối cảnh: "
                                 + request.getFocusIds().get(i));
             }
             focus.setOrderIndex(i);
@@ -232,13 +233,13 @@ public class MapFocusServiceImpl implements MapFocusService {
 
         MapFocus focus = focusRepository.findByFocusIdAndDeletedAtIsNull(focusUuid)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Map focus not found: " + focusId));
+                        "Không tìm thấy điểm focus bản đồ: " + focusId));
 
         if (!focus.getContextId().equals(ctxUuid)) {
-            throw new ResourceNotFoundException("Map focus not found: " + focusId);
+            throw new ResourceNotFoundException("Không tìm thấy điểm focus bản đồ: " + focusId);
         }
 
-        focus.setDeletedAt(LocalDateTime.now());
+        focus.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         focusRepository.save(focus);
         log.info("Map focus soft-deleted: focusId={}", focusId);
     }
@@ -362,7 +363,7 @@ public class MapFocusServiceImpl implements MapFocusService {
         try {
             return UUID.fromString(value);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid " + label + " ID format: " + value);
+            throw new InvalidRequestException("ID " + label + " sai định dạng: " + value);
         }
     }
 }

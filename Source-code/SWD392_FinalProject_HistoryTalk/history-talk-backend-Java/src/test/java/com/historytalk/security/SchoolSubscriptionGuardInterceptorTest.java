@@ -19,6 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,8 +55,8 @@ class SchoolSubscriptionGuardInterceptorTest {
                 .name("Trường THPT Chu Văn An")
                 .schoolCode("CVA")
                 .status(SchoolStatus.ACTIVE)
-                .subscriptionStartDate(LocalDate.now().minusMonths(1))
-                .subscriptionEndDate(LocalDate.now().plusMonths(5))
+                .subscriptionStartDate(LocalDate.now(ZoneOffset.UTC).minusMonths(1))
+                .subscriptionEndDate(LocalDate.now(ZoneOffset.UTC).plusMonths(5))
                 .build();
 
         user = User.builder()
@@ -89,7 +90,7 @@ class SchoolSubscriptionGuardInterceptorTest {
 
     @Test
     void preHandle_whenSubscriptionExpired_shouldThrowAccessDeniedException() {
-        school.setSubscriptionEndDate(LocalDate.now().minusDays(1));
+        school.setSubscriptionEndDate(LocalDate.now(ZoneOffset.UTC).minusDays(1));
         when(userRepository.findByIdWithSchool(userId)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> interceptor.preHandle(null, null, null))

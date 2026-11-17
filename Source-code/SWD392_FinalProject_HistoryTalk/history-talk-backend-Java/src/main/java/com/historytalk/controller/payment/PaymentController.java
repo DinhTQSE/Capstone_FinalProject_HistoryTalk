@@ -38,7 +38,7 @@ public class PaymentController {
             @RequestBody CreatePaymentRequest request) throws Exception {
         UUID uid = UUID.fromString(SecurityUtils.getUserId());
         CreatePaymentResponse response = paymentService.createPayOSCheckout(uid, request.getTierId());
-        return ResponseEntity.ok(ApiResponse.success(response, "Payment checkout created successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo phiên thanh toán thành công"));
     }
 
     /**
@@ -51,7 +51,7 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<UpgradeQuoteResponse>> getUpgradeQuote(@RequestParam String tierId) {
         UUID uid = UUID.fromString(SecurityUtils.getUserId());
         UpgradeQuoteResponse response = paymentService.getUpgradeQuote(uid, tierId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Upgrade quote calculated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tính giá nâng cấp gói thành công"));
     }
 
     /**
@@ -63,7 +63,7 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<List<PaymentHistoryResponse>>> getMyPaymentHistory() {
         UUID uid = UUID.fromString(SecurityUtils.getUserId());
         List<PaymentHistoryResponse> history = paymentService.getMyPaymentHistory(uid);
-        return ResponseEntity.ok(ApiResponse.success(history, "Payment history retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(history, "Lấy lịch sử thanh toán thành công"));
     }
 
     /**
@@ -80,7 +80,7 @@ public class PaymentController {
             @RequestParam(defaultValue = "20") int size) {
         var pageable = PageRequest.of(Math.max(0, page - 1), size);
         var data = paymentService.getAllPaymentHistory(status, userId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(data, "Payment history retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy lịch sử thanh toán thành công"));
     }
 
     /**
@@ -90,7 +90,7 @@ public class PaymentController {
     @GetMapping("/tiers")
     public ResponseEntity<ApiResponse<List<TierResponse>>> listTiers() {
         List<TierResponse> tiers = paymentService.listActiveTiers();
-        return ResponseEntity.ok(ApiResponse.success(tiers, "Tiers retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(tiers, "Lấy danh sách gói hội viên thành công"));
     }
 
     /**
@@ -123,6 +123,6 @@ public class PaymentController {
                 .filter(h -> h.getOrderCode() != null && h.getOrderCode().equals(orderCode))
                 .findFirst()
                 .orElse(null);
-        return ResponseEntity.ok(ApiResponse.success(order, "Order info retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(order, "Lấy thông tin đơn hàng thành công"));
     }
 }

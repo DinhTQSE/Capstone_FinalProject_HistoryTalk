@@ -28,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -106,7 +107,7 @@ class UserServiceImplTest {
                 .userName("user")
                 .email("user@example.com")
                 .role(UserRole.CUSTOMER)
-                .deletedAt(LocalDateTime.now())
+                .deletedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -178,12 +179,12 @@ class UserServiceImplTest {
                 .email("customer@example.com")
                 .role(UserRole.CUSTOMER)
                 .token(13_000)
-                .lastTokenResetAt(LocalDateTime.now().minusDays(1))
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC).minusDays(1))
                 .build();
         Tier pro = Tier.builder().tierId(UUID.randomUUID()).title("pro").amount(99_000)
                 .noMonth(1).limitedToken(10_000).build();
         UserTier proSub = UserTier.builder().id(UUID.randomUUID()).user(user).tier(pro)
-                .startTime(LocalDateTime.now().minusDays(1)).endTime(LocalDateTime.now().plusDays(29))
+                .startTime(LocalDateTime.now(ZoneOffset.UTC).minusDays(1)).endTime(LocalDateTime.now(ZoneOffset.UTC).plusDays(29))
                 .isActive(true).build();
         // the old Plus plan was deactivated by fulfillment, so only Pro is still active
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));

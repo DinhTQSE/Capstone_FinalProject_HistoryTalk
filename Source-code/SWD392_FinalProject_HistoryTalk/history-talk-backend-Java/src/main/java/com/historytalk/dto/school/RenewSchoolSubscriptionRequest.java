@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class RenewSchoolSubscriptionRequest {
 
-    @NotNull(message = "Package type must not be null")
+    @NotNull(message = "Loại gói không được để trống")
     private EnterprisePackage packageType;
 
     /**
@@ -24,19 +24,19 @@ public class RenewSchoolSubscriptionRequest {
      * If not provided and the current school is already ENTERPRISE_CUSTOM,
      * the system will retain the school's base contracted quota.
      */
-    @Min(value = 1, message = "Custom token quota must be greater than 0")
+    @Min(value = 1, message = "Hạn mức token tùy chỉnh phải lớn hơn 0")
     private Integer customTokenQuota;
 
-    @Min(value = 1, message = "Maximum students must be greater than 0")
+    @Min(value = 1, message = "Số học sinh tối đa phải lớn hơn 0")
     private Integer maxStudents;
 
-    @Min(value = 1, message = "Maximum teachers must be greater than 0")
+    @Min(value = 1, message = "Số giáo viên tối đa phải lớn hơn 0")
     private Integer maxTeachers;
 
-    @Min(value = 1, message = "Default daily student quota must be greater than 0")
+    @Min(value = 1, message = "Hạn mức hằng ngày mặc định của học sinh phải lớn hơn 0")
     private Integer defaultDailyStudentQuota;
 
-    @Min(value = 1, message = "Default daily teacher quota must be greater than 0")
+    @Min(value = 1, message = "Hạn mức hằng ngày mặc định của giáo viên phải lớn hơn 0")
     private Integer defaultDailyTeacherQuota;
 
     private LocalDate subscriptionStartDate;

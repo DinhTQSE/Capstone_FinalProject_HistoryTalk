@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.historytalk.exception.ForbiddenException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -111,7 +112,7 @@ public class MapPinServiceImpl implements MapPinService {
         }
 
         User creator = userRepository.findById(UUID.fromString(callerId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + callerId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + callerId));
 
         String pinOwnerType;
         String pinType;
@@ -269,7 +270,7 @@ public class MapPinServiceImpl implements MapPinService {
         List<MapPin> pins = mapPinRepository.findByHistoricalContext_ContextIdAndDeletedAtIsNull(ctxUuid);
         if (pins.isEmpty()) return;
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         pins.forEach(p -> p.setDeletedAt(now));
         mapPinRepository.saveAll(pins);
         log.info("Cascade soft-deleted {} map pins for contextId={}", pins.size(), contextId);
@@ -346,7 +347,7 @@ public class MapPinServiceImpl implements MapPinService {
         try {
             return UUID.fromString(value);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Invalid " + label + " ID format: " + value);
+            throw new InvalidRequestException("ID " + label + " sai định dạng: " + value);
         }
     }
 }

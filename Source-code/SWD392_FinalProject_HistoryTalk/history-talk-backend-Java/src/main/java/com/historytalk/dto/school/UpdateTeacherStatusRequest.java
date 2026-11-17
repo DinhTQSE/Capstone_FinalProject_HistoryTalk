@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateTeacherStatusRequest {
 
-    @NotNull(message = "Active status must not be null")
+    @NotNull(message = "Trạng thái hoạt động không được để trống")
     private Boolean active;
 }

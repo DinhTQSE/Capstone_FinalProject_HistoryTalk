@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -96,7 +97,7 @@ public class AiAuthoringController {
         error.put("success", false);
         error.put("errorCode", response.status());
         error.put("message", message);
-        error.put("timestamp", LocalDateTime.now().toString());
+        error.put("timestamp", LocalDateTime.now(ZoneOffset.UTC).toString());
         try {
             return objectMapper.writeValueAsString(error);
         } catch (Exception e) {

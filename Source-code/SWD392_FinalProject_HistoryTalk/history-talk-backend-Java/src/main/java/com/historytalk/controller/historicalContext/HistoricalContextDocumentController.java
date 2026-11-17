@@ -48,7 +48,7 @@ public class HistoricalContextDocumentController {
         log.info("GET /v1/historical-documents - Get all documents");
         String userRole = SecurityUtils.getRoleName();
         List<HistoricalContextDocumentResponse> documents = documentService.getAllDocuments(userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -60,7 +60,7 @@ public class HistoricalContextDocumentController {
         log.info("GET /v1/historical-documents/context/{} - Get documents by context", contextId);
         String userRole = SecurityUtils.getRoleName();
         List<HistoricalContextDocumentResponse> documents = documentService.getDocumentsByContextId(contextId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -72,7 +72,7 @@ public class HistoricalContextDocumentController {
         log.info("GET /v1/historical-documents/staff/{} - Get documents by staff", staffId);
         String userRole = SecurityUtils.getRoleName();
         List<HistoricalContextDocumentResponse> documents = documentService.getDocumentsByStaffId(staffId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -85,7 +85,7 @@ public class HistoricalContextDocumentController {
         log.info("GET /v1/historical-documents/search - Search documents with keyword: {}", keyword);
         String userRole = SecurityUtils.getRoleName();
         List<HistoricalContextDocumentResponse> documents = documentService.searchDocuments(keyword, userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -97,7 +97,7 @@ public class HistoricalContextDocumentController {
         log.info("GET /v1/historical-documents/{} - Get document by ID", docId);
         String userRole = SecurityUtils.getRoleName();
         HistoricalContextDocumentResponse document = documentService.getDocumentById(docId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(document, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(document, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -114,7 +114,7 @@ public class HistoricalContextDocumentController {
         log.info("POST /v1/historical-documents - Create document by user: {}", staffId);
         HistoricalContextDocumentResponse document = documentService.createDocument(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(document, "Document uploaded successfully"));
+                .body(ApiResponse.success(document, "Tải lên tài liệu thành công"));
     }
     
     /**
@@ -132,7 +132,7 @@ public class HistoricalContextDocumentController {
         String staffRole = SecurityUtils.getRoleName();
         log.info("PUT /v1/historical-documents/{} - Update document by user: {}", docId, staffId);
         HistoricalContextDocumentResponse document = documentService.updateDocument(docId, request, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(document, "Cập nhật tài liệu thành công"));
     }
     
     /**

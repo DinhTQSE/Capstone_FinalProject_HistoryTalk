@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Data
@@ -46,7 +47,7 @@ public class PaginatedApiResponse<T> {
                         .hasNext(pr.getHasNext())
                         .hasPrevious(pr.getHasPrevious())
                         .build() : null)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
     }
 }

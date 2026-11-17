@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -257,7 +258,7 @@ class B2bQuoteServiceImplTest {
         when(quoteRequestRepository.save(any(B2bQuoteRequest.class))).thenAnswer(inv -> {
             B2bQuoteRequest saved = inv.getArgument(0);
             saved.setId(UUID.randomUUID());
-            saved.setCreatedAt(LocalDateTime.now());
+            saved.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
             return saved;
         });
 
@@ -435,6 +436,6 @@ class B2bQuoteServiceImplTest {
 
         assertThatThrownBy(() -> b2bQuoteService.approveQuoteAndProvisionSchool(quoteId, UUID.randomUUID()))
                 .isInstanceOf(DataConflictException.class)
-                .hasMessageContaining("already been approved");
+                .hasMessageContaining("đã được duyệt");
     }
 }

@@ -226,7 +226,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         }
 
         Classroom targetClass = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(request.getTargetClassroomId(), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Target classroom not found with ID: " + request.getTargetClassroomId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học đích với ID: " + request.getTargetClassroomId()));
 
         int successCount = 0;
         List<String> notes = new ArrayList<>();
@@ -287,7 +287,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
 
     private Classroom validateAndGetClassroom(UUID classroomId, UUID schoolId, UserPrincipal principal) {
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with ID: " + classroomId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + classroomId));
 
         if (principal.getRole() == UserRole.TEACHER) {
             UUID currentTeacherUid = UUID.fromString(principal.getUid());
@@ -316,7 +316,7 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
         if (principal != null && principal.getSchoolId() != null) {
             return principal.getSchoolId();
         }
-        throw new AccessDeniedException("User does not belong to any school tenant");
+        throw new AccessDeniedException("Người dùng không thuộc trường học nào");
     }
 
     private ClassroomStudentResponse mapToClassroomStudentResponse(ClassStudent cs) {

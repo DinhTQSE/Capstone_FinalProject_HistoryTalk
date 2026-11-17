@@ -41,6 +41,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.HashMap;
@@ -100,7 +101,7 @@ public class AuthServiceImpl implements AuthService {
             String rawVerificationToken = assignEmailVerificationToken(existing);
             User updated = userRepository.save(existing);
             sendVerificationEmailAfterCommit(updated, rawVerificationToken);
-            return buildRegisterResponse(updated, "User registered successfully. Please verify your email before logging in.");
+            return buildRegisterResponse(updated, "Đăng ký tài khoản thành công. Vui lòng xác thực email trước khi đăng nhập.");
         }
         if (userRepository.existsByUserNameIgnoreCase(request.getUserName())) {
             throw new InvalidRequestException("Tên đăng nhập của bạn đã tồn tại");
@@ -119,7 +120,7 @@ public class AuthServiceImpl implements AuthService {
         if (freeTierOpt.isPresent()) {
             Tier freeTier = freeTierOpt.get();
             user.setToken(freeTier.getLimitedToken());
-            user.setLastTokenResetAt(LocalDateTime.now());
+            user.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         }
 
         String rawVerificationToken = assignEmailVerificationToken(user);
@@ -130,8 +131,8 @@ public class AuthServiceImpl implements AuthService {
             UserTier userTier = UserTier.builder()
                     .user(saved)
                     .tier(freeTier)
-                    .startTime(LocalDateTime.now())
-                    .endTime(LocalDateTime.now().plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120))
+                    .startTime(LocalDateTime.now(ZoneOffset.UTC))
+                    .endTime(LocalDateTime.now(ZoneOffset.UTC).plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120))
                     .isActive(true)
                     .build();
             userTierRepository.save(userTier);
@@ -140,7 +141,7 @@ public class AuthServiceImpl implements AuthService {
         log.info("User registered with uid: {} (pending email verification)", saved.getUid());
         sendVerificationEmailAfterCommit(saved, rawVerificationToken);
 
-        return buildRegisterResponse(saved, "User registered successfully. Please verify your email before logging in.");
+        return buildRegisterResponse(saved, "Đăng ký tài khoản thành công. Vui lòng xác thực email trước khi đăng nhập.");
     }
 
     @Override
@@ -214,7 +215,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userOptional.get();
         String rawToken = generatePasswordResetToken();
         user.setPasswordResetTokenHash(sha256Hex(rawToken));
-        user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(passwordResetTokenExpirationMinutes));
+        user.setPasswordResetExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(passwordResetTokenExpirationMinutes));
         userRepository.save(user);
 
         sendPasswordResetEmailAfterCommit(user, rawToken);
@@ -238,14 +239,14 @@ public class AuthServiceImpl implements AuthService {
 
         if (user.getDeletedAt() != null
                 || user.getPasswordResetExpiresAt() == null
-                || user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+                || user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
             throw new UnauthorizedException("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setPasswordResetTokenHash(null);
         user.setPasswordResetExpiresAt(null);
-        user.setPasswordChangedAt(LocalDateTime.now());
+        user.setPasswordChangedAt(LocalDateTime.now(ZoneOffset.UTC));
         user.setMustChangePassword(false);
         userRepository.save(user);
 
@@ -267,12 +268,12 @@ public class AuthServiceImpl implements AuthService {
         if (user.getDeletedAt() != null
                 || user.getAccountStatus() == com.historytalk.entity.enums.AccountStatus.DEACTIVATED
                 || user.getEmailVerificationExpiresAt() == null
-                || user.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now())) {
+                || user.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
             throw new UnauthorizedException("Token xác thực email không hợp lệ hoặc đã hết hạn");
         }
 
         user.setEmailVerified(true);
-        user.setEmailVerifiedAt(LocalDateTime.now());
+        user.setEmailVerifiedAt(LocalDateTime.now(ZoneOffset.UTC));
         user.setEmailVerificationTokenHash(null);
         user.setEmailVerificationExpiresAt(null);
         user.setEmailVerificationSentAt(null);
@@ -301,7 +302,7 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         if (user.getEmailVerificationSentAt() != null
                 && user.getEmailVerificationSentAt().plusSeconds(emailVerificationResendCooldownSeconds).isAfter(now)) {
             throw new InvalidRequestException("Vui lòng đợi trước khi yêu cầu gửi lại email xác thực.");
@@ -314,7 +315,7 @@ public class AuthServiceImpl implements AuthService {
 
     private String assignEmailVerificationToken(User user) {
         String rawToken = generatePasswordResetToken();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         user.setEmailVerificationTokenHash(sha256Hex(rawToken));
         user.setEmailVerificationExpiresAt(now.plusMinutes(emailVerificationTokenExpirationMinutes));
         user.setEmailVerificationSentAt(now);
@@ -383,8 +384,8 @@ public class AuthServiceImpl implements AuthService {
     public void logoutAll(String userId) {
         UUID uid = UUID.fromString(userId);
         User user = userRepository.findById(uid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        user.setPasswordChangedAt(LocalDateTime.now());
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+        user.setPasswordChangedAt(LocalDateTime.now(ZoneOffset.UTC));
         user.setMustChangePassword(false);
         userRepository.save(user);
         refreshTokenService.revokeAllUserTokens(uid);
@@ -415,7 +416,7 @@ public class AuthServiceImpl implements AuthService {
                 .userName(request.getUserName())
                 .email(request.getEmail().trim().toLowerCase())
                 .emailVerified(true)
-                .emailVerifiedAt(LocalDateTime.now())
+                .emailVerifiedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .build();
@@ -428,7 +429,7 @@ public class AuthServiceImpl implements AuthService {
                 .userName(saved.getUserName())
                 .email(saved.getEmail())
                 .role(saved.getRole().name())
-                .message("Staff account registered successfully")
+                .message("Tạo tài khoản nhân sự thành công")
                 .build();
     }
 
@@ -482,17 +483,17 @@ public class AuthServiceImpl implements AuthService {
         log.info("Soft deleting user {} requested by user {}", targetUserId, staffId);
 
         User requestUser = userRepository.findById(UUID.fromString(staffId))
-                .orElseThrow(() -> new ResourceNotFoundException("Requesting user not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng gửi yêu cầu"));
 
         if (!targetUserId.equals(staffId) && requestUser.getRole() != UserRole.SYSTEM_ADMIN) {
             throw new InvalidRequestException("Chỉ SYSTEM_ADMIN mới có thể vô hiệu hóa tài khoản của người dùng khác.");
         }
 
         User targetUser = userRepository.findById(UUID.fromString(targetUserId))
-                .orElseThrow(() -> new ResourceNotFoundException("Target user not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng đích"));
 
-        targetUser.setDeletedAt(LocalDateTime.now());
-        targetUser.setPasswordChangedAt(LocalDateTime.now());
+        targetUser.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
+        targetUser.setPasswordChangedAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(targetUser);
 
         // Hủy toàn bộ refresh token khi bị khóa tài khoản
@@ -539,7 +540,7 @@ public class AuthServiceImpl implements AuthService {
         try {
             return UserRole.valueOf(normalized);
         } catch (IllegalArgumentException e) {
-            throw new InvalidRequestException("Vai trò không hợp lệ: " + roleValue + ". Must be CONTENT_ADMIN or SYSTEM_ADMIN");
+            throw new InvalidRequestException("Vai trò không hợp lệ: " + roleValue + ". Chỉ chấp nhận CONTENT_ADMIN hoặc SYSTEM_ADMIN");
         }
     }
 }

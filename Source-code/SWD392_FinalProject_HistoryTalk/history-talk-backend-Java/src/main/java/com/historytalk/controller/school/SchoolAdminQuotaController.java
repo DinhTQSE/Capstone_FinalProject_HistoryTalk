@@ -38,7 +38,7 @@ public class SchoolAdminQuotaController {
             @AuthenticationPrincipal UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         SchoolResponse response = schoolManagementService.getSchoolById(schoolId);
-        return ResponseEntity.ok(ApiResponse.success(response, "School profile retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy hồ sơ trường học thành công"));
     }
 
     @GetMapping("/token-quota")
@@ -49,7 +49,7 @@ public class SchoolAdminQuotaController {
         
         UUID schoolId = resolveSchoolId(principal);
         SchoolTokenQuotaResponse response = schoolManagementService.getSchoolTokenQuota(schoolId);
-        return ResponseEntity.ok(ApiResponse.success(response, "School token quota retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy hạn mức token của trường thành công"));
     }
 
     private UUID resolveSchoolId(UserPrincipal principal) {

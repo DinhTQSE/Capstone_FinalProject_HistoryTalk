@@ -48,7 +48,7 @@ public class CharacterDocumentController {
         log.info("GET /v1/character-documents - Get all documents");
         String userRole = SecurityUtils.getRoleName();
         List<CharacterDocumentResponse> documents = documentService.getAllDocuments(userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -60,7 +60,7 @@ public class CharacterDocumentController {
         log.info("GET /v1/character-documents/character/{} - Get documents by character", characterId);
         String userRole = SecurityUtils.getRoleName();
         List<CharacterDocumentResponse> documents = documentService.getDocumentsByCharacterId(characterId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -72,7 +72,7 @@ public class CharacterDocumentController {
         log.info("GET /v1/character-documents/staff/{} - Get documents by staff", staffId);
         String userRole = SecurityUtils.getRoleName();
         List<CharacterDocumentResponse> documents = documentService.getDocumentsByStaffId(staffId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -85,7 +85,7 @@ public class CharacterDocumentController {
         log.info("GET /v1/character-documents/search - Search documents with keyword: {}", keyword);
         String userRole = SecurityUtils.getRoleName();
         List<CharacterDocumentResponse> documents = documentService.searchDocuments(keyword, userRole);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -97,7 +97,7 @@ public class CharacterDocumentController {
         log.info("GET /v1/character-documents/{} - Get document by ID", docId);
         String userRole = SecurityUtils.getRoleName();
         CharacterDocumentResponse document = documentService.getDocumentById(docId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(document, "Retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(document, "Lấy dữ liệu thành công"));
     }
     
     /**
@@ -114,7 +114,7 @@ public class CharacterDocumentController {
         log.info("POST /v1/character-documents - Create document by user: {}", staffId);
         CharacterDocumentResponse document = documentService.createDocument(request, staffId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(document, "Document uploaded successfully"));
+                .body(ApiResponse.success(document, "Tải lên tài liệu thành công"));
     }
     
     /**
@@ -132,7 +132,7 @@ public class CharacterDocumentController {
         String staffRole = SecurityUtils.getRoleName();
         log.info("PUT /v1/character-documents/{} - Update document by user: {}", docId, staffId);
         CharacterDocumentResponse document = documentService.updateDocument(docId, request, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(document, "Cập nhật tài liệu thành công"));
     }
     
     /**

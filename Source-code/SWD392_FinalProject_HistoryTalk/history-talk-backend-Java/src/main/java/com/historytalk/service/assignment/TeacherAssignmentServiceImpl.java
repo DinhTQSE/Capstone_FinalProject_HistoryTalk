@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -69,7 +70,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         String targetTitle = validateAndGetTargetTitle(request.getAssignmentType(), request.getTargetId(), schoolId);
 
         // 3. Validate Deadline
-        if (!request.getDeadline().isAfter(LocalDateTime.now())) {
+        if (!request.getDeadline().isAfter(LocalDateTime.now(ZoneOffset.UTC))) {
             throw new InvalidRequestException("Háº¡n ná»™p bÃ i pháº£i á»Ÿ thá»i Ä‘iá»ƒm tÆ°Æ¡ng lai");
         }
 
@@ -327,7 +328,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         if (request.getDeadline() != null) {
             LocalDateTime oldDeadline = assignment.getDeadline();
             LocalDateTime newDeadline = request.getDeadline();
-            if (!newDeadline.isAfter(LocalDateTime.now())) {
+            if (!newDeadline.isAfter(LocalDateTime.now(ZoneOffset.UTC))) {
                 throw new InvalidRequestException("Háº¡n ná»™p má»›i pháº£i á»Ÿ tÆ°Æ¡ng lai");
             }
             assignment.setDeadline(newDeadline);

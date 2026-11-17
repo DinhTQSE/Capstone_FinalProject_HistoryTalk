@@ -52,7 +52,7 @@ public class StaffQuizController {
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         String role = SecurityUtils.getRoleName();
         PaginatedResponse<QuizStaffResponse> data = quizService.getAllQuizzesForStaff(search, era, pageable, role);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy danh sách quiz thành công"));
     }
 
     /**
@@ -66,7 +66,7 @@ public class StaffQuizController {
 
         log.info("GET /api/v1/staff/quizzes/{}", quizId);
         QuizStaffResponse data = quizService.getQuizByIdForStaff(quizId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy thông tin quiz thành công"));
     }
 
     /**
@@ -81,7 +81,7 @@ public class StaffQuizController {
         log.info("POST /api/v1/staff/quizzes title={}", request.getTitle());
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizStaffResponse data = quizService.createQuiz(request, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz created successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Tạo quiz thành công"));
     }
 
     /**
@@ -96,7 +96,7 @@ public class StaffQuizController {
 
         log.info("PUT /api/v1/staff/quizzes/{}", quizId);
         QuizStaffResponse data = quizService.updateQuiz(quizId, request);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Cập nhật quiz thành công"));
     }
 
     /**
@@ -110,7 +110,7 @@ public class StaffQuizController {
 
         log.info("DELETE /api/v1/staff/quizzes/{}", quizId);
         quizService.deleteQuiz(quizId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Quiz deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa quiz thành công"));
     }
 
     /**
@@ -124,7 +124,7 @@ public class StaffQuizController {
 
         log.info("PATCH /api/v1/staff/quizzes/{}/soft-delete", quizId);
         quizService.softDeleteQuiz(quizId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Quiz soft-deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã chuyển quiz vào thùng rác"));
     }
 
     /**
@@ -139,7 +139,7 @@ public class StaffQuizController {
 
         log.info("POST /api/v1/staff/quizzes/{}/questions", quizId);
         QuestionResponse data = quizService.addQuestion(quizId, request);
-        return ResponseEntity.ok(ApiResponse.success(data, "Question added successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Thêm câu hỏi thành công"));
     }
 
     /**
@@ -155,7 +155,7 @@ public class StaffQuizController {
 
         log.info("PUT /api/v1/staff/quizzes/{}/questions/{}", quizId, questionId);
         quizService.updateQuestion(quizId, questionId, request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Question updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Cập nhật câu hỏi thành công"));
     }
 
     /**
@@ -170,7 +170,7 @@ public class StaffQuizController {
 
         log.info("DELETE /api/v1/staff/quizzes/{}/questions/{}", quizId, questionId);
         quizService.deleteQuestion(quizId, questionId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa câu hỏi thành công"));
     }
 
     /**
@@ -202,7 +202,7 @@ public class StaffQuizController {
                 contextId, file.getOriginalFilename(), file.getSize());
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizStaffResponse data = quizService.importQuizFromCsv(file, contextId, title, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz imported successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Nhập quiz thành công"));
     }
 
     /**
@@ -249,7 +249,7 @@ public class StaffQuizController {
         PaginatedResponse<QuizHistoryResponse> data = userId != null
                 ? quizService.getQuizHistoryByUserId(userId, pageable)
                 : quizService.getAllUsersQuizHistory(pageable);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz session history retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy lịch sử lượt làm quiz thành công"));
     }
 
     /**
@@ -268,7 +268,7 @@ public class StaffQuizController {
         log.info("GET /api/v1/staff/quizzes/sessions/{}", sessionId);
         // userId = null â†’ admin mode, skip ownership check
         QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, null);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy chi tiết lượt làm quiz thành công"));
     }
 
 

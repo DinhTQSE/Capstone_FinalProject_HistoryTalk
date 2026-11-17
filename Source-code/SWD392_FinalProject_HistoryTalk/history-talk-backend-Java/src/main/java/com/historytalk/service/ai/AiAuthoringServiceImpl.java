@@ -152,7 +152,7 @@ public class AiAuthoringServiceImpl implements AiAuthoringService {
             return;
         }
         User user = userRepository.findById(UUID.fromString(SecurityUtils.getUserId()))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
         if (user.getSchool() == null || !Objects.equals(user.getSchool().getId(), school.getId())) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh.");
         }

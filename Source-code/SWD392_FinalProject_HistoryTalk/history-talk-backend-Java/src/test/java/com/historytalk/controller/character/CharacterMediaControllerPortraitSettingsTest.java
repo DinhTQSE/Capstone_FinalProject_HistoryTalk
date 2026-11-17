@@ -84,7 +84,7 @@ class CharacterMediaControllerPortraitSettingsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("AUTO"))
                 .andExpect(jsonPath("$.data.points.mouth[0]").value(0.5))
-                .andExpect(jsonPath("$.message").value("Portrait settings retrieved successfully"));
+                .andExpect(jsonPath("$.message").value("Lấy cấu hình chân dung thành công"));
     }
 
     @Test
@@ -115,7 +115,7 @@ class CharacterMediaControllerPortraitSettingsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.mode").value("AUTO"))
-                .andExpect(jsonPath("$.message").value("Portrait settings saved successfully"));
+                .andExpect(jsonPath("$.message").value("Lưu cấu hình chân dung thành công"));
 
         verify(portraitSettingsService).savePortraitSettings(eq(characterId), eq(body), any(), any());
     }

@@ -32,7 +32,7 @@ public class StaffQuestController {
     public ResponseEntity<ApiResponse<List<DailyQuest>>> listQuests() {
         log.info("GET /api/v1/staff/quests");
         List<DailyQuest> quests = gamificationService.staffListQuests();
-        return ResponseEntity.ok(ApiResponse.success(quests, "Quests retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(quests, "Lấy danh sách nhiệm vụ thành công"));
     }
 
     @GetMapping("/{id}")
@@ -42,7 +42,7 @@ public class StaffQuestController {
     public ResponseEntity<ApiResponse<DailyQuest>> getQuest(@PathVariable String id) {
         log.info("GET /api/v1/staff/quests/{}", id);
         DailyQuest quest = gamificationService.staffGetQuest(id);
-        return ResponseEntity.ok(ApiResponse.success(quest, "Quest retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(quest, "Lấy thông tin nhiệm vụ thành công"));
     }
 
     @PutMapping("/{id}")
@@ -54,6 +54,6 @@ public class StaffQuestController {
             @Valid @RequestBody UpdateQuestRequest request) {
         log.info("PUT /api/v1/staff/quests/{}", id);
         DailyQuest updated = gamificationService.staffUpdateQuest(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updated, "Quest updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật nhiệm vụ thành công"));
     }
 }

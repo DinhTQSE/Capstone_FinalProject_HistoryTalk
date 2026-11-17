@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,8 +94,8 @@ class SchoolAdminTokenPurchaseControllerTest {
                 .checkoutUrl("https://pay.payos.vn/web/123456789")
                 .qrCode("000201010212...")
                 .status("PENDING")
-                .expiredAt(LocalDateTime.now().plusMinutes(15).toString())
-                .createdAt(LocalDateTime.now().toString())
+                .expiredAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(15).toString())
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC).toString())
                 .build();
 
         when(paymentService.createSchoolTokenPurchase(any(CreateSchoolTokenPurchaseRequest.class)))
@@ -136,8 +137,8 @@ class SchoolAdminTokenPurchaseControllerTest {
                 .amount(1_500_000)
                 .status("PAID")
                 .fulfillmentStatus("FULFILLED")
-                .paidAt(LocalDateTime.now().toString())
-                .createdAt(LocalDateTime.now().toString())
+                .paidAt(LocalDateTime.now(ZoneOffset.UTC).toString())
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC).toString())
                 .build();
 
         PaginatedResponse<SchoolTokenPurchaseHistoryResponse> pageResponse =

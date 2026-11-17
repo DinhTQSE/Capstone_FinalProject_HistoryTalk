@@ -24,6 +24,7 @@ import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -163,14 +164,14 @@ class CharacterPortraitSettingsServiceImplTest {
 
     @Test
     void save_teacherNotOwner_throwsForbidden403_andDoesNotSave() {
-        doThrow(new UnauthorizedException("You can only modify content you created"))
+        doThrow(new UnauthorizedException("Bạn chỉ có thể chỉnh sửa nội dung do mình tạo"))
                 .when(mediaService).assertCanManageMedia(eq(EntityType.CHARACTER), eq(characterUuid), anyString(), eq("TEACHER"));
 
         // A logged-in caller lacking permission is 403, not 401 (FE treats 401 as an expired session).
         assertThatThrownBy(() -> service.savePortraitSettings(
                 characterId, EXAMPLE_BODY.getBytes(StandardCharsets.UTF_8), userId, "TEACHER"))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("You can only modify content you created")
+                .hasMessage("Bạn chỉ có thể chỉnh sửa nội dung do mình tạo")
                 .extracting(ex -> ((ForbiddenException) ex).getHttpStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
         verify(characterRepository, never()).save(any());
@@ -178,7 +179,7 @@ class CharacterPortraitSettingsServiceImplTest {
 
     @Test
     void save_softDeletedCharacter_throwsNotFound() {
-        character.setDeletedAt(LocalDateTime.now());
+        character.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         assertThatThrownBy(() -> service.savePortraitSettings(
                 characterId, EXAMPLE_BODY.getBytes(StandardCharsets.UTF_8), userId, "CONTENT_ADMIN"))

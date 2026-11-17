@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,7 +73,7 @@ public class MessageServiceImpl implements MessageService {
 
         ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(sessionId), UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên trò chuyện với ID: " + sessionId));
 
         List<Message> messages = messageRepository
                 .findByChatSessionSessionIdOrderByTimestampAsc(UUID.fromString(sessionId), false);
@@ -310,7 +311,7 @@ public class MessageServiceImpl implements MessageService {
         ChatSession session = chatSessionRepository.findActiveBySessionIdAndUserUid(
                 UUID.fromString(request.getSessionId()), UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Chat session not found with ID: " + request.getSessionId()));
+                        "Không tìm thấy phiên trò chuyện với ID: " + request.getSessionId()));
 
         if (assignmentSubmissionRepository != null && assignmentSubmissionRepository.existsByChatSessionIdAndStatusIn(
                 session.getSessionId(), List.of(SubmissionStatus.SUBMITTED, SubmissionStatus.LATE_SUBMITTED))) {
@@ -370,7 +371,7 @@ public class MessageServiceImpl implements MessageService {
         return transactionTemplate.execute(status -> {
             ChatSession session = chatSessionRepository.findById(turn.sessionId())
                     .orElseThrow(() -> new ResourceNotFoundException(
-                            "Chat session not found with ID: " + turn.sessionId()));
+                            "Không tìm thấy phiên trò chuyện với ID: " + turn.sessionId()));
 
             // Save prompt tokens to the User's message
             turn.userMessage().setToken(promptTokens);
@@ -386,7 +387,7 @@ public class MessageServiceImpl implements MessageService {
                     .messageType(turn.messageType())
                     .build());
 
-            session.setLastMessageAt(LocalDateTime.now());
+            session.setLastMessageAt(LocalDateTime.now(ZoneOffset.UTC));
 
             return new FinishedTurn(assistantMessage, chatTokenCharger.charge(session.getUser(), promptTokens + completionTokens));
         });

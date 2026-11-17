@@ -66,7 +66,7 @@ public class HistoricalContextMediaController {
         DocumentMediaMetadataResponse response = mediaService.uploadDirectBinary(
                 contextUuid, EntityType.CONTEXT, file, mediaType, width, height, userId, userRole);
         
-        return ResponseEntity.ok(ApiResponse.success(response, "Media uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tải lên media thành công"));
     }
 
     @GetMapping("/view-url")
@@ -89,7 +89,7 @@ public class HistoricalContextMediaController {
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
                 contextUuid, EntityType.CONTEXT, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
         
-        return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo đường dẫn xem thành công"));
     }
 
     @DeleteMapping

@@ -132,7 +132,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         }
 
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
 
         HistoricalContext context = HistoricalContext.builder()
                 .name(request.getName())
@@ -273,7 +273,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             throw new InvalidRequestException("Bạn không có quyền xóa mềm bối cảnh lịch sử này");
         }
         
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
         context.setDeletedAt(now);
         contextRepository.save(context);
 

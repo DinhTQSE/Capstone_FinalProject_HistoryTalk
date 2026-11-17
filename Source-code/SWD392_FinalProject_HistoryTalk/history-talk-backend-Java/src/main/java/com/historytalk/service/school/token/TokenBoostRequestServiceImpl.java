@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,7 +73,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         }
 
         Classroom classroom = activeClassrooms.get(0);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         if (tokenBoostRequestRepository.existsByStudent_UidAndRequestDateAndStatus(
                 studentUid, today, TokenBoostRequestStatus.PENDING)) {
@@ -133,7 +134,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                     .orElseThrow(() -> new ResourceNotFoundException("KhÃ´ng tÃ¬m tháº¥y lá»›p há»c vá»›i ID: " + request.getClassroomId()));
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         TokenBoostRequest ticket = TokenBoostRequest.builder()
                 .school(school)
                 .classroom(targetClassroom)
@@ -145,7 +146,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                 .status(TokenBoostRequestStatus.PENDING_ADMIN)
                 .teacherReviewedBy(teacher)
                 .teacherReviewNote("GiÃ¡o viÃªn táº¡o ticket xin School Admin cáº¥p thÃªm token")
-                .teacherReviewedAt(LocalDateTime.now())
+                .teacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .requestDate(today)
                 .build();
 
@@ -189,7 +190,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         int tokensToGrant = request.getTokens();
         transferFromTeacherAllowanceToStudent(teacher, student, teacherClass, school, tokensToGrant);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         String reason = (request.getReason() != null && !request.getReason().isBlank())
                 ? request.getReason().trim()
                 : "GiÃ¡o viÃªn cáº¥p trá»±c tiáº¿p token tá»« háº¡n má»©c giÃ¡o viÃªn trong ngÃ y";
@@ -206,7 +207,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                 .status(TokenBoostRequestStatus.APPROVED)
                 .teacherReviewedBy(teacher)
                 .teacherReviewNote(reason)
-                .teacherReviewedAt(LocalDateTime.now())
+                .teacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .reviewedBy(teacher)
                 .reviewNote(reason)
                 .requestDate(today)
@@ -358,7 +359,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
                 boostRequest.setTeacherReviewedBy(reviewer);
                 boostRequest.setTeacherReviewNote(reviewDto.getReviewNote());
-                boostRequest.setTeacherReviewedAt(LocalDateTime.now());
+                boostRequest.setTeacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             } else {
                 // School Admin approves from school's shared pool (for Student or for Teacher who ran out of quota)
                 int availablePool = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
@@ -372,7 +373,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
                 boostRequest.setAdminReviewedBy(reviewer);
                 boostRequest.setAdminReviewNote(reviewDto.getReviewNote());
-                boostRequest.setAdminReviewedAt(LocalDateTime.now());
+                boostRequest.setAdminReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             }
 
             boostRequest.setStatus(TokenBoostRequestStatus.APPROVED);
@@ -394,7 +395,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
             boostRequest.setTeacherReviewNote(reviewDto.getReviewNote() != null
                     ? reviewDto.getReviewNote()
                     : "GiÃ¡o viÃªn Ä‘Ã£ háº¿t háº¡n má»©c ngÃ y, chuyá»ƒn ticket lÃªn School Admin duyá»‡t cáº¥p thÃªm");
-            boostRequest.setTeacherReviewedAt(LocalDateTime.now());
+            boostRequest.setTeacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             boostRequest.setReviewedBy(reviewer);
             boostRequest.setReviewNote(boostRequest.getTeacherReviewNote());
 
@@ -405,11 +406,11 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
             if (principal.getRole() == UserRole.TEACHER) {
                 boostRequest.setTeacherReviewedBy(reviewer);
                 boostRequest.setTeacherReviewNote(reviewDto.getReviewNote());
-                boostRequest.setTeacherReviewedAt(LocalDateTime.now());
+                boostRequest.setTeacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             } else {
                 boostRequest.setAdminReviewedBy(reviewer);
                 boostRequest.setAdminReviewNote(reviewDto.getReviewNote());
-                boostRequest.setAdminReviewedAt(LocalDateTime.now());
+                boostRequest.setAdminReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             }
             boostRequest.setReviewedBy(reviewer);
             boostRequest.setReviewNote(reviewDto.getReviewNote());
@@ -432,13 +433,13 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                     tokensToGrant, availablePool));
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         // Prepare teacher daily allowance
         if (teacher.getLastTokenResetAt() == null || teacher.getLastTokenResetAt().toLocalDate().isBefore(today)) {
             teacher.setDailyTokensUsed(0);
             teacher.setDailyBonusTokens(0);
-            teacher.setLastTokenResetAt(LocalDateTime.now());
+            teacher.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         }
         int teacherBaseDaily = (school.getDefaultDailyTeacherQuota() != null && school.getDefaultDailyTeacherQuota() > 0)
                 ? school.getDefaultDailyTeacherQuota()
@@ -459,7 +460,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         teacher.setDailyTokensUsed(updatedTeacherUsed);
         int updatedTeacherRemaining = Math.min(Math.max(0, (teacherBaseDaily + teacherBonusToday) - updatedTeacherUsed), availablePool);
         teacher.setToken(updatedTeacherRemaining);
-        teacher.setLastTokenResetAt(LocalDateTime.now());
+        teacher.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(teacher);
 
         // Add to student's daily bonus allowance
@@ -468,7 +469,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
     private void grantDailyBonusFromSchoolPool(
             User targetUser, Classroom classroom, School school, int tokensToGrant, int availablePool) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         if (targetUser.getLastTokenResetAt() == null || targetUser.getLastTokenResetAt().toLocalDate().isBefore(today)) {
             targetUser.setDailyTokensUsed(0);
             targetUser.setDailyBonusTokens(0);
@@ -497,7 +498,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         int updatedDisplayToken = Math.max(currentDisplayToken + tokensToGrant, recalculatedRemaining);
 
         targetUser.setToken(Math.min(availablePool, updatedDisplayToken));
-        targetUser.setLastTokenResetAt(LocalDateTime.now());
+        targetUser.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(targetUser);
     }
 

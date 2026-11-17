@@ -17,6 +17,8 @@ import vn.payos.model.webhooks.WebhookData;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 @Slf4j
 @Service
@@ -49,7 +51,7 @@ public class PaymentWebhookService {
 
         if (PaymentOrderStatus.PAID != order.getStatus()) {
             order.setStatus(PaymentOrderStatus.PAID);
-            order.setPaidAt(LocalDateTime.now());
+            order.setPaidAt(LocalDateTime.now(ZoneOffset.UTC));
         } else {
             log.info("Order {} already marked PAID; checking fulfillment status={}",
                     order.getOrderCode(), order.getFulfillmentStatus());
@@ -96,24 +98,24 @@ public class PaymentWebhookService {
     private PaymentOrder lockOrder(Long orderCode) {
         return paymentOrderRepository
                 .findByOrderCodeForUpdate(orderCode)
-                .orElseThrow(() -> new RuntimeException("Payment order not found: " + orderCode));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn thanh toán: " + orderCode));
     }
 
     private void validatePayOSData(PaymentOrder order, WebhookData data) {
         if (data.getAmount() == null) {
-            throw new RuntimeException("PayOS amount is null for order " + order.getOrderCode());
+            throw new RuntimeException("PayOS không trả về số tiền cho đơn hàng " + order.getOrderCode());
         }
 
         if (!data.getAmount().equals(order.getAmount().longValue())) {
             throw new RuntimeException(
-                    "PayOS amount mismatch for order " + order.getOrderCode()
-                            + ": expected " + order.getAmount() + ", got " + data.getAmount());
+                    "Số tiền PayOS không khớp với đơn hàng " + order.getOrderCode()
+                            + ": mong đợi " + order.getAmount() + ", nhận được " + data.getAmount());
         }
 
         if (order.getPaymentLinkId() != null
                 && data.getPaymentLinkId() != null
                 && !order.getPaymentLinkId().equals(data.getPaymentLinkId())) {
-            throw new RuntimeException("PayOS payment link mismatch for order " + order.getOrderCode());
+            throw new RuntimeException("Liên kết thanh toán PayOS không khớp với đơn hàng " + order.getOrderCode());
         }
     }
 
@@ -144,20 +146,26 @@ public class PaymentWebhookService {
             log.info("Payment transaction for reference {} already exists or violates uniqueness; skipping",
                     data.getReference());
         } catch (Exception e) {
-            throw new RuntimeException("Cannot save payment transaction for order " + order.getOrderCode(), e);
+            throw new RuntimeException("Không thể lưu giao dịch thanh toán cho đơn hàng " + order.getOrderCode(), e);
         }
     }
 
+    private static final ZoneId PAYOS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private LocalDateTime parsePayOSDate(String transactionDateTime) {
         if (transactionDateTime == null || transactionDateTime.isBlank()) {
-            return LocalDateTime.now();
+            return LocalDateTime.now(ZoneOffset.UTC);
         }
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            return LocalDateTime.parse(transactionDateTime, formatter);
+            // PayOS reports transaction time in Vietnam local time; store it as UTC like every other timestamp.
+            return LocalDateTime.parse(transactionDateTime, formatter)
+                    .atZone(PAYOS_ZONE)
+                    .withZoneSameInstant(ZoneOffset.UTC)
+                    .toLocalDateTime();
         } catch (Exception e) {
             log.warn("Could not parse PayOS transaction date '{}', using now", transactionDateTime);
-            return LocalDateTime.now();
+            return LocalDateTime.now(ZoneOffset.UTC);
         }
     }
 }

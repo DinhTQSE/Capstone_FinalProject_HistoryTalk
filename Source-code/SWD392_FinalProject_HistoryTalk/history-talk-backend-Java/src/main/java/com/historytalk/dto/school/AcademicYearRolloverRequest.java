@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AcademicYearRolloverRequest {
 
-    @NotNull(message = "Completed academic year must not be null")
+    @NotNull(message = "Năm học đã kết thúc không được để trống")
     private Integer completedAcademicYear;
 
     @Builder.Default

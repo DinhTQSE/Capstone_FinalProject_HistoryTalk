@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Slf4j
@@ -45,7 +46,7 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
 
         verifySchoolSubscriptionActive(school);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         boolean needsDailyReset = user.getLastTokenResetAt() == null
                 || user.getLastTokenResetAt().toLocalDate().isBefore(today);
 
@@ -54,7 +55,7 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
             // On a new day, simply reset the user's daily usage counter and daily bonus allowance to 0.
             user.setDailyTokensUsed(0);
             user.setDailyBonusTokens(0);
-            user.setLastTokenResetAt(LocalDateTime.now());
+            user.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         }
 
         int baseDailyLimit = resolveUserDailyLimit(user, school);
@@ -110,7 +111,7 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
 
         user.setToken(effectiveRemaining);
         if (user.getLastTokenResetAt() == null) {
-            user.setLastTokenResetAt(LocalDateTime.now());
+            user.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         }
 
         schoolRepository.save(school);
@@ -144,7 +145,7 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
                     "Toàn bộ nền tảng trường học tạm ngưng cho đến khi gia hạn năm học mới.");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         if (school.getSubscriptionEndDate() != null && today.isAfter(school.getSubscriptionEndDate())) {
             school.setStatus(SchoolStatus.EXPIRED);
             schoolRepository.save(school);

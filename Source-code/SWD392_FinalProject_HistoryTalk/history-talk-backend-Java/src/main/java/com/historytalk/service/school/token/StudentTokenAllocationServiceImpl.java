@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Slf4j
@@ -33,11 +34,11 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
     @Transactional
     public AllocateStudentTokenResponse allocateTokens(UUID schoolId, AllocateStudentTokenRequest request) {
         if (schoolId == null) {
-            throw new InvalidRequestException("School ID must not be null");
+            throw new InvalidRequestException("ID trường học không được để trống");
         }
 
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
 
         // 1. Thu thập danh sách ID học sinh
         Set<UUID> targetStudentIds = new LinkedHashSet<>();
@@ -49,7 +50,7 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
         }
 
         if (targetStudentIds.isEmpty()) {
-            throw new InvalidRequestException("Please provide studentId or studentIds to allocate tokens");
+            throw new InvalidRequestException("Vui lòng cung cấp studentId hoặc studentIds để cấp token");
         }
 
         int tokenAmount = request.getTokenAmount();
@@ -60,30 +61,30 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
         int availableTokens = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
         if (availableTokens < tokenAmount) {
             throw new InvalidRequestException(String.format(
-                    "Insufficient token quota: School shared pool only has %,d available tokens.",
+                    "Không đủ hạn mức token: quỹ chung của trường chỉ còn %,d token.",
                     availableTokens));
         }
 
         // 3. Truy vấn và xác thực học sinh
         List<User> students = userRepository.findAllById(targetStudentIds);
         if (students.size() != targetStudentIds.size()) {
-            throw new ResourceNotFoundException("One or more student IDs could not be found");
+            throw new ResourceNotFoundException("Không tìm thấy một hoặc nhiều ID học sinh");
         }
 
         for (User student : students) {
             if (student.getRole() != UserRole.SCHOOL_STUDENT) {
                 throw new InvalidRequestException(String.format(
-                        "User %s is not a student (Role: %s)", student.getUserName(), student.getRole()));
+                        "Người dùng %s không phải là học sinh (Vai trò: %s)", student.getUserName(), student.getRole()));
             }
             if (student.getSchool() == null || !schoolId.equals(student.getSchool().getId())) {
                 throw new InvalidRequestException(String.format(
-                        "Student %s does not belong to school %s", student.getUserName(), school.getSchoolCode()));
+                        "Học sinh %s không thuộc trường %s", student.getUserName(), school.getSchoolCode()));
             }
         }
 
         // 4. Pure Shared Pool: Không trừ trước quỹ trường (school.unallocatedTokenQuota giữ nguyên).
         // Tăng dailyBonusTokens của học sinh để nâng trần sử dụng trong ngày; chỉ trừ quỹ trường khi học sinh thực sự chat AI.
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         int defaultDailyQuota = (school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
                 ? school.getDefaultDailyStudentQuota()
                 : 1000;
@@ -94,7 +95,7 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
             if (isNewDay) {
                 student.setDailyTokensUsed(0);
                 student.setDailyBonusTokens(0);
-                student.setLastTokenResetAt(LocalDateTime.now());
+                student.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
             }
 
             int currentBonus = student.getDailyBonusTokens() != null ? Math.max(0, student.getDailyBonusTokens()) : 0;
@@ -126,7 +127,7 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
                 .affectedStudentCount(studentCount)
                 .tokenAmountPerStudent(tokenAmount)
                 .remainingSchoolTokens(availableTokens)
-                .message(String.format("Granted %,d daily bonus tokens to %d students successfully (Pure Shared Pool)", totalTokensNeeded, studentCount))
+                .message(String.format("Đã cấp %,d token thưởng hằng ngày cho %d học sinh (từ quỹ chung)", totalTokensNeeded, studentCount))
                 .build();
     }
 }

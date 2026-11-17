@@ -60,7 +60,7 @@ public class SchoolAdminStudentController {
 
         StudentImportResultDto result = studentImportService.importSchoolWide(file, defaultInitialToken, principal);
 
-        String message = String.format("Import completed: %d succeeded, %d failed. Allocated %,d tokens.",
+        String message = String.format("Hoàn tất nhập dữ liệu: %d thành công, %d thất bại. Đã cấp %,d token.",
                 result.getSuccessCount(), result.getFailureCount(), result.getTotalTokensAllocated());
 
         return ResponseEntity.ok(ApiResponse.success(result, message));
@@ -120,7 +120,7 @@ public class SchoolAdminStudentController {
 
         PaginatedResponse<StudentResponse> response = studentManagementService.getStudents(
                 schoolId, search, active, pageable);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Students retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách học sinh thành công"));
     }
 
     @GetMapping("/{id}")
@@ -132,7 +132,7 @@ public class SchoolAdminStudentController {
 
         UUID schoolId = resolveSchoolId(principal);
         StudentResponse response = studentManagementService.getStudentById(id, schoolId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student details retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy chi tiết học sinh thành công"));
     }
 
     @PutMapping("/{id}")
@@ -145,7 +145,7 @@ public class SchoolAdminStudentController {
 
         UUID schoolId = resolveSchoolId(principal);
         StudentResponse response = studentManagementService.updateStudent(id, schoolId, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student profile updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật hồ sơ học sinh thành công"));
     }
 
     @PutMapping("/{id}/status")
@@ -159,8 +159,8 @@ public class SchoolAdminStudentController {
         UUID schoolId = resolveSchoolId(principal);
         StudentResponse response = studentManagementService.updateStudentStatus(id, schoolId, request.getActive());
         String msg = Boolean.TRUE.equals(request.getActive())
-                ? "Student account activated successfully"
-                : "Student account deactivated successfully";
+                ? "Kích hoạt tài khoản học sinh thành công"
+                : "Vô hiệu hóa tài khoản học sinh thành công";
         return ResponseEntity.ok(ApiResponse.success(response, msg));
     }
 
@@ -173,7 +173,7 @@ public class SchoolAdminStudentController {
 
         UUID schoolId = resolveSchoolId(principal);
         studentManagementService.deleteStudent(id, schoolId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Student account deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa tài khoản học sinh thành công"));
     }
 
     @PostMapping("/{id}/reset-password")
@@ -185,7 +185,7 @@ public class SchoolAdminStudentController {
 
         UUID schoolId = resolveSchoolId(principal);
         ResetPasswordResponse response = studentManagementService.resetStudentPassword(id, schoolId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student password reset successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đặt lại mật khẩu học sinh thành công"));
     }
 
     private UUID resolveSchoolId(UserPrincipal principal) {

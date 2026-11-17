@@ -15,11 +15,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TeacherGrantStudentTokenRequest {
 
-    @NotNull(message = "Tokens to grant must not be null")
-    @Min(value = 50, message = "Tokens to grant must be at least 50")
-    @Max(value = 50000, message = "Tokens to grant cannot exceed 50,000")
+    @NotNull(message = "Số token cấp không được để trống")
+    @Min(value = 50, message = "Số token cấp tối thiểu là 50")
+    @Max(value = 50000, message = "Số token cấp không được vượt quá 50.000")
     private Integer tokens;
 
-    @Size(max = 500, message = "Reason must not exceed 500 characters")
+    @Size(max = 500, message = "Lý do không được vượt quá 500 ký tự")
     private String reason;
 }

@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,7 +110,7 @@ class PaymentFulfillmentServiceTest {
                 .orderCode(987654321L)
                 .status(PaymentOrderStatus.PAID)
                 .fulfillmentStatus(PaymentFulfillmentStatus.FULFILLED)
-                .fulfilledAt(LocalDateTime.now())
+                .fulfilledAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         when(paymentOrderRepository.findByOrderCodeForUpdate(order.getOrderCode())).thenReturn(Optional.of(order));
@@ -192,7 +193,7 @@ class PaymentFulfillmentServiceTest {
 
         assertThat(fulfilled).isFalse();
         assertThat(order.getFulfillmentStatus()).isEqualTo(PaymentFulfillmentStatus.FAILED);
-        assertThat(order.getFulfillmentError()).contains("Order user is missing or deleted");
+        assertThat(order.getFulfillmentError()).contains("Người dùng của đơn hàng không tồn tại hoặc đã bị xóa");
         verify(userTierRepository, never()).save(any(UserTier.class));
         verify(userRepository, never()).save(any(User.class));
     }
@@ -240,7 +241,7 @@ class PaymentFulfillmentServiceTest {
         UUID userId = UUID.randomUUID();
         User user = User.builder().uid(userId).userName("customer").email("c@example.com")
                 .role(UserRole.CUSTOMER).token(3_000).build();
-        LocalDateTime start = LocalDateTime.now().minusDays(10);
+        LocalDateTime start = LocalDateTime.now(ZoneOffset.UTC).minusDays(10);
         UserTier freeSub = activeSub(user, tierOf("free", 0, 1, 1_500), start);
         UserTier plusSub = activeSub(user, tierOf("plus", 49_000, 1, 5_000), start);
         UserTier proMonthSub = activeSub(user, tierOf("pro", 99_000, 1, 10_000), start);
@@ -256,7 +257,7 @@ class PaymentFulfillmentServiceTest {
         assertThat(ok).isTrue();
         assertThat(plusSub.getIsActive()).isFalse();
         assertThat(proMonthSub.getIsActive()).isFalse();
-        assertThat(plusSub.getEndTime()).isBeforeOrEqualTo(LocalDateTime.now());
+        assertThat(plusSub.getEndTime()).isBeforeOrEqualTo(LocalDateTime.now(ZoneOffset.UTC));
         assertThat(freeSub.getIsActive()).isTrue();
         // keeps the 3,000 already held (incl. today's old-plan tokens) + full 10,000 of the new plan
         assertThat(user.getToken()).isEqualTo(13_000);
@@ -265,7 +266,7 @@ class PaymentFulfillmentServiceTest {
         verify(userTierRepository).save(created.capture());
         assertThat(created.getValue().getTier()).isSameAs(proYear);
         assertThat(created.getValue().getIsActive()).isTrue();
-        assertThat(created.getValue().getEndTime()).isAfter(LocalDateTime.now().plusMonths(11));
+        assertThat(created.getValue().getEndTime()).isAfter(LocalDateTime.now(ZoneOffset.UTC).plusMonths(11));
     }
 
     @Test
@@ -273,8 +274,8 @@ class PaymentFulfillmentServiceTest {
         UUID userId = UUID.randomUUID();
         User user = User.builder().uid(userId).userName("customer").email("c@example.com")
                 .role(UserRole.CUSTOMER).token(0).build();
-        UserTier freeSub = activeSub(user, tierOf("free", 0, 1, 1_500), LocalDateTime.now().minusDays(10));
-        UserTier expiredPlus = activeSub(user, tierOf("plus", 49_000, 1, 5_000), LocalDateTime.now().minusDays(31));
+        UserTier freeSub = activeSub(user, tierOf("free", 0, 1, 1_500), LocalDateTime.now(ZoneOffset.UTC).minusDays(10));
+        UserTier expiredPlus = activeSub(user, tierOf("plus", 49_000, 1, 5_000), LocalDateTime.now(ZoneOffset.UTC).minusDays(31));
         expiredPlus.setIsActive(false);
         PaymentOrder order = upgradeOrder(user, tierOf("pro", 99_000, 1, 10_000), expiredPlus, 444555667L);
 

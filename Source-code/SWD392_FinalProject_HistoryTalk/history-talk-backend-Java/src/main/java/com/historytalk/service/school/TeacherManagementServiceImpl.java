@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,11 +42,11 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public TeacherResponse createTeacher(CreateTeacherRequest request, UUID schoolId) {
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
 
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new DataConflictException("Email " + normalizedEmail + " is already in use");
+            throw new DataConflictException("Email " + normalizedEmail + " đã được sử dụng");
         }
 
         String baseUserName = school.getSchoolCode().toLowerCase() + "_gv_";
@@ -69,7 +70,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                         school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 10000))
                 .dailyTokensUsed(0)
                 .dailyBonusTokens(0)
-                .lastTokenResetAt(LocalDateTime.now())
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         User saved = userRepository.save(teacher);
@@ -84,7 +85,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional(readOnly = true)
     public PaginatedResponse<TeacherResponse> getTeachers(UUID schoolId, String search, Boolean active, Pageable pageable) {
         if (!schoolRepository.existsById(schoolId)) {
-            throw new ResourceNotFoundException("School not found with ID: " + schoolId);
+            throw new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId);
         }
 
         String keyword = (search != null) ? search.trim() : "";
@@ -110,19 +111,19 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public TeacherResponse updateTeacher(UUID teacherId, UUID schoolId, UpdateTeacherRequest request) {
         User teacher = userRepository.findById(teacherId)
-                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with ID: " + teacherId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getSchool() == null || !teacher.getSchool().getId().equals(schoolId)) {
-            throw new ResourceNotFoundException("Teacher does not belong to your school");
+            throw new ResourceNotFoundException("Giáo viên không thuộc trường của bạn");
         }
 
         if (teacher.getRole() != UserRole.TEACHER) {
-            throw new ResourceNotFoundException("Account is not a teacher");
+            throw new ResourceNotFoundException("Tài khoản không phải là giáo viên");
         }
 
         String newEmail = request.getEmail().trim().toLowerCase();
         if (!newEmail.equalsIgnoreCase(teacher.getEmail()) && userRepository.existsByEmailIgnoreCaseAndUidNot(newEmail, teacherId)) {
-            throw new DataConflictException("Email " + newEmail + " is already in use by another account");
+            throw new DataConflictException("Email " + newEmail + " đã được sử dụng bởi một tài khoản khác");
         }
 
         teacher.setFullName(request.getFullName().trim());
@@ -138,17 +139,17 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public void deleteTeacher(UUID teacherId, UUID schoolId) {
         User teacher = userRepository.findById(teacherId)
-                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with ID: " + teacherId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getSchool() == null || !teacher.getSchool().getId().equals(schoolId)) {
-            throw new ResourceNotFoundException("Teacher does not belong to your school");
+            throw new ResourceNotFoundException("Giáo viên không thuộc trường của bạn");
         }
 
         if (teacher.getRole() != UserRole.TEACHER) {
-            throw new ResourceNotFoundException("Account is not a teacher");
+            throw new ResourceNotFoundException("Tài khoản không phải là giáo viên");
         }
 
-        teacher.setDeletedAt(LocalDateTime.now());
+        teacher.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(teacher);
         log.info("Soft-deleted teacher: {}", teacher.getUserName());
     }
@@ -157,14 +158,14 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public ResetPasswordResponse resetTeacherPassword(UUID teacherId, UUID schoolId) {
         User teacher = userRepository.findById(teacherId)
-                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with ID: " + teacherId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getSchool() == null || !teacher.getSchool().getId().equals(schoolId)) {
-            throw new ResourceNotFoundException("Teacher does not belong to your school");
+            throw new ResourceNotFoundException("Giáo viên không thuộc trường của bạn");
         }
 
         if (teacher.getRole() != UserRole.TEACHER) {
-            throw new ResourceNotFoundException("Account is not a teacher");
+            throw new ResourceNotFoundException("Tài khoản không phải là giáo viên");
         }
 
         String rawPassword = generateRandomPassword(10);
@@ -179,7 +180,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .fullName(teacher.getFullName())
                 .email(teacher.getEmail())
                 .initialPassword(rawPassword)
-                .message("Teacher password reset successfully. Please deliver this temporary password to the teacher.")
+                .message("Đặt lại mật khẩu giáo viên thành công. Vui lòng gửi mật khẩu tạm thời này cho giáo viên.")
                 .build();
     }
 
@@ -187,20 +188,20 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
     @Transactional
     public TeacherResponse updateTeacherStatus(UUID teacherId, UUID schoolId, boolean active) {
         User teacher = userRepository.findById(teacherId)
-                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with ID: " + teacherId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherId));
 
         if (teacher.getSchool() == null || !teacher.getSchool().getId().equals(schoolId)) {
-            throw new ResourceNotFoundException("Teacher does not belong to your school");
+            throw new ResourceNotFoundException("Giáo viên không thuộc trường của bạn");
         }
 
         if (teacher.getRole() != UserRole.TEACHER) {
-            throw new ResourceNotFoundException("Account is not a teacher");
+            throw new ResourceNotFoundException("Tài khoản không phải là giáo viên");
         }
 
         if (active) {
             teacher.setDeletedAt(null);
         } else {
-            teacher.setDeletedAt(LocalDateTime.now());
+            teacher.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         }
 
         User updated = userRepository.save(teacher);
@@ -216,7 +217,7 @@ public class TeacherManagementServiceImpl implements TeacherManagementService {
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
                 .active(user.getDeletedAt() == null)
-                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))
                 .build();
     }
 

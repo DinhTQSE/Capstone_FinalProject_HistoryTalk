@@ -25,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
@@ -100,7 +101,7 @@ class AuthServiceImplTest {
         verify(userRepository).save(userCaptor.capture());
         User saved = userCaptor.getValue();
         assertThat(saved.getPasswordResetTokenHash()).hasSize(64);
-        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now());
+        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now(ZoneOffset.UTC));
 
         ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
         verify(passwordResetEmailService)
@@ -124,7 +125,7 @@ class AuthServiceImplTest {
     @Test
     void forgotPasswordDeletedUserDoesNothing() {
         User user = user("deleted", "deleted@example.com");
-        user.setDeletedAt(LocalDateTime.now());
+        user.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         when(userRepository.findByEmailIgnoreCase("deleted@example.com")).thenReturn(Optional.of(user));
 
         authService.forgotPassword("deleted@example.com");
@@ -148,7 +149,7 @@ class AuthServiceImplTest {
         verify(userRepository).save(userCaptor.capture());
         User saved = userCaptor.getValue();
         assertThat(saved.getPasswordResetTokenHash()).hasSize(64);
-        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now());
+        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now(ZoneOffset.UTC));
     }
 
     @Test
@@ -156,7 +157,7 @@ class AuthServiceImplTest {
         String rawToken = "valid-reset-token";
         User user = user("customer", "customer@example.com");
         user.setPasswordResetTokenHash(sha256Hex(rawToken));
-        user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(5));
+        user.setPasswordResetExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(5));
         when(userRepository.findByPasswordResetTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("new-password")).thenReturn("encoded-new-password");
 
@@ -200,9 +201,9 @@ class AuthServiceImplTest {
     void resetPasswordRejectsDeletedUser() {
         String rawToken = "deleted-user-token";
         User user = user("customer", "customer@example.com");
-        user.setDeletedAt(LocalDateTime.now());
+        user.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         user.setPasswordResetTokenHash(sha256Hex(rawToken));
-        user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(5));
+        user.setPasswordResetExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(5));
         when(userRepository.findByPasswordResetTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.resetPassword(rawToken, "new-password", "new-password"))
@@ -234,7 +235,7 @@ class AuthServiceImplTest {
         String rawToken = "expired-reset-token";
         User user = user("customer", "customer@example.com");
         user.setPasswordResetTokenHash(sha256Hex(rawToken));
-        user.setPasswordResetExpiresAt(LocalDateTime.now().minusMinutes(1));
+        user.setPasswordResetExpiresAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         when(userRepository.findByPasswordResetTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.resetPassword(rawToken, "new-password", "new-password"))
@@ -278,7 +279,7 @@ class AuthServiceImplTest {
         User saved = userCaptor.getValue();
         assertThat(saved.getEmailVerified()).isFalse();
         assertThat(saved.getEmailVerificationTokenHash()).hasSize(64);
-        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now());
+        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now(ZoneOffset.UTC));
 
         ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
         verify(emailVerificationService)
@@ -304,7 +305,7 @@ class AuthServiceImplTest {
         User user = user("customer", "customer@gmail.com");
         user.setEmailVerified(false);
         user.setEmailVerificationTokenHash(sha256Hex(rawToken));
-        user.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(15));
+        user.setEmailVerificationExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(15));
         when(userRepository.findByEmailVerificationTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
 
         authService.verifyEmail(rawToken);
@@ -322,7 +323,7 @@ class AuthServiceImplTest {
         User user = user("customer", "customer@gmail.com");
         user.setEmailVerified(false);
         user.setEmailVerificationTokenHash(sha256Hex(rawToken));
-        user.setEmailVerificationExpiresAt(LocalDateTime.now().minusMinutes(1));
+        user.setEmailVerificationExpiresAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         when(userRepository.findByEmailVerificationTokenHash(sha256Hex(rawToken))).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.verifyEmail(rawToken))
@@ -334,7 +335,7 @@ class AuthServiceImplTest {
     void resendVerificationEmailRespectsCooldown() {
         User user = user("customer", "customer@gmail.com");
         user.setEmailVerified(false);
-        user.setEmailVerificationSentAt(LocalDateTime.now().minusSeconds(10));
+        user.setEmailVerificationSentAt(LocalDateTime.now(ZoneOffset.UTC).minusSeconds(10));
         when(userRepository.findByEmailIgnoreCase("customer@gmail.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.resendVerificationEmail("customer@gmail.com"))

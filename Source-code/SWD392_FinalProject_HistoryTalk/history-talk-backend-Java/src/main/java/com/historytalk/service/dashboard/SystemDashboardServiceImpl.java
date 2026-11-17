@@ -59,6 +59,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -92,7 +93,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
 
     @Override
     public DashboardOverviewResponse getOverview() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
@@ -167,7 +168,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                         .active(userRepository.countActiveUsers())
                         .inactive(userRepository.countInactiveUsers())
                         .deleted(userRepository.countDeletedUsers())
-                        .recentlyActive(userRepository.countRecentlyActiveUsers(LocalDateTime.now().minusDays(7)))
+                        .recentlyActive(userRepository.countRecentlyActiveUsers(LocalDateTime.now(ZoneOffset.UTC).minusDays(7)))
                         .build())
                 .byRole(List.of(
                         roleCount(UserRole.CUSTOMER),
@@ -202,7 +203,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     public DashboardChatActivityResponse getChatActivity(LocalDate from, LocalDate to, String granularity) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
@@ -243,7 +244,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 .jvmMemoryMax(sumMetricValue("jvm.memory.max"))
                 .httpRequestCount(sumMetricCount("http.server.requests"))
                 .httpErrorCount(sumHttpServerErrorCount())
-                .lastCheckedAt(LocalDateTime.now())
+                .lastCheckedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
     }
 
@@ -251,7 +252,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     public DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
@@ -343,7 +344,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     @Override
     public DashboardTierAnalyticsResponse getTiers(LocalDate from, LocalDate to, String granularity) {
         DateRange range = resolveDateRange(from, to);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         long currentPaidUsers = tierRepository.countCurrentPaidCustomers();
         long currentFreeUsers = tierRepository.countCurrentFreeCustomers();
         long customerBase = currentPaidUsers + currentFreeUsers;
@@ -536,7 +537,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     }
 
     private DateRange resolveDateRange(LocalDate from, LocalDate to) {
-        LocalDate resolvedTo = to == null ? LocalDate.now() : to;
+        LocalDate resolvedTo = to == null ? LocalDate.now(ZoneOffset.UTC) : to;
         LocalDate resolvedFrom = from == null ? resolvedTo.minusDays(DEFAULT_RANGE_DAYS) : from;
 
         if (resolvedFrom.isAfter(resolvedTo)) {

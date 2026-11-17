@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -121,16 +122,16 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
     @Override
     public B2bQuoteCalculationResponse calculateQuote(CalculateB2bQuoteRequest request) {
         if (request == null) {
-            throw new InvalidRequestException("Quote calculation request must not be null");
+            throw new InvalidRequestException("Yêu cầu tính báo giá không được để trống");
         }
         int students = request.getNumberOfStudents() != null ? request.getNumberOfStudents() : 0;
         int teachers = request.getNumberOfTeachers() != null ? request.getNumberOfTeachers() : 0;
 
         if (students < 1 || students > 50_000) {
-            throw new InvalidRequestException("Number of students must be between 1 and 50,000");
+            throw new InvalidRequestException("Số lượng học sinh phải từ 1 đến 50.000");
         }
         if (teachers < 1 || teachers > 5_000) {
-            throw new InvalidRequestException("Number of teachers must be between 1 and 5,000");
+            throw new InvalidRequestException("Số lượng giáo viên phải từ 1 đến 5.000");
         }
 
         EnterprisePackage resolvedPkg = resolvePackageType(request.getSelectedPackage(), students, teachers);
@@ -144,7 +145,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         LocalDate subStart = request.getSubscriptionStartDate();
         LocalDate subEnd = request.getSubscriptionEndDate();
         if (subStart == null || subEnd == null) {
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
             int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
             subStart = LocalDate.of(academicStartYear, 9, 1);
             subEnd = LocalDate.of(academicStartYear + 1, 5, 31);
@@ -248,7 +249,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         } else if (subStart != null || subEnd != null) {
             throw new InvalidRequestException("Vui lòng cung cấp đầy đủ cả ngày bắt đầu và ngày kết thúc chu kỳ gói.");
         } else {
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
             int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
             subStart = LocalDate.of(academicStartYear, 9, 1);
             subEnd = LocalDate.of(academicStartYear + 1, 5, 31);
@@ -340,7 +341,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
     @Transactional(readOnly = true)
     public B2bQuoteResponse getQuoteRequestById(UUID quoteId) {
         B2bQuoteRequest quote = quoteRequestRepository.findById(quoteId)
-                .orElseThrow(() -> new ResourceNotFoundException("B2B quote request not found with ID: " + quoteId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu báo giá B2B với ID: " + quoteId));
         return mapToQuoteResponse(quote);
     }
 
@@ -349,13 +350,13 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
     public B2bQuoteResponse updateQuoteStatus(
             UUID quoteId, UpdateB2bQuoteStatusRequest request, UUID adminUid) {
         B2bQuoteRequest quote = quoteRequestRepository.findById(quoteId)
-                .orElseThrow(() -> new ResourceNotFoundException("B2B quote request not found with ID: " + quoteId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu báo giá B2B với ID: " + quoteId));
 
         if (quote.getStatus() == B2bQuoteStatus.APPROVED) {
-            throw new DataConflictException("Quote request has already been approved and cannot be modified");
+            throw new DataConflictException("Yêu cầu báo giá đã được duyệt và không thể chỉnh sửa");
         }
         if (request.getStatus() == B2bQuoteStatus.APPROVED) {
-            throw new InvalidRequestException("Use the /approve endpoint to approve a quote and provision a school");
+            throw new InvalidRequestException("Hãy dùng endpoint /approve để duyệt báo giá và khởi tạo trường học");
         }
 
         if (request.getCustomDiscountPercent() != null) {
@@ -422,7 +423,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
             quote.setAdminNote(request.getAdminNote().trim());
         }
         quote.setReviewedByUid(adminUid);
-        quote.setReviewedAt(LocalDateTime.now());
+        quote.setReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         B2bQuoteRequest saved = quoteRequestRepository.save(quote);
         log.info("Updated B2B quote {} status to {} by admin {}", saved.getQuoteCode(), saved.getStatus(), adminUid);
@@ -433,13 +434,13 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
     @Transactional
     public ApproveB2bQuoteResponse approveQuoteAndProvisionSchool(UUID quoteId, UUID adminUid) {
         B2bQuoteRequest quote = quoteRequestRepository.findById(quoteId)
-                .orElseThrow(() -> new ResourceNotFoundException("B2B quote request not found with ID: " + quoteId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu báo giá B2B với ID: " + quoteId));
 
         if (quote.getStatus() == B2bQuoteStatus.APPROVED) {
-            throw new DataConflictException("Quote request " + quote.getQuoteCode() + " has already been approved");
+            throw new DataConflictException("Yêu cầu báo giá " + quote.getQuoteCode() + " đã được duyệt trước đó");
         }
         if (quote.getStatus() == B2bQuoteStatus.REJECTED) {
-            throw new InvalidRequestException("Cannot approve a rejected quote request");
+            throw new InvalidRequestException("Không thể duyệt yêu cầu báo giá đã bị từ chối");
         }
 
         SchoolResponse createdSchool = schoolManagementService.createSchool(
@@ -457,7 +458,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
 
         // Override the school's token pool, daily limits, and max student/teacher caps with the exact quote values
         School schoolEntity = schoolRepository.findById(createdSchool.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Provisioned school not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học đã được khởi tạo"));
         int exactPool = (int) Math.min(Integer.MAX_VALUE, quote.getTotalTokenPool());
         schoolEntity.setTotalSchoolTokenQuota(exactPool);
         schoolEntity.setUnallocatedTokenQuota(exactPool);
@@ -494,7 +495,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
 
         quote.setStatus(B2bQuoteStatus.APPROVED);
         quote.setReviewedByUid(adminUid);
-        quote.setReviewedAt(LocalDateTime.now());
+        quote.setReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
         quote.setCreatedSchoolId(createdSchool.getId());
         quote.setCreatedSchoolAdminUid(schoolAdmin.getUid());
         B2bQuoteRequest savedQuote = quoteRequestRepository.save(quote);
@@ -583,7 +584,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
     }
 
     private String generateUniqueQuoteCode() {
-        int year = LocalDate.now().getYear();
+        int year = LocalDate.now(ZoneOffset.UTC).getYear();
         String candidate;
         do {
             int rand = 1000 + secureRandom.nextInt(9000);
@@ -632,7 +633,7 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
                 .reviewedAt(q.getReviewedAt())
                 .createdSchoolId(q.getCreatedSchoolId())
                 .createdSchoolAdminUid(q.getCreatedSchoolAdminUid())
-                .createdAt(q.getCreatedAt() != null ? q.getCreatedAt() : LocalDateTime.now())
+                .createdAt(q.getCreatedAt() != null ? q.getCreatedAt() : LocalDateTime.now(ZoneOffset.UTC))
                 .updatedAt(q.getUpdatedAt())
                 .build();
     }

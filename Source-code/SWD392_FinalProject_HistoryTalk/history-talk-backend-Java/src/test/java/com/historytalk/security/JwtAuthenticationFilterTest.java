@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -125,7 +126,7 @@ class JwtAuthenticationFilterTest {
                 .email("user@example.com")
                 .role(UserRole.CUSTOMER)
                 .accountStatus(AccountStatus.ACTIVE)
-                .passwordChangedAt(LocalDateTime.now().plusSeconds(5))
+                .passwordChangedAt(LocalDateTime.now(ZoneOffset.UTC).plusSeconds(5))
                 .build();
         when(userRepository.findById(uid)).thenReturn(Optional.of(user));
 

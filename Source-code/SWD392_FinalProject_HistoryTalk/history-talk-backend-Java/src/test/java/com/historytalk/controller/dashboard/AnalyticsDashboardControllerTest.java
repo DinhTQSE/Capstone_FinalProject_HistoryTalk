@@ -26,6 +26,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -179,7 +180,7 @@ class AnalyticsDashboardControllerTest {
                 .email("cust@test.com")
                 .currentTier("PLUS")
                 .currentTokens(3000)
-                .tierExpiresAt(LocalDateTime.now().plusDays(15))
+                .tierExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusDays(15))
                 .totalQuizzesAttempted(15L)
                 .averageScorePercentage(75.0)
                 .totalAiMessages(90L)

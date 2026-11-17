@@ -31,6 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -369,7 +370,7 @@ class ClassroomStudentServiceImplTest {
                 .id(UUID.randomUUID())
                 .classroom(classroomA)
                 .student(student1)
-                .joinedAt(LocalDateTime.now())
+                .joinedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .status("ACTIVE")
                 .build();
 

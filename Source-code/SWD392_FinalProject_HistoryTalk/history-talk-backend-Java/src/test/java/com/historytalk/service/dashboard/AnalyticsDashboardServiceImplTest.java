@@ -34,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -127,7 +128,7 @@ class AnalyticsDashboardServiceImplTest {
                 .school(school)
                 .dailyTokensUsed(300)
                 .dailyBonusTokens(500)
-                .lastTokenResetAt(LocalDateTime.now())
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC))
                 .token(1200)
                 .build();
 
@@ -451,7 +452,7 @@ class AnalyticsDashboardServiceImplTest {
                 .sessionId(UUID.randomUUID())
                 .quiz(quiz)
                 .score(9.0f)
-                .endTime(LocalDateTime.now())
+                .endTime(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         when(quizSessionRepository.findRecentCompletedByUser(eq(studentUid), any(Pageable.class)))
@@ -499,7 +500,7 @@ class AnalyticsDashboardServiceImplTest {
         Tier tier = Tier.builder().title("PLUS").build();
         UserTier userTier = UserTier.builder()
                 .tier(tier)
-                .endTime(LocalDateTime.now().plusMonths(1))
+                .endTime(LocalDateTime.now(ZoneOffset.UTC).plusMonths(1))
                 .build();
         when(userTierRepository.findCurrentActiveByUid(eq(userUid), any())).thenReturn(Optional.of(userTier));
 
@@ -525,7 +526,7 @@ class AnalyticsDashboardServiceImplTest {
                 .amount(99000)
                 .tier(tier)
                 .status(PaymentOrderStatus.PAID)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
         when(paymentOrderRepository.findByUser_UidOrderByCreatedAtDesc(userUid)).thenReturn(List.of(order));
 

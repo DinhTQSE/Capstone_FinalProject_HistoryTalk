@@ -13,16 +13,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MediaUploadRequest {
-    @NotBlank(message = "File name is required")
+    @NotBlank(message = "Tên tệp không được để trống")
     private String fileName;
 
-    @NotBlank(message = "Content type is required")
+    @NotBlank(message = "Loại nội dung (content type) không được để trống")
     private String contentType;
 
-    @NotNull(message = "File size is required")
-    @Positive(message = "File size must be positive")
+    @NotNull(message = "Kích thước tệp không được để trống")
+    @Positive(message = "Kích thước tệp phải lớn hơn 0")
     private Long fileSizeBytes;
 
-    @NotBlank(message = "Media type is required")
+    @NotBlank(message = "Loại media không được để trống")
     private String mediaType;
 }

@@ -33,6 +33,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,7 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponse getMyProfile(String userId) {
         User user = loadActiveUser(userId);
         UUID uid = user.getUid();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
         // Resolve current active tier: paid tier is preferred over free (ORDER BY amount DESC)
         Optional<UserTier> activeSubOpt = userTierRepository.findCurrentActiveByUid(uid, now);
@@ -65,7 +66,7 @@ public class UserServiceImpl implements UserService {
         LocalDateTime subEndTime = activeSubOpt.map(UserTier::getEndTime).orElse(null);
 
         // Daily token top-up based on ALL currently active tiers
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         if (user.getLastTokenResetAt() == null ||
                 !user.getLastTokenResetAt().toLocalDate().isEqual(today)) {
             
@@ -109,7 +110,7 @@ public class UserServiceImpl implements UserService {
             throw new InvalidRequestException("Máº­t kháº©u má»›i vÃ  máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        user.setPasswordChangedAt(LocalDateTime.now());
+        user.setPasswordChangedAt(LocalDateTime.now(ZoneOffset.UTC));
         user.setMustChangePassword(false);
         refreshTokenService.revokeAllUserTokens(user.getUid());
         userRepository.save(user);
@@ -163,7 +164,7 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponse restoreUser(String userId) {
         User user = loadUser(userId);
         if (user.getDeletedAt() == null) {
-            throw new InvalidRequestException("User account is already active");
+            throw new InvalidRequestException("Tài khoản người dùng đang hoạt động");
         }
         user.setDeletedAt(null);
         return userMapper.toProfileResponse(userRepository.save(user), null, null);
@@ -211,7 +212,7 @@ public class UserServiceImpl implements UserService {
     public UserDashboardResponse getUserDashboard(String userId) {
         User user = loadActiveUser(userId);
         UUID uid = user.getUid();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
         // 1. Learning Analytics
         List<QuizSession> completedSessions = quizSessionRepository
@@ -328,7 +329,7 @@ public class UserServiceImpl implements UserService {
 
     private User loadUser(String userId) {
         return userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
     }
 
     private void applyProfileUpdate(User user, String userName, String fullName, LocalDate dob,

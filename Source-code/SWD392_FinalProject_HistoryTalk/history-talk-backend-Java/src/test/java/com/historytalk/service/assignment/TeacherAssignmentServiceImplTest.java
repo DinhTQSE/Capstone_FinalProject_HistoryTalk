@@ -36,6 +36,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,7 +110,7 @@ class TeacherAssignmentServiceImplTest {
                 .assignmentType(AssignmentType.CONTEXT_READING)
                 .targetId(contextId)
                 .minRequirement(120)
-                .deadline(LocalDateTime.now().plusDays(3))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(3))
                 .build();
 
         Assignment savedAssignment = Assignment.builder()
@@ -250,7 +251,7 @@ class TeacherAssignmentServiceImplTest {
                 .classroom(classroom)
                 .title("Bài tập lịch sử")
                 .assignmentType(AssignmentType.CONTEXT_READING)
-                .deadline(LocalDateTime.now().plusDays(2))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(2))
                 .minRequirement(60)
                 .status(AssignmentStatus.ACTIVE)
                 .build();
@@ -281,9 +282,9 @@ class TeacherAssignmentServiceImplTest {
     @DisplayName("Cập nhật gia hạn deadline và tự động revert LATE_SUBMITTED sang SUBMITTED")
     void testUpdateAssignment_Success_RevertsLateSubmissions() {
         UUID assignmentId = UUID.randomUUID();
-        LocalDateTime oldDeadline = LocalDateTime.now().minusHours(1);
-        LocalDateTime newDeadline = LocalDateTime.now().plusDays(2);
-        LocalDateTime submittedAt = LocalDateTime.now().minusMinutes(30); // Nộp sau oldDeadline nhưng trước newDeadline
+        LocalDateTime oldDeadline = LocalDateTime.now(ZoneOffset.UTC).minusHours(1);
+        LocalDateTime newDeadline = LocalDateTime.now(ZoneOffset.UTC).plusDays(2);
+        LocalDateTime submittedAt = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(30); // Nộp sau oldDeadline nhưng trước newDeadline
 
         Assignment assignment = Assignment.builder()
                 .id(assignmentId)
@@ -354,7 +355,7 @@ class TeacherAssignmentServiceImplTest {
                 .title("Kiểm tra 15 phút Điện Biên Phủ")
                 .assignmentType(AssignmentType.QUIZ_TEST)
                 .targetId(quizId)
-                .deadline(LocalDateTime.now().plusDays(2))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(2))
                 .build();
 
         Assignment savedAssignment = Assignment.builder()
@@ -398,7 +399,7 @@ class TeacherAssignmentServiceImplTest {
                 .title("Kiểm tra nháp")
                 .assignmentType(AssignmentType.QUIZ_TEST)
                 .targetId(quizId)
-                .deadline(LocalDateTime.now().plusDays(2))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(2))
                 .build();
 
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
@@ -429,7 +430,7 @@ class TeacherAssignmentServiceImplTest {
                 .title("Giao bài quiz trường khác")
                 .assignmentType(AssignmentType.QUIZ_TEST)
                 .targetId(quizId)
-                .deadline(LocalDateTime.now().plusDays(2))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(2))
                 .build();
 
         when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));

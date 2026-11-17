@@ -126,11 +126,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         String finalSchoolCode = resolveOrGenerateSchoolCode(request.getSchoolCode(), request.getName(), request.getAddress());
 
         if (Boolean.FALSE.equals(request.getLocalHistoryPolicyAccepted())) {
-            throw new InvalidRequestException("School must agree to the local history content terms and conditions");
+            throw new InvalidRequestException("Trường phải đồng ý với điều khoản nội dung lịch sử địa phương");
         }
 
         int totalQuota = resolvePackageTokens(request.getPackageType());
-        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
         int academicStartYear = today.getMonthValue() >= 6 ? today.getYear() : today.getYear() - 1;
 
         if (request.getSubscriptionStartDate() != null && request.getSubscriptionEndDate() != null) {
@@ -176,7 +176,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional(readOnly = true)
     public SchoolResponse getSchoolById(UUID schoolId) {
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
         return mapToSchoolResponse(school);
     }
 
@@ -211,11 +211,11 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional
     public SchoolAdminResponse createSchoolAdmin(CreateSchoolAdminRequest request) {
         School school = schoolRepository.findById(request.getSchoolId())
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + request.getSchoolId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + request.getSchoolId()));
 
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw new DataConflictException("Email " + normalizedEmail + " is already in use by another account");
+            throw new DataConflictException("Email " + normalizedEmail + " đã được sử dụng bởi một tài khoản khác");
         }
 
         String baseUserName = school.getSchoolCode().toLowerCase() + "_admin";
@@ -251,7 +251,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional(readOnly = true)
     public PaginatedResponse<SchoolAdminResponse> getSchoolAdmins(UUID schoolId, String search, Boolean active, Pageable pageable) {
         if (!schoolRepository.existsById(schoolId)) {
-            throw new ResourceNotFoundException("School not found with ID: " + schoolId);
+            throw new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId);
         }
 
         String keyword = (search != null) ? search.trim() : "";
@@ -277,15 +277,15 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional
     public SchoolAdminResponse updateSchoolAdmin(UUID adminId, UpdateSchoolAdminRequest request) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quản trị trường với ID: " + adminId));
 
         if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
-            throw new ResourceNotFoundException("Account is not a School Admin");
+            throw new ResourceNotFoundException("Tài khoản không phải là quản trị trường");
         }
 
         String newEmail = request.getEmail().trim().toLowerCase();
         if (!newEmail.equalsIgnoreCase(admin.getEmail()) && userRepository.existsByEmailIgnoreCaseAndUidNot(newEmail, adminId)) {
-            throw new DataConflictException("Email " + newEmail + " is already in use by another account");
+            throw new DataConflictException("Email " + newEmail + " đã được sử dụng bởi một tài khoản khác");
         }
 
         admin.setFullName(request.getFullName().trim());
@@ -301,16 +301,16 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional
     public SchoolAdminResponse updateSchoolAdminStatus(UUID adminId, boolean active) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quản trị trường với ID: " + adminId));
 
         if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
-            throw new ResourceNotFoundException("Account is not a School Admin");
+            throw new ResourceNotFoundException("Tài khoản không phải là quản trị trường");
         }
 
         if (active) {
             admin.setDeletedAt(null);
         } else {
-            admin.setDeletedAt(java.time.LocalDateTime.now());
+            admin.setDeletedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
         }
 
         User saved = userRepository.save(admin);
@@ -322,13 +322,13 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional
     public void deleteSchoolAdmin(UUID adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quản trị trường với ID: " + adminId));
 
         if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
-            throw new ResourceNotFoundException("Account is not a School Admin");
+            throw new ResourceNotFoundException("Tài khoản không phải là quản trị trường");
         }
 
-        admin.setDeletedAt(java.time.LocalDateTime.now());
+        admin.setDeletedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
         userRepository.save(admin);
         log.info("Soft-deleted School Admin: {}", admin.getUserName());
     }
@@ -337,10 +337,10 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional
     public ResetPasswordResponse resetSchoolAdminPassword(UUID adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new ResourceNotFoundException("School Admin not found with ID: " + adminId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quản trị trường với ID: " + adminId));
 
         if (admin.getRole() != UserRole.SCHOOL_ADMIN) {
-            throw new ResourceNotFoundException("Account is not a School Admin");
+            throw new ResourceNotFoundException("Tài khoản không phải là quản trị trường");
         }
 
         String rawPassword = generateRandomPassword(10);
@@ -355,7 +355,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .fullName(admin.getFullName())
                 .email(admin.getEmail())
                 .initialPassword(rawPassword)
-                .message("Password reset successfully. Please deliver this temporary password to the School Admin.")
+                .message("Đặt lại mật khẩu thành công. Vui lòng gửi mật khẩu tạm thời này cho quản trị trường.")
                 .build();
     }
 
@@ -370,7 +370,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .schoolId(user.getSchool() != null ? user.getSchool().getId() : null)
                 .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
                 .active(user.getDeletedAt() == null)
-                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))
                 .build();
     }
 
@@ -378,7 +378,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
     @Transactional(readOnly = true)
     public SchoolTokenQuotaResponse getSchoolTokenQuota(UUID schoolId) {
         School school = schoolRepository.findById(schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + schoolId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
 
         long total = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0L;
         long unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0L;
@@ -416,7 +416,7 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
                 .nextPackageType(school.getNextPackageType())
                 .localHistoryPolicyAccepted(school.getLocalHistoryPolicyAccepted())
                 .status(school.getStatus())
-                .createdAt(school.getCreatedAt() != null ? school.getCreatedAt() : java.time.LocalDateTime.now())
+                .createdAt(school.getCreatedAt() != null ? school.getCreatedAt() : java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))
                 .build();
     }
 
@@ -432,10 +432,10 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
         if (schoolCodeInput != null && !schoolCodeInput.trim().isEmpty()) {
             String customCode = schoolCodeInput.trim().toUpperCase();
             if (!SCHOOL_CODE_PATTERN.matcher(customCode).matches()) {
-                throw new InvalidRequestException("School code must contain 2-30 alphanumeric characters, hyphens or underscores");
+                throw new InvalidRequestException("Mã trường phải gồm 2-30 ký tự chữ, số, dấu gạch ngang hoặc gạch dưới");
             }
             if (schoolRepository.existsBySchoolCodeIgnoreCase(customCode)) {
-                throw new DataConflictException("School code " + customCode + " already exists in the system");
+                throw new DataConflictException("Mã trường " + customCode + " đã tồn tại trong hệ thống");
             }
             return customCode;
         }

@@ -170,7 +170,7 @@ public class CharacterServiceImpl implements CharacterService {
 
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "User not found with id: " + userId));
+                        "Không tìm thấy người dùng với ID: " + userId));
 
         Character character = Character.builder()
                 .name(request.getName())
@@ -292,7 +292,7 @@ public class CharacterServiceImpl implements CharacterService {
                     "Bạn không có quyền xóa mềm nhân vật này");
         }
 
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
         character.setDeletedAt(now);
         characterRepository.save(character);
 
@@ -344,7 +344,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId));
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
-                .orElseThrow(() -> new ResourceNotFoundException("Historical Context not found with id: " + contextId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
         if (character.getHistoricalContexts().contains(context)) {
             return;
@@ -366,7 +366,7 @@ public class CharacterServiceImpl implements CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId));
 
         HistoricalContext context = contextRepository.findById(UUID.fromString(contextId))
-                .orElseThrow(() -> new ResourceNotFoundException("Historical Context not found with id: " + contextId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
 
         if (!character.getHistoricalContexts().remove(context)) {
             throw new ResourceNotFoundException("Không tìm thấy liên kết giữa nhân vật và bối cảnh");
@@ -520,7 +520,7 @@ public class CharacterServiceImpl implements CharacterService {
             Set<UUID> foundIds = found.stream().map(HistoricalContext::getContextId).collect(Collectors.toSet());
             for (String id : ids) {
                 if (!foundIds.contains(UUID.fromString(id))) {
-                    throw new ResourceNotFoundException("Historical Context not found with id: " + id);
+                    throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + id);
                 }
             }
         }

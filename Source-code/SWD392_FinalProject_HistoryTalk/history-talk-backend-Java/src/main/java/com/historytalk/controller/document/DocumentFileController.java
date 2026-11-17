@@ -44,7 +44,7 @@ public class DocumentFileController {
         String staffRole = SecurityUtils.getRoleName();
         log.info("POST /api/v1/documents/{}/upload-pdf by user {} (role={})", docId, staffId, staffRole);
         DocumentFileResponse document = documentFileService.uploadPdfFile(docId, file, staffId, staffRole);
-        return ResponseEntity.ok(ApiResponse.success(document, "PDF file uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(document, "Tải lên tệp PDF thành công"));
     }
 
     @GetMapping("/{docId}/pdf-url")
@@ -60,6 +60,6 @@ public class DocumentFileController {
                 .url(signedUrl.url())
                 .expiresIn(signedUrl.expiresIn())
                 .build();
-        return ResponseEntity.ok(ApiResponse.success(response, "PDF URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo đường dẫn PDF thành công"));
     }
 }
