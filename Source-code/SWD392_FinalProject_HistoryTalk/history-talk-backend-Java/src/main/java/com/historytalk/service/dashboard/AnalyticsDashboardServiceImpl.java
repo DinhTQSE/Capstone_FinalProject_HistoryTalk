@@ -31,6 +31,7 @@ import com.historytalk.repository.payment.UserTierRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.utils.SecurityUtils;
+import com.historytalk.service.school.token.TokenDay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -39,7 +40,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.management.ManagementFactory;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -74,7 +74,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             resolvedSchoolId = resolvedPrincipal.getSchoolId();
         }
         if (resolvedSchoolId == null) {
-            throw new InvalidRequestException("TÃ i khoáº£n Quáº£n trá»‹ viÃªn chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i trÆ°á»ng há»c nÃ o.");
+            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
         }
 
         UUID finalSchoolId = resolvedSchoolId;
@@ -95,7 +95,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         double studentPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByStudents * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
         double teacherPercent = tokensUsedTotal > 0 ? Math.round((tokensUsedByTeachers * 100.0 / tokensUsedTotal) * 10.0) / 10.0 : 0.0;
 
-        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         List<ClassroomTokenUsageProjection> topClassProjections = classroomRepository.findTopClassroomsByTokenUsage(finalSchoolId, todayStart, 5);
         List<ClassroomTokenUsageSummaryDto> topClassrooms = (topClassProjections != null) ? topClassProjections.stream()
                 .map(p -> ClassroomTokenUsageSummaryDto.builder()
@@ -190,7 +190,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + classId));
 
         if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
-            throw new AccessDeniedException("Báº¡n khÃ´ng cÃ³ quyá»n xem dá»¯ liá»‡u cá»§a lá»›p há»c nÃ y!");
+            throw new AccessDeniedException("Bạn không có quyền xem dữ liệu của lớp học này!");
         }
 
         School school = classroom.getSchool();
@@ -207,11 +207,10 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 ? tokenBoostRequestRepository.countByClassroom_IdAndStatus(classId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
                 : 0L;
 
-        // Láº¥y danh sÃ¡ch há»c sinh thuá»™c lá»›p
+        // Lấy danh sách học sinh thuộc lớp
         List<UUID> studentUids = classStudentRepository.findEnrolledStudentUids(classId);
         long studentCount = studentUids.size();
 
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         List<TeacherClassroomDashboardResponse.StudentAnalyticsItem> studentItems = new ArrayList<>();
         long totalAiMessages = 0L;
         if (!studentUids.isEmpty()) {
@@ -231,8 +230,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 long aiMessages = messageCountMap.getOrDefault(student.getUid(), 0L);
                 totalAiMessages += aiMessages;
 
-                boolean isSameDay = student.getLastTokenResetAt() != null
-                        && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
+                boolean isSameDay = !TokenDay.isNewDay(student.getLastTokenResetAt());
                 int usedToday = isSameDay && student.getDailyTokensUsed() != null
                         ? Math.max(0, student.getDailyTokensUsed())
                         : 0;
@@ -319,13 +317,11 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             }
         }
 
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        boolean isSameDay = student.getLastTokenResetAt() != null
-                && !student.getLastTokenResetAt().toLocalDate().isBefore(today);
+        boolean isSameDay = !TokenDay.isNewDay(student.getLastTokenResetAt());
         int bonusToday = isSameDay && student.getDailyBonusTokens() != null
                 ? Math.max(0, student.getDailyBonusTokens())
                 : 0;
-        long queriedTokensUsedToday = messageRepository.sumTokensUsedByUserSince(studentUid, today.atStartOfDay());
+        long queriedTokensUsedToday = messageRepository.sumTokensUsedByUserSince(studentUid, TokenDay.startOfToday());
         int trackedUsedToday = isSameDay && student.getDailyTokensUsed() != null
                 ? Math.max(0, student.getDailyTokensUsed())
                 : 0;
@@ -557,10 +553,10 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null || userId.isBlank()) {
-            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p Ä‘á»ƒ thá»±c hiá»‡n thao tÃ¡c");
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         return new UserPrincipal(user);
     }
 
@@ -618,13 +614,13 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             resolvedSchoolId = resolvedPrincipal.getSchoolId();
         }
         if (resolvedSchoolId == null) {
-            throw new InvalidRequestException("TÃ i khoáº£n Quáº£n trá»‹ viÃªn chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i trÆ°á»ng há»c nÃ o.");
+            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
         }
         if (!schoolRepository.existsById(resolvedSchoolId)) {
             throw new ResourceNotFoundException("Không tìm thấy trường học với ID: " + resolvedSchoolId);
         }
 
-        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
         long schoolTotal = messageRepository.sumTokensUsedBySchoolStudents(resolvedSchoolId)
@@ -679,7 +675,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         if (resolved.getRole() == UserRole.TEACHER) {
             UUID teacherUid = UUID.fromString(resolved.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(teacherUid)) {
-                throw new AccessDeniedException("Báº¡n khÃ´ng Ä‘Æ°á»£c phÃ¢n cÃ´ng phá»¥ trÃ¡ch lá»›p há»c nÃ y!");
+                throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
             }
         }
 
@@ -693,7 +689,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 ? Math.max(0, school.getUnallocatedTokenQuota())
                 : 0;
 
-        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
         Pageable safePageable = (pageable != null)
@@ -748,7 +744,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         User teacher = userRepository.findById(teacherUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên với ID: " + teacherUid));
 
-        LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
+        LocalDateTime todayStart = TokenDay.startOfToday();
         List<ClassroomTokenUsageProjection> projections = classroomRepository.findClassroomsTokenUsageForTeacher(
                 schoolId, teacherUid, todayStart);
 

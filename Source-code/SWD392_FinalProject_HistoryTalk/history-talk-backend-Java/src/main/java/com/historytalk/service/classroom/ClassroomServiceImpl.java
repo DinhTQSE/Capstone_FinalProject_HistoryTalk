@@ -58,18 +58,18 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         String trimmedClassName = request.getClassName().trim();
 
-        // 1. Kiá»ƒm tra chá»‘ng trÃ¹ng tÃªn lá»›p trong cÃ¹ng trÆ°á»ng vÃ  nÄƒm há»c
+        // 1. Kiểm tra chống trùng tên lớp trong cùng trường và năm học
         if (classroomRepository.existsBySchoolIdAndClassNameIgnoreCaseAndAcademicYearAndDeletedAtIsNull(
                 schoolId, trimmedClassName, request.getAcademicYear())) {
             throw new DataConflictException(String.format(
-                    "Lá»›p há»c \"%s\" Ä‘Ã£ tá»“n táº¡i trong nÄƒm há»c %d cá»§a trÆ°á»ng",
+                    "Lớp học \"%s\" đã tồn tại trong năm học %d của trường",
                     trimmedClassName, request.getAcademicYear()));
         }
 
-        // 2. XÃ¡c Ä‘á»‹nh GiÃ¡o viÃªn phá»¥ trÃ¡ch
+        // 2. Xác định Giáo viên phụ trách
         User teacher = null;
         if (userPrincipal.getRole() == UserRole.TEACHER) {
-            // Náº¿u Teacher tá»± táº¡o lá»›p thÃ¬ máº·c Ä‘á»‹nh gÃ¡n cho chÃ­nh mÃ¬nh
+            // Nếu Teacher tự tạo lớp thì mặc định gán cho chính mình
             teacher = userRepository.findById(UUID.fromString(userPrincipal.getUid()))
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giáo viên"));
         } else if (userPrincipal.getRole() == UserRole.SCHOOL_ADMIN) {
@@ -78,7 +78,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             }
         }
 
-        // 3. Sinh mÃ£ lá»›p há»c thÃ´ng minh (kÃ¨m mÃ£ trÆ°á»ng vÃ  nÄƒm há»c)
+        // 3. Sinh mã lớp học thông minh (kèm mã trường và năm học)
         String classCode = smartClassCodeGenerator.generateClassCode(
                 school.getSchoolCode(), trimmedClassName, request.getAcademicYear());
 
@@ -110,18 +110,18 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
-        // Kiá»ƒm tra quyá»n háº¡n
+        // Kiểm tra quyền hạn
         if (userPrincipal.getRole() == UserRole.TEACHER) {
             UUID currentTeacherUid = UUID.fromString(userPrincipal.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(currentTeacherUid)) {
-                throw new AccessDeniedException("Báº¡n khÃ´ng Ä‘Æ°á»£c phÃ¢n cÃ´ng phá»¥ trÃ¡ch lá»›p há»c nÃ y!");
+                throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
             }
             if (request.getTeacherId() != null && !request.getTeacherId().equals(currentTeacherUid)) {
-                throw new AccessDeniedException("GiÃ¡o viÃªn khÃ´ng cÃ³ quyá»n chuyá»ƒn nhÆ°á»£ng quyá»n phá»¥ trÃ¡ch lá»›p cho ngÆ°á»i khÃ¡c!");
+                throw new AccessDeniedException("Giáo viên không có quyền chuyển nhượng quyền phụ trách lớp cho người khác!");
             }
         }
 
-        // Cáº­p nháº­t tÃªn lá»›p / nÄƒm há»c náº¿u cÃ³
+        // Cập nhật tên lớp / năm học nếu có
         String newClassName = request.getClassName() != null ? request.getClassName().trim() : classroom.getClassName();
         Integer newAcademicYear = request.getAcademicYear() != null ? request.getAcademicYear() : classroom.getAcademicYear();
 
@@ -129,7 +129,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             if (classroomRepository.existsBySchoolIdAndClassNameIgnoreCaseAndAcademicYearAndIdNotAndDeletedAtIsNull(
                     schoolId, newClassName, newAcademicYear, id)) {
                 throw new DataConflictException(String.format(
-                        "Lá»›p há»c \"%s\" Ä‘Ã£ tá»“n táº¡i trong nÄƒm há»c %d cá»§a trÆ°á»ng",
+                        "Lớp học \"%s\" đã tồn tại trong năm học %d của trường",
                         newClassName, newAcademicYear));
             }
             classroom.setClassName(newClassName);
@@ -152,7 +152,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             classroom.setStatus(request.getStatus().trim());
         }
 
-        // Cáº­p nháº­t giÃ¡o viÃªn (chá»‰ School Admin má»›i Ä‘Æ°á»£c Ä‘á»•i)
+        // Cập nhật giáo viên (chỉ School Admin mới được đổi)
         if (userPrincipal.getRole() == UserRole.SCHOOL_ADMIN && request.getTeacherId() != null) {
             User teacher = validateAndGetTeacher(request.getTeacherId(), schoolId);
             classroom.setTeacher(teacher);
@@ -174,16 +174,16 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
-        // Kiá»ƒm tra phÃ¢n quyá»n truy cáº­p chi tiáº¿t lá»›p
+        // Kiểm tra phân quyền truy cập chi tiết lớp
         if (userPrincipal.getRole() == UserRole.TEACHER) {
             UUID currentTeacherUid = UUID.fromString(userPrincipal.getUid());
             if (classroom.getTeacher() == null || !classroom.getTeacher().getUid().equals(currentTeacherUid)) {
-                throw new AccessDeniedException("Báº¡n khÃ´ng Ä‘Æ°á»£c phÃ¢n cÃ´ng phá»¥ trÃ¡ch lá»›p há»c nÃ y!");
+                throw new AccessDeniedException("Bạn không được phân công phụ trách lớp học này!");
             }
         } else if (userPrincipal.getRole() == UserRole.SCHOOL_STUDENT) {
             UUID currentStudentUid = UUID.fromString(userPrincipal.getUid());
             if (!classStudentRepository.existsByClassroomIdAndStudentUid(id, currentStudentUid)) {
-                throw new AccessDeniedException("Báº¡n khÃ´ng pháº£i lÃ  thÃ nh viÃªn cá»§a lá»›p há»c nÃ y!");
+                throw new AccessDeniedException("Bạn không phải là thành viên của lớp học này!");
             }
         }
 
@@ -301,9 +301,9 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
         Classroom classroom = findClassroomInTenant(id, schoolId);
 
-        // Chá»‰ School Admin má»›i Ä‘Æ°á»£c xÃ³a lá»›p há»c
+        // Chỉ School Admin mới được xóa lớp học
         if (userPrincipal.getRole() != UserRole.SCHOOL_ADMIN) {
-            throw new AccessDeniedException("Chá»‰ School Admin má»›i cÃ³ quyá»n xÃ³a lá»›p há»c!");
+            throw new AccessDeniedException("Chỉ School Admin mới có quyền xóa lớp học!");
         }
 
         classroom.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
@@ -318,10 +318,10 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p Ä‘á»ƒ thá»±c hiá»‡n thao tÃ¡c");
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện thao tác");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         return new UserPrincipal(user);
     }
 

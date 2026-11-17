@@ -49,6 +49,9 @@ class HistoricalContextServiceImplTest {
     @Mock
     private MapPinService mapPinService;
 
+    @Mock
+    private com.historytalk.security.ContentAccessPolicy contentAccessPolicy;
+
     @InjectMocks
     private HistoricalContextServiceImpl historicalContextService;
 
@@ -108,6 +111,7 @@ class HistoricalContextServiceImplTest {
         context.setSchool(school);
 
         when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
+        when(contentAccessPolicy.canView(context, "USER")).thenReturn(false);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 historicalContextService.getContextById(context.getContextId().toString(), "USER"))

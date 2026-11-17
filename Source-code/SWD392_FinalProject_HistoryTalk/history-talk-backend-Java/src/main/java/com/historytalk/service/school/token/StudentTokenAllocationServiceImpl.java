@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -84,14 +83,12 @@ public class StudentTokenAllocationServiceImpl implements StudentTokenAllocation
 
         // 4. Pure Shared Pool: Không trừ trước quỹ trường (school.unallocatedTokenQuota giữ nguyên).
         // Tăng dailyBonusTokens của học sinh để nâng trần sử dụng trong ngày; chỉ trừ quỹ trường khi học sinh thực sự chat AI.
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         int defaultDailyQuota = (school.getDefaultDailyStudentQuota() != null && school.getDefaultDailyStudentQuota() > 0)
                 ? school.getDefaultDailyStudentQuota()
                 : 1000;
 
         for (User student : students) {
-            boolean isNewDay = student.getLastTokenResetAt() == null
-                    || student.getLastTokenResetAt().toLocalDate().isBefore(today);
+            boolean isNewDay = TokenDay.isNewDay(student.getLastTokenResetAt());
             if (isNewDay) {
                 student.setDailyTokensUsed(0);
                 student.setDailyBonusTokens(0);

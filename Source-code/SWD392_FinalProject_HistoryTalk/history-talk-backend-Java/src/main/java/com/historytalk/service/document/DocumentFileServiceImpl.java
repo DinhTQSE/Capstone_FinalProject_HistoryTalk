@@ -6,6 +6,7 @@ import com.historytalk.entity.enums.DocumentType;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.DocumentRepository;
+import com.historytalk.security.ContentAccessPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
 
     private final DocumentRepository documentRepository;
     private final SupabaseDocumentStorageService supabaseDocumentStorageService;
+    private final ContentAccessPolicy contentAccessPolicy;
 
     @Override
     @Transactional
@@ -75,6 +77,11 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId));
 
+        // Teachers and students only get links for documents they are allowed to read
+        if (!contentAccessPolicy.canView(doc, userRole)) {
+            throw new ResourceNotFoundException("Không tìm thấy tài liệu: " + docId);
+        }
+
         if (doc.getDocumentType() != DocumentType.PDF || doc.getFileUrl() == null || doc.getFileUrl().isBlank()) {
             throw new InvalidRequestException("Tài liệu không có file PDF nào được tải lên");
         }
@@ -99,17 +106,11 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        if (role == null) return false;
-        String r = role.toUpperCase(java.util.Locale.ROOT).replace("ROLE_", "");
-        return "CONTENT_ADMIN".equals(r)
-                || "SYSTEM_ADMIN".equals(r)
-                || "STAFF".equals(r)
-                || "ADMIN".equals(r)
-                || "TEACHER".equals(r)
-                || "SCHOOL_ADMIN".equals(r);
+        return ContentAccessPolicy.isStaff(role);
     }
 
     private boolean isStaffOrAdminOrStudent(String role) {
-        return isStaffOrAdmin(role) || "SCHOOL_STUDENT".equalsIgnoreCase(role);
+        return isStaffOrAdmin(role) || "TEACHER".equalsIgnoreCase(role)
+                || "SCHOOL_ADMIN".equalsIgnoreCase(role) || "SCHOOL_STUDENT".equalsIgnoreCase(role);
     }
 }

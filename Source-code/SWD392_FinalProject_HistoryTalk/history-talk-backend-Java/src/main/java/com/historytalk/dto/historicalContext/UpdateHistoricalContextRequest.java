@@ -1,5 +1,6 @@
 package com.historytalk.dto.historicalContext;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.historytalk.entity.enums.EventCategory;
 import com.historytalk.entity.enums.EventEra;
@@ -30,12 +31,15 @@ public class UpdateHistoricalContextRequest {
     private EventCategory category;
 
     @JsonProperty("year")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer year;
 
     @JsonProperty("startYear")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer startYear;
 
     @JsonProperty("endYear")
+    @Min(value = 1, message = "Năm phải lớn hơn 0 (năm trước Công nguyên thì chọn TCN)")
     private Integer endYear;
 
     @JsonProperty("isBC")
@@ -61,6 +65,23 @@ public class UpdateHistoricalContextRequest {
     @JsonProperty("battleMap")
     private Object battleMap;
 
+    /**
+     * Optional story script. Absent key = keep the stored script; {"storyScript": null} = delete it.
+     * Jackson calls the setter for an explicit null too, so {@link #storyScriptPresent} tells the two apart.
+     */
+    @JsonProperty("storyScript")
+    private Object storyScript;
+
+    /** True when the request body contained the "storyScript" key (even with a null value). */
+    @JsonIgnore
+    private boolean storyScriptPresent;
+
     @JsonProperty("isPublished")
     private Boolean isPublished;
+
+    @JsonProperty("storyScript")
+    public void setStoryScript(Object storyScript) {
+        this.storyScript = storyScript;
+        this.storyScriptPresent = true;
+    }
 }

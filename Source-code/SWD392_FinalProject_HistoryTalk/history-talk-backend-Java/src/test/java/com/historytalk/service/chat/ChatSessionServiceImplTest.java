@@ -189,4 +189,13 @@ class ChatSessionServiceImplTest {
         assertThat(scenario.getContextYear()).isEqualTo(1954);
         assertThat(scenario.getScope()).isEqualTo("GLOBAL");
     }
+
+    @Test
+    void getSessionsWithoutCharacterIdIsBadRequestNotServerError() {
+        String userId = UUID.randomUUID().toString();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> chatSessionService.getSessions(userId, null))
+                .isInstanceOf(com.historytalk.exception.InvalidRequestException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> chatSessionService.getSessions(userId, "not-a-uuid"))
+                .isInstanceOf(com.historytalk.exception.InvalidRequestException.class);
+    }
 }

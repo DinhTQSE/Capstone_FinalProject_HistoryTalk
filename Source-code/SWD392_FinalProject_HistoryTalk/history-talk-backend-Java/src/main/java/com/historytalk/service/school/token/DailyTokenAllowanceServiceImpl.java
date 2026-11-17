@@ -46,10 +46,32 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
 
         verifySchoolSubscriptionActive(school);
 
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        boolean needsDailyReset = user.getLastTokenResetAt() == null
-                || user.getLastTokenResetAt().toLocalDate().isBefore(today);
+        int effectiveAvailableToday = refreshDailyAllowance(user);
 
+        if (effectiveAvailableToday <= 0) {
+            if (user.getRole() == UserRole.TEACHER) {
+                throw new AccessDeniedException(
+                        "AI_QUOTA_EXCEEDED: Bạn đã sử dụng hết hạn mức Token trong ngày của Giáo viên (đã bao gồm phần cấp cho học sinh). " +
+                        "Bạn có thể tạo Ticket gửi Quản trị viên Trường (School Admin) để được cấp thêm hạn mức.");
+            }
+            throw new AccessDeniedException(
+                    "AI_QUOTA_EXCEEDED: Bạn đã hết hạn mức Token AI trong ngày (hoặc Quỹ Token chung của trường đã hết). " +
+                    "Các tính năng làm bài Quiz, đọc tài liệu và nộp bài tập vẫn sử dụng bình thường. " +
+                    "Bạn có thể bấm 'Xin thêm Token' để giáo viên phụ trách lớp cấp thêm từ quỹ giáo viên.");
+        }
+
+        return effectiveAvailableToday;
+    }
+
+    @Override
+    @Transactional
+    public int refreshDailyAllowance(User user) {
+        School school = user.getSchool();
+        if (school == null) {
+            return 0;
+        }
+
+        boolean needsDailyReset = TokenDay.isNewDay(user.getLastTokenResetAt());
         if (needsDailyReset) {
             // Pure Shared Pool: All school tokens remain in school.unallocatedTokenQuota until spent.
             // On a new day, simply reset the user's daily usage counter and daily bonus allowance to 0.
@@ -72,19 +94,6 @@ public class DailyTokenAllowanceServiceImpl implements DailyTokenAllowanceServic
         if (needsDailyReset) {
             userRepository.save(user);
         }
-
-        if (effectiveAvailableToday <= 0) {
-            if (user.getRole() == UserRole.TEACHER) {
-                throw new AccessDeniedException(
-                        "AI_QUOTA_EXCEEDED: Bạn đã sử dụng hết hạn mức Token trong ngày của Giáo viên (đã bao gồm phần cấp cho học sinh). " +
-                        "Bạn có thể tạo Ticket gửi Quản trị viên Trường (School Admin) để được cấp thêm hạn mức.");
-            }
-            throw new AccessDeniedException(
-                    "AI_QUOTA_EXCEEDED: Bạn đã hết hạn mức Token AI trong ngày (hoặc Quỹ Token chung của trường đã hết). " +
-                    "Các tính năng làm bài Quiz, đọc tài liệu và nộp bài tập vẫn sử dụng bình thường. " +
-                    "Bạn có thể bấm 'Xin thêm Token' để giáo viên phụ trách lớp cấp thêm từ quỹ giáo viên.");
-        }
-
         return effectiveAvailableToday;
     }
 

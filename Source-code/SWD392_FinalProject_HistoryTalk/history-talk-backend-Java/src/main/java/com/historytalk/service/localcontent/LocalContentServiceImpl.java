@@ -19,6 +19,7 @@ import com.historytalk.entity.enums.EntityType;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.ForbiddenException;
 import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.exception.UnauthorizedException;
@@ -68,6 +69,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class LocalContentServiceImpl implements LocalContentService {
+
+    /** MSG11 – insufficient permissions (HTTP 403). */
+    private static final String MSG11 = "Bạn không có quyền thực hiện thao tác này.";
 
     private final LocalContextRepository localContextRepo;
     private final LocalCharacterRepository localCharacterRepo;
@@ -196,13 +200,12 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         UUID teacherId = resolveUserId(principal);
 
-        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), school.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        HistoricalContext ctx = requireLocalContext(UUID.fromString(contextId), school.getId());
 
         // CLASS_ONLY: only owner teacher can see it
         if (ctx.getContentScope() == ContentScope.CLASS_ONLY
                 && !ctx.getCreatedBy().getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn không có quyền truy cập nội dung địa phương này");
+            throw new ForbiddenException(MSG11);
         }
         return mapContextToResponse(ctx);
     }
@@ -354,12 +357,11 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         UUID teacherId = resolveUserId(principal);
 
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), school.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), school.getId());
 
         if (character.getContentScope() == ContentScope.CLASS_ONLY
                 && !character.getCreatedBy().getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn không có quyền truy cập nội dung địa phương này");
+            throw new ForbiddenException(MSG11);
         }
         return mapCharacterToResponse(character);
     }
@@ -492,8 +494,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         User admin = resolveUser(principal);
 
-        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương trong trường của bạn"));
+        HistoricalContext ctx = requireLocalContext(UUID.fromString(contextId), schoolId);
 
         applyStatus(ctx, req.getStatus(), req.getNote(), admin);
         ctx = localContextRepo.save(ctx);
@@ -507,8 +508,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         User admin = resolveUser(principal);
 
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương trong trường của bạn"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), schoolId);
 
         applyStatus(character, req.getStatus(), req.getNote(), admin);
         Character saved = localCharacterRepo.save(character);
@@ -564,8 +564,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         UUID studentId = resolveUserId(principal);
 
-        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        HistoricalContext ctx = requireLocalContext(UUID.fromString(contextId), schoolId);
         if (!Boolean.TRUE.equals(ctx.getIsPublished()) || ctx.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Nội dung chưa được xuất bản");
         }
@@ -580,7 +579,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                     .toList();
             boolean hasAccess = assignedClasses.stream().anyMatch(studentClasses::contains);
             if (!hasAccess) {
-                throw new UnauthorizedException("Bạn không có quyền truy cập nội dung địa phương dành riêng cho lớp này");
+                throw new ForbiddenException(MSG11);
             }
         }
 
@@ -593,8 +592,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         UUID studentId = resolveUserId(principal);
 
-        Character c = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        Character c = requireLocalCharacter(UUID.fromString(characterId), schoolId);
         if (!Boolean.TRUE.equals(c.getIsPublished()) || c.getDeletedAt() != null) {
             throw new ResourceNotFoundException("Nội dung chưa được xuất bản");
         }
@@ -609,7 +607,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                     .toList();
             boolean hasAccess = assignedClasses.stream().anyMatch(studentClasses::contains);
             if (!hasAccess) {
-                throw new UnauthorizedException("Bạn không có quyền truy cập nội dung địa phương dành riêng cho lớp này");
+                throw new ForbiddenException(MSG11);
             }
         }
 
@@ -619,6 +617,26 @@ public class LocalContentServiceImpl implements LocalContentService {
     // ══════════════════════════════════════════════════════════════════════════
     // Private helpers
     // ══════════════════════════════════════════════════════════════════════════
+
+    /** Local context of the given school; another school's content is refused with MSG11, a missing one is 404. */
+    private HistoricalContext requireLocalContext(UUID contextId, UUID schoolId) {
+        return localContextRepo.findByIdAndSchool(contextId, schoolId)
+                .orElseThrow(() -> localContextRepo.findById(contextId)
+                        .filter(other -> other.getSchool() != null && other.getDeletedAt() == null)
+                        .isPresent()
+                        ? new ForbiddenException(MSG11)
+                        : new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+    }
+
+    /** Local character of the given school; another school's content is refused with MSG11, a missing one is 404. */
+    private Character requireLocalCharacter(UUID characterId, UUID schoolId) {
+        return localCharacterRepo.findByIdAndSchool(characterId, schoolId)
+                .orElseThrow(() -> localCharacterRepo.findById(characterId)
+                        .filter(other -> other.getSchool() != null && other.getDeletedAt() == null)
+                        .isPresent()
+                        ? new ForbiddenException(MSG11)
+                        : new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+    }
 
     private void applyStatus(HistoricalContext ctx, ContentStatus status, String note, User admin) {
         ctx.setContentStatus(status);
@@ -715,14 +733,14 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
         UUID requested = parseClassId(classId);
         if (!enrolled.contains(requested)) {
-            throw new UnauthorizedException("Bạn không thuộc lớp học này");
+            throw new ForbiddenException("Bạn không thuộc lớp học này");
         }
         return List.of(requested);
     }
 
     private void assertCreatedBy(User createdBy, UUID teacherId) {
         if (createdBy == null || !createdBy.getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn chỉ có thể chỉnh sửa nội dung do mình tạo");
+            throw new ForbiddenException(MSG11);
         }
     }
 
@@ -745,19 +763,17 @@ public class LocalContentServiceImpl implements LocalContentService {
     }
 
     private HistoricalContext findLocalContextOwned(String contextId, UUID schoolId, UUID teacherId) {
-        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        HistoricalContext ctx = requireLocalContext(UUID.fromString(contextId), schoolId);
         if (!ctx.getCreatedBy().getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn chỉ có thể chỉnh sửa nội dung do mình tạo");
+            throw new ForbiddenException(MSG11);
         }
         return ctx;
     }
 
     private Character findLocalCharacterOwned(String characterId, UUID schoolId, UUID teacherId) {
-        Character c = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        Character c = requireLocalCharacter(UUID.fromString(characterId), schoolId);
         if (!c.getCreatedBy().getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn chỉ có thể chỉnh sửa nội dung do mình tạo");
+            throw new ForbiddenException(MSG11);
         }
         return c;
     }
@@ -1020,8 +1036,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> getLocalContextDocuments(String contextId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        requireLocalContext(UUID.fromString(contextId), schoolId);
         return documentRepository
                 .findByEntityIdAndEntityTypeOrderByUploadDateDesc(UUID.fromString(contextId), EntityType.CONTEXT, false)
                 .stream().map(this::mapDocumentToResponse).collect(Collectors.toList());
@@ -1033,8 +1048,7 @@ public class LocalContentServiceImpl implements LocalContentService {
             String contextId, CreateHistoricalContextDocumentRequest req, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        HistoricalContext ctx = requireLocalContext(UUID.fromString(contextId), schoolId);
 
         DocumentType type = req.getType() != null ? req.getType() : DocumentType.TEXT;
         Document doc = Document.builder()
@@ -1061,8 +1075,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        HistoricalContext ctx = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        HistoricalContext ctx = requireLocalContext(UUID.fromString(contextId), schoolId);
 
         String resolvedTitle = StringUtils.hasText(title) ? title.trim()
                 : (file.getOriginalFilename() != null ? file.getOriginalFilename() : "Tài liệu PDF");
@@ -1113,15 +1126,14 @@ public class LocalContentServiceImpl implements LocalContentService {
     public void deleteLocalContextDocument(String contextId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         UUID teacherId = resolveUserId(principal);
-        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        requireLocalContext(UUID.fromString(contextId), schoolId);
         Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu"));
         if (!doc.getEntityId().equals(UUID.fromString(contextId))) {
             throw new ResourceNotFoundException("Tài liệu không thuộc bối cảnh này");
         }
         if (!doc.getCreatedBy().getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn chỉ có thể xóa tài liệu do mình tải lên");
+            throw new ForbiddenException(MSG11);
         }
         doc.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         documentRepository.save(doc);
@@ -1132,8 +1144,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public List<HistoricalContextDocumentResponse> getLocalCharacterDocuments(String characterId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        requireLocalCharacter(UUID.fromString(characterId), schoolId);
         return documentRepository
                 .findByEntityIdAndEntityTypeOrderByUploadDateDesc(UUID.fromString(characterId), EntityType.CHARACTER, false)
                 .stream().map(this::mapDocumentToResponse).collect(Collectors.toList());
@@ -1145,8 +1156,7 @@ public class LocalContentServiceImpl implements LocalContentService {
             String characterId, CreateHistoricalContextDocumentRequest req, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), schoolId);
 
         DocumentType type = req.getType() != null ? req.getType() : DocumentType.TEXT;
         Document doc = Document.builder()
@@ -1173,8 +1183,7 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), schoolId);
 
         String resolvedTitle = StringUtils.hasText(title) ? title.trim()
                 : (file.getOriginalFilename() != null ? file.getOriginalFilename() : "Tài liệu PDF");
@@ -1225,15 +1234,14 @@ public class LocalContentServiceImpl implements LocalContentService {
     public void deleteLocalCharacterDocument(String characterId, String docId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         UUID teacherId = resolveUserId(principal);
-        localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        requireLocalCharacter(UUID.fromString(characterId), schoolId);
         Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu"));
         if (!doc.getEntityId().equals(UUID.fromString(characterId))) {
             throw new ResourceNotFoundException("Tài liệu không thuộc nhân vật này");
         }
         if (!doc.getCreatedBy().getUid().equals(teacherId)) {
-            throw new UnauthorizedException("Bạn chỉ có thể xóa tài liệu do mình tải lên");
+            throw new ForbiddenException(MSG11);
         }
         doc.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         documentRepository.save(doc);
@@ -1266,8 +1274,7 @@ public class LocalContentServiceImpl implements LocalContentService {
             UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         UUID teacherId = resolveUserId(principal);
-        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        requireLocalContext(UUID.fromString(contextId), schoolId);
         Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu"));
         if (!doc.getEntityId().equals(UUID.fromString(contextId))) {
@@ -1308,8 +1315,7 @@ public class LocalContentServiceImpl implements LocalContentService {
             UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         UUID teacherId = resolveUserId(principal);
-        localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        requireLocalCharacter(UUID.fromString(characterId), schoolId);
         Document doc = documentRepository.findById(UUID.fromString(docId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài liệu"));
         if (!doc.getEntityId().equals(UUID.fromString(characterId))) {
@@ -1349,10 +1355,8 @@ public class LocalContentServiceImpl implements LocalContentService {
     public void linkCharacterToContext(String characterId, String contextId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
-        HistoricalContext context = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), schoolId);
+        HistoricalContext context = requireLocalContext(UUID.fromString(contextId), schoolId);
 
         if (!character.getHistoricalContexts().contains(context)) {
             character.getHistoricalContexts().add(context);
@@ -1366,10 +1370,8 @@ public class LocalContentServiceImpl implements LocalContentService {
     public void unlinkCharacterFromContext(String characterId, String contextId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
-        HistoricalContext context = localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), schoolId);
+        HistoricalContext context = requireLocalContext(UUID.fromString(contextId), schoolId);
 
         if (character.getHistoricalContexts().remove(context)) {
             localCharacterRepo.save(character);
@@ -1381,8 +1383,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional(readOnly = true)
     public List<LocalContentResponse> getCharacterContexts(String characterId, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        Character character = localCharacterRepo.findByIdAndSchool(UUID.fromString(characterId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân vật địa phương"));
+        Character character = requireLocalCharacter(UUID.fromString(characterId), schoolId);
         if (character.getHistoricalContexts() == null) {
             return List.of();
         }
@@ -1483,8 +1484,7 @@ public class LocalContentServiceImpl implements LocalContentService {
     public PaginatedResponse<QuizStaffResponse> getLocalContextQuizzes(
             String contextId, int page, int size, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
-        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        requireLocalContext(UUID.fromString(contextId), schoolId);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         Page<com.historytalk.entity.quiz.Quiz> p = quizRepository.findByContextIdAndDeletedAtIsNull(UUID.fromString(contextId), pageable);
         return buildPage(p.map(this::mapQuizToStaffResponse));
@@ -1496,8 +1496,7 @@ public class LocalContentServiceImpl implements LocalContentService {
             String contextId, CreateQuizRequest request, UserPrincipal principal) {
         UUID schoolId = resolveSchoolId(principal);
         User teacher = resolveUser(principal);
-        localContextRepo.findByIdAndSchool(UUID.fromString(contextId), schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh địa phương"));
+        requireLocalContext(UUID.fromString(contextId), schoolId);
         request.setContextId(contextId);
         return quizService.createQuiz(request, teacher.getUid());
     }

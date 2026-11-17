@@ -18,13 +18,13 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateTokenBoostRequestDto {
 
-    @NotNull(message = "Số token yêu cầu không được để trống")
-    @Min(value = 100, message = "Số token yêu cầu tối thiểu là 100")
-    @Max(value = 50000, message = "Số token yêu cầu không được vượt quá 50.000 mỗi lần")
+    @NotNull(message = "Vui lòng nhập số token cần xin")
+    @Min(value = 100, message = "Số token xin tối thiểu là 100")
+    @Max(value = 50000, message = "Mỗi yêu cầu xin tối đa 50.000 token")
     private Integer requestedTokens;
 
-    @NotBlank(message = "Lý do không được để trống")
-    @Size(max = 500, message = "Lý do không được vượt quá 500 ký tự")
+    @NotBlank(message = "Vui lòng nhập lý do")
+    @Size(max = 500, message = "Lý do tối đa 500 ký tự")
     private String reason;
 
     /**

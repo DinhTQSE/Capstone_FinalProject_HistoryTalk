@@ -1,5 +1,6 @@
 package com.historytalk.dto.historicalContext;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.historytalk.entity.enums.ContentStatus;
 import com.historytalk.entity.enums.EventCategory;
@@ -65,6 +66,14 @@ public class HistoricalContextResponse {
      */
     @JsonProperty("battleMap")
     private Object battleMap;
+
+    /**
+     * Story script, always serialised (null when there is none) so the FE can detect server support.
+     * Learners only receive a published script; staff also receive drafts.
+     */
+    @JsonProperty("storyScript")
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    private Object storyScript;
 
     @JsonProperty("isPublished")
     private Boolean isPublished;

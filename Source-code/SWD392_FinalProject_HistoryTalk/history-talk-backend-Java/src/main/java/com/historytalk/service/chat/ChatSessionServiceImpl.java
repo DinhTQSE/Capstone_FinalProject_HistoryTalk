@@ -70,9 +70,19 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     public List<ChatSessionResponse> getSessions(String userId, String characterId) {
         log.info("Getting chat sessions for user={} character={}", userId, characterId);
 
+        if (characterId == null || characterId.isBlank()) {
+            throw new InvalidRequestException("Yêu cầu characterId");
+        }
+        final UUID characterUuid;
+        try {
+            characterUuid = UUID.fromString(characterId);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException("characterId không hợp lệ");
+        }
+
         List<ChatSession> sessions = chatSessionRepository.findByUserAndCharacter(
                 UUID.fromString(userId),
-                UUID.fromString(characterId));
+                characterUuid);
         if (sessions.isEmpty()) {
             return List.of();
         }

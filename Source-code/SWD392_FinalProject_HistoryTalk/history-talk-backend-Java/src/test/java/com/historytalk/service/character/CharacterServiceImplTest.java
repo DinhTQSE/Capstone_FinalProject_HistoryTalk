@@ -11,6 +11,8 @@ import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.security.ContentAccessPolicy;
+import com.historytalk.entity.enums.UserRole;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -46,6 +48,9 @@ class CharacterServiceImplTest {
     @Mock
     private DocumentRepository documentRepository;
 
+    @Mock
+    private ContentAccessPolicy contentAccessPolicy;
+
     @InjectMocks
     private CharacterServiceImpl characterService;
 
@@ -65,6 +70,7 @@ class CharacterServiceImplTest {
                 .build();
 
         when(characterRepository.findById(characterId)).thenReturn(Optional.of(character));
+        when(contentAccessPolicy.canView(character, "USER")).thenReturn(true);
 
         CharacterResponse response = characterService.getCharacterById(characterId.toString(), "USER");
 
@@ -117,6 +123,7 @@ class CharacterServiceImplTest {
         User creator = User.builder()
                 .uid(userId)
                 .userName("staff")
+                .role(UserRole.CONTENT_ADMIN)
                 .build();
         CreateCharacterRequest request = CreateCharacterRequest.builder()
                 .name("Tran Hung Dao")
@@ -173,8 +180,27 @@ class CharacterServiceImplTest {
                 .build();
 
         when(characterRepository.findById(character.getCharacterId())).thenReturn(java.util.Optional.of(character));
+        when(contentAccessPolicy.canView(character, "USER")).thenReturn(false);
 
         assertThatThrownBy(() -> characterService.getCharacterById(character.getCharacterId().toString(), "USER"))
                 .isInstanceOf(com.historytalk.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
+    void createCharacterRejectsTeacherBecauseGlobalCharactersAreStaffOnly() {
+        UUID userId = UUID.randomUUID();
+        User teacher = User.builder().uid(userId).userName("teacher").role(UserRole.TEACHER).build();
+        CreateCharacterRequest request = CreateCharacterRequest.builder()
+                .name("Nhan vat moi")
+                .background("Historical character background")
+                .build();
+
+        when(characterRepository.existsByNameIgnoreCaseAndSchoolIsNull("Nhan vat moi")).thenReturn(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(teacher));
+
+        assertThatThrownBy(() -> characterService.createCharacter(request, userId.toString()))
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("Bạn không có quyền tạo nhân vật");
+        verify(characterRepository, org.mockito.Mockito.never()).save(any(Character.class));
     }
 }

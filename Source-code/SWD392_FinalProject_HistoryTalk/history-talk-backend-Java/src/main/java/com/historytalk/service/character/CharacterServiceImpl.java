@@ -17,6 +17,7 @@ import com.historytalk.repository.CharacterRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.UserRepository;
+import com.historytalk.security.ContentAccessPolicy;
 import com.historytalk.utils.SecurityUtils;
 import com.historytalk.service.speech.CharacterVoices;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class CharacterServiceImpl implements CharacterService {
     private final HistoricalContextRepository contextRepository;
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
+    private final ContentAccessPolicy contentAccessPolicy;
 
     @Transactional(readOnly = true)
     public PaginatedResponse<CharacterResponse> getAllCharacters(String search, String eraStr, int page, int limit, String role) {
@@ -85,30 +87,9 @@ public class CharacterServiceImpl implements CharacterService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy nhân vật với id: " + characterId));
 
-        if (!isStaffOrAdmin(role) && !Boolean.TRUE.equals(character.getIsPublished())) {
+        // Drafts, deleted rows and other schools' local characters are hidden (reported as not found)
+        if (!contentAccessPolicy.canView(character, role)) {
             throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
-        }
-        if (!isStaffOrAdmin(role) && character.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
-        }
-
-        // School-owned isolation check: local characters cannot be viewed by outsiders
-        if (character.getSchool() != null && !isStaffOrAdmin(role)) {
-            String userId = SecurityUtils.getUserId();
-            UUID userSchoolId = null;
-            if (userId != null) {
-                try {
-                    userSchoolId = userRepository.findById(UUID.fromString(userId))
-                            .map(User::getSchool)
-                            .map(com.historytalk.entity.school.School::getId)
-                            .orElse(null);
-                } catch (Exception ex) {
-                    log.debug("Error retrieving user school: {}", ex.getMessage());
-                }
-            }
-            if (userSchoolId == null || !userSchoolId.equals(character.getSchool().getId())) {
-                throw new ResourceNotFoundException("Không tìm thấy nhân vật với id: " + characterId);
-            }
         }
 
         return character;
@@ -171,6 +152,11 @@ public class CharacterServiceImpl implements CharacterService {
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy người dùng với ID: " + userId));
+
+        // Global characters are created by content staff only; teachers use /teacher/local-contents
+        if (!isStaffOrAdmin(user.getRole() != null ? user.getRole().name() : null)) {
+            throw new InvalidRequestException("Bạn không có quyền tạo nhân vật");
+        }
 
         Character character = Character.builder()
                 .name(request.getName())
@@ -537,12 +523,7 @@ public class CharacterServiceImpl implements CharacterService {
     }
 
     private boolean isStaffOrAdmin(String role) {
-        return role != null && (
-                "CONTENT_ADMIN".equalsIgnoreCase(role)
-                        || "SYSTEM_ADMIN".equalsIgnoreCase(role)
-                        || "STAFF".equalsIgnoreCase(role)
-                        || "ADMIN".equalsIgnoreCase(role) || "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role)
-        );
+        return ContentAccessPolicy.isStaff(role);
     }
 
     private ContentStatus buildStatus(Boolean isPublished, java.time.LocalDateTime deletedAt) {

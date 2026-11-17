@@ -16,6 +16,16 @@ public interface DailyTokenAllowanceService {
     int verifyAndPrepareDailyAllowance(User student);
 
     /**
+     * Resets the user's daily usage and bonus on a new token day and syncs {@code user.token} with what is left
+     * today. Unlike {@link #verifyAndPrepareDailyAllowance(User)} it never throws, so read paths such as
+     * {@code GET /users/me} can call it.
+     *
+     * @param user a teacher or school student
+     * @return effective remaining tokens the user can spend today (0 when the user has no school)
+     */
+    int refreshDailyAllowance(User user);
+
+    /**
      * Deducts consumed AI tokens directly from the school's shared token pool
      * ({@code school.unallocatedTokenQuota}) and increments the student's daily
      * usage counter ({@code student.dailyTokensUsed}).

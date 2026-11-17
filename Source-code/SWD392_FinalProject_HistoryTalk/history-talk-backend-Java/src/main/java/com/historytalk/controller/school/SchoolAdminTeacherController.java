@@ -143,12 +143,12 @@ public class SchoolAdminTeacherController {
         }
         String userId = SecurityUtils.getUserId();
         if (userId == null) {
-            throw new UnauthorizedException("Vui lÃ²ng Ä‘Äƒng nháº­p vá»›i tÃ i khoáº£n Quáº£n trá»‹ viÃªn TrÆ°á»ng");
+            throw new UnauthorizedException("Vui lòng đăng nhập với tài khoản Quản trị viên Trường");
         }
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new UnauthorizedException("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n ngÆ°á»i dÃ¹ng"));
+                .orElseThrow(() -> new UnauthorizedException("Không tìm thấy thông tin tài khoản người dùng"));
         if (user.getSchool() == null) {
-            throw new InvalidRequestException("TÃ i khoáº£n chÆ°a Ä‘Æ°á»£c liÃªn káº¿t vá»›i báº¥t ká»³ trÆ°á»ng há»c nÃ o");
+            throw new InvalidRequestException("Tài khoản chưa được liên kết với bất kỳ trường học nào");
         }
         return user.getSchool().getId();
     }

@@ -213,4 +213,48 @@ class DailyTokenAllowanceServiceImplTest {
         assertEquals(400, teacher.getDailyTokensUsed());
         assertEquals(99_600, activeSchool.getUnallocatedTokenQuota());
     }
+
+    @Test
+    @DisplayName("refreshDailyAllowance: a new day drops yesterday's usage and approved bonus, without throwing")
+    void refreshDailyAllowance_NewDay_DropsYesterdayBonus() {
+        activeStudent.setDailyTokensUsed(554);
+        activeStudent.setDailyBonusTokens(3_100);
+        activeStudent.setToken(3_546);
+        when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
+                .thenReturn(Collections.emptyList());
+
+        int available = dailyTokenAllowanceService.refreshDailyAllowance(activeStudent);
+
+        assertEquals(1_000, available);
+        assertEquals(1_000, activeStudent.getToken());
+        assertEquals(0, activeStudent.getDailyTokensUsed());
+        assertEquals(0, activeStudent.getDailyBonusTokens());
+        assertFalse(TokenDay.isNewDay(activeStudent.getLastTokenResetAt()));
+        verify(userRepository).save(activeStudent);
+    }
+
+    @Test
+    @DisplayName("refreshDailyAllowance: same day keeps today's bonus and usage")
+    void refreshDailyAllowance_SameDay_KeepsBonus() {
+        activeStudent.setDailyTokensUsed(200);
+        activeStudent.setDailyBonusTokens(500);
+        activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
+                .thenReturn(Collections.emptyList());
+
+        assertEquals(1_300, dailyTokenAllowanceService.refreshDailyAllowance(activeStudent));
+        assertEquals(500, activeStudent.getDailyBonusTokens());
+    }
+
+    @Test
+    @DisplayName("TokenDay rolls over at 00:00 Vietnam time, not at UTC midnight")
+    void tokenDay_RollsOverAtVietnamMidnight() {
+        java.time.ZonedDateTime vnMidnight = TokenDay.today().atStartOfDay(TokenDay.ZONE);
+        LocalDateTime justBefore = vnMidnight.minusMinutes(30).withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime();
+        LocalDateTime justAfter = vnMidnight.plusMinutes(30).withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime();
+
+        assertTrue(TokenDay.isNewDay(justBefore));
+        assertFalse(TokenDay.isNewDay(justAfter));
+        assertTrue(TokenDay.isNewDay(null));
+    }
 }

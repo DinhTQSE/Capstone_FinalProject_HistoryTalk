@@ -18,6 +18,11 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
+    /** Row lock on the user, used to serialise per-user writes such as the daily token request. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.uid = :uid")
+    Optional<User> findByIdForUpdate(@Param("uid") UUID uid);
+
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.school WHERE u.uid = :uid")
     Optional<User> findByIdWithSchool(@Param("uid") UUID uid);
 

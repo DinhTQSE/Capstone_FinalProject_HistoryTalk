@@ -30,7 +30,7 @@ public class PaymentController {
 
     /**
      * Creates a PayOS payment link for the given tier.
-     * Requires authentication â€” the user's uid is read from the JWT via
+     * Requires authentication — the user's uid is read from the JWT via
      * SecurityUtils.
      */
     @PostMapping("/checkout")
@@ -85,7 +85,7 @@ public class PaymentController {
 
     /**
      * Lists all active tiers available for purchase.
-     * Public â€” no authentication required.
+     * Public — no authentication required.
      */
     @GetMapping("/tiers")
     public ResponseEntity<ApiResponse<List<TierResponse>>> listTiers() {
@@ -101,7 +101,7 @@ public class PaymentController {
      * must POST them here so the backend can update the order status for the UI
      * without waiting for the async webhook.
      *
-     * Requires authentication â€” the order ownership is validated against the
+     * Requires authentication — the order ownership is validated against the
      * authenticated user's uid so that users cannot update each other's orders.
      *
      * This endpoint does NOT upgrade the user's tier; that remains exclusively

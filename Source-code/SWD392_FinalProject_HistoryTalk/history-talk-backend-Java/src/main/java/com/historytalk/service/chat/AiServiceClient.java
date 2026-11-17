@@ -556,6 +556,15 @@ public class AiServiceClient {
          */
         @Async
         public void processDocumentAsync(String docId, String entityId, String content) {
+                processDocument(docId, entityId, content);
+        }
+
+        /**
+         * Synchronous form of {@link #processDocumentAsync}, used by the retry job.
+         *
+         * @return true when the AI service indexed the document
+         */
+        public boolean processDocument(String docId, String entityId, String content) {
                 ProcessDocumentRequest request = new ProcessDocumentRequest(docId, entityId, content);
                 try {
                         log.info("Calling AI service to process document: {}", docId);
@@ -567,9 +576,11 @@ public class AiServiceClient {
                                         .toBodilessEntity();
                         aiMetricsService.recordRequest("process_document", "success");
                         log.info("Successfully sent document {} for AI processing", docId);
+                        return true;
                 } catch (RestClientException e) {
                         aiMetricsService.recordRequest("process_document", "failure");
                         log.error("AI service /documents/process call failed for doc {}: {}", docId, e.getMessage());
+                        return false;
                 }
         }
 
