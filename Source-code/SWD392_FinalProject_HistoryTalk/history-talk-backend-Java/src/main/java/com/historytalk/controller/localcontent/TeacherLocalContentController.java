@@ -68,7 +68,7 @@ public class TeacherLocalContentController {
 
         LocalContentResponse response = localContentService.createLocalContext(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Local context created successfully"));
+                .body(ApiResponse.success(response, "Tạo bối cảnh địa phương thành công"));
     }
 
     @GetMapping("/contexts")
@@ -86,7 +86,7 @@ public class TeacherLocalContentController {
 
         PaginatedResponse<LocalContentResponse> response =
                 localContentService.getLocalContexts(search, status, page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local contexts retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách bối cảnh địa phương thành công"));
     }
 
     @GetMapping("/contexts/{contextId}")
@@ -96,7 +96,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.getLocalContextById(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local context retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin bối cảnh địa phương thành công"));
     }
 
     @PutMapping("/contexts/{contextId}")
@@ -109,7 +109,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.updateLocalContext(contextId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local context updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật bối cảnh địa phương thành công"));
     }
 
     @DeleteMapping("/contexts/{contextId}")
@@ -119,7 +119,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.deleteLocalContext(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Local context deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa bối cảnh địa phương thành công"));
     }
 
     @PutMapping("/contexts/{contextId}/submit")
@@ -131,7 +131,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.submitLocalContext(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Context published successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Xuất bản bối cảnh thành công"));
     }
 
     @PutMapping("/contexts/{contextId}/status")
@@ -144,7 +144,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.updateLocalContextStatus(contextId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Context status updated to " + request.getStatus()));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã cập nhật trạng thái bối cảnh thành " + request.getStatus()));
     }
 
     // ── Media endpoints — Context ─────────────────────────────────────────────
@@ -166,7 +166,7 @@ public class TeacherLocalContentController {
         UUID contextUuid = UUID.fromString(contextId);
         DocumentMediaMetadataResponse response = mediaService.uploadDirectBinary(
                 contextUuid, EntityType.CONTEXT, file, mediaType, width, height, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(response, "Media uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tải lên media thành công"));
     }
 
     @GetMapping("/contexts/{contextId}/media/view-url")
@@ -182,7 +182,7 @@ public class TeacherLocalContentController {
         UUID contextUuid = UUID.fromString(contextId);
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
                 contextUuid, EntityType.CONTEXT, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo đường dẫn xem thành công"));
     }
 
     @DeleteMapping("/contexts/{contextId}/media")
@@ -212,7 +212,7 @@ public class TeacherLocalContentController {
 
         LocalContentResponse response = localContentService.createLocalCharacter(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Local character created successfully"));
+                .body(ApiResponse.success(response, "Tạo nhân vật địa phương thành công"));
     }
 
     @GetMapping("/characters")
@@ -228,7 +228,7 @@ public class TeacherLocalContentController {
 
         PaginatedResponse<LocalContentResponse> response =
                 localContentService.getLocalCharacters(search, status, page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local characters retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách nhân vật địa phương thành công"));
     }
 
     @GetMapping("/characters/{characterId}")
@@ -238,7 +238,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.getLocalCharacterById(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local character retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin nhân vật địa phương thành công"));
     }
 
     @PutMapping("/characters/{characterId}")
@@ -251,7 +251,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.updateLocalCharacter(characterId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local character updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật nhân vật địa phương thành công"));
     }
 
     @DeleteMapping("/characters/{characterId}")
@@ -261,7 +261,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.deleteLocalCharacter(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Local character deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa nhân vật địa phương thành công"));
     }
 
     @PutMapping("/characters/{characterId}/submit")
@@ -273,7 +273,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.submitLocalCharacter(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Character published successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Xuất bản nhân vật thành công"));
     }
 
     @PutMapping("/characters/{characterId}/status")
@@ -286,7 +286,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.updateLocalCharacterStatus(characterId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Character status updated to " + request.getStatus()));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã cập nhật trạng thái nhân vật thành " + request.getStatus()));
     }
 
     // ── Media endpoints — Character ───────────────────────────────────────────
@@ -307,7 +307,7 @@ public class TeacherLocalContentController {
         UUID characterUuid = UUID.fromString(characterId);
         DocumentMediaMetadataResponse response = mediaService.uploadDirectBinary(
                 characterUuid, EntityType.CHARACTER, file, mediaType, width, height, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(response, "Media uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tải lên media thành công"));
     }
 
     @GetMapping("/characters/{characterId}/media/view-url")
@@ -323,7 +323,7 @@ public class TeacherLocalContentController {
         UUID characterUuid = UUID.fromString(characterId);
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
                 characterUuid, EntityType.CHARACTER, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo đường dẫn xem thành công"));
     }
 
     @DeleteMapping("/characters/{characterId}/media")
@@ -351,7 +351,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var docs = localContentService.getLocalContextDocuments(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+        return ResponseEntity.ok(ApiResponse.success(docs, "Lấy danh sách tài liệu thành công — " + docs.size() + " kết quả"));
     }
 
     @PostMapping("/contexts/{contextId}/documents")
@@ -366,7 +366,7 @@ public class TeacherLocalContentController {
 
         var doc = localContentService.addLocalContextDocument(contextId, request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(doc, "Document added to local context successfully"));
+                .body(ApiResponse.success(doc, "Thêm tài liệu vào bối cảnh địa phương thành công"));
     }
 
     @PostMapping(value = "/contexts/{contextId}/documents/upload-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -381,7 +381,7 @@ public class TeacherLocalContentController {
 
         var doc = localContentService.uploadLocalContextPdfDocument(contextId, file, title, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(doc, "PDF document uploaded to local context successfully"));
+                .body(ApiResponse.success(doc, "Tải tài liệu PDF lên bối cảnh địa phương thành công"));
     }
 
     @DeleteMapping("/contexts/{contextId}/documents/{docId}")
@@ -394,7 +394,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.deleteLocalContextDocument(contextId, docId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Document deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa tài liệu thành công"));
     }
 
     // ── Document endpoints — Character ────────────────────────────────────────
@@ -409,7 +409,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var docs = localContentService.getLocalCharacterDocuments(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(docs, "Documents retrieved — " + docs.size() + " found"));
+        return ResponseEntity.ok(ApiResponse.success(docs, "Lấy danh sách tài liệu thành công — " + docs.size() + " kết quả"));
     }
 
     @PostMapping("/characters/{characterId}/documents")
@@ -423,7 +423,7 @@ public class TeacherLocalContentController {
 
         var doc = localContentService.addLocalCharacterDocument(characterId, request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(doc, "Document added to local character successfully"));
+                .body(ApiResponse.success(doc, "Thêm tài liệu vào nhân vật địa phương thành công"));
     }
 
     @PostMapping(value = "/characters/{characterId}/documents/upload-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -438,7 +438,7 @@ public class TeacherLocalContentController {
 
         var doc = localContentService.uploadLocalCharacterPdfDocument(characterId, file, title, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(doc, "PDF document uploaded to local character successfully"));
+                .body(ApiResponse.success(doc, "Tải tài liệu PDF lên nhân vật địa phương thành công"));
     }
 
     @DeleteMapping("/characters/{characterId}/documents/{docId}")
@@ -451,7 +451,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.deleteLocalCharacterDocument(characterId, docId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Document deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa tài liệu thành công"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -468,7 +468,7 @@ public class TeacherLocalContentController {
         String userId = com.historytalk.utils.SecurityUtils.getUserId();
         String userRole = com.historytalk.utils.SecurityUtils.getRoleName();
         String url = mapImageUploadService.uploadMapImage(file, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Media uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Tải lên media thành công"));
     }
 
     @PostMapping(value = "/media/upload-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -480,7 +480,7 @@ public class TeacherLocalContentController {
             @RequestPart("file") MultipartFile file) {
 
         String url = videoUploadService.uploadVideo(file, SecurityUtils.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Video uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("url", url), "Tải lên video thành công"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -496,7 +496,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var doc = localContentService.updateLocalContextDocument(contextId, docId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(doc, "Document updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(doc, "Cập nhật tài liệu thành công"));
     }
 
     @PutMapping("/characters/{characterId}/documents/{docId}")
@@ -508,7 +508,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var doc = localContentService.updateLocalCharacterDocument(characterId, docId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(doc, "Document updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(doc, "Cập nhật tài liệu thành công"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -523,7 +523,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.linkCharacterToContext(characterId, contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Context linked to character successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Liên kết bối cảnh với nhân vật thành công"));
     }
 
     @DeleteMapping("/characters/{characterId}/contexts/{contextId}")
@@ -534,7 +534,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.unlinkCharacterFromContext(characterId, contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Context unlinked from character successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Hủy liên kết bối cảnh với nhân vật thành công"));
     }
 
     @GetMapping("/characters/{characterId}/contexts")
@@ -544,7 +544,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var list = localContentService.getCharacterContexts(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(list, "Character contexts retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách bối cảnh của nhân vật thành công"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -559,7 +559,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.getTrashedContexts(page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Trashed contexts retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Lấy danh sách bối cảnh trong thùng rác thành công"));
     }
 
     @PatchMapping("/trash/contexts/{contextId}/restore")
@@ -569,7 +569,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.restoreLocalContext(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Local context restored successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Khôi phục bối cảnh địa phương thành công"));
     }
 
     @DeleteMapping("/trash/contexts/{contextId}/permanent")
@@ -579,7 +579,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.permanentDeleteLocalContext(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Local context permanently deleted"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa vĩnh viễn bối cảnh địa phương"));
     }
 
     @GetMapping("/trash/characters")
@@ -590,7 +590,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.getTrashedCharacters(page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Trashed characters retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Lấy danh sách nhân vật trong thùng rác thành công"));
     }
 
     @PatchMapping("/trash/characters/{characterId}/restore")
@@ -600,7 +600,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.restoreLocalCharacter(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Local character restored successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Khôi phục nhân vật địa phương thành công"));
     }
 
     @DeleteMapping("/trash/characters/{characterId}/permanent")
@@ -610,7 +610,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.permanentDeleteLocalCharacter(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Local character permanently deleted"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa vĩnh viễn nhân vật địa phương"));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -626,7 +626,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.getLocalContextQuizzes(contextId, page, size, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Local quizzes retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Lấy danh sách quiz địa phương thành công"));
     }
 
     @PostMapping("/contexts/{contextId}/quizzes")
@@ -638,7 +638,7 @@ public class TeacherLocalContentController {
 
         var res = localContentService.createLocalQuiz(contextId, request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(res, "Local quiz created successfully"));
+                .body(ApiResponse.success(res, "Tạo quiz địa phương thành công"));
     }
 
     @GetMapping("/quizzes/{quizId}")
@@ -648,7 +648,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.getLocalQuizById(quizId, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Local quiz retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Lấy thông tin quiz địa phương thành công"));
     }
 
     @PutMapping("/quizzes/{quizId}")
@@ -659,7 +659,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.updateLocalQuiz(quizId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Local quiz updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Cập nhật quiz địa phương thành công"));
     }
 
     @DeleteMapping("/quizzes/{quizId}")
@@ -669,7 +669,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.deleteLocalQuiz(quizId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Local quiz deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa quiz địa phương thành công"));
     }
 
     @PatchMapping("/quizzes/{quizId}/publish")
@@ -679,7 +679,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         var res = localContentService.togglePublishLocalQuiz(quizId, principal);
-        return ResponseEntity.ok(ApiResponse.success(res, "Quiz publish status updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(res, "Cập nhật trạng thái xuất bản quiz thành công"));
     }
 
     @PostMapping("/quizzes/{quizId}/questions")
@@ -691,7 +691,7 @@ public class TeacherLocalContentController {
 
         var res = localContentService.addLocalQuizQuestion(quizId, request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(res, "Question added successfully"));
+                .body(ApiResponse.success(res, "Thêm câu hỏi thành công"));
     }
 
     @PutMapping("/quizzes/{quizId}/questions/{questionId}")
@@ -703,7 +703,7 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.updateLocalQuizQuestion(quizId, questionId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Question updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Cập nhật câu hỏi thành công"));
     }
 
     @DeleteMapping("/quizzes/{quizId}/questions/{questionId}")
@@ -714,6 +714,6 @@ public class TeacherLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         localContentService.deleteLocalQuizQuestion(quizId, questionId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa câu hỏi thành công"));
     }
 }

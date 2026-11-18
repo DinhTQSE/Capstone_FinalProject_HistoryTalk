@@ -215,7 +215,7 @@ public class DocumentMediaServiceImpl implements MediaService {
         }
         if (isRole(userRole, "TEACHER")
                 && (owned.createdBy() == null || !user.getUid().equals(owned.createdBy().getUid()))) {
-            throw new UnauthorizedException("You can only modify content you created");
+            throw new UnauthorizedException("Bạn chỉ có thể chỉnh sửa nội dung do mình tạo");
         }
     }
 

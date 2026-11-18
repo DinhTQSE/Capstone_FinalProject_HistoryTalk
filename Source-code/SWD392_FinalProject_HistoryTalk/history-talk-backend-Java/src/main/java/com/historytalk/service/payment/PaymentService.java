@@ -38,8 +38,8 @@ import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -60,19 +60,19 @@ public class PaymentService {
     @Transactional
     public CreatePaymentResponse createPayOSCheckout(UUID uid, String tierId) throws Exception {
         User user = userRepository.findById(uid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uid));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + uid));
 
         Tier tier = loadPurchasableTier(tierId);
 
         // Mid-period upgrade: the unused part of the active paid plan is deducted from the price.
         // Downgrades and same-plan purchases are rejected by the calculator.
-        UpgradeQuote quote = resolveQuote(uid, tier, LocalDateTime.now());
+        UpgradeQuote quote = resolveQuote(uid, tier, LocalDateTime.now(ZoneOffset.UTC));
 
         Instant expiredAtInstant = Instant.now().plus(15, ChronoUnit.MINUTES);
         long payosExpiredAt = expiredAtInstant.getEpochSecond();
         LocalDateTime expiredAtDb = LocalDateTime.ofInstant(
                 expiredAtInstant,
-                ZoneId.of("Asia/Ho_Chi_Minh")
+                ZoneOffset.UTC
         );
 
         Long orderCode = generateOrderCode();
@@ -133,7 +133,7 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public UpgradeQuoteResponse getUpgradeQuote(UUID uid, String tierId) {
         Tier tier = loadPurchasableTier(tierId);
-        UpgradeQuote quote = resolveQuote(uid, tier, LocalDateTime.now());
+        UpgradeQuote quote = resolveQuote(uid, tier, LocalDateTime.now(ZoneOffset.UTC));
         UserTier current = quote.replacedSubscription();
 
         return UpgradeQuoteResponse.builder()
@@ -153,14 +153,14 @@ public class PaymentService {
 
     private Tier loadPurchasableTier(String tierId) {
         Tier tier = tierRepository.findById(UUID.fromString(tierId))
-                .orElseThrow(() -> new ResourceNotFoundException("Tier not found: " + tierId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói hội viên: " + tierId));
 
         if (!Boolean.TRUE.equals(tier.getIsActive()) || tier.getDeletedAt() != null) {
-            throw new InvalidRequestException("Tier is inactive or deleted");
+            throw new InvalidRequestException("Gói hội viên đã ngừng hoạt động hoặc đã bị xóa");
         }
 
         if (tier.getAmount() == null || tier.getAmount() <= 0) {
-            throw new InvalidRequestException("Free tier does not require payment");
+            throw new InvalidRequestException("Gói miễn phí không cần thanh toán");
         }
         return tier;
     }
@@ -252,10 +252,10 @@ public class PaymentService {
     public PayOSReturnResponse handlePayOSReturn(UUID uid, PayOSReturnRequest request) {
         PaymentOrder order = paymentOrderRepository.findByOrderCode(request.getOrderCode())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Payment order not found: " + request.getOrderCode()));
+                        "Không tìm thấy đơn thanh toán: " + request.getOrderCode()));
 
         if (!order.getUser().getUid().equals(uid)) {
-            throw new InvalidRequestException("Payment order does not belong to this user");
+            throw new InvalidRequestException("Đơn thanh toán không thuộc về người dùng này");
         }
 
         PaymentOrderStatus current = order.getStatus();
@@ -281,7 +281,7 @@ public class PaymentService {
             return PayOSReturnResponse.builder()
                     .orderCode(order.getOrderCode())
                     .resolvedStatus(current.name())
-                    .message("Payment is being verified. Please wait for confirmation.")
+                    .message("Thanh toán đang được xác minh. Vui lòng chờ xác nhận.")
                     .build();
         }
 
@@ -310,11 +310,11 @@ public class PaymentService {
 
     private PayOSReturnResponse buildResponse(Long orderCode, PaymentOrderStatus status) {
         String message = switch (status) {
-            case CANCELLED -> "Payment has been cancelled.";
-            case PAID -> "Payment has already been confirmed.";
-            case EXPIRED -> "Payment link has expired. Please create a new order.";
-            case FAILED -> "Payment failed. Please try again.";
-            default -> "Payment is pending. Please wait for confirmation.";
+            case CANCELLED -> "Thanh toán đã bị hủy.";
+            case PAID -> "Thanh toán đã được xác nhận.";
+            case EXPIRED -> "Liên kết thanh toán đã hết hạn. Vui lòng tạo đơn hàng mới.";
+            case FAILED -> "Thanh toán thất bại. Vui lòng thử lại.";
+            default -> "Thanh toán đang chờ xử lý. Vui lòng chờ xác nhận.";
         };
         return PayOSReturnResponse.builder()
                 .orderCode(orderCode)
@@ -359,7 +359,7 @@ public class PaymentService {
         long payosExpiredAt = expiredAtInstant.getEpochSecond();
         LocalDateTime expiredAtDb = LocalDateTime.ofInstant(
                 expiredAtInstant,
-                ZoneId.of("Asia/Ho_Chi_Minh")
+                ZoneOffset.UTC
         );
 
         Long orderCode = generateOrderCode();

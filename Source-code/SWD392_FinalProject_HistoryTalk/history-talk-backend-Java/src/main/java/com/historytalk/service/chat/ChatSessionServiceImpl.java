@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -182,7 +183,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .chatSession(saved)
                 .build();
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         transactionTemplate.executeWithoutResult(status -> {
             messageRepository.save(greetingMsg);
             chatSessionRepository.findById(saved.getSessionId()).ifPresent(session -> session.setLastMessageAt(now));
@@ -197,7 +198,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 request.getCharacterId());
 
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         if (user.getRole() == com.historytalk.entity.enums.UserRole.CUSTOMER && (user.getToken() == null || user.getToken() <= 0)) {
             throw new InvalidRequestException("Bạn đã hết token. Vui lòng nạp thêm để tiếp tục chat.");
@@ -282,11 +283,11 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         ChatSession session;
         if (isStaffOrAdmin(userRole)) {
             session = chatSessionRepository.findById(UUID.fromString(sessionId))
-                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên trò chuyện với ID: " + sessionId));
         } else {
             session = chatSessionRepository
                     .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
-                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên trò chuyện với ID: " + sessionId));
         }
 
         chatSessionRepository.delete(session);
@@ -300,14 +301,14 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         ChatSession session;
         if (isStaffOrAdmin(userRole)) {
             session = chatSessionRepository.findById(UUID.fromString(sessionId))
-                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên trò chuyện với ID: " + sessionId));
         } else {
             session = chatSessionRepository
                     .findBySessionIdAndUserUid(UUID.fromString(sessionId), UUID.fromString(userId))
-                    .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên trò chuyện với ID: " + sessionId));
         }
 
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
         session.setDeletedAt(now);
         chatSessionRepository.save(session);
 
@@ -363,7 +364,7 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 : DEFAULT_EXAM_QUESTION_COUNT;
         if (user != null && user.getRole() == UserRole.CUSTOMER && userTierRepository != null) {
             boolean hasPaidTier = userTierRepository
-                    .findCurrentActiveByUid(user.getUid(), LocalDateTime.now())
+                    .findCurrentActiveByUid(user.getUid(), LocalDateTime.now(ZoneOffset.UTC))
                     .map(ut -> ut.getTier() != null && ut.getTier().getAmount() != null && ut.getTier().getAmount() > 0)
                     .orElse(false);
             if (!hasPaidTier) {

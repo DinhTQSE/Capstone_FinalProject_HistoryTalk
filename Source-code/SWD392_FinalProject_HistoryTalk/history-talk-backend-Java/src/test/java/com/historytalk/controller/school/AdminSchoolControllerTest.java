@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -66,7 +67,7 @@ class AdminSchoolControllerTest {
                 .schoolId(schoolId)
                 .schoolName("THPT Lê Hồng Phong")
                 .active(true)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         PaginatedResponse<SchoolAdminResponse> paginatedResponse = PaginatedResponse.<SchoolAdminResponse>builder()
@@ -174,7 +175,7 @@ class AdminSchoolControllerTest {
         mockMvc.perform(delete("/api/v1/admin/school-admins/{id}", adminId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("School Admin account deleted successfully"));
+                .andExpect(jsonPath("$.message").value("Xóa tài khoản quản trị trường thành công"));
 
         verify(schoolManagementService).deleteSchoolAdmin(adminId);
     }

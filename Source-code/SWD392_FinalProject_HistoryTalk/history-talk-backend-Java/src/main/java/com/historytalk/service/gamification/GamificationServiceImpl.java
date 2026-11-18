@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
@@ -76,7 +77,7 @@ public class GamificationServiceImpl implements GamificationService {
     @Transactional(readOnly = true)
     public TodayGamificationResponse getTodayState(String userId) {
         UUID userUid = UUID.fromString(userId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         Optional<DailyCheckIn> todayCheckIn = checkInRepository.findByUserUidAndDate(userUid, today);
         Optional<DailyCheckIn> lastCheckIn = checkInRepository.findFirstByUserUidOrderByDateDesc(userUid);
@@ -130,10 +131,10 @@ public class GamificationServiceImpl implements GamificationService {
     @Transactional
     public ClaimQuestResponse claimQuestReward(String userId, String questId) {
         UUID userUid = UUID.fromString(userId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         User user = userRepository.findById(userUid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         DailyQuest quest = questRepository.findById(questId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhiệm vụ: " + questId));
@@ -169,10 +170,10 @@ public class GamificationServiceImpl implements GamificationService {
     @Transactional
     public DailyCheckInResponse dailyCheckIn(String userId) {
         UUID userUid = UUID.fromString(userId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         User user = userRepository.findById(userUid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         Optional<DailyCheckIn> todayCheckInOpt = checkInRepository.findByUserUidAndDate(userUid, today);
         int currentToken = user.getToken() != null ? user.getToken() : 0;
@@ -222,7 +223,7 @@ public class GamificationServiceImpl implements GamificationService {
     public void recordProgress(String userId, QuestType questType) {
         try {
             UUID userUid = UUID.fromString(userId);
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
             User user = userRepository.findById(userUid).orElse(null);
             if (user == null) return;

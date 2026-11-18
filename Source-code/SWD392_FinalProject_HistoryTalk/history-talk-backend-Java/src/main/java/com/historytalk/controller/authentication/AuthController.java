@@ -59,7 +59,7 @@ public class AuthController {
         log.info("POST /api/v1/auth/register - email: {}", request.getEmail());
         RegisterResponse data = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(data, "User registered successfully"));
+                .body(ApiResponse.success(data, "Đăng ký tài khoản thành công"));
     }
 
     @PostMapping("/verify-email")
@@ -69,7 +69,7 @@ public class AuthController {
 
         log.info("POST /api/v1/auth/verify-email");
         authService.verifyEmail(request.getToken());
-        return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xác thực email thành công"));
     }
 
     @PostMapping("/resend-verification")
@@ -79,7 +79,7 @@ public class AuthController {
 
         log.info("POST /api/v1/auth/resend-verification");
         authService.resendVerificationEmail(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success(null, "If the account exists and is not verified, a verification email has been sent"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Nếu tài khoản tồn tại và chưa được xác thực, email xác thực đã được gửi"));
     }
 
     @PostMapping("/register-content-admin")
@@ -92,7 +92,7 @@ public class AuthController {
 
         log.info("POST /api/v1/auth/register-content-admin - email: {}", request.getEmail());
         RegisterStaffResponse data = authService.registerStaff(request);
-        return ResponseEntity.ok(ApiResponse.success(data, "Staff account registered successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Tạo tài khoản nhân sự thành công"));
     }
 
     @PostMapping("/login")
@@ -105,7 +105,7 @@ public class AuthController {
         String ip = HttpRequestUtils.getClientIpAddress(servletRequest);
         String device = HttpRequestUtils.getDeviceInfo(servletRequest);
         LoginResponse data = authService.login(request, ip, device);
-        return ResponseEntity.ok(ApiResponse.success(data, "Login successful"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Đăng nhập thành công"));
     }
 
     @PostMapping("/google")
@@ -115,7 +115,7 @@ public class AuthController {
         String idToken = requestBody.get("idToken");
         log.info("POST /api/v1/auth/google");
         LoginResponse data = googleOAuthService.authenticateGoogleIdToken(idToken);
-        return ResponseEntity.ok(ApiResponse.success(data, "Google login successful"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Đăng nhập bằng Google thành công"));
     }
 
     @PostMapping("/forgot-password")
@@ -125,7 +125,7 @@ public class AuthController {
 
         log.info("POST /api/v1/auth/forgot-password");
         authService.forgotPassword(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success(null, "If the email exists, a password reset link has been sent"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Nếu email tồn tại, liên kết đặt lại mật khẩu đã được gửi"));
     }
 
     @PostMapping("/reset-password")
@@ -135,7 +135,7 @@ public class AuthController {
 
         log.info("POST /api/v1/auth/reset-password");
         authService.resetPassword(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
-        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công"));
     }
 
     @PostMapping("/reset-password/{token}")
@@ -147,21 +147,21 @@ public class AuthController {
         log.info("POST /api/v1/auth/reset-password/{}", token);
         String password = requestBody.getOrDefault("password", requestBody.get("newPassword"));
         authService.resetPassword(token, password, password);
-        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công"));
     }
 
     @PostMapping("/google/login-url")
     @Operation(summary = "Get Google login URL", description = "Returns backend Google OAuth2 authorization URL.")
     public ResponseEntity<ApiResponse<Map<String, String>>> googleLoginUrl() {
         Map<String, String> data = Map.of("url", "/Historical-tell/oauth2/authorization/google");
-        return ResponseEntity.ok(ApiResponse.success(data, "Google login URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Tạo đường dẫn đăng nhập Google thành công"));
     }
 
     @GetMapping("/google/backend-test/success")
     @Operation(summary = "Backend-only Google OAuth success callback", description = "Local test endpoint for OAuth redirects before frontend integration.")
     public ResponseEntity<ApiResponse<Map<String, String>>> googleBackendTestSuccess(
             @RequestParam Map<String, String> queryParams) {
-        return ResponseEntity.ok(ApiResponse.success(queryParams, "Google OAuth backend test successful"));
+        return ResponseEntity.ok(ApiResponse.success(queryParams, "Kiểm tra Google OAuth phía backend thành công"));
     }
 
     @GetMapping("/google/backend-test/failure")
@@ -169,7 +169,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Map<String, String>>> googleBackendTestFailure(
             @RequestParam Map<String, String> queryParams) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Google OAuth backend test failed", queryParams.getOrDefault("error", "GOOGLE_OAUTH_FAILED")));
+                .body(ApiResponse.error("Kiểm tra Google OAuth phía backend thất bại", queryParams.getOrDefault("error", "GOOGLE_OAUTH_FAILED")));
     }
 
     @PostMapping("/refresh-token")
@@ -182,7 +182,7 @@ public class AuthController {
         String ip = HttpRequestUtils.getClientIpAddress(servletRequest);
         String device = HttpRequestUtils.getDeviceInfo(servletRequest);
         RefreshTokenResponse data = authService.refreshToken(request.getRefreshToken(), ip, device);
-        return ResponseEntity.ok(ApiResponse.success(data, "Token refreshed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Làm mới token thành công"));
     }
 
     @PostMapping("/logout")
@@ -193,8 +193,8 @@ public class AuthController {
         log.info("POST /api/v1/auth/logout");
         String refreshToken = body != null ? body.getRefreshToken() : null;
         authService.logout(request.getHeader("Authorization"), refreshToken);
-        LogoutResponse data = LogoutResponse.builder().message("Logout successful").build();
-        return ResponseEntity.ok(ApiResponse.success(data, "Logout successful"));
+        LogoutResponse data = LogoutResponse.builder().message("Đăng xuất thành công").build();
+        return ResponseEntity.ok(ApiResponse.success(data, "Đăng xuất thành công"));
     }
 
     @PostMapping("/logout-all")
@@ -205,8 +205,8 @@ public class AuthController {
         String userId = SecurityUtils.getUserId();
         log.info("POST /api/v1/auth/logout-all - user: {}", userId);
         authService.logoutAll(userId);
-        LogoutResponse data = LogoutResponse.builder().message("All sessions revoked successfully").build();
-        return ResponseEntity.ok(ApiResponse.success(data, "All sessions revoked successfully"));
+        LogoutResponse data = LogoutResponse.builder().message("Đã thu hồi tất cả phiên đăng nhập").build();
+        return ResponseEntity.ok(ApiResponse.success(data, "Đã thu hồi tất cả phiên đăng nhập"));
     }
 
     @PatchMapping("/users/{userId}/deactivate")
@@ -218,7 +218,7 @@ public class AuthController {
         log.info("PATCH /api/v1/auth/users/{}/deactivate", userId);
         String staffId = SecurityUtils.getUserId();
         authService.softDeleteUser(userId, staffId);
-        return ResponseEntity.ok(ApiResponse.success(null, "User account deactivated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Vô hiệu hóa tài khoản người dùng thành công"));
     }
 
     @PatchMapping("/me/deactivate")
@@ -229,6 +229,6 @@ public class AuthController {
         String userId = SecurityUtils.getUserId();
         log.info("PATCH /api/v1/auth/me/deactivate - user {}", userId);
         authService.softDeleteUser(userId, userId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Account deactivated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Vô hiệu hóa tài khoản thành công"));
     }
 }

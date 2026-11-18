@@ -72,7 +72,7 @@ public class CharacterMediaController {
         DocumentMediaMetadataResponse response = mediaService.uploadDirectBinary(
                 characterUuid, EntityType.CHARACTER, file, mediaType, width, height, userId, userRole);
         
-        return ResponseEntity.ok(ApiResponse.success(response, "Media uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tải lên media thành công"));
     }
 
     @GetMapping("/view-url")
@@ -95,7 +95,7 @@ public class CharacterMediaController {
         SignedViewUrlResponse response = mediaService.generateSignedViewUrl(
                 characterUuid, EntityType.CHARACTER, mediaType, thumbnailWidth, thumbnailHeight, userId, userRole);
         
-        return ResponseEntity.ok(ApiResponse.success(response, "View URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo đường dẫn xem thành công"));
     }
 
     @DeleteMapping
@@ -132,7 +132,7 @@ public class CharacterMediaController {
 
         JsonNode settings = portraitSettingsService.getPortraitSettings(characterId, SecurityUtils.getRoleName());
 
-        return ResponseEntity.ok(ApiResponse.success(settings, "Portrait settings retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(settings, "Lấy cấu hình chân dung thành công"));
     }
 
     @PutMapping(value = "/portrait-settings", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -160,7 +160,7 @@ public class CharacterMediaController {
 
         JsonNode saved = portraitSettingsService.savePortraitSettings(characterId, body, userId, userRole);
 
-        return ResponseEntity.ok(ApiResponse.success(saved, "Portrait settings saved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(saved, "Lưu cấu hình chân dung thành công"));
     }
 
     private static final String PORTRAIT_SETTINGS_EXAMPLE = """

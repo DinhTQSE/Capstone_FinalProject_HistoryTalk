@@ -42,7 +42,7 @@ public class UserController {
         log.info("GET /api/v1/users/me - user {}", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.getMyProfile(userId),
-                "User profile retrieved successfully"
+                "Lấy hồ sơ người dùng thành công"
         ));
     }
 
@@ -54,7 +54,7 @@ public class UserController {
         log.info("GET /api/v1/users/me/dashboard - user {}", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.getUserDashboard(userId),
-                "User dashboard retrieved successfully"
+                "Lấy dashboard người dùng thành công"
         ));
     }
 
@@ -65,7 +65,7 @@ public class UserController {
         String userId = SecurityUtils.getUserId();
         log.info("POST /api/v1/users/me/daily-check-in - user {}", userId);
         com.historytalk.dto.gamification.DailyCheckInResponse data = gamificationService.dailyCheckIn(userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Daily check-in successful"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Điểm danh hằng ngày thành công"));
     }
 
     @PatchMapping("/me")
@@ -77,7 +77,7 @@ public class UserController {
         log.info("PATCH /api/v1/users/me - user {}", userId);
         return ResponseEntity.ok(ApiResponse.success(
                 userService.updateMyProfile(userId, request),
-                "User profile updated successfully"
+                "Cập nhật hồ sơ người dùng thành công"
         ));
     }
 
@@ -89,6 +89,6 @@ public class UserController {
         String userId = SecurityUtils.getUserId();
         log.info("PATCH /api/v1/users/me/password - user {}", userId);
         userService.changeMyPassword(userId, request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Password changed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
     }
 }

@@ -63,7 +63,7 @@ public class MapPinController {
 
         List<MapPinResponse> data = mapPinService.getPins(contextId, year, callerId, role);
 
-        return ResponseEntity.ok(ApiResponse.success(data, "Map pins retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy danh sách map pin thành công"));
     }
 
     /**
@@ -93,7 +93,7 @@ public class MapPinController {
         MapPinResponse data = mapPinService.createPin(contextId, request, callerId, role);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                             .body(ApiResponse.success(data, "Map pin created successfully"));
+                             .body(ApiResponse.success(data, "Tạo map pin thành công"));
     }
 
     /**
@@ -129,7 +129,7 @@ public class MapPinController {
 
         MapPinResponse data = mapPinService.updatePin(contextId, pinId, request, callerId, role);
 
-        return ResponseEntity.ok(ApiResponse.success(data, "Map pin updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Cập nhật map pin thành công"));
     }
 
     /**

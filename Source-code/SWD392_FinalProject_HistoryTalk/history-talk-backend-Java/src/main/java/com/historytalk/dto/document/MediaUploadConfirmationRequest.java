@@ -11,13 +11,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MediaUploadConfirmationRequest {
-    @NotBlank(message = "Upload ID is required")
+    @NotBlank(message = "Upload ID không được để trống")
     private String uploadId;
 
-    @NotBlank(message = "Storage path is required")
+    @NotBlank(message = "Đường dẫn lưu trữ không được để trống")
     private String storagePath;
 
-    @NotBlank(message = "Content type is required")
+    @NotBlank(message = "Loại nội dung (content type) không được để trống")
     private String contentType;
 
     private Integer width;

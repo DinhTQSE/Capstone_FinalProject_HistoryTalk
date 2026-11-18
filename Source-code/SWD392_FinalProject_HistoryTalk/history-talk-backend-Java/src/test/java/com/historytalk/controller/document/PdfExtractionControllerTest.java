@@ -104,7 +104,7 @@ class PdfExtractionControllerTest {
                 .build();
 
         when(pdfExtractionRateLimiter.acquire(eq(staffId), eq(true))).thenReturn("lock-token-01");
-        when(pdfExtractionService.extractText(any(), eq(1), eq(3), eq(true), isNull())).thenReturn(extracted);
+        when(pdfExtractionService.extractText(any(), eq(1), eq(3), eq(true), eq(false), isNull(), isNull())).thenReturn(extracted);
 
         mockMvc.perform(multipart("/api/v1/documents/pdf/extract")
                         .file(file)

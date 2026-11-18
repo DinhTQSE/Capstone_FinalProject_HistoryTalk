@@ -13,8 +13,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TopUpSchoolTokensRequest {
 
-    @NotNull(message = "Additional tokens must not be null")
-    @Min(value = 1000, message = "Top-up amount must be at least 1,000 tokens")
+    @NotNull(message = "Số token nạp thêm không được để trống")
+    @Min(value = 1000, message = "Số token nạp thêm tối thiểu là 1.000")
     private Integer additionalTokens;
 
     private String note;

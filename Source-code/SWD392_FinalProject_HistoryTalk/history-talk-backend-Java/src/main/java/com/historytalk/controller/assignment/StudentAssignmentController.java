@@ -41,7 +41,7 @@ public class StudentAssignmentController {
             @AuthenticationPrincipal UserPrincipal principal) {
         PaginatedResponse<StudentAssignmentResponse> response = studentAssignmentService.getMyAssignments(
                 classroomId, status, pageable, principal);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Assignments retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách bài tập thành công"));
     }
 
     @GetMapping("/{assignmentId}")
@@ -51,7 +51,7 @@ public class StudentAssignmentController {
             @PathVariable UUID assignmentId,
             @AuthenticationPrincipal UserPrincipal principal) {
         StudentAssignmentResponse response = studentAssignmentService.getAssignmentDetail(assignmentId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Assignment detail retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy chi tiết bài tập thành công"));
     }
 
     @PostMapping("/{assignmentId}/start")
@@ -61,7 +61,7 @@ public class StudentAssignmentController {
             @PathVariable UUID assignmentId,
             @AuthenticationPrincipal UserPrincipal principal) {
         StudentSubmissionResponse response = studentAssignmentService.startAssignment(assignmentId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Assignment started successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Bắt đầu làm bài tập thành công"));
     }
 
     @PostMapping("/{assignmentId}/submit")
@@ -72,6 +72,6 @@ public class StudentAssignmentController {
             @RequestBody(required = false) SubmitAssignmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         StudentSubmissionResponse response = studentAssignmentService.submitAssignment(assignmentId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Assignment submitted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Nộp bài tập thành công"));
     }
 }

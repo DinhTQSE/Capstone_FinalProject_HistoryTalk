@@ -40,6 +40,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -202,7 +203,7 @@ class QuizServiceImplImportTest {
 
     @Test
     void softDeletedContextIsRejected() {
-        context.setDeletedAt(LocalDateTime.now());
+        context.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         assertThatThrownBy(() -> importCsv(HEADER + row("EASY", "", "Câu 1", "A,B,C,D", "0")))
                 .isInstanceOf(ResourceNotFoundException.class);

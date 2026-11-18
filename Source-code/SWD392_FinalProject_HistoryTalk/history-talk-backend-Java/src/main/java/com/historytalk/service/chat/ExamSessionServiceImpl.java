@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -111,7 +112,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                     .examExpectedAnswer(first.expectedAnswer())
                     .examSource(first.sourceExcerpt())
                     .build());
-            session.setLastMessageAt(LocalDateTime.now());
+            session.setLastMessageAt(LocalDateTime.now(ZoneOffset.UTC));
             return saved;
         });
     }
@@ -271,7 +272,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
             assistantMessage.setChatSession(session);
             messageRepository.save(assistantMessage);
 
-            session.setLastMessageAt(LocalDateTime.now());
+            session.setLastMessageAt(LocalDateTime.now(ZoneOffset.UTC));
             return chatTokenCharger.charge(session.getUser(), totalTokens);
         });
 
@@ -357,7 +358,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
 
     private ChatSession loadSession(UUID sessionId) {
         return chatSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found with ID: " + sessionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên trò chuyện với ID: " + sessionId));
     }
 
     private ExamProgressResponse computeProgress(int total, List<Message> messages) {

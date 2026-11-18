@@ -175,7 +175,7 @@ class TeacherManagementServiceImplTest {
 
         assertThatThrownBy(() -> teacherManagementService.updateTeacher(teacherId, otherSchoolId, request))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Teacher does not belong to your school");
+                .hasMessageContaining("Giáo viên không thuộc trường của bạn");
     }
 
     @Test

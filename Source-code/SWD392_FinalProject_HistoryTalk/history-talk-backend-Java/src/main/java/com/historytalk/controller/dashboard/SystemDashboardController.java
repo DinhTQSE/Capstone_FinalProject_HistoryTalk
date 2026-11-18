@@ -45,7 +45,7 @@ public class SystemDashboardController {
         log.info("GET /api/v1/system-admin/dashboard/overview - scope: {}", scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getOverview(scope),
-                "Dashboard overview retrieved successfully"
+                "Lấy tổng quan dashboard thành công"
         ));
     }
 
@@ -60,7 +60,7 @@ public class SystemDashboardController {
                 from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getUserAnalytics(from, to, granularity, scope),
-                "User analytics retrieved successfully"
+                "Lấy thống kê người dùng thành công"
         ));
     }
 
@@ -71,7 +71,7 @@ public class SystemDashboardController {
         log.info("GET /api/v1/system-admin/dashboard/content - scope: {}", scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getContentSummary(scope),
-                "Content summary retrieved successfully"
+                "Lấy tổng hợp nội dung thành công"
         ));
     }
 
@@ -86,7 +86,7 @@ public class SystemDashboardController {
                 from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getChatActivity(from, to, granularity, scope),
-                "Chat activity retrieved successfully"
+                "Lấy thống kê hoạt động trò chuyện thành công"
         ));
     }
 
@@ -96,7 +96,7 @@ public class SystemDashboardController {
         log.info("GET /api/v1/system-admin/dashboard/system-health");
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getSystemHealth(),
-                "System health retrieved successfully"
+                "Lấy tình trạng hệ thống thành công"
         ));
     }
 
@@ -111,7 +111,7 @@ public class SystemDashboardController {
                 from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getRevenue(from, to, granularity, scope),
-                "Revenue analytics retrieved successfully"
+                "Lấy thống kê doanh thu thành công"
         ));
     }
 
@@ -126,7 +126,7 @@ public class SystemDashboardController {
                 from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getPayments(from, to, granularity, scope),
-                "Payment analytics retrieved successfully"
+                "Lấy thống kê thanh toán thành công"
         ));
     }
 
@@ -140,7 +140,7 @@ public class SystemDashboardController {
                 from, to, granularity);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getTiers(from, to, granularity),
-                "Tier analytics retrieved successfully"
+                "Lấy thống kê gói hội viên thành công"
         ));
     }
 
@@ -155,7 +155,7 @@ public class SystemDashboardController {
                 from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getQuiz(from, to, granularity, scope),
-                "Quiz analytics retrieved successfully"
+                "Lấy thống kê quiz thành công"
         ));
     }
 
@@ -170,7 +170,7 @@ public class SystemDashboardController {
                 from, to, granularity, scope);
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.getTokens(from, to, granularity, scope),
-                "Token usage analytics retrieved successfully"
+                "Lấy thống kê sử dụng token thành công"
         ));
     }
 
@@ -179,6 +179,6 @@ public class SystemDashboardController {
     public ResponseEntity<ApiResponse<Void>> testNotification(
             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody com.historytalk.dto.dashboard.TestNotificationRequest request) {
         log.info("POST /api/v1/system-admin/dashboard/test-notification - type: {}", request.getType());
-        return ResponseEntity.ok(ApiResponse.success(null, "Test notification sent"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã gửi thông báo thử nghiệm"));
     }
 }

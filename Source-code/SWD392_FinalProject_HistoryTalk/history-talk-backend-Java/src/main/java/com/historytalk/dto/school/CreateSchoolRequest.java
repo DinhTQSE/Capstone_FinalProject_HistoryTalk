@@ -18,27 +18,27 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class CreateSchoolRequest {
 
-    @NotBlank(message = "School name must not be blank")
-    @Size(max = 255, message = "School name must not exceed 255 characters")
+    @NotBlank(message = "Tên trường không được để trống")
+    @Size(max = 255, message = "Tên trường không được vượt quá 255 ký tự")
     private String name;
 
-    @Size(max = 50, message = "School code must not exceed 50 characters")
+    @Size(max = 50, message = "Mã trường không được vượt quá 50 ký tự")
     private String schoolCode;
 
-    @Size(max = 500, message = "Address must not exceed 500 characters")
+    @Size(max = 500, message = "Địa chỉ không được vượt quá 500 ký tự")
     private String address;
 
-    @NotBlank(message = "Contact email must not be blank")
-    @Email(message = "Contact email is invalid")
+    @NotBlank(message = "Email liên hệ không được để trống")
+    @Email(message = "Email liên hệ không hợp lệ")
     private String contactEmail;
 
-    @Size(max = 20, message = "Contact phone must not exceed 20 characters")
+    @Size(max = 20, message = "Số điện thoại liên hệ không được vượt quá 20 ký tự")
     private String contactPhone;
 
-    @NotNull(message = "Package type must not be null")
+    @NotNull(message = "Loại gói không được để trống")
     private EnterprisePackage packageType;
 
-    @NotNull(message = "Local history policy acceptance is required")
+    @NotNull(message = "Bắt buộc đồng ý với chính sách nội dung lịch sử địa phương")
     private Boolean localHistoryPolicyAccepted;
 
     private LocalDate subscriptionStartDate;

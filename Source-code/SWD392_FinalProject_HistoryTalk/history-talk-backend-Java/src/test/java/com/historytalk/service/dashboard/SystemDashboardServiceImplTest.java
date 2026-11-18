@@ -41,6 +41,7 @@ import org.springframework.boot.actuate.health.HealthEndpoint;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 
@@ -136,9 +137,9 @@ class SystemDashboardServiceImplTest {
         when(messageRepository.countMessagesByPeriod(any(), any(), eq("day"))).thenReturn(Collections.emptyList());
         when(chatSessionRepository.countActiveSince(any())).thenReturn(3L);
 
-        LocalDateTime before = LocalDateTime.now();
+        LocalDateTime before = LocalDateTime.now(ZoneOffset.UTC);
         DashboardChatActivityResponse response = service.getChatActivity(today, today, "day", "ALL");
-        LocalDateTime after = LocalDateTime.now();
+        LocalDateTime after = LocalDateTime.now(ZoneOffset.UTC);
 
         ArgumentCaptor<LocalDateTime> cutoffCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(chatSessionRepository).countActiveSince(cutoffCaptor.capture());

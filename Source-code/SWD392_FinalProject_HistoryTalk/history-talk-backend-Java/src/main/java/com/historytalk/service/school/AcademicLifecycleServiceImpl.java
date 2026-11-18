@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -57,7 +58,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         School school = schoolRepository.findById(schoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId));
 
-        LocalDate refDate = request.getReferenceDate() != null ? request.getReferenceDate() : LocalDate.now();
+        LocalDate refDate = request.getReferenceDate() != null ? request.getReferenceDate() : LocalDate.now(ZoneOffset.UTC);
         LocalDate subEnd = school.getSubscriptionEndDate();
         boolean isEligible;
         if (subEnd != null) {
@@ -146,7 +147,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
             throw new InvalidRequestException("Trường học chưa đăng ký gia hạn gói cho năm học mới.");
         }
 
-        LocalDate refDate = referenceDate != null ? referenceDate : LocalDate.now();
+        LocalDate refDate = referenceDate != null ? referenceDate : LocalDate.now(ZoneOffset.UTC);
         LocalDate subEnd = school.getSubscriptionEndDate();
         boolean canActivate = (subEnd != null && !refDate.isBefore(subEnd)) || refDate.getMonthValue() >= 9;
         if (!canActivate) {
@@ -416,7 +417,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
         student.setDailyBonusTokens(0);
         student.setAccountStatus(AccountStatus.DEACTIVATED);
         student.setDeactivatedReason(reason);
-        student.setDeletedAt(LocalDateTime.now());
+        student.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         List<ClassStudent> activeEnrollments = classStudentRepository.findByStudentUidAndStatus(student.getUid(), "ACTIVE");
         for (ClassStudent cs : activeEnrollments) {
@@ -471,7 +472,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
                 .maxTeachers(school.getMaxTeachers())
                 .localHistoryPolicyAccepted(school.getLocalHistoryPolicyAccepted())
                 .status(school.getStatus())
-                .createdAt(school.getCreatedAt() != null ? school.getCreatedAt() : LocalDateTime.now())
+                .createdAt(school.getCreatedAt() != null ? school.getCreatedAt() : LocalDateTime.now(ZoneOffset.UTC))
                 .build();
     }
 }

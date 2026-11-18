@@ -61,7 +61,7 @@ public class DirectBinaryUploadStrategy implements MediaUploadStrategy {
 
         if (file.getSize() > maxSize) {
             throw new IllegalArgumentException(
-                    "File size " + file.getSize() + " bytes exceeds maximum " + maxSize + " bytes for " + mediaType);
+                    "Kích thước tệp " + file.getSize() + " byte vượt quá giới hạn " + maxSize + " byte cho loại " + mediaType);
         }
 
         String uploadId = UUID.randomUUID().toString();

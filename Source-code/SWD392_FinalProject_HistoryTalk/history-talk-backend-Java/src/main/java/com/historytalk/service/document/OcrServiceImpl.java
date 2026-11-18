@@ -119,17 +119,17 @@ public class OcrServiceImpl implements OcrService {
             }
 
             if (absoluteDatapath == null) {
-                throw new IOException("Cannot resolve tessdata directory for language: " + effectiveLang);
+                throw new IOException("Không xác định được thư mục tessdata cho ngôn ngữ: " + effectiveLang);
             }
 
             File tessDataDir = new File(absoluteDatapath);
             if (!tessDataDir.exists() || !tessDataDir.isDirectory()) {
-                throw new IOException("Tessdata directory does not exist: " + absoluteDatapath);
+                throw new IOException("Thư mục tessdata không tồn tại: " + absoluteDatapath);
             }
 
             File languageDataFile = new File(tessDataDir, languageFile);
             if (!languageDataFile.exists()) {
-                throw new IOException("Language data file not found: " + languageFile + " in directory: " + absoluteDatapath);
+                throw new IOException("Không tìm thấy tệp dữ liệu ngôn ngữ: " + languageFile + " trong thư mục: " + absoluteDatapath);
             }
 
             log.info("Tesseract configured with datapath: {}, language: {}", absoluteDatapath, effectiveLang);
@@ -150,7 +150,7 @@ public class OcrServiceImpl implements OcrService {
     @Override
     public String extractTextFromImage(File imageFile) throws IOException {
         if (imageFile == null || !imageFile.exists()) {
-            throw new IOException("Image file does not exist");
+            throw new IOException("Tệp ảnh không tồn tại");
         }
 
         try {
@@ -161,7 +161,7 @@ public class OcrServiceImpl implements OcrService {
             return text;
         } catch (TesseractException e) {
             log.error("OCR failed for image: {}", imageFile.getName(), e);
-            throw new IOException("OCR processing failed: " + e.getMessage(), e);
+            throw new IOException("Xử lý OCR thất bại: " + e.getMessage(), e);
         }
     }
 
@@ -185,7 +185,7 @@ public class OcrServiceImpl implements OcrService {
             BiConsumer<Integer, Integer> onProgress,
             BooleanSupplier isCancelled) throws IOException {
         if (pdfFile == null || !pdfFile.exists()) {
-            throw new IOException("PDF file does not exist");
+            throw new IOException("Tệp PDF không tồn tại");
         }
 
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
@@ -327,7 +327,7 @@ public class OcrServiceImpl implements OcrService {
             if (cause instanceof RuntimeException re) {
                 throw re;
             }
-            throw new IOException("PDF OCR processing failed: " + cause.getMessage(), cause);
+            throw new IOException("Xử lý OCR cho PDF thất bại: " + cause.getMessage(), cause);
         } finally {
             executor.shutdownNow();
             tesseractPool.clear();
@@ -399,12 +399,12 @@ public class OcrServiceImpl implements OcrService {
             }
             return result;
         } catch (TesseractException e) {
-            throw new IOException("OCR processing failed on page " + pageNumber + ": " + e.getMessage(), e);
+            throw new IOException("Xử lý OCR thất bại ở trang " + pageNumber + ": " + e.getMessage(), e);
         } catch (RuntimeException re) {
             if (re instanceof CancellationException) {
                 throw re;
             }
-            throw new IOException("OCR processing failed on page " + pageNumber + ": " + re.getMessage(), re);
+            throw new IOException("Xử lý OCR thất bại ở trang " + pageNumber + ": " + re.getMessage(), re);
         }
     }
 

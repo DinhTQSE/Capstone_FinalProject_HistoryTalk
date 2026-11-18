@@ -133,7 +133,7 @@ class StudentManagementServiceImplTest {
 
         assertThatThrownBy(() -> studentManagementService.getStudentById(studentId, otherSchoolId))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Student does not belong to your school");
+                .hasMessageContaining("Học sinh không thuộc trường của bạn");
     }
 
     @Test

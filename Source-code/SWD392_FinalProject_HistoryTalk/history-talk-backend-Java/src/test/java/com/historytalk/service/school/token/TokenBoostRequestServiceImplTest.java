@@ -29,6 +29,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -98,7 +99,7 @@ class TokenBoostRequestServiceImplTest {
                 .token(10_000)
                 .dailyTokensUsed(0)
                 .dailyBonusTokens(0)
-                .lastTokenResetAt(LocalDateTime.now())
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         otherTeacher = User.builder()
@@ -121,7 +122,7 @@ class TokenBoostRequestServiceImplTest {
                 .token(0)
                 .dailyTokensUsed(1_000)
                 .dailyBonusTokens(0)
-                .lastTokenResetAt(LocalDateTime.now())
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         classroom = Classroom.builder()
@@ -202,7 +203,7 @@ class TokenBoostRequestServiceImplTest {
                 .requestedTokens(1000)
                 .reason("Ôn thi học kỳ")
                 .status(TokenBoostRequestStatus.PENDING)
-                .requestDate(LocalDate.now())
+                .requestDate(LocalDate.now(ZoneOffset.UTC))
                 .build();
 
         when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
@@ -277,7 +278,7 @@ class TokenBoostRequestServiceImplTest {
                 .requestedTokens(1000)
                 .reason("Em cần thêm 1000 token")
                 .status(TokenBoostRequestStatus.PENDING)
-                .requestDate(LocalDate.now())
+                .requestDate(LocalDate.now(ZoneOffset.UTC))
                 .build();
 
         when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));

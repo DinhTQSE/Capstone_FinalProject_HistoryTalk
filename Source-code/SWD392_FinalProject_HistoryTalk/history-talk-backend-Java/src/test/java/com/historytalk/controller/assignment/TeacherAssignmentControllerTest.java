@@ -31,6 +31,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -100,7 +101,7 @@ class TeacherAssignmentControllerTest {
                 .title("Tìm hiểu Trận Bạch Đằng")
                 .assignmentType(AssignmentType.CONTEXT_READING)
                 .targetId(UUID.randomUUID())
-                .deadline(LocalDateTime.now().plusDays(2))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(2))
                 .minRequirement(60)
                 .build();
 
@@ -169,7 +170,7 @@ class TeacherAssignmentControllerTest {
     void testUpdateAssignment_Success() throws Exception {
         UpdateAssignmentRequest req = UpdateAssignmentRequest.builder()
                 .title("Tiêu đề mới")
-                .deadline(LocalDateTime.now().plusDays(3))
+                .deadline(LocalDateTime.now(ZoneOffset.UTC).plusDays(3))
                 .build();
 
         TeacherAssignmentResponse resp = TeacherAssignmentResponse.builder()

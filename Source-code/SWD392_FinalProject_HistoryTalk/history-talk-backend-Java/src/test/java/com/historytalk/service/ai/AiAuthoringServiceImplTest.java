@@ -127,7 +127,7 @@ class AiAuthoringServiceImplTest {
 
     @Test
     void deletedContextIsNotFound() throws Exception {
-        context.setDeletedAt(java.time.LocalDateTime.now());
+        context.setDeletedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
         when(contextRepository.findById(contextId)).thenReturn(Optional.of(context));
 
         assertThatThrownBy(() -> service.generateStory(body("{\"contextId\":\"CTX\"}")))

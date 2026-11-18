@@ -18,19 +18,19 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UpdateStudentRequest {
 
-    @NotBlank(message = "Full name must not be blank")
-    @Size(min = 2, max = 150, message = "Full name must be between 2 and 150 characters")
+    @NotBlank(message = "Họ tên không được để trống")
+    @Size(min = 2, max = 150, message = "Họ tên phải từ 2 đến 150 ký tự")
     private String fullName;
 
-    @Past(message = "Date of birth must be in the past")
+    @Past(message = "Ngày sinh phải là một ngày trong quá khứ")
     private LocalDate dob;
 
     private Gender gender;
 
-    @Size(max = 20, message = "Phone number must not exceed 20 characters")
+    @Size(max = 20, message = "Số điện thoại không được vượt quá 20 ký tự")
     private String phoneNumber;
 
-    @Email(message = "Email is invalid")
-    @Size(max = 100, message = "Email must not exceed 100 characters")
+    @Email(message = "Email không hợp lệ")
+    @Size(max = 100, message = "Email không được vượt quá 100 ký tự")
     private String email;
 }

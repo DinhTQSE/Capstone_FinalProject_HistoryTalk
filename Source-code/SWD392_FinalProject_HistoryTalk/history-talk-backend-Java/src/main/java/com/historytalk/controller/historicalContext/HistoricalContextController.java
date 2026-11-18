@@ -57,7 +57,7 @@ public class HistoricalContextController {
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,
-                "Historical contexts retrieved successfully"
+                "Lấy danh sách bối cảnh lịch sử thành công"
         ));
     }
     
@@ -81,7 +81,7 @@ public class HistoricalContextController {
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,
-                "Historical context retrieved successfully"
+                "Lấy thông tin bối cảnh lịch sử thành công"
         ));
     }
     
@@ -102,7 +102,7 @@ public class HistoricalContextController {
         
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 response,
-                "Historical context created successfully"
+                "Tạo bối cảnh lịch sử thành công"
         ));
     }
     
@@ -125,7 +125,7 @@ public class HistoricalContextController {
         
         return ResponseEntity.ok(ApiResponse.success(
                 response,
-                "Historical context updated successfully"
+                "Cập nhật bối cảnh lịch sử thành công"
         ));
     }
     
@@ -165,7 +165,7 @@ public class HistoricalContextController {
         String userRole = SecurityUtils.getRoleName();
         contextService.softDeleteContext(contextId, userId, userRole);
 
-        return ResponseEntity.ok(ApiResponse.success(null, "Historical context soft-deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã chuyển bối cảnh lịch sử vào thùng rác"));
     }
 
     /**
@@ -178,7 +178,7 @@ public class HistoricalContextController {
         log.info("GET /v1/historical-contexts/{}/documents", contextId);
         String role = SecurityUtils.getRoleName();
         var documents = contextDocumentService.getDocumentsByContextId(contextId, role);
-        return ResponseEntity.ok(ApiResponse.success(documents, "Context documents retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(documents, "Lấy danh sách tài liệu của bối cảnh thành công"));
     }
 
 }

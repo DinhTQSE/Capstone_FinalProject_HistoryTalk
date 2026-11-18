@@ -45,6 +45,7 @@ import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -148,7 +149,7 @@ class PaymentServiceTest {
         UserTier activePaid = UserTier.builder()
                 .user(customer)
                 .tier(plusTier)
-                .endTime(LocalDateTime.now().plusDays(20))
+                .endTime(LocalDateTime.now(ZoneOffset.UTC).plusDays(20))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(customer));
@@ -158,7 +159,7 @@ class PaymentServiceTest {
 
         assertThatThrownBy(() -> paymentService.createPayOSCheckout(userId, tierId.toString()))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("only upgrade to a higher plan");
+                .hasMessageContaining("chỉ có thể nâng cấp lên gói cao hơn");
 
         verify(paymentOrderRepository, never()).save(any());
     }
@@ -172,7 +173,7 @@ class PaymentServiceTest {
 
         assertThatThrownBy(() -> paymentService.createPayOSCheckout(userId, tierId.toString()))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("Free tier does not require payment");
+                .hasMessageContaining("Gói miễn phí không cần thanh toán");
     }
 
     @Test
@@ -224,7 +225,7 @@ class PaymentServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(PaymentOrderStatus.PENDING);
         assertThat(response.getResolvedStatus()).isEqualTo("PENDING");
-        assertThat(response.getMessage()).contains("Payment is being verified");
+        assertThat(response.getMessage()).contains("Thanh toán đang được xác minh");
         verify(paymentOrderRepository, never()).save(any());
     }
 

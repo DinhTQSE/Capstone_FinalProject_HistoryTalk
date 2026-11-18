@@ -37,7 +37,7 @@ public class VoiceController {
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "List the voices a character can use")
     public ResponseEntity<ApiResponse<List<VoiceOptionResponse>>> listVoices() {
-        return ResponseEntity.ok(ApiResponse.success(characterSpeechService.listVoices(), "Voices retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(characterSpeechService.listVoices(), "Lấy danh sách giọng đọc thành công"));
     }
 
     @PostMapping("/preview")

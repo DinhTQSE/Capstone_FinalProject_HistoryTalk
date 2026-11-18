@@ -10,6 +10,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BulkRestoreUsersRequest {
-    @NotEmpty(message = "User IDs list cannot be empty")
+    @NotEmpty(message = "Danh sách ID người dùng không được để trống")
     private List<String> userIds;
 }

@@ -30,6 +30,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -140,7 +141,7 @@ class StudentAssignmentControllerTest {
                 .submissionId(submissionId)
                 .assignmentId(assignmentId)
                 .status(SubmissionStatus.IN_PROGRESS)
-                .startedAt(LocalDateTime.now())
+                .startedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         when(studentAssignmentService.startAssignment(eq(assignmentId), any())).thenReturn(resp);
@@ -163,7 +164,7 @@ class StudentAssignmentControllerTest {
                 .assignmentId(assignmentId)
                 .status(SubmissionStatus.SUBMITTED)
                 .score(new BigDecimal("9.50"))
-                .submittedAt(LocalDateTime.now())
+                .submittedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         when(studentAssignmentService.submitAssignment(eq(assignmentId), any(), any())).thenReturn(resp);

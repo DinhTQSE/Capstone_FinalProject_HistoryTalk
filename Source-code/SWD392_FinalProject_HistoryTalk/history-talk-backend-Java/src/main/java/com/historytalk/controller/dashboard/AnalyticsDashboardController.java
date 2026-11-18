@@ -43,7 +43,7 @@ public class AnalyticsDashboardController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/school-admin/dashboard by user: {}", principal != null ? principal.getUsername() : "security-context");
         SchoolAdminDashboardResponse response = analyticsDashboardService.getSchoolAdminDashboard(principal != null ? principal.getSchoolId() : null);
-        return ResponseEntity.ok(ApiResponse.success(response, "School Admin dashboard retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy dashboard quản trị trường thành công"));
     }
 
     @GetMapping("/teacher/dashboard/classrooms/{classId}")
@@ -54,7 +54,7 @@ public class AnalyticsDashboardController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/teacher/dashboard/classrooms/{} by teacher: {}", classId, principal != null ? principal.getUsername() : "security-context");
         TeacherClassroomDashboardResponse response = analyticsDashboardService.getTeacherClassroomDashboard(classId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Teacher classroom dashboard retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy dashboard lớp học của giáo viên thành công"));
     }
 
     @GetMapping("/student/dashboard")
@@ -64,7 +64,7 @@ public class AnalyticsDashboardController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/student/dashboard by student: {}", principal != null ? principal.getUsername() : "security-context");
         StudentPersonalDashboardResponse response = analyticsDashboardService.getStudentDashboard(principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student dashboard retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy dashboard học sinh thành công"));
     }
 
     @GetMapping("/customer/dashboard")
@@ -74,7 +74,7 @@ public class AnalyticsDashboardController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/customer/dashboard by customer: {}", principal != null ? principal.getUsername() : "security-context");
         CustomerPersonalDashboardResponse response = analyticsDashboardService.getCustomerDashboard(principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Customer dashboard retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy dashboard khách hàng thành công"));
     }
 
     @GetMapping("/admin/dashboard")
@@ -83,7 +83,7 @@ public class AnalyticsDashboardController {
     public ResponseEntity<ApiResponse<SystemAdminComprehensiveDashboardResponse>> getSystemAdminDashboard() {
         log.info("GET /api/v1/admin/dashboard");
         SystemAdminComprehensiveDashboardResponse response = analyticsDashboardService.getSystemAdminDashboard();
-        return ResponseEntity.ok(ApiResponse.success(response, "System Admin dashboard retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy dashboard quản trị hệ thống thành công"));
     }
 
     @GetMapping("/school-admin/analytics/classrooms")
@@ -101,7 +101,7 @@ public class AnalyticsDashboardController {
         log.info("GET /api/v1/school-admin/analytics/classrooms by school admin: {}", principal != null ? principal.getUsername() : "security-context");
         PaginatedResponse<ClassroomTokenUsageSummaryDto> response = analyticsDashboardService.getClassroomsTokenUsage(
                 principal != null ? principal.getSchoolId() : null, academicYear, gradeLevel, status, search, pageable);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Classroom token analytics retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy thống kê token của lớp học thành công"));
     }
 
     @GetMapping("/school-admin/analytics/classrooms/{classroomId}/students")
@@ -117,7 +117,7 @@ public class AnalyticsDashboardController {
         log.info("GET /api/v1/school-admin/analytics/classrooms/{}/students by user: {}", classroomId, principal != null ? principal.getUsername() : "security-context");
         PaginatedResponse<StudentTokenUsageDetailDto> response = analyticsDashboardService.getClassroomStudentsTokenUsage(
                 classroomId, search, pageable, principal);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Classroom students token usage retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy mức sử dụng token của học sinh trong lớp thành công"));
     }
 
     @GetMapping("/teacher/dashboard/classes-overview")
@@ -127,7 +127,7 @@ public class AnalyticsDashboardController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/teacher/dashboard/classes-overview by teacher: {}", principal != null ? principal.getUsername() : "security-context");
         TeacherClassesOverviewResponse response = analyticsDashboardService.getTeacherClassesOverview(principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Teacher classes overview retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy tổng quan lớp học của giáo viên thành công"));
     }
 
 }

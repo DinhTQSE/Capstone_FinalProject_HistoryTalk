@@ -31,7 +31,7 @@ public class TierController {
     public ResponseEntity<ApiResponse<List<TierResponse>>> getAllTiers() {
         log.info("GET /tiers");
         List<TierResponse> tiers = tierService.getAllTiers();
-        return ResponseEntity.ok(ApiResponse.success(tiers, "Tiers retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(tiers, "Lấy danh sách gói hội viên thành công"));
     }
 
     @GetMapping("/{id}")
@@ -39,7 +39,7 @@ public class TierController {
     public ResponseEntity<ApiResponse<TierResponse>> getTierById(@PathVariable String id) {
         log.info("GET /tiers/{}", id);
         TierResponse tier = tierService.getTierById(id);
-        return ResponseEntity.ok(ApiResponse.success(tier, "Tier retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(tier, "Lấy thông tin gói hội viên thành công"));
     }
 
     @PostMapping
@@ -50,7 +50,7 @@ public class TierController {
         log.info("POST /tiers - title: {}", request.getTitle());
         TierResponse created = tierService.createTier(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created, "Tier created successfully"));
+                .body(ApiResponse.success(created, "Tạo gói hội viên thành công"));
     }
 
     @PutMapping("/{id}")
@@ -62,7 +62,7 @@ public class TierController {
             @Valid @RequestBody CreateTierRequest request) {
         log.info("PUT /tiers/{}", id);
         TierResponse updated = tierService.updateTier(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updated, "Tier updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật gói hội viên thành công"));
     }
 
     @PatchMapping("/{id}")
@@ -74,7 +74,7 @@ public class TierController {
             @Valid @RequestBody CreateTierRequest request) {
         log.info("PATCH /tiers/{}", id);
         TierResponse updated = tierService.updateTier(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updated, "Tier updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật gói hội viên thành công"));
     }
 
     @DeleteMapping("/{id}")
@@ -84,6 +84,6 @@ public class TierController {
     public ResponseEntity<ApiResponse<?>> deleteTier(@PathVariable String id) {
         log.info("DELETE /tiers/{}", id);
         tierService.deleteTier(id);
-        return ResponseEntity.ok(ApiResponse.success(null, "Tier deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa gói hội viên thành công"));
     }
 }

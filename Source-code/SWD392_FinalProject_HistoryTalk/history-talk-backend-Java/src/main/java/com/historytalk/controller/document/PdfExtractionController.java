@@ -82,7 +82,7 @@ public class PdfExtractionController {
                     Boolean.TRUE.equals(extractImages),
                     null,
                     null);
-            return ResponseEntity.ok(ApiResponse.success(response, "PDF text extracted successfully"));
+            return ResponseEntity.ok(ApiResponse.success(response, "Trích xuất văn bản PDF thành công"));
         } finally {
             pdfExtractionRateLimiter.release(staffId, lockToken);
         }

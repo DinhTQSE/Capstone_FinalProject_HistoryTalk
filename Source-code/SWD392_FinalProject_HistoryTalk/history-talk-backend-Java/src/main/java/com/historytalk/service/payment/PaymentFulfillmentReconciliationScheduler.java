@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Slf4j
@@ -27,7 +28,7 @@ public class PaymentFulfillmentReconciliationScheduler {
 
     @Scheduled(fixedDelay = 60_000)
     public void retryUnfulfilledPaidOrders() {
-        LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(PROCESSING_STALE_MINUTES);
+        LocalDateTime staleBefore = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(PROCESSING_STALE_MINUTES);
         List<PaymentOrder> orders = paymentOrderRepository.findOrdersNeedingFulfillmentRetry(
                 PaymentOrderStatus.PAID,
                 List.of(PaymentFulfillmentStatus.PENDING, PaymentFulfillmentStatus.FAILED),

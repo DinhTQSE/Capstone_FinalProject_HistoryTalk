@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,7 +25,7 @@ public class GlobalExceptionHandler {
                 .errorCode(ex.getErrorCode())
                 .message(ex.getMessage())
                 .status(ex.getHttpStatus())
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
         return ResponseEntity.status(ex.getHttpStatus()).body(errorResponse);
     }
@@ -77,9 +78,9 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
                 .errorCode(HttpStatus.FORBIDDEN.value())
-                .message(ex.getMessage() != null ? ex.getMessage() : "Truy cập bị từ chối")
+                .message(accessDeniedMessage(ex.getMessage()))
                 .status(HttpStatus.FORBIDDEN)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
@@ -91,7 +92,7 @@ public class GlobalExceptionHandler {
                 .errorCode(HttpStatus.BAD_REQUEST.value())
                 .message("Tham số không hợp lệ: " + ex.getMessage())
                 .status(HttpStatus.BAD_REQUEST)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
@@ -114,7 +115,7 @@ public class GlobalExceptionHandler {
                 .message("Dữ liệu đầu vào không hợp lệ")
                 .errors(errors)
                 .status(HttpStatus.BAD_REQUEST)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
@@ -144,7 +145,7 @@ public class GlobalExceptionHandler {
                 .message("Dữ liệu đầu vào không hợp lệ")
                 .errors(errors)
                 .status(HttpStatus.BAD_REQUEST)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
@@ -154,5 +155,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ErrorResponse> handleRateLimitExceeded(RateLimitExceededException ex) {
         return buildErrorResponse(ex);
+    }
+
+    /**
+     * Keeps custom (already Vietnamese, possibly code-prefixed) messages and replaces Spring's
+     * default English "Access Denied" with a Vietnamese one.
+     */
+    public static String accessDeniedMessage(String raw) {
+        if (raw == null || raw.isBlank() || "Access Denied".equalsIgnoreCase(raw.trim())) {
+            return "Bạn không có quyền thực hiện thao tác này";
+        }
+        return raw;
     }
 }

@@ -19,7 +19,7 @@ import java.util.List;
 @Data
 public class ReorderMapFocusRequest {
 
-    @NotNull(message = "focusIds must not be null")
-    @Size(min = 1, message = "At least one focusId must be provided")
+    @NotNull(message = "focusIds không được để trống")
+    @Size(min = 1, message = "Cần cung cấp ít nhất một focusId")
     private List<String> focusIds;
 }

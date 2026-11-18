@@ -57,7 +57,7 @@ public class SchoolLifecycleAndTokenController {
             @Valid @RequestBody RenewSchoolSubscriptionRequest request) {
         log.info("POST /api/v1/admin/schools/{}/renew", schoolId);
         SchoolResponse response = academicLifecycleService.renewSchoolSubscription(schoolId, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "School subscription renewed for next academic year"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Gia hạn gói của trường cho năm học tiếp theo thành công"));
     }
 
     @PostMapping("/school-admin/subscription/renew")
@@ -68,7 +68,7 @@ public class SchoolLifecycleAndTokenController {
             @Valid @RequestBody RenewSchoolSubscriptionRequest request) {
         log.info("POST /api/v1/school-admin/subscription/renew (package={})", request.getPackageType());
         SchoolResponse response = academicLifecycleService.renewSchoolSubscriptionForSchoolAdmin(principal, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "School subscription renewed for next academic year"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Gia hạn gói của trường cho năm học tiếp theo thành công"));
     }
 
     @PostMapping("/admin/schools/{id}/activate-academic-year")
@@ -80,7 +80,7 @@ public class SchoolLifecycleAndTokenController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate referenceDate) {
         log.info("POST /api/v1/admin/schools/{}/activate-academic-year", schoolId);
         SchoolResponse response = academicLifecycleService.activateRenewedSubscription(schoolId, referenceDate);
-        return ResponseEntity.ok(ApiResponse.success(response, "New academic year subscription activated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Kích hoạt gói năm học mới thành công"));
     }
 
     @PostMapping("/admin/schools/{id}/top-up")
@@ -91,7 +91,7 @@ public class SchoolLifecycleAndTokenController {
             @Valid @RequestBody TopUpSchoolTokensRequest request) {
         log.info("POST /api/v1/admin/schools/{}/top-up (+{} tokens)", schoolId, request.getAdditionalTokens());
         SchoolResponse response = academicLifecycleService.topUpSchoolTokens(schoolId, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "School token pool topped up successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Nạp thêm token vào quỹ của trường thành công"));
     }
 
     // ── US-SP7-16: Configure Daily Student & Teacher Token Quota Policy ─────
@@ -104,7 +104,7 @@ public class SchoolLifecycleAndTokenController {
             @Valid @RequestBody UpdateSchoolTokenPolicyRequest request) {
         log.info("PUT /api/v1/school-admin/token-policy");
         SchoolResponse response = academicLifecycleService.updateSchoolTokenPolicy(principal, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Daily token quota policy updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật chính sách hạn mức token hằng ngày thành công"));
     }
 
     // ── US-SP7-17: Teacher Direct Token Transfer & Ticket Workflow ──────────
@@ -118,7 +118,7 @@ public class SchoolLifecycleAndTokenController {
         log.info("POST /api/v1/student/token-requests");
         TokenBoostRequestResponse response = tokenBoostRequestService.createBoostRequest(principal, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Token boost request submitted successfully"));
+                .body(ApiResponse.success(response, "Gửi yêu cầu xin thêm token thành công"));
     }
 
     @GetMapping("/student/token-requests")
@@ -128,7 +128,7 @@ public class SchoolLifecycleAndTokenController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.info("GET /api/v1/student/token-requests");
         List<TokenBoostRequestResponse> response = tokenBoostRequestService.getStudentBoostRequests(principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student token boost requests retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách yêu cầu xin thêm token của học sinh thành công"));
     }
 
     @PostMapping("/teacher/students/{studentId}/grant-tokens")
@@ -141,7 +141,7 @@ public class SchoolLifecycleAndTokenController {
         log.info("POST /api/v1/teacher/students/{}/grant-tokens (+{} tokens)", studentId, request.getTokens());
         TokenBoostRequestResponse response =
                 tokenBoostRequestService.grantTokensFromTeacherToStudent(principal, studentId, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Tokens transferred from teacher daily allowance to student successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Chuyển token từ hạn mức hằng ngày của giáo viên cho học sinh thành công"));
     }
 
     @PostMapping("/teacher/token-requests")
@@ -153,7 +153,7 @@ public class SchoolLifecycleAndTokenController {
         log.info("POST /api/v1/teacher/token-requests");
         TokenBoostRequestResponse response = tokenBoostRequestService.createTeacherAdminTicket(principal, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Ticket submitted to School Admin successfully"));
+                .body(ApiResponse.success(response, "Gửi yêu cầu lên quản trị trường thành công"));
     }
 
     @GetMapping("/teacher/token-requests")
@@ -168,7 +168,7 @@ public class SchoolLifecycleAndTokenController {
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, limit));
         PaginatedResponse<TokenBoostRequestResponse> response =
                 tokenBoostRequestService.getBoostRequestsForReviewer(principal, status, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response, "Token boost requests retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách yêu cầu xin thêm token thành công"));
     }
 
     @PutMapping("/teacher/token-requests/{requestId}/review")
@@ -181,7 +181,7 @@ public class SchoolLifecycleAndTokenController {
         log.info("PUT /api/v1/teacher/token-requests/{}/review ({})", requestId, reviewDto.getAction());
         TokenBoostRequestResponse response =
                 tokenBoostRequestService.reviewBoostRequest(principal, requestId, reviewDto);
-        return ResponseEntity.ok(ApiResponse.success(response, "Token boost request reviewed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Duyệt yêu cầu xin thêm token thành công"));
     }
 
     @GetMapping("/school-admin/token-requests")
@@ -196,7 +196,7 @@ public class SchoolLifecycleAndTokenController {
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, limit));
         PaginatedResponse<TokenBoostRequestResponse> response =
                 tokenBoostRequestService.getBoostRequestsForReviewer(principal, status, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response, "School Admin token boost requests retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách yêu cầu xin thêm token gửi quản trị trường thành công"));
     }
 
     @PutMapping("/school-admin/token-requests/{requestId}/review")
@@ -209,7 +209,7 @@ public class SchoolLifecycleAndTokenController {
         log.info("PUT /api/v1/school-admin/token-requests/{}/review ({})", requestId, reviewDto.getAction());
         TokenBoostRequestResponse response =
                 tokenBoostRequestService.reviewBoostRequest(principal, requestId, reviewDto);
-        return ResponseEntity.ok(ApiResponse.success(response, "Token boost request reviewed by School Admin successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Quản trị trường đã duyệt yêu cầu xin thêm token"));
     }
 
     @GetMapping("/token-requests")
@@ -224,7 +224,7 @@ public class SchoolLifecycleAndTokenController {
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.max(1, limit));
         PaginatedResponse<TokenBoostRequestResponse> response =
                 tokenBoostRequestService.getBoostRequestsForReviewer(principal, status, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response, "Token boost requests retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách yêu cầu xin thêm token thành công"));
     }
 
     @GetMapping("/token-requests/{requestId}")
@@ -235,7 +235,7 @@ public class SchoolLifecycleAndTokenController {
             @PathVariable("requestId") UUID requestId) {
         log.info("GET /api/v1/token-requests/{}", requestId);
         TokenBoostRequestResponse response = tokenBoostRequestService.getBoostRequestById(principal, requestId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Token boost request details retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy chi tiết yêu cầu xin thêm token thành công"));
     }
 
     // ── US-SP7-18: Academic Year Rollover (ARCHIVED) & Student Deactivation ─
@@ -248,7 +248,7 @@ public class SchoolLifecycleAndTokenController {
             @Valid @RequestBody AcademicYearRolloverRequest request) {
         log.info("POST /api/v1/school-admin/academic-year/rollover (year={})", request.getCompletedAcademicYear());
         AcademicYearRolloverResponse response = academicLifecycleService.rolloverAcademicYear(principal, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Academic year rollover completed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Chuyển năm học thành công"));
     }
 
     @PutMapping("/school-admin/students/{uid}/deactivate")
@@ -260,6 +260,6 @@ public class SchoolLifecycleAndTokenController {
             @Valid @RequestBody DeactivateStudentRequest request) {
         log.info("PUT /api/v1/school-admin/students/{}/deactivate (reason={})", studentUid, request.getReason());
         StudentResponse response = academicLifecycleService.deactivateStudentAccount(principal, studentUid, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Student account deactivated and login blocked"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã vô hiệu hóa tài khoản học sinh và chặn đăng nhập"));
     }
 }

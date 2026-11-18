@@ -44,7 +44,7 @@ public class QuizController {
         log.info("GET /api/v1/quizzes search={}, contextId={}", search, contextId);
         UUID userId = resolveUserId();
         List<QuizCustomerResponse> data = quizService.getAllQuizzesForCustomer(search, contextId, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quizzes retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy danh sách quiz thành công"));
     }
 
     /**
@@ -59,7 +59,7 @@ public class QuizController {
         log.info("GET /api/v1/quizzes/{}", quizId);
         UUID userId = resolveUserId();
         QuizCustomerResponse data = quizService.getQuizByIdForCustomer(quizId, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy thông tin quiz thành công"));
     }
 
     /**
@@ -77,7 +77,7 @@ public class QuizController {
         log.info("POST /api/v1/quizzes/{}/start limitedTime={}", quizId, limitedTime);
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizStartResponse data = quizService.startQuiz(quizId, userId, limitedTime);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz started successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Bắt đầu làm quiz thành công"));
     }
 
     /**
@@ -94,7 +94,7 @@ public class QuizController {
         log.info("POST /api/v1/quizzes/submit sessionId={}", request.getSessionId());
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizSubmitResponse data = quizService.submitQuiz(request, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz submitted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Nộp quiz thành công"));
     }
 
     /**
@@ -115,7 +115,7 @@ public class QuizController {
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), size);
         PaginatedResponse<QuizHistoryResponse> data = quizService.getQuizHistory(userId, quizId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz history retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy lịch sử làm quiz thành công"));
     }
 
     /**
@@ -132,7 +132,7 @@ public class QuizController {
         log.info("GET /api/v1/quizzes/results/me/{}", sessionId);
         UUID userId = UUID.fromString(SecurityUtils.getUserId());
         QuizSessionDetailResponse data = quizService.getSessionDetail(sessionId, userId);
-        return ResponseEntity.ok(ApiResponse.success(data, "Quiz session detail retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy chi tiết lượt làm quiz thành công"));
     }
 
 

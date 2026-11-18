@@ -42,7 +42,7 @@ public class TeacherAssignmentController {
             @AuthenticationPrincipal UserPrincipal principal) {
         TeacherAssignmentResponse response = teacherAssignmentService.createAssignment(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Assignment created successfully"));
+                .body(ApiResponse.success(response, "Tạo bài tập thành công"));
     }
 
     @GetMapping("/classroom/{classroomId}")
@@ -55,7 +55,7 @@ public class TeacherAssignmentController {
             @AuthenticationPrincipal UserPrincipal principal) {
         PaginatedResponse<TeacherAssignmentResponse> response = teacherAssignmentService.getAssignmentsByClassroom(
                 classroomId, status, pageable, principal);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Assignments retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách bài tập thành công"));
     }
 
     @GetMapping("/{assignmentId}")
@@ -65,7 +65,7 @@ public class TeacherAssignmentController {
             @PathVariable UUID assignmentId,
             @AuthenticationPrincipal UserPrincipal principal) {
         AssignmentGradebookResponse response = teacherAssignmentService.getAssignmentGradebook(assignmentId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Gradebook retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy bảng điểm thành công"));
     }
 
     @PutMapping("/{assignmentId}")
@@ -76,7 +76,7 @@ public class TeacherAssignmentController {
             @Valid @RequestBody UpdateAssignmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         TeacherAssignmentResponse response = teacherAssignmentService.updateAssignment(assignmentId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Assignment updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật bài tập thành công"));
     }
 
     @DeleteMapping("/{assignmentId}")
@@ -86,6 +86,6 @@ public class TeacherAssignmentController {
             @PathVariable UUID assignmentId,
             @AuthenticationPrincipal UserPrincipal principal) {
         teacherAssignmentService.cancelAssignment(assignmentId, principal);
-        return ResponseEntity.ok(ApiResponse.success(null, "Assignment cancelled successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Hủy bài tập thành công"));
     }
 }

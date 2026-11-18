@@ -19,6 +19,6 @@ public interface OcrService {
             int endPage,
             BiConsumer<Integer, Integer> onProgress,
             BooleanSupplier isCancelled) throws IOException {
-        throw new UnsupportedOperationException("extractLinesFromPdf is not implemented");
+        throw new UnsupportedOperationException("extractLinesFromPdf chưa được hỗ trợ");
     }
 }

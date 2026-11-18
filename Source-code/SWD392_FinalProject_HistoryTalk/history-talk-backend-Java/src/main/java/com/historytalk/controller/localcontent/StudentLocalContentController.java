@@ -49,7 +49,7 @@ public class StudentLocalContentController {
         PaginatedResponse<LocalContentResponse> result =
                 localContentService.getStudentPublishedLocalContexts(search, classId, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(result,
-                "Published local contexts retrieved — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " found"));
+                "Lấy danh sách bối cảnh địa phương đã xuất bản thành công — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " kết quả"));
     }
 
     @GetMapping("/contexts/{contextId}")
@@ -61,7 +61,7 @@ public class StudentLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.getPublishedLocalContextById(contextId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local context retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin bối cảnh địa phương thành công"));
     }
 
     // ── Character list ────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ public class StudentLocalContentController {
         PaginatedResponse<LocalContentResponse> result =
                 localContentService.getStudentPublishedLocalCharacters(search, classId, page, size, principal);
         return ResponseEntity.ok(ApiResponse.success(result,
-                "Published local characters retrieved — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " found"));
+                "Lấy danh sách nhân vật địa phương đã xuất bản thành công — " + (result.getTotalElements() != null ? result.getTotalElements() : 0) + " kết quả"));
     }
 
     @GetMapping("/characters/{characterId}")
@@ -93,6 +93,6 @@ public class StudentLocalContentController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         LocalContentResponse response = localContentService.getPublishedLocalCharacterById(characterId, principal);
-        return ResponseEntity.ok(ApiResponse.success(response, "Local character retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin nhân vật địa phương thành công"));
     }
 }

@@ -78,6 +78,6 @@ public class MapImageUploadController {
 
         return ResponseEntity.ok(ApiResponse.success(
                 Map.of("url", url),
-                "Battle-map image uploaded successfully"));
+                "Tải lên ảnh bản đồ trận đánh thành công"));
     }
 }

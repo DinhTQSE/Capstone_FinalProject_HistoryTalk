@@ -29,7 +29,7 @@ public class AllocateStudentTokenRequest {
     /**
      * Số lượng Token cấp cho MỖI học sinh
      */
-    @NotNull(message = "Token amount is required")
-    @Min(value = 1, message = "Token amount must be greater than 0")
+    @NotNull(message = "Số token không được để trống")
+    @Min(value = 1, message = "Số token phải lớn hơn 0")
     private Integer tokenAmount;
 }

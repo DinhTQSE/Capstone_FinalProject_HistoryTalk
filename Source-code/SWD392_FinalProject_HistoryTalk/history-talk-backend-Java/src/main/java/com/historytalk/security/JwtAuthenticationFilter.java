@@ -20,7 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
@@ -141,7 +141,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         // JWT iat has second-level precision; truncate passwordChangedAt to seconds to avoid same-second false rejections.
         Instant passwordChangedInstant = user.getPasswordChangedAt()
-                .atZone(ZoneId.systemDefault())
+                .atOffset(ZoneOffset.UTC)
                 .toInstant()
                 .truncatedTo(ChronoUnit.SECONDS);
         return issuedAt.toInstant().isBefore(passwordChangedInstant);

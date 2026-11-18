@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Slf4j
@@ -55,17 +56,17 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
     @Transactional
     public StudentImportResultDto processImport(MultipartFile file, StudentImportContext context) {
         if (file == null || file.isEmpty()) {
-            throw new InvalidRequestException("Upload file must not be empty");
+            throw new InvalidRequestException("Tệp tải lên không được để trống");
         }
         if (context.getClassroomId() == null) {
-            throw new InvalidRequestException("Classroom ID must be specified for classroom import");
+            throw new InvalidRequestException("Cần chỉ định ID lớp học khi nhập dữ liệu vào lớp");
         }
 
         School school = schoolRepository.findById(context.getSchoolId())
-                .orElseThrow(() -> new ResourceNotFoundException("School not found with ID: " + context.getSchoolId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + context.getSchoolId()));
 
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(context.getClassroomId(), context.getSchoolId())
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with ID: " + context.getClassroomId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + context.getClassroomId()));
 
         StudentImportResultDto resultDto = StudentImportResultDto.builder()
                 .errors(new ArrayList<>())
@@ -75,7 +76,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
         List<StudentImportRowDto> rawRows = parseRecords(file);
         resultDto.setTotalRows(rawRows.size());
         if (rawRows.isEmpty()) {
-            throw new InvalidRequestException("The file contains no data rows");
+            throw new InvalidRequestException("Tệp không có dòng dữ liệu nào");
         }
 
         List<RowPlan> plans = new ArrayList<>();
@@ -117,28 +118,28 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
             } else {
                 // CASE 2: Học sinh MỚI TINH cần onboarding
                 if (row.getFullName() == null || row.getFullName().trim().isEmpty()) {
-                    addError(resultDto, row.getRowNumber(), rawCode, "full_name", "Full name must not be blank");
+                    addError(resultDto, row.getRowNumber(), rawCode, "full_name", "Họ tên không được để trống");
                     hasError = true;
                 }
                 if (row.getDob() == null) {
-                    addError(resultDto, row.getRowNumber(), rawCode, "dob", "Date of birth format is invalid (expected YYYY-MM-DD)");
+                    addError(resultDto, row.getRowNumber(), rawCode, "dob", "Ngày sinh sai định dạng (yêu cầu YYYY-MM-DD)");
                     hasError = true;
                 }
                 if (rawCode != null && !rawCode.isEmpty()) {
                     if (!rawCode.matches("^[A-Za-z0-9_-]{2,30}$")) {
-                        addError(resultDto, row.getRowNumber(), rawCode, "student_code", "Student code must contain only letters, numbers, hyphens or underscores (2-30 characters)");
+                        addError(resultDto, row.getRowNumber(), rawCode, "student_code", "Mã học sinh chỉ được chứa chữ cái, chữ số, dấu gạch ngang hoặc gạch dưới (2-30 ký tự)");
                         hasError = true;
                     } else if (!seenCodesInFile.add(rawCode.toLowerCase())) {
-                        addError(resultDto, row.getRowNumber(), rawCode, "student_code", "Duplicate student code within the file");
+                        addError(resultDto, row.getRowNumber(), rawCode, "student_code", "Mã học sinh bị trùng trong tệp");
                         hasError = true;
                     }
                 }
                 if (rawEmail != null && !rawEmail.isEmpty()) {
                     if (!seenEmailsInFile.add(rawEmail)) {
-                        addError(resultDto, row.getRowNumber(), rawCode, "email", "Duplicate email within the file");
+                        addError(resultDto, row.getRowNumber(), rawCode, "email", "Email bị trùng trong tệp");
                         hasError = true;
                     } else if (userRepository.existsByEmailIgnoreCase(rawEmail)) {
-                        addError(resultDto, row.getRowNumber(), rawCode, "email", "Email already in use across the system");
+                        addError(resultDto, row.getRowNumber(), rawCode, "email", "Email đã được sử dụng trong hệ thống");
                         hasError = true;
                     }
                 }
@@ -161,7 +162,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
         int schoolPool = school.getUnallocatedTokenQuota() != null ? Math.max(0, school.getUnallocatedTokenQuota()) : 0;
 
         // Persist & Enroll
-        int currentYear = Year.now().getValue() % 100;
+        int currentYear = Year.now(ZoneOffset.UTC).getValue() % 100;
         long existingStudentCount = userRepository.countBySchoolIdAndRole(school.getId(), UserRole.SCHOOL_STUDENT);
 
         for (RowPlan plan : plans) {
@@ -231,7 +232,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
                         .token(effectiveDailyAvailable)
                         .dailyTokensUsed(0)
                         .dailyBonusTokens(extraToken)
-                        .lastTokenResetAt(LocalDateTime.now())
+                        .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC))
                         .mustChangePassword(true)
                         .build();
 

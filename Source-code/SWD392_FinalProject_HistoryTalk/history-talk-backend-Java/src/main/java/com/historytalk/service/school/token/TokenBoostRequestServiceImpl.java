@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -211,7 +212,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
                 .status(TokenBoostRequestStatus.APPROVED)
                 .teacherReviewedBy(teacher)
                 .teacherReviewNote(reason)
-                .teacherReviewedAt(LocalDateTime.now())
+                .teacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .reviewedBy(teacher)
                 .reviewNote(reason)
                 .requestDate(today)
@@ -368,7 +369,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
                 boostRequest.setTeacherReviewedBy(reviewer);
                 boostRequest.setTeacherReviewNote(reviewDto.getReviewNote());
-                boostRequest.setTeacherReviewedAt(LocalDateTime.now());
+                boostRequest.setTeacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             } else {
                 // School Admin approves from school's shared pool (for Student or for Teacher who ran out of quota)
                 int availablePool = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
@@ -382,7 +383,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
 
                 boostRequest.setAdminReviewedBy(reviewer);
                 boostRequest.setAdminReviewNote(reviewDto.getReviewNote());
-                boostRequest.setAdminReviewedAt(LocalDateTime.now());
+                boostRequest.setAdminReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             }
 
             boostRequest.setStatus(TokenBoostRequestStatus.APPROVED);
@@ -413,11 +414,11 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
             if (principal.getRole() == UserRole.TEACHER) {
                 boostRequest.setTeacherReviewedBy(reviewer);
                 boostRequest.setTeacherReviewNote(reviewDto.getReviewNote());
-                boostRequest.setTeacherReviewedAt(LocalDateTime.now());
+                boostRequest.setTeacherReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             } else {
                 boostRequest.setAdminReviewedBy(reviewer);
                 boostRequest.setAdminReviewNote(reviewDto.getReviewNote());
-                boostRequest.setAdminReviewedAt(LocalDateTime.now());
+                boostRequest.setAdminReviewedAt(LocalDateTime.now(ZoneOffset.UTC));
             }
             boostRequest.setReviewedBy(reviewer);
             boostRequest.setReviewNote(reviewDto.getReviewNote());
@@ -444,7 +445,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         if (TokenDay.isNewDay(teacher.getLastTokenResetAt())) {
             teacher.setDailyTokensUsed(0);
             teacher.setDailyBonusTokens(0);
-            teacher.setLastTokenResetAt(LocalDateTime.now());
+            teacher.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         }
         int teacherBaseDaily = (school.getDefaultDailyTeacherQuota() != null && school.getDefaultDailyTeacherQuota() > 0)
                 ? school.getDefaultDailyTeacherQuota()
@@ -465,7 +466,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         teacher.setDailyTokensUsed(updatedTeacherUsed);
         int updatedTeacherRemaining = Math.min(Math.max(0, (teacherBaseDaily + teacherBonusToday) - updatedTeacherUsed), availablePool);
         teacher.setToken(updatedTeacherRemaining);
-        teacher.setLastTokenResetAt(LocalDateTime.now());
+        teacher.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(teacher);
 
         // Add to student's daily bonus allowance
@@ -502,7 +503,7 @@ public class TokenBoostRequestServiceImpl implements TokenBoostRequestService {
         int updatedDisplayToken = Math.max(currentDisplayToken + tokensToGrant, recalculatedRemaining);
 
         targetUser.setToken(Math.min(availablePool, updatedDisplayToken));
-        targetUser.setLastTokenResetAt(LocalDateTime.now());
+        targetUser.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(targetUser);
     }
 

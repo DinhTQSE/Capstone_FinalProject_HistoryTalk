@@ -12,6 +12,7 @@ import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Entity
@@ -93,7 +94,7 @@ public class TokenBoostRequest {
 
     @Builder.Default
     @Column(name = "request_date", nullable = false)
-    private LocalDate requestDate = LocalDate.now();
+    private LocalDate requestDate = LocalDate.now(ZoneOffset.UTC);
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

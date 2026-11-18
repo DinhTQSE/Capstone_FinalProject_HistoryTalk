@@ -47,14 +47,14 @@ public class PdfTypeClassifier {
 
     public PdfType classify(PDDocument document) throws IOException {
         if (document == null) {
-            throw new IllegalArgumentException("Document cannot be null");
+            throw new IllegalArgumentException("Tài liệu không được để trống");
         }
         return classify(document, 1, document.getNumberOfPages());
     }
 
     public PdfType classify(PDDocument document, int startPage, int endPage) throws IOException {
         if (document == null) {
-            throw new IllegalArgumentException("Document cannot be null");
+            throw new IllegalArgumentException("Tài liệu không được để trống");
         }
 
         int totalPages = document.getNumberOfPages();

@@ -10,26 +10,26 @@ import lombok.Data;
 public class CreateMapFocusRequest {
 
     /** Display name for this focus point (e.g. "A1 Hill"). */
-    @NotBlank(message = "Name is required")
+    @NotBlank(message = "Tên không được để trống")
     private String name;
 
     /** Optional description of the geographic focus point. */
     private String description;
 
     /** WGS-84 latitude of the camera target. */
-    @NotNull(message = "Latitude is required")
+    @NotNull(message = "Vĩ độ không được để trống")
     private Double latitude;
 
     /** WGS-84 longitude of the camera target. */
-    @NotNull(message = "Longitude is required")
+    @NotNull(message = "Kinh độ không được để trống")
     private Double longitude;
 
     /**
      * Leaflet/Mapbox zoom level. Must be between 1.0 and 20.0.
      * Defaults to 8.0 on the server if omitted.
      */
-    @DecimalMin(value = "1.0", message = "Zoom level must be at least 1.0")
-    @DecimalMax(value = "20.0", message = "Zoom level must be at most 20.0")
+    @DecimalMin(value = "1.0", message = "Mức zoom phải từ 1.0 trở lên")
+    @DecimalMax(value = "20.0", message = "Mức zoom tối đa là 20.0")
     private Double zoomLevel;
 
     /**

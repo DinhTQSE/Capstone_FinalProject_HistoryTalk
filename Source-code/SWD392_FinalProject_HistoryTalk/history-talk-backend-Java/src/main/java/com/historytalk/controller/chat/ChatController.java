@@ -61,7 +61,7 @@ public class ChatController {
             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
 
         PaginatedResponse<ChatScenarioResponse> response = chatSessionService.getScenarios(search, era, pageable);
-        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Scenarios retrieved successfully"));
+        return ResponseEntity.ok(PaginatedApiResponse.of(response, "Lấy danh sách kịch bản thành công"));
     }
 
     /**
@@ -75,7 +75,7 @@ public class ChatController {
 
         String userId = SecurityUtils.getUserId();
         List<ChatSessionResponse> sessions = chatSessionService.getSessions(userId, characterId);
-        return ResponseEntity.ok(ApiResponse.success(sessions, "Sessions retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(sessions, "Lấy danh sách phiên trò chuyện thành công"));
     }
 
     /**
@@ -90,7 +90,7 @@ public class ChatController {
         String userRole = SecurityUtils.getRoleName();
         ChatSessionResponse session = chatSessionService.createSession(userId, userRole, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(session, "Session created successfully"));
+                .body(ApiResponse.success(session, "Tạo phiên trò chuyện thành công"));
     }
 
     /**
@@ -114,7 +114,7 @@ public class ChatController {
         String userId = SecurityUtils.getUserId();
         String userRole = SecurityUtils.getRoleName();
         chatSessionService.softDeleteSession(id, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success(null, "Session soft-deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa phiên trò chuyện"));
     }
 
     /**
@@ -125,7 +125,7 @@ public class ChatController {
     public ResponseEntity<ApiResponse<GetMessagesResponse>> getMessages(@PathVariable String id) {
         String userId = SecurityUtils.getUserId();
         GetMessagesResponse result = messageService.getMessages(id, userId);
-        return ResponseEntity.ok(ApiResponse.success(result, "Messages retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(result, "Lấy danh sách tin nhắn thành công"));
     }
 
     /**
@@ -174,7 +174,7 @@ public class ChatController {
     @PostMapping("/messages/check")
     public ResponseEntity<ApiResponse<?>> checkMessage(@Valid @RequestBody CheckMessageRequest request) {
         messageService.checkMessageContent(request.getContent());
-        return ResponseEntity.ok(ApiResponse.success(null, "Message content is allowed"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Nội dung tin nhắn hợp lệ"));
     }
 
     /**
@@ -188,7 +188,7 @@ public class ChatController {
         String userId = SecurityUtils.getUserId();
         SendMessageResponse result = messageService.sendMessage(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(result, "Message sent successfully"));
+                .body(ApiResponse.success(result, "Gửi tin nhắn thành công"));
     }
 
     /**
@@ -217,6 +217,6 @@ public class ChatController {
     public ResponseEntity<ApiResponse<List<ChatHistoryGroupResponse>>> getChatHistory() {
         String userId = SecurityUtils.getUserId();
         List<ChatHistoryGroupResponse> history = chatHistoryService.getHistory(userId);
-        return ResponseEntity.ok(ApiResponse.success(history, "Chat history retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(history, "Lấy lịch sử trò chuyện thành công"));
     }
 }

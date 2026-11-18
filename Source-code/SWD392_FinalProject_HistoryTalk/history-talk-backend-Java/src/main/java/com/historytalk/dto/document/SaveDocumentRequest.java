@@ -13,12 +13,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class SaveDocumentRequest {
-    @NotBlank(message = "Document ID is required")
+    @NotBlank(message = "ID tài liệu không được để trống")
     private String docId;
 
-    @NotBlank(message = "Content is required")
+    @NotBlank(message = "Nội dung không được để trống")
     private String content;
 
-    @NotNull(message = "Status is required")
+    @NotNull(message = "Trạng thái không được để trống")
     private ContentStatus status;
 }

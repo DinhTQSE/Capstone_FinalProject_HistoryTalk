@@ -21,6 +21,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -56,8 +57,8 @@ class DailyTokenAllowanceServiceImplTest {
                 .totalSchoolTokenQuota(5_000_000)
                 .unallocatedTokenQuota(100_000)
                 .defaultDailyStudentQuota(1_000)
-                .subscriptionStartDate(LocalDate.now().minusMonths(1))
-                .subscriptionEndDate(LocalDate.now().plusMonths(5))
+                .subscriptionStartDate(LocalDate.now(ZoneOffset.UTC).minusMonths(1))
+                .subscriptionEndDate(LocalDate.now(ZoneOffset.UTC).plusMonths(5))
                 .status(SchoolStatus.ACTIVE)
                 .build();
 
@@ -69,7 +70,7 @@ class DailyTokenAllowanceServiceImplTest {
                 .accountStatus(AccountStatus.ACTIVE)
                 .school(activeSchool)
                 .token(400) // 400 unused tokens from yesterday
-                .lastTokenResetAt(LocalDateTime.now().minusDays(1))
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC).minusDays(1))
                 .build();
     }
 
@@ -89,7 +90,7 @@ class DailyTokenAllowanceServiceImplTest {
         assertEquals(1_000, activeStudent.getToken());
         // Pure Shared Pool: school pool remains 100,000 until student actually chats with AI
         assertEquals(100_000, activeSchool.getUnallocatedTokenQuota());
-        assertEquals(LocalDate.now(), activeStudent.getLastTokenResetAt().toLocalDate());
+        assertEquals(LocalDate.now(ZoneOffset.UTC), activeStudent.getLastTokenResetAt().toLocalDate());
         verify(schoolRepository, never()).save(activeSchool);
         verify(userRepository).save(activeStudent);
     }
@@ -117,7 +118,7 @@ class DailyTokenAllowanceServiceImplTest {
     void recordStudentTokenUsage_DeductsDirectlyFromSchoolPool() {
         activeStudent.setDailyTokensUsed(200);
         activeStudent.setDailyBonusTokens(0);
-        activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        activeStudent.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
                 .thenReturn(Collections.emptyList());
 
@@ -136,7 +137,7 @@ class DailyTokenAllowanceServiceImplTest {
     void verifyAndPrepareDailyAllowance_SameDay_NoReset() {
         activeStudent.setDailyTokensUsed(350);
         activeStudent.setDailyBonusTokens(0);
-        activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        activeStudent.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
                 .thenReturn(Collections.emptyList());
 
@@ -152,7 +153,7 @@ class DailyTokenAllowanceServiceImplTest {
     void verifyAndPrepareDailyAllowance_Exhausted_ThrowsAiQuotaExceeded() {
         activeStudent.setDailyTokensUsed(1_000);
         activeStudent.setDailyBonusTokens(0);
-        activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        activeStudent.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
                 .thenReturn(Collections.emptyList());
 
@@ -165,7 +166,7 @@ class DailyTokenAllowanceServiceImplTest {
     @Test
     @DisplayName("US-SP7-14: Expired school subscription throws SCHOOL_SUBSCRIPTION_EXPIRED")
     void verifyAndPrepareDailyAllowance_ExpiredSchool_ThrowsSubscriptionExpired() {
-        activeSchool.setSubscriptionEndDate(LocalDate.now().minusDays(1));
+        activeSchool.setSubscriptionEndDate(LocalDate.now(ZoneOffset.UTC).minusDays(1));
 
         AccessDeniedException ex = assertThrows(AccessDeniedException.class,
                 () -> dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(activeStudent));
@@ -199,7 +200,7 @@ class DailyTokenAllowanceServiceImplTest {
                 .school(activeSchool)
                 .token(0)
                 .dailyTokensUsed(500)
-                .lastTokenResetAt(LocalDateTime.now().minusDays(1))
+                .lastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC).minusDays(1))
                 .build();
 
         int available = dailyTokenAllowanceService.verifyAndPrepareDailyAllowance(teacher);

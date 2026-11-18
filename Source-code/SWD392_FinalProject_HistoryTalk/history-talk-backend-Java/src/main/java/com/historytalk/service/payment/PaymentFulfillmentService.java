@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,7 +37,7 @@ public class PaymentFulfillmentService {
     @Transactional
     public boolean fulfillPaidOrder(Long orderCode) {
         PaymentOrder order = paymentOrderRepository.findByOrderCodeForUpdate(orderCode)
-                .orElseThrow(() -> new RuntimeException("Payment order not found: " + orderCode));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn thanh toán: " + orderCode));
         return fulfillLockedPaidOrder(order);
     }
 
@@ -57,14 +58,14 @@ public class PaymentFulfillmentService {
             return false;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         markProcessing(order, now);
 
         try {
             if (PaymentOrderType.SCHOOL_TOKEN_TOPUP.equals(order.getOrderType())) {
                 School school = order.getSchool();
                 if (school == null) {
-                    throw new IllegalStateException("School token topup order is missing associated school");
+                    throw new IllegalStateException("Đơn nạp token của trường không gắn với trường học nào");
                 }
                 long addTokens = order.getTopupTokens() != null ? order.getTopupTokens() : 0L;
                 int currentTotal = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0;
@@ -92,10 +93,10 @@ public class PaymentFulfillmentService {
             Tier newTier = order.getTier();
 
             if (user == null || user.getDeletedAt() != null) {
-                throw new IllegalStateException("Order user is missing or deleted");
+                throw new IllegalStateException("Người dùng của đơn hàng không tồn tại hoặc đã bị xóa");
             }
             if (newTier == null || newTier.getDeletedAt() != null) {
-                throw new IllegalStateException("Order tier is missing or deleted");
+                throw new IllegalStateException("Gói hội viên của đơn hàng không tồn tại hoặc đã bị xóa");
             }
 
             // Only one paid subscription may be active: the new one replaces any active paid plan (mid-period upgrade).

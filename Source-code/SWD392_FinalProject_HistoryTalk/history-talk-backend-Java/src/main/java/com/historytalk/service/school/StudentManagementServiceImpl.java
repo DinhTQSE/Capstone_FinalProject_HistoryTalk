@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,7 +40,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
     @Transactional(readOnly = true)
     public PaginatedResponse<StudentResponse> getStudents(UUID schoolId, String search, Boolean active, Pageable pageable) {
         if (!schoolRepository.existsById(schoolId)) {
-            throw new ResourceNotFoundException("School not found with ID: " + schoolId);
+            throw new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId);
         }
 
         String keyword = (search != null) ? search.trim() : "";
@@ -76,7 +77,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             String newEmail = request.getEmail().trim().toLowerCase();
             if (!newEmail.equalsIgnoreCase(student.getEmail()) && userRepository.existsByEmailIgnoreCaseAndUidNot(newEmail, studentId)) {
-                throw new DataConflictException("Email " + newEmail + " is already in use by another account");
+                throw new DataConflictException("Email " + newEmail + " đã được sử dụng bởi một tài khoản khác");
             }
             student.setEmail(newEmail);
         }
@@ -103,7 +104,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
         if (active) {
             student.setDeletedAt(null);
         } else {
-            student.setDeletedAt(LocalDateTime.now());
+            student.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         }
 
         User saved = userRepository.save(student);
@@ -115,7 +116,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
     @Transactional
     public void deleteStudent(UUID studentId, UUID schoolId) {
         User student = findStudentInSchool(studentId, schoolId);
-        student.setDeletedAt(LocalDateTime.now());
+        student.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         userRepository.save(student);
         log.info("Soft-deleted student: {}", student.getUserName());
     }
@@ -143,20 +144,20 @@ public class StudentManagementServiceImpl implements StudentManagementService {
                 .fullName(student.getFullName())
                 .email(student.getEmail())
                 .initialPassword(rawPassword)
-                .message("Student password reset successfully. Default pattern is {studentCode}@2026.")
+                .message("Đặt lại mật khẩu học sinh thành công. Mật khẩu mặc định có dạng {studentCode}@2026.")
                 .build();
     }
 
     private User findStudentInSchool(UUID studentId, UUID schoolId) {
         User student = userRepository.findById(studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + studentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy học sinh với ID: " + studentId));
 
         if (student.getSchool() == null || !student.getSchool().getId().equals(schoolId)) {
-            throw new ResourceNotFoundException("Student does not belong to your school");
+            throw new ResourceNotFoundException("Học sinh không thuộc trường của bạn");
         }
 
         if (student.getRole() != UserRole.SCHOOL_STUDENT) {
-            throw new ResourceNotFoundException("Account is not a student");
+            throw new ResourceNotFoundException("Tài khoản không phải là học sinh");
         }
 
         return student;
@@ -176,7 +177,7 @@ public class StudentManagementServiceImpl implements StudentManagementService {
                 .active(user.getDeletedAt() == null)
                 .schoolId(user.getSchool() != null ? user.getSchool().getId() : null)
                 .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
-                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : LocalDateTime.now())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : LocalDateTime.now(ZoneOffset.UTC))
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }

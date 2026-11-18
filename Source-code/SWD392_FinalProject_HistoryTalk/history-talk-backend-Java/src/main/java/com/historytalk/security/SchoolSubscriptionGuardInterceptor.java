@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
@@ -60,7 +61,7 @@ public class SchoolSubscriptionGuardInterceptor implements HandlerInterceptor {
         if (role == UserRole.SCHOOL_ADMIN || role == UserRole.TEACHER || role == UserRole.SCHOOL_STUDENT) {
             School school = user.getSchool();
             if (school != null) {
-                LocalDate today = LocalDate.now();
+                LocalDate today = LocalDate.now(ZoneOffset.UTC);
                 if (school.getSubscriptionEndDate() != null && today.isAfter(school.getSubscriptionEndDate())) {
                     if (school.getStatus() != SchoolStatus.EXPIRED) {
                         school.setStatus(SchoolStatus.EXPIRED);

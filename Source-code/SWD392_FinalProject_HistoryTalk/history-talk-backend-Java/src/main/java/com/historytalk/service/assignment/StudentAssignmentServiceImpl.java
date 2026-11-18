@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -115,7 +116,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
         if (submission.getStatus() == SubmissionStatus.NOT_STARTED) {
             submission.setStatus(SubmissionStatus.IN_PROGRESS);
-            submission.setStartedAt(LocalDateTime.now());
+            submission.setStartedAt(LocalDateTime.now(ZoneOffset.UTC));
             assignmentSubmissionRepository.save(submission);
             log.info("Student {} started assignment {}", studentUid, assignmentId);
         }
@@ -141,7 +142,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
             throw new InvalidRequestException("Bạn đã nộp bài tập này rồi, không thể nộp lại");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         SubmissionStatus finalStatus = (assignment.getDeadline() != null && now.isAfter(assignment.getDeadline()))
                 ? SubmissionStatus.LATE_SUBMITTED
                 : SubmissionStatus.SUBMITTED;
@@ -262,7 +263,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
     private StudentAssignmentResponse mapToStudentAssignmentResponse(AssignmentSubmission s, String resolvedTargetTitle) {
         Assignment a = s.getAssignment();
-        boolean isExpired = a.getDeadline() != null && LocalDateTime.now().isAfter(a.getDeadline());
+        boolean isExpired = a.getDeadline() != null && LocalDateTime.now(ZoneOffset.UTC).isAfter(a.getDeadline());
 
         return StudentAssignmentResponse.builder()
                 .assignmentId(a.getId())

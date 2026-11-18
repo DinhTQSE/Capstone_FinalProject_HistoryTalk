@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DeactivateStudentRequest {
 
-    @NotBlank(message = "Deactivation reason must not be blank (e.g., GRADUATED, TRANSFERRED_OUT)")
-    @Size(max = 255, message = "Deactivation reason must not exceed 255 characters")
+    @NotBlank(message = "Lý do vô hiệu hóa không được để trống (ví dụ: GRADUATED, TRANSFERRED_OUT)")
+    @Size(max = 255, message = "Lý do vô hiệu hóa không được vượt quá 255 ký tự")
     private String reason;
 }

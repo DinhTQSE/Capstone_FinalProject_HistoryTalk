@@ -58,7 +58,7 @@ public class MapFocusController {
         String role = SecurityUtils.getRoleName();   // null for guests
         List<MapFocusResponse> data = mapFocusService.getFocuses(contextId, role);
 
-        return ResponseEntity.ok(ApiResponse.success(data, "Map focuses retrieved successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Lấy danh sách điểm focus bản đồ thành công"));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ public class MapFocusController {
         MapFocusResponse data = mapFocusService.createFocus(contextId, request, callerId, role);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                             .body(ApiResponse.success(data, "Map focus created successfully"));
+                             .body(ApiResponse.success(data, "Tạo điểm focus bản đồ thành công"));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ public class MapFocusController {
         MapFocusResponse data =
                 mapFocusService.updateFocus(contextId, focusId, request, callerId, role);
 
-        return ResponseEntity.ok(ApiResponse.success(data, "Map focus updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Cập nhật điểm focus bản đồ thành công"));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ public class MapFocusController {
 
         List<MapFocusResponse> data = mapFocusService.reorderFocuses(contextId, request, role);
 
-        return ResponseEntity.ok(ApiResponse.success(data, "Map focuses reordered successfully"));
+        return ResponseEntity.ok(ApiResponse.success(data, "Sắp xếp lại điểm focus bản đồ thành công"));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

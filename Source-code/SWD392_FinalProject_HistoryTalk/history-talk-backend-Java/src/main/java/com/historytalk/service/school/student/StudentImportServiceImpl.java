@@ -53,7 +53,7 @@ public class StudentImportServiceImpl implements StudentImportService {
     public StudentImportResultDto importStudents(ImportScope scope, MultipartFile file, StudentImportContext context) {
         StudentImportProcessor processor = processorMap.get(scope);
         if (processor == null) {
-            throw new UnsupportedOperationException("No import processor registered for scope: " + scope);
+            throw new UnsupportedOperationException("Không có bộ xử lý nhập dữ liệu cho phạm vi: " + scope);
         }
         return processor.processImport(file, context);
     }
@@ -125,7 +125,7 @@ public class StudentImportServiceImpl implements StudentImportService {
 
     private Classroom validateClassroomAccess(UUID classroomId, UUID schoolId, UserPrincipal principal) {
         Classroom classroom = classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with ID: " + classroomId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học với ID: " + classroomId));
 
         if (principal != null && principal.getRole() == UserRole.TEACHER) {
             UUID currentTeacherUid = UUID.fromString(principal.getUid());

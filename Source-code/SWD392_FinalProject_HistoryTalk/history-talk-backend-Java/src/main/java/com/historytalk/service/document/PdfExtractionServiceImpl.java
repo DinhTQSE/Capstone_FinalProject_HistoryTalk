@@ -345,7 +345,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             Boolean extractImages,
             BiConsumer<Integer, Integer> onProgress) throws IOException {
         if (pdfBytes == null || pdfBytes.length == 0) {
-            throw new InvalidRequestException("PDF bytes cannot be empty");
+            throw new InvalidRequestException("Dữ liệu PDF không được để trống");
         }
 
         if (pdfBytes.length > MAX_FILE_BYTES) {
@@ -481,7 +481,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
             throw ce;
         } catch (IOException ex) {
             log.error("Failed to extract text from PDF: {}", ex.getMessage());
-            throw new SystemException("Failed to extract text from PDF: " + ex.getMessage());
+            throw new SystemException("Trích xuất văn bản từ PDF thất bại: " + ex.getMessage());
         }
     }
 
@@ -525,7 +525,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                     }
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new CancellationException("Vision AI processing interrupted");
+                    throw new CancellationException("Quá trình xử lý Vision AI bị gián đoạn");
                 }
             }, imageIoExecutor);
             futures.add(future);
@@ -783,7 +783,7 @@ public class PdfExtractionServiceImpl implements PdfExtractionService {
                     uploadFutures.add(future);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new CancellationException("PDF image extraction interrupted");
+                    throw new CancellationException("Quá trình trích xuất ảnh từ PDF bị gián đoạn");
                 } catch (CancellationException ce) {
                     throw ce;
                 } catch (Exception e) {

@@ -29,8 +29,8 @@ public class UpdateMapFocusRequest {
     /**
      * New zoom level (1.0–20.0). Unchanged if null.
      */
-    @DecimalMin(value = "1.0", message = "Zoom level must be at least 1.0")
-    @DecimalMax(value = "20.0", message = "Zoom level must be at most 20.0")
+    @DecimalMin(value = "1.0", message = "Mức zoom phải từ 1.0 trở lên")
+    @DecimalMax(value = "20.0", message = "Mức zoom tối đa là 20.0")
     private Double zoomLevel;
 
     /**

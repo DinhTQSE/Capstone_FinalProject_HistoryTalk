@@ -1,6 +1,7 @@
 package com.historytalk.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.historytalk.exception.GlobalExceptionHandler;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,12 +16,13 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
         response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 
         Map<String,Object> body = new LinkedHashMap<>();
         body.put("status", HttpServletResponse.SC_FORBIDDEN);
         body.put("error", "Forbidden");
-        body.put("message", accessDeniedException.getMessage());
+        body.put("message", GlobalExceptionHandler.accessDeniedMessage(accessDeniedException.getMessage()));
         body.put("path", request.getServletPath());
 
         ObjectMapper mapper= new ObjectMapper();

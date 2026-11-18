@@ -29,6 +29,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -106,7 +107,7 @@ class SchoolAdminTeacherControllerTest {
                 .fullName("Trần Thị Giáo Viên")
                 .email("teacher@lhp.edu.vn")
                 .active(true)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         PaginatedResponse<TeacherResponse> paginatedResponse = PaginatedResponse.<TeacherResponse>builder()
@@ -196,7 +197,7 @@ class SchoolAdminTeacherControllerTest {
         mockMvc.perform(delete("/api/v1/school-admin/teachers/{id}", teacherId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Teacher account deleted successfully"));
+                .andExpect(jsonPath("$.message").value("Xóa tài khoản giáo viên thành công"));
 
         verify(teacherManagementService).deleteTeacher(teacherId, schoolId);
     }

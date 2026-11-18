@@ -17,6 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,7 +52,7 @@ class MessageServiceImplTest {
         UUID userId = UUID.randomUUID();
         ChatSession deletedSession = ChatSession.builder()
                 .sessionId(sessionId)
-                .deletedAt(LocalDateTime.now())
+                .deletedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         lenient().when(chatSessionRepository.findBySessionIdAndUserUid(sessionId, userId))
@@ -59,7 +60,7 @@ class MessageServiceImplTest {
 
         assertThatThrownBy(() -> messageService.getMessages(sessionId.toString(), userId.toString()))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Chat session not found");
+                .hasMessageContaining("Không tìm thấy phiên trò chuyện");
     }
 
     @Test
@@ -68,7 +69,7 @@ class MessageServiceImplTest {
         UUID userId = UUID.randomUUID();
         ChatSession deletedSession = ChatSession.builder()
                 .sessionId(sessionId)
-                .deletedAt(LocalDateTime.now())
+                .deletedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
         SendMessageRequest request = new SendMessageRequest();
         ReflectionTestUtils.setField(request, "sessionId", sessionId.toString());
@@ -79,6 +80,6 @@ class MessageServiceImplTest {
 
         assertThatThrownBy(() -> messageService.sendMessage(userId.toString(), request))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Chat session not found");
+                .hasMessageContaining("Không tìm thấy phiên trò chuyện");
     }
 }

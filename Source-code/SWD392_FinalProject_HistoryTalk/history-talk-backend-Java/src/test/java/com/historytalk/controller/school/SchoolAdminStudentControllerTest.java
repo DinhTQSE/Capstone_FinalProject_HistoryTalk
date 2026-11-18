@@ -282,7 +282,7 @@ class SchoolAdminStudentControllerTest {
         mockMvc.perform(delete("/api/v1/school-admin/students/{id}", studentId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Student account deleted successfully"));
+                .andExpect(jsonPath("$.message").value("Xóa tài khoản học sinh thành công"));
 
         verify(studentManagementService).deleteStudent(studentId, schoolId);
     }

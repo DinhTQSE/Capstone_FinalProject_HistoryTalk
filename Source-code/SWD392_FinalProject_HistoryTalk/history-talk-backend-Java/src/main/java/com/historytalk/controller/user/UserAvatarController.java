@@ -52,7 +52,7 @@ public class UserAvatarController {
         SignedViewUrlResponse response = userAvatarService.uploadAvatarDirect(
                 userId, file, mediaType, width, height, currentUserId, userRole);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "Avatar uploaded successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tải lên ảnh đại diện thành công"));
     }
 
     @GetMapping("/view-url")
@@ -68,7 +68,7 @@ public class UserAvatarController {
 
         SignedViewUrlResponse response = userAvatarService.generateAvatarViewUrl(userId, currentUserId);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "Avatar view URL generated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Tạo đường dẫn xem ảnh đại diện thành công"));
     }
 
     @DeleteMapping

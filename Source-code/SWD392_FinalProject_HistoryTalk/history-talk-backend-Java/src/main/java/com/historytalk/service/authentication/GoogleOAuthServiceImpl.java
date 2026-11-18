@@ -25,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -86,14 +87,14 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
         try {
             Map<String, Object> response = restTemplate.getForObject(verificationUrl, Map.class);
             if (response == null || response.containsKey("error")) {
-                throw new UnauthorizedException("Invalid Google ID Token");
+                throw new UnauthorizedException("Google ID Token không hợp lệ");
             }
             
             String email = (String) response.get("email");
             String name = (String) response.get("name");
             
             if (email == null || email.isBlank()) {
-                throw new UnauthorizedException("Google account email is required");
+                throw new UnauthorizedException("Tài khoản Google phải có email");
             }
             email = email.toLowerCase();
             
@@ -102,7 +103,7 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                     .orElseGet(() -> createGoogleUserAndSendPasswordEmail(finalEmail, name));
             
             if (user.getDeletedAt() != null) {
-                throw new UnauthorizedException("Account has been deactivated");
+                throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
             }
             markEmailVerifiedIfNeeded(user);
             
@@ -127,14 +128,14 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                     .build();
         } catch (Exception e) {
             log.error("Google ID Token verification failed: {}", e.getMessage());
-            throw new UnauthorizedException("Google authentication failed: " + e.getMessage());
+            throw new UnauthorizedException("Xác thực Google thất bại: " + e.getMessage());
         }
     }
 
     private void markEmailVerifiedIfNeeded(User user) {
         if (!Boolean.TRUE.equals(user.getEmailVerified())) {
             user.setEmailVerified(true);
-            user.setEmailVerifiedAt(LocalDateTime.now());
+            user.setEmailVerifiedAt(LocalDateTime.now(ZoneOffset.UTC));
             user.setEmailVerificationTokenHash(null);
             user.setEmailVerificationExpiresAt(null);
             user.setEmailVerificationSentAt(null);
@@ -170,14 +171,14 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
                 .password(passwordEncoder.encode(temporaryPassword))
                 .role(UserRole.CUSTOMER)
                 .emailVerified(true)
-                .emailVerifiedAt(LocalDateTime.now())
+                .emailVerifiedAt(LocalDateTime.now(ZoneOffset.UTC))
                 .build();
 
         java.util.Optional<Tier> freeTierOpt = tierRepository.findByTitleIgnoreCaseAndIsActiveTrueAndDeletedAtIsNull("free");
         if (freeTierOpt.isPresent()) {
             Tier freeTier = freeTierOpt.get();
             user.setToken(freeTier.getLimitedToken());
-            user.setLastTokenResetAt(LocalDateTime.now());
+            user.setLastTokenResetAt(LocalDateTime.now(ZoneOffset.UTC));
         }
 
         User saved = userRepository.save(user);
@@ -187,8 +188,8 @@ public class GoogleOAuthServiceImpl implements GoogleOAuthService {
             UserTier userTier = UserTier.builder()
                     .user(saved)
                     .tier(freeTier)
-                    .startTime(LocalDateTime.now())
-                    .endTime(LocalDateTime.now().plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120))
+                    .startTime(LocalDateTime.now(ZoneOffset.UTC))
+                    .endTime(LocalDateTime.now(ZoneOffset.UTC).plusMonths(freeTier.getNoMonth() > 0 ? freeTier.getNoMonth() : 120))
                     .isActive(true)
                     .build();
             userTierRepository.save(userTier);

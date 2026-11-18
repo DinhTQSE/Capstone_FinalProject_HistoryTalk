@@ -55,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +125,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("getQuizByIdForCustomer: quizId={}", quizId);
         UUID uuid = parseUuid(quizId, "quizId");
         Quiz quiz = quizRepository.findActiveById(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanReadQuizForCustomer(quiz, resolveUserSchoolId(userId), quizId);
         long playCount = userId != null
                 ? quizSessionRepository.countCompletedByQuizAndUser(uuid, userId)
@@ -138,16 +139,16 @@ public class QuizServiceImpl implements QuizService {
         log.info("startQuiz: quizId={}, userId={}, limitedTime={}", quizId, userId, limitedTime);
         UUID uuid = parseUuid(quizId, "quizId");
         Quiz quiz = quizRepository.findActiveById(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
         UUID userSchoolId = user.getSchool() != null ? user.getSchool().getId() : null;
         assertCanReadQuizForCustomer(quiz, userSchoolId, quizId);
 
         QuizSession session = QuizSession.builder()
                 .quiz(quiz)
                 .user(user)
-                .startTime(LocalDateTime.now())
+                .startTime(LocalDateTime.now(ZoneOffset.UTC))
                 .limitedTime(limitedTime)
                 .build();
         session = quizSessionRepository.save(session);
@@ -168,7 +169,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("submitQuiz: sessionId={}, userId={}", request.getSessionId(), userId);
         UUID sessionUuid = parseUuid(request.getSessionId(), "sessionId");
         QuizSession session = quizSessionRepository.findBySessionId(sessionUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz session not found: " + request.getSessionId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lượt làm quiz: " + request.getSessionId()));
 
         // Ownership check
         if (!session.getUser().getUid().equals(userId)) {
@@ -193,7 +194,7 @@ public class QuizServiceImpl implements QuizService {
             LocalDateTime rejectFrom = session.getStartTime()
                     .plusSeconds(session.getLimitedTime())
                     .plusSeconds(60);
-            if (!LocalDateTime.now().isBefore(rejectFrom)) {
+            if (!LocalDateTime.now(ZoneOffset.UTC).isBefore(rejectFrom)) {
                 throw new InvalidRequestException("Đã hết thời gian làm bài");
             }
         }
@@ -249,7 +250,7 @@ public class QuizServiceImpl implements QuizService {
         session.getAnswerDetails().addAll(answerDetails);
 
         // Terminate session
-        session.setEndTime(LocalDateTime.now());
+        session.setEndTime(LocalDateTime.now(ZoneOffset.UTC));
         session.setScore((float) score);
         quizSessionRepository.save(session);
         gamificationService.recordProgress(userId.toString(), QuestType.QUIZ);
@@ -293,7 +294,7 @@ public class QuizServiceImpl implements QuizService {
         UUID sessionUuid = parseUuid(sessionId, "sessionId");
 
         QuizSession session = quizSessionRepository.findBySessionId(sessionUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz session not found: " + sessionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lượt làm quiz: " + sessionId));
 
         // Ownership check — skipped for admin (userId == null)
         if (userId != null && !session.getUser().getUid().equals(userId)) {
@@ -369,7 +370,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("getQuizHistoryByUserId: userId={}", userId);
         UUID uid = parseUuid(userId, "userId");
         userRepository.findById(uid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
         Page<QuizSession> page = quizSessionRepository.findCompletedByUserUidForAdmin(uid, pageable);
         return mapToHistoryPaginatedResponse(page);
     }
@@ -391,7 +392,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizStaffResponse getQuizByIdForStaff(String quizId) {
         log.info("getQuizByIdForStaff: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanReadQuizForStaff(quiz, quizId);
         return mapToStaffResponse(quiz);
     }
@@ -402,10 +403,10 @@ public class QuizServiceImpl implements QuizService {
         log.info("createQuiz: title={}, userId={}", request.getTitle(), userId);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
 
         HistoricalContext context = historicalContextRepository.findById(parseUuid(request.getContextId(), "contextId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử: " + request.getContextId()));
 
         assertCanCreateQuizInContext(context, user);
         UUID scopeSchoolId = resolveContextSchoolId(context);
@@ -437,14 +438,14 @@ public class QuizServiceImpl implements QuizService {
     public QuizStaffResponse updateQuiz(String quizId, UpdateQuizRequest request) {
         log.info("updateQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
 
         HistoricalContext targetContext = quiz.getHistoricalContext();
         if (request.getContextId() != null && !request.getContextId().isBlank()) {
             targetContext = historicalContextRepository
                     .findById(parseUuid(request.getContextId(), "contextId"))
-                    .orElseThrow(() -> new ResourceNotFoundException("Historical context not found: " + request.getContextId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử: " + request.getContextId()));
             assertCanMoveQuizToContext(quiz, targetContext);
             quiz.setHistoricalContext(targetContext);
         }
@@ -472,7 +473,7 @@ public class QuizServiceImpl implements QuizService {
     public void deleteQuiz(String quizId) {
         log.info("deleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
         ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quizRepository.delete(quiz);
@@ -483,10 +484,10 @@ public class QuizServiceImpl implements QuizService {
     public void softDeleteQuiz(String quizId) {
         log.info("softDeleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
         ensureQuizNotReferencedByAssignment(quiz.getQuizId());
-        quiz.setDeletedAt(LocalDateTime.now());
+        quiz.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         quizRepository.save(quiz);
     }
 
@@ -502,7 +503,7 @@ public class QuizServiceImpl implements QuizService {
     public QuestionResponse addQuestion(String quizId, QuestionRequest request) {
         log.info("addQuestion: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
         Question question = questionRepository.save(buildQuestion(request));
         linkQuestion(quiz, question, quizQuestionRepository.findMaxOrderIndex(quiz.getQuizId()) + 1);
@@ -516,11 +517,11 @@ public class QuizServiceImpl implements QuizService {
         // Validate quiz exists and caller has write permission
         UUID quizUuid = parseUuid(quizId, "quizId");
         Quiz quiz = quizRepository.findById(quizUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
 
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
 
         if (!quizQuestionRepository.existsByQuiz_QuizIdAndQuestion_QuestionId(quizUuid, question.getQuestionId())) {
             throw new InvalidRequestException("Câu hỏi không thuộc về quiz: " + quizId);
@@ -599,7 +600,7 @@ public class QuizServiceImpl implements QuizService {
                         "Không tìm thấy bối cảnh lịch sử với ID: " + contextIdStr));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
         assertCanCreateQuizInContext(context, user);
 
         UUID scopeSchoolId = resolveContextSchoolId(context);
@@ -1026,9 +1027,9 @@ public class QuizServiceImpl implements QuizService {
     public QuestionBankResponse updateBankQuestion(String questionId, QuestionRequest request) {
         log.info("updateBankQuestion: questionId={}", questionId);
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
         if (question.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Question has been deleted: " + questionId);
+            throw new ResourceNotFoundException("Câu hỏi đã bị xóa: " + questionId);
         }
         if (request.getContent() != null && !request.getContent().isBlank()) {
             question.setContent(request.getContent());
@@ -1056,8 +1057,8 @@ public class QuizServiceImpl implements QuizService {
     public void softDeleteBankQuestion(String questionId) {
         log.info("softDeleteBankQuestion: questionId={}", questionId);
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
-        question.setDeletedAt(LocalDateTime.now());
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
+        question.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         questionRepository.save(question);
     }
 
@@ -1069,10 +1070,10 @@ public class QuizServiceImpl implements QuizService {
         UUID questionUuid = parseUuid(questionId, "questionId");
 
         Quiz quiz = quizRepository.findById(quizUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
         Question question = questionRepository.findById(questionUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
 
         if (question.getDeletedAt() != null) {
             throw new InvalidRequestException("Không thể thêm câu hỏi đã bị xóa vào quiz");
@@ -1102,10 +1103,10 @@ public class QuizServiceImpl implements QuizService {
         UUID questionUuid = parseUuid(questionId, "questionId");
 
         Quiz quiz = quizRepository.findById(quizUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz not found: " + quizId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         assertCanModifyQuiz(quiz);
         questionRepository.findById(questionUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + questionId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
 
         QuizQuestionId linkId = new QuizQuestionId(quizUuid, questionUuid);
         QuizQuestion link = quizQuestionRepository.findById(linkId)
@@ -1168,13 +1169,13 @@ public class QuizServiceImpl implements QuizService {
     private void assertCanReadQuizForCustomer(Quiz quiz, UUID userSchoolId, String quizId) {
         UUID quizSchoolId = resolveQuizSchoolId(quiz);
         if (quizSchoolId != null && !quizSchoolId.equals(userSchoolId)) {
-            throw new ResourceNotFoundException("Quiz not found: " + quizId);
+            throw new ResourceNotFoundException("Không tìm thấy quiz: " + quizId);
         }
     }
 
     private void assertCanReadQuizForStaff(Quiz quiz, String quizId) {
         if (quiz.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Quiz not found: " + quizId);
+            throw new ResourceNotFoundException("Không tìm thấy quiz: " + quizId);
         }
         String role = SecurityUtils.getRoleName();
         if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
@@ -1188,7 +1189,7 @@ public class QuizServiceImpl implements QuizService {
 
     private void assertCanModifyQuiz(Quiz quiz) {
         if (quiz.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Quiz not found: " + quiz.getQuizId());
+            throw new ResourceNotFoundException("Không tìm thấy quiz: " + quiz.getQuizId());
         }
         String role = SecurityUtils.getRoleName();
         if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {

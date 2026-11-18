@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -145,7 +146,7 @@ class GoogleOAuthServiceImplTest {
     @Test
     void authenticateGoogleUser_rejectsSoftDeletedUser() {
         User deleted = user("deleted", "deleted@gmail.com", UserRole.CUSTOMER);
-        deleted.setDeletedAt(LocalDateTime.now());
+        deleted.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         when(userRepository.findByEmailIgnoreCase("deleted@gmail.com")).thenReturn(Optional.of(deleted));
 
