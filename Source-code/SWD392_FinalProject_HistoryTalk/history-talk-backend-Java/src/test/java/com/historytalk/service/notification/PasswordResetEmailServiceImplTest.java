@@ -68,7 +68,7 @@ class PasswordResetEmailServiceImplTest {
 
         assertThatThrownBy(() -> service.sendPasswordResetEmail("user@example.com", "History User", "raw-token-123"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Failed to send password reset email")
+                .hasMessage("Không thể gửi email đặt lại mật khẩu")
                 .hasCause(failure);
     }
 
@@ -80,7 +80,7 @@ class PasswordResetEmailServiceImplTest {
 
         assertThatThrownBy(() -> service.sendPasswordResetEmail("user@example.com", "History User", "raw-token-123"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Failed to send password reset email")
+                .hasMessage("Không thể gửi email đặt lại mật khẩu")
                 .hasCause(failure);
     }
 

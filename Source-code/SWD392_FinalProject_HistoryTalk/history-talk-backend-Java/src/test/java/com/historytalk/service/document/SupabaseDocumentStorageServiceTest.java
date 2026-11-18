@@ -41,7 +41,7 @@ class SupabaseDocumentStorageServiceTest {
                 "application/pdf",
                 "pdf-bytes".getBytes());
 
-        server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/documents/context/" + entityId + "/" + docId + ".pdf"))
+        server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/context/" + entityId + "/" + docId + ".pdf"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer service-role-key"))
                 .andExpect(header("apikey", "service-role-key"))
@@ -50,7 +50,7 @@ class SupabaseDocumentStorageServiceTest {
 
         UploadedDocumentFile uploaded = service.uploadPdf(EntityType.CONTEXT, entityId, docId, file);
 
-        assertThat(uploaded.objectPath()).isEqualTo("documents/context/" + entityId + "/" + docId + ".pdf");
+        assertThat(uploaded.objectPath()).isEqualTo("context/" + entityId + "/" + docId + ".pdf");
         server.verify();
     }
 
@@ -69,7 +69,7 @@ class SupabaseDocumentStorageServiceTest {
 
         assertThatThrownBy(() -> service.uploadPdf(EntityType.CONTEXT, UUID.randomUUID(), UUID.randomUUID(), file))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("Only .pdf files are accepted");
+                .hasMessageContaining(".pdf");
     }
 
     @Test
@@ -87,7 +87,7 @@ class SupabaseDocumentStorageServiceTest {
 
         assertThatThrownBy(() -> service.uploadPdf(EntityType.CONTEXT, UUID.randomUUID(), UUID.randomUUID(), file))
                 .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining("PDF file must not be empty");
+                .hasMessageContaining("trống");
     }
 
     @Test
@@ -108,13 +108,13 @@ class SupabaseDocumentStorageServiceTest {
         when(file.getContentType()).thenReturn("application/pdf");
         when(file.getBytes()).thenReturn("pdf-bytes".getBytes());
 
-        server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/documents/context/" + entityId + "/" + docId + ".pdf"))
+        server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/context/" + entityId + "/" + docId + ".pdf"))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
 
         UploadedDocumentFile uploaded = service.uploadPdf(EntityType.CONTEXT, entityId, docId, file);
 
-        assertThat(uploaded.objectPath()).isEqualTo("documents/context/" + entityId + "/" + docId + ".pdf");
+        assertThat(uploaded.objectPath()).isEqualTo("context/" + entityId + "/" + docId + ".pdf");
         server.verify();
     }
 
@@ -143,7 +143,7 @@ class SupabaseDocumentStorageServiceTest {
                 "service-role-key",
                 "documents",
                 builder);
-        String objectPath = "documents/context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        String objectPath = "context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
 
         server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/" + objectPath))
                 .andExpect(method(HttpMethod.GET))
@@ -151,7 +151,7 @@ class SupabaseDocumentStorageServiceTest {
                 .andExpect(header("apikey", "service-role-key"))
                 .andRespond(withSuccess("pdf-bytes".getBytes(), MediaType.APPLICATION_PDF));
 
-        DownloadedDocumentFile downloaded = service.downloadPdf(objectPath);
+        DownloadedDocumentFile downloaded = service.downloadPdf("documents/" + objectPath);
 
         assertThat(downloaded.bytes()).isEqualTo("pdf-bytes".getBytes());
         assertThat(downloaded.contentType()).isEqualTo(MediaType.APPLICATION_PDF_VALUE);
@@ -167,15 +167,15 @@ class SupabaseDocumentStorageServiceTest {
                 "service-role-key",
                 "documents",
                 builder);
-        String objectPath = "documents/context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        String objectPath = "context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
 
         server.expect(requestTo("https://example.supabase.co/storage/v1/object/documents/" + objectPath))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(new byte[0], MediaType.APPLICATION_PDF));
 
-        assertThatThrownBy(() -> service.downloadPdf(objectPath))
+        assertThatThrownBy(() -> service.downloadPdf("documents/" + objectPath))
                 .isInstanceOf(SystemException.class)
-                .hasMessageContaining("empty");
+                .hasMessageContaining("trống");
     }
 
     @Test
@@ -187,17 +187,18 @@ class SupabaseDocumentStorageServiceTest {
                 "service-role-key",
                 "documents",
                 builder);
-        String objectPath = "documents/context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        String cleanPath = "context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        String objectPath = "documents/" + cleanPath;
 
-        server.expect(requestTo("https://example.supabase.co/storage/v1/object/sign/documents/" + objectPath))
+        server.expect(requestTo("https://example.supabase.co/storage/v1/object/sign/documents/" + cleanPath))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer service-role-key"))
                 .andExpect(header("apikey", "service-role-key"))
-                .andRespond(withSuccess("{\"signedURL\":\"/storage/v1/object/sign/documents/" + objectPath + "?token=abc\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"signedURL\":\"/storage/v1/object/sign/documents/" + cleanPath + "?token=abc\"}", MediaType.APPLICATION_JSON));
 
         DocumentPdfUrl signedUrl = service.createSignedPdfUrl(objectPath, 300, "document.pdf");
 
-        assertThat(signedUrl.url()).isEqualTo("https://example.supabase.co/storage/v1/object/sign/documents/" + objectPath + "?token=abc&download=document.pdf");
+        assertThat(signedUrl.url()).isEqualTo("https://example.supabase.co/storage/v1/object/sign/documents/" + cleanPath + "?token=abc&download=document.pdf");
         assertThat(signedUrl.expiresIn()).isEqualTo(300);
         server.verify();
     }
@@ -211,15 +212,16 @@ class SupabaseDocumentStorageServiceTest {
                 "service-role-key",
                 "documents",
                 builder);
-        String objectPath = "documents/context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        String cleanPath = "context/" + UUID.randomUUID() + "/" + UUID.randomUUID() + ".pdf";
+        String objectPath = "documents/" + cleanPath;
 
-        server.expect(requestTo("https://example.supabase.co/storage/v1/object/sign/documents/" + objectPath))
+        server.expect(requestTo("https://example.supabase.co/storage/v1/object/sign/documents/" + cleanPath))
                 .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("{\"signedURL\":\"/object/sign/documents/" + objectPath + "?token=abc\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"signedURL\":\"/object/sign/documents/" + cleanPath + "?token=abc\"}", MediaType.APPLICATION_JSON));
 
         DocumentPdfUrl signedUrl = service.createSignedPdfUrl(objectPath, 300, "my source.pdf");
 
-        assertThat(signedUrl.url()).isEqualTo("https://example.supabase.co/storage/v1/object/sign/documents/" + objectPath + "?token=abc&download=my+source.pdf");
+        assertThat(signedUrl.url()).isEqualTo("https://example.supabase.co/storage/v1/object/sign/documents/" + cleanPath + "?token=abc&download=my+source.pdf");
         server.verify();
     }
 }

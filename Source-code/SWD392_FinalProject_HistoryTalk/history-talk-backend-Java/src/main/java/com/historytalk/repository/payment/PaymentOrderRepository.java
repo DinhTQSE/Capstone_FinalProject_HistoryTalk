@@ -125,6 +125,17 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
         FROM PaymentOrder o
         WHERE o.deletedAt IS NULL
           AND o.status = :status
+          AND o.orderType = :orderType
+    """)
+    Long sumAmountByStatusAndOrderType(
+            @Param("status") PaymentOrderStatus status,
+            @Param("orderType") PaymentOrderType orderType);
+
+    @Query("""
+        SELECT COALESCE(SUM(o.amount), 0)
+        FROM PaymentOrder o
+        WHERE o.deletedAt IS NULL
+          AND o.status = :status
           AND o.paidAt >= :from
           AND o.paidAt < :to
     """)
@@ -133,7 +144,24 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to);
 
+    @Query("""
+        SELECT COALESCE(SUM(o.amount), 0)
+        FROM PaymentOrder o
+        WHERE o.deletedAt IS NULL
+          AND o.status = :status
+          AND o.orderType = :orderType
+          AND o.paidAt >= :from
+          AND o.paidAt < :to
+    """)
+    Long sumAmountByStatusAndOrderTypeAndPaidAtBetween(
+            @Param("status") PaymentOrderStatus status,
+            @Param("orderType") PaymentOrderType orderType,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
+
     long countByDeletedAtIsNullAndStatus(PaymentOrderStatus status);
+
+    long countByDeletedAtIsNullAndStatusAndOrderType(PaymentOrderStatus status, PaymentOrderType orderType);
 
     @Query(value = """
             SELECT status AS status,
@@ -143,6 +171,16 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
             GROUP BY status
             """, nativeQuery = true)
     List<DashboardStatusCountProjection> countOrdersByStatus();
+
+    @Query(value = """
+            SELECT status AS status,
+                   COUNT(*) AS count
+            FROM payment_order
+            WHERE deleted_at IS NULL
+              AND order_type = :orderType
+            GROUP BY status
+            """, nativeQuery = true)
+    List<DashboardStatusCountProjection> countOrdersByStatusAndOrderType(@Param("orderType") String orderType);
 
     @Query(value = """
             SELECT to_char(
@@ -170,8 +208,35 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
             @Param("bucket") String bucket);
 
     @Query(value = """
-            SELECT CAST(t.tier_id AS text) AS "tierId",
-                   t.title AS "tierTitle",
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', paid_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', paid_at)
+                    ELSE date_trunc('day', paid_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COALESCE(SUM(amount), 0) AS revenue,
+            COUNT(*) AS "paidOrders"
+            FROM payment_order
+            WHERE deleted_at IS NULL
+              AND status = 'PAID'
+              AND order_type = :orderType
+              AND paid_at IS NOT NULL
+              AND paid_at >= :from
+              AND paid_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodRevenueProjection> sumPaidRevenueByPeriodAndOrderType(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("orderType") String orderType);
+
+    @Query(value = """
+            SELECT MIN(CAST(t.tier_id AS text)) AS "tierId",
+                   LOWER(t.title) AS "tierTitle",
                    COALESCE(SUM(o.amount), 0) AS revenue,
                    COUNT(o.order_id) AS "paidOrders"
             FROM tier t
@@ -179,12 +244,13 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
               ON o.tier_id = t.tier_id
              AND o.deleted_at IS NULL
              AND o.status = 'PAID'
+             AND o.order_type = 'TIER_SUBSCRIPTION'
              AND o.paid_at IS NOT NULL
              AND o.paid_at >= :from
              AND o.paid_at < :to
             WHERE t.deleted_at IS NULL
-            GROUP BY t.tier_id, t.title
-            ORDER BY revenue DESC, "paidOrders" DESC, t.title ASC
+            GROUP BY LOWER(t.title)
+            ORDER BY revenue DESC, "paidOrders" DESC, "tierTitle" ASC
             """, nativeQuery = true)
     List<DashboardTierRevenueProjection> sumPaidRevenueByTier(
             @Param("from") LocalDateTime from,

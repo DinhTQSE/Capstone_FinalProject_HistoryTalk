@@ -1507,6 +1507,9 @@ public class LocalContentServiceImpl implements LocalContentService {
         UUID schoolId = resolveSchoolId(principal);
         var quiz = quizRepository.findById(UUID.fromString(quizId))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz"));
+        if (quiz.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Không tìm thấy quiz");
+        }
         if (quiz.getHistoricalContext() == null || quiz.getHistoricalContext().getSchool() == null
                 || !quiz.getHistoricalContext().getSchool().getId().equals(schoolId)) {
             throw new UnauthorizedException("Bạn không có quyền truy cập quiz này");

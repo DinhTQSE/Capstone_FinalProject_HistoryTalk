@@ -4,6 +4,8 @@ public interface DashboardTopWrongQuestionProjection {
 
     String getQuestionId();
 
+    String getQuestionContent();
+
     String getQuizId();
 
     String getQuizTitle();

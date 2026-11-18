@@ -26,11 +26,14 @@ import com.historytalk.entity.quiz.QuizAnswerDetail;
 import com.historytalk.entity.quiz.QuizQuestion;
 import com.historytalk.entity.quiz.QuizQuestionId;
 import com.historytalk.entity.quiz.QuizSession;
+import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
 import com.historytalk.exception.DataConflictException;
 import com.historytalk.exception.InvalidRequestException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import com.historytalk.exception.ResourceNotFoundException;
+import com.historytalk.utils.SecurityUtils;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.QuestionRepository;
 import com.historytalk.repository.QuizAnswerDetailRepository;
@@ -99,7 +102,8 @@ public class QuizServiceImpl implements QuizService {
                 log.warn("Invalid contextId format: {}", contextId);
             }
         }
-        List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search), contextUuid);
+        UUID schoolId = resolveUserSchoolId(userId);
+        List<Quiz> quizzes = quizRepository.findAllActiveForCustomer(normalize(search), contextUuid, schoolId);
         if (quizzes.isEmpty()) {
             return List.of();
         }
@@ -122,6 +126,7 @@ public class QuizServiceImpl implements QuizService {
         UUID uuid = parseUuid(quizId, "quizId");
         Quiz quiz = quizRepository.findActiveById(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanReadQuizForCustomer(quiz, resolveUserSchoolId(userId), quizId);
         long playCount = userId != null
                 ? quizSessionRepository.countCompletedByQuizAndUser(uuid, userId)
                 : 0L;
@@ -137,6 +142,8 @@ public class QuizServiceImpl implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
+        UUID userSchoolId = user.getSchool() != null ? user.getSchool().getId() : null;
+        assertCanReadQuizForCustomer(quiz, userSchoolId, quizId);
 
         QuizSession session = QuizSession.builder()
                 .quiz(quiz)
@@ -373,9 +380,10 @@ public class QuizServiceImpl implements QuizService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<QuizStaffResponse> getAllQuizzesForStaff(String search, String era, Pageable pageable, String role) {
-        log.info("getAllQuizzesForStaff: search={}, era={}", search, era);
+        log.info("getAllQuizzesForStaff: search={}, era={}, role={}", search, era, role);
         EventEra eraEnum = parseEra(era);
-        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, false, pageable);
+        UUID schoolId = resolveCurrentStaffSchoolId(role);
+        Page<Quiz> page = quizRepository.findAllForStaff(normalize(search), eraEnum, false, schoolId, pageable);
         return mapToStaffPaginatedResponse(page);
     }
 
@@ -385,6 +393,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("getQuizByIdForStaff: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanReadQuizForStaff(quiz, quizId);
         return mapToStaffResponse(quiz);
     }
 
@@ -393,15 +402,17 @@ public class QuizServiceImpl implements QuizService {
     public QuizStaffResponse createQuiz(CreateQuizRequest request, UUID userId) {
         log.info("createQuiz: title={}, userId={}", request.getTitle(), userId);
 
-        if (quizRepository.existsByTitleIgnoreCase(request.getTitle())) {
-            throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + request.getTitle());
-        }
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
 
         HistoricalContext context = historicalContextRepository.findById(parseUuid(request.getContextId(), "contextId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử: " + request.getContextId()));
+
+        assertCanCreateQuizInContext(context, user);
+        UUID scopeSchoolId = resolveContextSchoolId(context);
+        if (quizRepository.existsActiveByTitleInScope(request.getTitle(), scopeSchoolId)) {
+            throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + request.getTitle());
+        }
 
         Quiz quiz = Quiz.builder()
                 .title(request.getTitle())
@@ -428,21 +439,25 @@ public class QuizServiceImpl implements QuizService {
         log.info("updateQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
+
+        HistoricalContext targetContext = quiz.getHistoricalContext();
+        if (request.getContextId() != null && !request.getContextId().isBlank()) {
+            targetContext = historicalContextRepository
+                    .findById(parseUuid(request.getContextId(), "contextId"))
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử: " + request.getContextId()));
+            assertCanMoveQuizToContext(quiz, targetContext);
+            quiz.setHistoricalContext(targetContext);
+        }
 
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             String newTitle = request.getTitle().trim();
+            UUID scopeSchoolId = resolveContextSchoolId(targetContext);
             if (!newTitle.equalsIgnoreCase(quiz.getTitle()) &&
-                    quizRepository.existsByTitleIgnoreCaseAndQuizIdNot(newTitle, quiz.getQuizId())) {
+                    quizRepository.existsActiveByTitleInScopeAndQuizIdNot(newTitle, scopeSchoolId, quiz.getQuizId())) {
                 throw new DataConflictException("Quiz với tiêu đề này đã tồn tại: " + newTitle);
             }
             quiz.setTitle(newTitle);
-        }
-
-        if (request.getContextId() != null && !request.getContextId().isBlank()) {
-            HistoricalContext context = historicalContextRepository
-                    .findById(parseUuid(request.getContextId(), "contextId"))
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử: " + request.getContextId()));
-            quiz.setHistoricalContext(context);
         }
 
         if (request.getIsPublished() != null) {
@@ -459,6 +474,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("deleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
         ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quizRepository.delete(quiz);
     }
@@ -469,6 +485,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("softDeleteQuiz: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
         ensureQuizNotReferencedByAssignment(quiz.getQuizId());
         quiz.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         quizRepository.save(quiz);
@@ -487,6 +504,7 @@ public class QuizServiceImpl implements QuizService {
         log.info("addQuestion: quizId={}", quizId);
         Quiz quiz = quizRepository.findById(parseUuid(quizId, "quizId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
         Question question = questionRepository.save(buildQuestion(request));
         linkQuestion(quiz, question, quizQuestionRepository.findMaxOrderIndex(quiz.getQuizId()) + 1);
         return mapToQuestionResponse(question);
@@ -496,10 +514,11 @@ public class QuizServiceImpl implements QuizService {
     @Transactional
     public void updateQuestion(String quizId, String questionId, QuestionRequest request) {
         log.info("updateQuestion: quizId={}, questionId={}", quizId, questionId);
-        // Validate quiz exists
+        // Validate quiz exists and caller has write permission
         UUID quizUuid = parseUuid(quizId, "quizId");
-        quizRepository.findById(quizUuid)
+        Quiz quiz = quizRepository.findById(quizUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
 
         Question question = questionRepository.findById(parseUuid(questionId, "questionId"))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
@@ -580,12 +599,14 @@ public class QuizServiceImpl implements QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy bối cảnh lịch sử với ID: " + contextIdStr));
 
-        if (quizRepository.existsByTitleIgnoreCase(quizTitle)) {
-            throw new DataConflictException("Quiz với tiêu đề '" + quizTitle + "' đã tồn tại");
-        }
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
+        assertCanCreateQuizInContext(context, user);
+
+        UUID scopeSchoolId = resolveContextSchoolId(context);
+        if (quizRepository.existsActiveByTitleInScope(quizTitle, scopeSchoolId)) {
+            throw new DataConflictException("Quiz với tiêu đề '" + quizTitle + "' đã tồn tại");
+        }
 
         // ── 2. Parse and validate every row, collecting all errors ──────────────
         List<QuestionRequest> questionRequests = new ArrayList<>();
@@ -1050,6 +1071,7 @@ public class QuizServiceImpl implements QuizService {
 
         Quiz quiz = quizRepository.findById(quizUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
         Question question = questionRepository.findById(questionUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
 
@@ -1080,8 +1102,9 @@ public class QuizServiceImpl implements QuizService {
         UUID quizUuid = parseUuid(quizId, "quizId");
         UUID questionUuid = parseUuid(questionId, "questionId");
 
-        quizRepository.findById(quizUuid)
+        Quiz quiz = quizRepository.findById(quizUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quiz: " + quizId));
+        assertCanModifyQuiz(quiz);
         questionRepository.findById(questionUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy câu hỏi: " + questionId));
 
@@ -1102,6 +1125,111 @@ public class QuizServiceImpl implements QuizService {
 
     private String normalize(String search) {
         return (search == null || search.isBlank()) ? null : search.trim();
+    }
+
+    // ==================== Multi-Tenant Isolation Helpers ====================
+
+    private UUID resolveUserSchoolId(UUID userId) {
+        if (userId == null) {
+            return null;
+        }
+        return userRepository.findById(userId)
+                .map(User::getSchool)
+                .map(School::getId)
+                .orElse(null);
+    }
+
+    private UUID resolveContextSchoolId(HistoricalContext context) {
+        return (context != null && context.getSchool() != null) ? context.getSchool().getId() : null;
+    }
+
+    private UUID resolveQuizSchoolId(Quiz quiz) {
+        return quiz != null ? resolveContextSchoolId(quiz.getHistoricalContext()) : null;
+    }
+
+    private boolean isSchoolScopedStaffRole(String role) {
+        return "TEACHER".equalsIgnoreCase(role) || "SCHOOL_ADMIN".equalsIgnoreCase(role);
+    }
+
+    private UUID resolveCurrentStaffSchoolId(String role) {
+        if (!isSchoolScopedStaffRole(role)) {
+            return null;
+        }
+        String uid = SecurityUtils.getUserId();
+        if (uid == null) {
+            return null;
+        }
+        UUID schoolId = resolveUserSchoolId(UUID.fromString(uid));
+        if (schoolId == null) {
+            throw new AccessDeniedException("Tài khoản trường học chưa được gán vào trường nào");
+        }
+        return schoolId;
+    }
+
+    private void assertCanReadQuizForCustomer(Quiz quiz, UUID userSchoolId, String quizId) {
+        UUID quizSchoolId = resolveQuizSchoolId(quiz);
+        if (quizSchoolId != null && !quizSchoolId.equals(userSchoolId)) {
+            throw new ResourceNotFoundException("Không tìm thấy quiz: " + quizId);
+        }
+    }
+
+    private void assertCanReadQuizForStaff(Quiz quiz, String quizId) {
+        if (quiz.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Không tìm thấy quiz: " + quizId);
+        }
+        String role = SecurityUtils.getRoleName();
+        if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
+            UUID userSchoolId = resolveCurrentStaffSchoolId(role);
+            UUID quizSchoolId = resolveQuizSchoolId(quiz);
+            if (quizSchoolId != null && !quizSchoolId.equals(userSchoolId)) {
+                throw new AccessDeniedException("Bạn không có quyền xem bộ đề của trường khác");
+            }
+        }
+    }
+
+    private void assertCanModifyQuiz(Quiz quiz) {
+        if (quiz.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Không tìm thấy quiz: " + quiz.getQuizId());
+        }
+        String role = SecurityUtils.getRoleName();
+        if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
+            UUID userSchoolId = resolveCurrentStaffSchoolId(role);
+            UUID quizSchoolId = resolveQuizSchoolId(quiz);
+            if (quizSchoolId == null) {
+                throw new AccessDeniedException("Bạn không có quyền chỉnh sửa hoặc xóa bộ đề Global của hệ thống");
+            }
+            if (!quizSchoolId.equals(userSchoolId)) {
+                throw new AccessDeniedException("Bạn không có quyền chỉnh sửa hoặc xóa bộ đề của trường khác");
+            }
+        }
+    }
+
+    private void assertCanCreateQuizInContext(HistoricalContext context, User user) {
+        String role = SecurityUtils.getRoleName();
+        UUID contextSchoolId = resolveContextSchoolId(context);
+        if (isSchoolScopedStaffRole(role) && SecurityUtils.getUserId() != null) {
+            UUID userSchoolId = user.getSchool() != null ? user.getSchool().getId() : null;
+            if (userSchoolId == null) {
+                throw new AccessDeniedException("Tài khoản trường học chưa được gán vào trường nào");
+            }
+            if (contextSchoolId == null) {
+                throw new AccessDeniedException("Bạn không có quyền tạo bộ đề trong bối cảnh Global của hệ thống");
+            }
+            if (!contextSchoolId.equals(userSchoolId)) {
+                throw new AccessDeniedException("Bạn không có quyền tạo bộ đề cho trường khác");
+            }
+        }
+    }
+
+    private void assertCanMoveQuizToContext(Quiz quiz, HistoricalContext targetContext) {
+        UUID currentSchoolId = resolveQuizSchoolId(quiz);
+        UUID targetSchoolId = resolveContextSchoolId(targetContext);
+        if (currentSchoolId == null && targetSchoolId != null) {
+            throw new InvalidRequestException("Không thể chuyển bộ đề Global sang bối cảnh nội bộ của trường");
+        }
+        if (currentSchoolId != null && !currentSchoolId.equals(targetSchoolId)) {
+            throw new AccessDeniedException("Không thể chuyển bộ đề sang bối cảnh của trường khác hoặc Global");
+        }
     }
 
     private EventEra parseEra(String era) {

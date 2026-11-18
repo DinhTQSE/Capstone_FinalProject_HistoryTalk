@@ -11,6 +11,7 @@ import com.historytalk.dto.dashboard.DashboardTierAnalyticsResponse;
 import com.historytalk.dto.dashboard.DashboardTokenUsageResponse;
 import com.historytalk.dto.dashboard.DashboardUserAnalyticsResponse;
 import com.historytalk.entity.enums.PaymentOrderStatus;
+import com.historytalk.entity.enums.PaymentOrderType;
 import com.historytalk.entity.enums.PaymentTransactionStatus;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.exception.InvalidRequestException;
@@ -74,6 +75,13 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final int DEFAULT_RANGE_DAYS = 29;
     private static final int MAX_RANGE_DAYS = 180;
+    private static final long ACTIVE_SESSION_WINDOW_MINUTES = 2L;
+    private static final List<UserRole> B2C_ROLES = List.of(UserRole.CUSTOMER);
+    private static final List<UserRole> B2B_ROLES = List.of(
+            UserRole.SCHOOL_ADMIN, UserRole.TEACHER, UserRole.SCHOOL_STUDENT);
+    private static final List<String> B2C_ROLE_NAMES = List.of(UserRole.CUSTOMER.name());
+    private static final List<String> B2B_ROLE_NAMES = List.of(
+            UserRole.SCHOOL_ADMIN.name(), UserRole.TEACHER.name(), UserRole.SCHOOL_STUDENT.name());
 
     private final UserRepository userRepository;
     private final HistoricalContextRepository historicalContextRepository;
@@ -92,50 +100,98 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     private final ObjectProvider<HealthEndpoint> healthEndpointProvider;
 
     @Override
-    public DashboardOverviewResponse getOverview() {
+    public DashboardOverviewResponse getOverview(String scope) {
+        DashboardScope resolvedScope = normalizeScope(scope);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
         DashboardSystemHealthResponse health = getSystemHealth();
 
-        List<DashboardOverviewResponse.TopCharacterOverview> topCharacters = messageRepository
+        List<DashboardOverviewResponse.TopCharacterOverview> topGlobalCharacters = messageRepository
                 .findTopCharactersForDashboard(10)
                 .stream()
-                .map(c -> DashboardOverviewResponse.TopCharacterOverview.builder()
-                        .characterId(c.getCharacterId())
-                        .name(c.getName())
-                        .title(c.getTitle() != null ? c.getTitle() : "")
-                        .imageUrl(c.getImageUrl() != null ? c.getImageUrl() : "")
-                        .totalMessages(nullSafe(c.getTotalMessages()))
-                        .userMessages(nullSafe(c.getUserMessages()))
-                        .aiMessages(nullSafe(c.getAiMessages()))
-                        .build())
+                .map(this::toTopCharacterOverview)
                 .toList();
 
-        return DashboardOverviewResponse.builder()
-                .users(DashboardOverviewResponse.UserOverview.builder()
-                        .total(userRepository.countAllUsers())
-                        .active(userRepository.countActiveUsers())
-                        .inactive(userRepository.countInactiveUsers())
-                        .deleted(userRepository.countDeletedUsers())
-                        .newToday(userRepository.countCreatedBetween(todayStart, tomorrowStart))
-                        .newThisMonth(userRepository.countCreatedBetween(monthStart, tomorrowStart))
-                        .build())
-                .roles(buildRoleOverview())
-                .content(DashboardOverviewResponse.ContentOverview.builder()
+        List<DashboardOverviewResponse.TopCharacterOverview> topLocalCharacters = messageRepository
+                .findTopLocalCharactersForDashboard(10)
+                .stream()
+                .map(this::toTopCharacterOverview)
+                .toList();
+
+        List<DashboardOverviewResponse.TopCharacterOverview> topCharacters =
+                resolvedScope == DashboardScope.B2B ? topLocalCharacters : topGlobalCharacters;
+
+        DashboardOverviewResponse.UserOverview userOverview = switch (resolvedScope) {
+            case B2C -> DashboardOverviewResponse.UserOverview.builder()
+                    .total(userRepository.countActiveUsersByRoles(B2C_ROLES))
+                    .active(userRepository.countActiveUsersByRoles(B2C_ROLES))
+                    .inactive(userRepository.countInactiveUsers())
+                    .deleted(userRepository.countDeletedUsersByRoles(B2C_ROLES))
+                    .newToday(userRepository.countCreatedBetweenByRoles(todayStart, tomorrowStart, B2C_ROLES))
+                    .newThisMonth(userRepository.countCreatedBetweenByRoles(monthStart, tomorrowStart, B2C_ROLES))
+                    .build();
+            case B2B -> DashboardOverviewResponse.UserOverview.builder()
+                    .total(userRepository.countActiveUsersByRoles(B2B_ROLES))
+                    .active(userRepository.countActiveUsersByRoles(B2B_ROLES))
+                    .inactive(userRepository.countInactiveUsers())
+                    .deleted(userRepository.countDeletedUsersByRoles(B2B_ROLES))
+                    .newToday(userRepository.countCreatedBetweenByRoles(todayStart, tomorrowStart, B2B_ROLES))
+                    .newThisMonth(userRepository.countCreatedBetweenByRoles(monthStart, tomorrowStart, B2B_ROLES))
+                    .build();
+            case ALL -> DashboardOverviewResponse.UserOverview.builder()
+                    .total(userRepository.countAllUsers())
+                    .active(userRepository.countActiveUsers())
+                    .inactive(userRepository.countInactiveUsers())
+                    .deleted(userRepository.countDeletedUsers())
+                    .newToday(userRepository.countCreatedBetween(todayStart, tomorrowStart))
+                    .newThisMonth(userRepository.countCreatedBetween(monthStart, tomorrowStart))
+                    .build();
+        };
+
+        DashboardOverviewResponse.ContentOverview contentOverview = resolvedScope == DashboardScope.B2B
+                ? DashboardOverviewResponse.ContentOverview.builder()
+                        .historicalContexts(historicalContextRepository.countLocalCurrent())
+                        .publishedHistoricalContexts(historicalContextRepository.countLocalPublished())
+                        .characters(characterRepository.countLocalCurrent())
+                        .publishedCharacters(characterRepository.countLocalPublished())
+                        .documents(documentRepository.countCurrent())
+                        .build()
+                : DashboardOverviewResponse.ContentOverview.builder()
                         .historicalContexts(historicalContextRepository.countCurrent())
                         .publishedHistoricalContexts(historicalContextRepository.countPublished())
                         .characters(characterRepository.countCurrent())
                         .publishedCharacters(characterRepository.countPublished())
                         .documents(documentRepository.countCurrent())
-                        .build())
-                .chat(DashboardOverviewResponse.ChatOverview.builder()
-                        .sessions(chatSessionRepository.countCurrent())
-                        .messages(messageRepository.countCurrent())
-                        .messagesToday(messageRepository.countCreatedBetween(todayStart, tomorrowStart))
-                        .build())
+                        .build();
+
+        DashboardOverviewResponse.ChatOverview chatOverview = switch (resolvedScope) {
+            case B2C -> DashboardOverviewResponse.ChatOverview.builder()
+                    .sessions(chatSessionRepository.countCurrentByRoles(B2C_ROLES))
+                    .messages(messageRepository.countCurrentByRoles(B2C_ROLES))
+                    .messagesToday(messageRepository.countCreatedBetweenByRoles(todayStart, tomorrowStart, B2C_ROLES))
+                    .build();
+            case B2B -> DashboardOverviewResponse.ChatOverview.builder()
+                    .sessions(chatSessionRepository.countCurrentByRoles(B2B_ROLES))
+                    .messages(messageRepository.countCurrentByRoles(B2B_ROLES))
+                    .messagesToday(messageRepository.countCreatedBetweenByRoles(todayStart, tomorrowStart, B2B_ROLES))
+                    .build();
+            case ALL -> DashboardOverviewResponse.ChatOverview.builder()
+                    .sessions(chatSessionRepository.countCurrent())
+                    .messages(messageRepository.countCurrent())
+                    .messagesToday(messageRepository.countCreatedBetween(todayStart, tomorrowStart))
+                    .build();
+        };
+
+        return DashboardOverviewResponse.builder()
+                .users(userOverview)
+                .roles(buildRoleOverview())
+                .content(contentOverview)
+                .chat(chatOverview)
                 .topCharacters(topCharacters)
+                .topGlobalCharacters(topGlobalCharacters)
+                .topLocalCharacters(topLocalCharacters)
                 .systemHealth(DashboardOverviewResponse.SystemHealthOverview.builder()
                         .status(health.getStatus())
                         .lastCheckedAt(health.getLastCheckedAt())
@@ -144,14 +200,67 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     }
 
     @Override
-    public DashboardUserAnalyticsResponse getUserAnalytics(LocalDate from, LocalDate to, String granularity) {
+    public DashboardUserAnalyticsResponse getUserAnalytics(LocalDate from, LocalDate to, String granularity, String scope) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
+        DashboardScope resolvedScope = normalizeScope(scope);
 
-        Map<String, Long> newUsersByPeriod = toPeriodMap(
-                userRepository.countNewUsersByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
-        Map<String, Long> activeUsersByPeriod = toPeriodMap(
-                userRepository.countActiveUsersByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+        Map<String, Long> newUsersByPeriod;
+        Map<String, Long> activeUsersByPeriod;
+        DashboardUserAnalyticsResponse.UserSummary summary;
+        List<DashboardUserAnalyticsResponse.RoleCount> byRole;
+
+        if (resolvedScope == DashboardScope.B2C) {
+            newUsersByPeriod = toPeriodMap(
+                    userRepository.countNewUsersByPeriodAndRoles(range.fromDateTime(), range.toExclusive(), bucket, B2C_ROLE_NAMES));
+            activeUsersByPeriod = toPeriodMap(
+                    userRepository.countActiveUsersByPeriodAndRoles(range.fromDateTime(), range.toExclusive(), bucket, B2C_ROLE_NAMES));
+            summary = DashboardUserAnalyticsResponse.UserSummary.builder()
+                    .total(userRepository.countActiveUsersByRoles(B2C_ROLES))
+                    .active(userRepository.countActiveUsersByRoles(B2C_ROLES))
+                    .inactive(userRepository.countInactiveUsers())
+                    .deleted(userRepository.countDeletedUsersByRoles(B2C_ROLES))
+                    .recentlyActive(userRepository.countRecentlyActiveUsersByRoles(LocalDateTime.now(ZoneOffset.UTC).minusDays(7), B2C_ROLES))
+                    .build();
+            byRole = List.of(roleCount(UserRole.CUSTOMER));
+        } else if (resolvedScope == DashboardScope.B2B) {
+            newUsersByPeriod = toPeriodMap(
+                    userRepository.countNewUsersByPeriodAndRoles(range.fromDateTime(), range.toExclusive(), bucket, B2B_ROLE_NAMES));
+            activeUsersByPeriod = toPeriodMap(
+                    userRepository.countActiveUsersByPeriodAndRoles(range.fromDateTime(), range.toExclusive(), bucket, B2B_ROLE_NAMES));
+            summary = DashboardUserAnalyticsResponse.UserSummary.builder()
+                    .total(userRepository.countActiveUsersByRoles(B2B_ROLES))
+                    .active(userRepository.countActiveUsersByRoles(B2B_ROLES))
+                    .inactive(userRepository.countInactiveUsers())
+                    .deleted(userRepository.countDeletedUsersByRoles(B2B_ROLES))
+                    .recentlyActive(userRepository.countRecentlyActiveUsersByRoles(LocalDateTime.now(ZoneOffset.UTC).minusDays(7), B2B_ROLES))
+                    .build();
+            byRole = List.of(
+                    roleCount(UserRole.SCHOOL_ADMIN),
+                    roleCount(UserRole.TEACHER),
+                    roleCount(UserRole.SCHOOL_STUDENT)
+            );
+        } else {
+            newUsersByPeriod = toPeriodMap(
+                    userRepository.countNewUsersByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+            activeUsersByPeriod = toPeriodMap(
+                    userRepository.countActiveUsersByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+            summary = DashboardUserAnalyticsResponse.UserSummary.builder()
+                    .total(userRepository.countAllUsers())
+                    .active(userRepository.countActiveUsers())
+                    .inactive(userRepository.countInactiveUsers())
+                    .deleted(userRepository.countDeletedUsers())
+                    .recentlyActive(userRepository.countRecentlyActiveUsers(LocalDateTime.now(ZoneOffset.UTC).minusDays(7)))
+                    .build();
+            byRole = List.of(
+                    roleCount(UserRole.CUSTOMER),
+                    roleCount(UserRole.SCHOOL_ADMIN),
+                    roleCount(UserRole.TEACHER),
+                    roleCount(UserRole.SCHOOL_STUDENT),
+                    roleCount(UserRole.CONTENT_ADMIN),
+                    roleCount(UserRole.SYSTEM_ADMIN)
+            );
+        }
 
         List<DashboardUserAnalyticsResponse.UserTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
                 .stream()
@@ -163,54 +272,94 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 .toList();
 
         return DashboardUserAnalyticsResponse.builder()
-                .summary(DashboardUserAnalyticsResponse.UserSummary.builder()
-                        .total(userRepository.countAllUsers())
-                        .active(userRepository.countActiveUsers())
-                        .inactive(userRepository.countInactiveUsers())
-                        .deleted(userRepository.countDeletedUsers())
-                        .recentlyActive(userRepository.countRecentlyActiveUsers(LocalDateTime.now(ZoneOffset.UTC).minusDays(7)))
-                        .build())
-                .byRole(List.of(
-                        roleCount(UserRole.CUSTOMER),
-                        roleCount(UserRole.CONTENT_ADMIN),
-                        roleCount(UserRole.SYSTEM_ADMIN)
-                ))
+                .summary(summary)
+                .byRole(byRole)
                 .trend(trend)
                 .build();
     }
 
     @Override
-    public DashboardContentSummaryResponse getContentSummary() {
+    public DashboardContentSummaryResponse getContentSummary(String scope) {
+        DashboardScope resolvedScope = normalizeScope(scope);
+
+        DashboardContentSummaryResponse.InventoryStats globalContexts = DashboardContentSummaryResponse.InventoryStats.builder()
+                .total(historicalContextRepository.countCurrent())
+                .published(historicalContextRepository.countPublished())
+                .active(historicalContextRepository.countActive())
+                .build();
+        DashboardContentSummaryResponse.InventoryStats globalCharacters = DashboardContentSummaryResponse.InventoryStats.builder()
+                .total(characterRepository.countCurrent())
+                .published(characterRepository.countPublished())
+                .active(characterRepository.countActive())
+                .build();
+        DashboardContentSummaryResponse.InventoryStats localContexts = DashboardContentSummaryResponse.InventoryStats.builder()
+                .total(historicalContextRepository.countLocalCurrent())
+                .published(historicalContextRepository.countLocalPublished())
+                .active(historicalContextRepository.countLocalActive())
+                .build();
+        DashboardContentSummaryResponse.InventoryStats localCharacters = DashboardContentSummaryResponse.InventoryStats.builder()
+                .total(characterRepository.countLocalCurrent())
+                .published(characterRepository.countLocalPublished())
+                .active(characterRepository.countLocalActive())
+                .build();
+
         return DashboardContentSummaryResponse.builder()
-                .historicalContexts(DashboardContentSummaryResponse.InventoryStats.builder()
-                        .total(historicalContextRepository.countCurrent())
-                        .published(historicalContextRepository.countPublished())
-                        .active(historicalContextRepository.countActive())
-                        .build())
-                .characters(DashboardContentSummaryResponse.InventoryStats.builder()
-                        .total(characterRepository.countCurrent())
-                        .published(characterRepository.countPublished())
-                        .active(characterRepository.countActive())
-                        .build())
+                .historicalContexts(resolvedScope == DashboardScope.B2B ? localContexts : globalContexts)
+                .characters(resolvedScope == DashboardScope.B2B ? localCharacters : globalCharacters)
                 .documents(DashboardContentSummaryResponse.DocumentStats.builder()
                         .total(documentRepository.countCurrent())
                         .active(documentRepository.countActive())
                         .build())
+                .localHistoricalContexts(localContexts)
+                .localCharacters(localCharacters)
                 .build();
     }
 
     @Override
-    public DashboardChatActivityResponse getChatActivity(LocalDate from, LocalDate to, String granularity) {
+    public DashboardChatActivityResponse getChatActivity(LocalDate from, LocalDate to, String granularity, String scope) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
+        DashboardScope resolvedScope = normalizeScope(scope);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime activeCutoff = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(ACTIVE_SESSION_WINDOW_MINUTES);
 
-        Map<String, Long> sessionsByPeriod = toPeriodMap(
-                chatSessionRepository.countSessionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
-        Map<String, Long> messagesByPeriod = toPeriodMap(
-                messageRepository.countMessagesByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+        Map<String, Long> sessionsByPeriod;
+        Map<String, Long> messagesByPeriod;
+        DashboardChatActivityResponse.ChatSummary summary;
+
+        if (resolvedScope == DashboardScope.ALL) {
+            sessionsByPeriod = toPeriodMap(
+                    chatSessionRepository.countSessionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+            messagesByPeriod = toPeriodMap(
+                    messageRepository.countMessagesByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+            summary = DashboardChatActivityResponse.ChatSummary.builder()
+                    .sessions(chatSessionRepository.countCurrent())
+                    .activeSessions(chatSessionRepository.countActiveSince(activeCutoff))
+                    .messages(messageRepository.countCurrent())
+                    .userMessages(messageRepository.countByAiFlag(false))
+                    .aiMessages(messageRepository.countByAiFlag(true))
+                    .sessionsToday(chatSessionRepository.countCreatedBetween(todayStart, tomorrowStart))
+                    .messagesToday(messageRepository.countCreatedBetween(todayStart, tomorrowStart))
+                    .build();
+        } else {
+            List<UserRole> roles = resolvedScope == DashboardScope.B2C ? B2C_ROLES : B2B_ROLES;
+            List<String> roleNames = resolvedScope == DashboardScope.B2C ? B2C_ROLE_NAMES : B2B_ROLE_NAMES;
+            sessionsByPeriod = toPeriodMap(
+                    chatSessionRepository.countSessionsByPeriodAndRoles(range.fromDateTime(), range.toExclusive(), bucket, roleNames));
+            messagesByPeriod = toPeriodMap(
+                    messageRepository.countMessagesByPeriodAndRoles(range.fromDateTime(), range.toExclusive(), bucket, roleNames));
+            summary = DashboardChatActivityResponse.ChatSummary.builder()
+                    .sessions(chatSessionRepository.countCurrentByRoles(roles))
+                    .activeSessions(chatSessionRepository.countActiveSinceByRoles(activeCutoff, roles))
+                    .messages(messageRepository.countCurrentByRoles(roles))
+                    .userMessages(messageRepository.countByAiFlagAndRoles(false, roles))
+                    .aiMessages(messageRepository.countByAiFlagAndRoles(true, roles))
+                    .sessionsToday(chatSessionRepository.countCreatedBetweenByRoles(todayStart, tomorrowStart, roles))
+                    .messagesToday(messageRepository.countCreatedBetweenByRoles(todayStart, tomorrowStart, roles))
+                    .build();
+        }
 
         List<DashboardChatActivityResponse.ChatTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
                 .stream()
@@ -222,15 +371,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 .toList();
 
         return DashboardChatActivityResponse.builder()
-                .summary(DashboardChatActivityResponse.ChatSummary.builder()
-                        .sessions(chatSessionRepository.countCurrent())
-                        .activeSessions(chatSessionRepository.countActive())
-                        .messages(messageRepository.countCurrent())
-                        .userMessages(messageRepository.countByAiFlag(false))
-                        .aiMessages(messageRepository.countByAiFlag(true))
-                        .sessionsToday(chatSessionRepository.countCreatedBetween(todayStart, tomorrowStart))
-                        .messagesToday(messageRepository.countCreatedBetween(todayStart, tomorrowStart))
-                        .build())
+                .summary(summary)
                 .trend(trend)
                 .build();
     }
@@ -249,9 +390,11 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     }
 
     @Override
-    public DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity) {
+    public DashboardRevenueResponse getRevenue(LocalDate from, LocalDate to, String granularity, String scope) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
+        DashboardScope resolvedScope = normalizeScope(scope);
+        PaymentOrderType orderType = resolveOrderType(resolvedScope);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
@@ -259,12 +402,19 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         LocalDateTime yearStart = today.withDayOfYear(1).atStartOfDay();
         LocalDateTime nextYearStart = today.plusYears(1).withDayOfYear(1).atStartOfDay();
 
-        long totalRevenue = toLong(paymentOrderRepository.sumAmountByStatus(PaymentOrderStatus.PAID));
-        long paidOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PAID);
+        long totalRevenue = orderType == null
+                ? toLong(paymentOrderRepository.sumAmountByStatus(PaymentOrderStatus.PAID))
+                : toLong(paymentOrderRepository.sumAmountByStatusAndOrderType(PaymentOrderStatus.PAID, orderType));
+        long paidOrders = orderType == null
+                ? paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PAID)
+                : paymentOrderRepository.countByDeletedAtIsNullAndStatusAndOrderType(PaymentOrderStatus.PAID, orderType);
         long averageOrderValue = paidOrders == 0 ? 0 : totalRevenue / paidOrders;
 
         Map<String, DashboardPeriodRevenueProjection> revenueByPeriod = toRevenuePeriodMap(
-                paymentOrderRepository.sumPaidRevenueByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+                orderType == null
+                        ? paymentOrderRepository.sumPaidRevenueByPeriod(range.fromDateTime(), range.toExclusive(), bucket)
+                        : paymentOrderRepository.sumPaidRevenueByPeriodAndOrderType(
+                                range.fromDateTime(), range.toExclusive(), bucket, orderType.name()));
 
         List<DashboardRevenueResponse.RevenueTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
                 .stream()
@@ -278,39 +428,72 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 })
                 .toList();
 
+        long revenueToday = orderType == null
+                ? toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
+                        PaymentOrderStatus.PAID, todayStart, tomorrowStart))
+                : toLong(paymentOrderRepository.sumAmountByStatusAndOrderTypeAndPaidAtBetween(
+                        PaymentOrderStatus.PAID, orderType, todayStart, tomorrowStart));
+        long revenueThisMonth = orderType == null
+                ? toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
+                        PaymentOrderStatus.PAID, monthStart, tomorrowStart))
+                : toLong(paymentOrderRepository.sumAmountByStatusAndOrderTypeAndPaidAtBetween(
+                        PaymentOrderStatus.PAID, orderType, monthStart, tomorrowStart));
+        long revenueThisYear = orderType == null
+                ? toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
+                        PaymentOrderStatus.PAID, yearStart, nextYearStart))
+                : toLong(paymentOrderRepository.sumAmountByStatusAndOrderTypeAndPaidAtBetween(
+                        PaymentOrderStatus.PAID, orderType, yearStart, nextYearStart));
+
+        List<DashboardRevenueResponse.RevenueByTier> revenueByTier = resolvedScope == DashboardScope.B2B
+                ? List.of()
+                : paymentOrderRepository.sumPaidRevenueByTier(range.fromDateTime(), range.toExclusive())
+                        .stream()
+                        .map(this::toRevenueByTier)
+                        .toList();
+
         return DashboardRevenueResponse.builder()
                 .summary(DashboardRevenueResponse.RevenueSummary.builder()
                         .totalRevenue(totalRevenue)
-                        .revenueToday(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
-                                PaymentOrderStatus.PAID, todayStart, tomorrowStart)))
-                        .revenueThisMonth(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
-                                PaymentOrderStatus.PAID, monthStart, tomorrowStart)))
-                        .revenueThisYear(toLong(paymentOrderRepository.sumAmountByStatusAndPaidAtBetween(
-                                PaymentOrderStatus.PAID, yearStart, nextYearStart)))
+                        .revenueToday(revenueToday)
+                        .revenueThisMonth(revenueThisMonth)
+                        .revenueThisYear(revenueThisYear)
                         .paidOrders(paidOrders)
                         .averageOrderValue(averageOrderValue)
                         .build())
-                .ordersByStatus(buildOrderStatusCounts())
-                .revenueByTier(paymentOrderRepository.sumPaidRevenueByTier(range.fromDateTime(), range.toExclusive())
-                        .stream()
-                        .map(this::toRevenueByTier)
-                        .toList())
+                .ordersByStatus(buildOrderStatusCounts(orderType))
+                .revenueByTier(revenueByTier)
                 .trend(trend)
                 .build();
     }
 
     @Override
-    public DashboardPaymentResponse getPayments(LocalDate from, LocalDate to, String granularity) {
+    public DashboardPaymentResponse getPayments(LocalDate from, LocalDate to, String granularity, String scope) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
-        Map<String, DashboardTransactionTrendProjection> transactionsByPeriod = toTransactionPeriodMap(
-                paymentTransactionRepository.countTransactionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+        DashboardScope resolvedScope = normalizeScope(scope);
+        PaymentOrderType orderType = resolveOrderType(resolvedScope);
 
-        long pendingOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PENDING);
-        long paidOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.PAID);
-        long cancelledOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.CANCELLED);
-        long expiredOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.EXPIRED);
-        long failedOrders = paymentOrderRepository.countByDeletedAtIsNullAndStatus(PaymentOrderStatus.FAILED);
+        Map<String, DashboardTransactionTrendProjection> transactionsByPeriod = toTransactionPeriodMap(
+                orderType == null
+                        ? paymentTransactionRepository.countTransactionsByPeriod(
+                                range.fromDateTime(), range.toExclusive(), bucket)
+                        : paymentTransactionRepository.countTransactionsByPeriodAndOrderType(
+                                range.fromDateTime(), range.toExclusive(), bucket, orderType.name()));
+
+        long pendingOrders = countOrders(PaymentOrderStatus.PENDING, orderType);
+        long paidOrders = countOrders(PaymentOrderStatus.PAID, orderType);
+        long cancelledOrders = countOrders(PaymentOrderStatus.CANCELLED, orderType);
+        long expiredOrders = countOrders(PaymentOrderStatus.EXPIRED, orderType);
+        long failedOrders = countOrders(PaymentOrderStatus.FAILED, orderType);
+
+        long successfulTransactions = orderType == null
+                ? paymentTransactionRepository.countByDeletedAtIsNullAndStatus(PaymentTransactionStatus.SUCCESS)
+                : paymentTransactionRepository.countByStatusAndOrderType(
+                        PaymentTransactionStatus.SUCCESS.name(), orderType.name());
+        long failedTransactions = orderType == null
+                ? paymentTransactionRepository.countByDeletedAtIsNullAndStatus(PaymentTransactionStatus.FAILED)
+                : paymentTransactionRepository.countByStatusAndOrderType(
+                        PaymentTransactionStatus.FAILED.name(), orderType.name());
 
         List<DashboardPaymentResponse.TransactionTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
                 .stream()
@@ -332,10 +515,8 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                         .cancelledOrders(cancelledOrders)
                         .expiredOrders(expiredOrders)
                         .failedOrders(failedOrders)
-                        .successfulTransactions(paymentTransactionRepository.countByDeletedAtIsNullAndStatus(
-                                PaymentTransactionStatus.SUCCESS))
-                        .failedTransactions(paymentTransactionRepository.countByDeletedAtIsNullAndStatus(
-                                PaymentTransactionStatus.FAILED))
+                        .successfulTransactions(successfulTransactions)
+                        .failedTransactions(failedTransactions)
                         .build())
                 .transactionTrend(trend)
                 .build();
@@ -372,14 +553,51 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
     }
 
     @Override
-    public DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity) {
+    public DashboardQuizAnalyticsResponse getQuiz(LocalDate from, LocalDate to, String granularity, String scope) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
-        long startedSessions = quizSessionRepository.countStartedSessions();
-        long completedSessions = quizSessionRepository.countCompletedSessions();
+        DashboardScope resolvedScope = normalizeScope(scope);
 
-        Map<String, DashboardQuizTrendProjection> sessionsByPeriod = toQuizPeriodMap(
-                quizSessionRepository.countSessionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+        Boolean isLocal = resolvedScope == DashboardScope.ALL ? null : (resolvedScope == DashboardScope.B2B);
+
+        long totalQuizzes;
+        long publishedQuizzes;
+        long draftQuizzes;
+        long startedSessions;
+        long completedSessions;
+        double averageScorePercentage;
+        Map<String, DashboardQuizTrendProjection> sessionsByPeriod;
+
+        if (isLocal == null) {
+            totalQuizzes = quizRepository.countAllQuizzes();
+            publishedQuizzes = quizRepository.countPublishedQuizzes();
+            draftQuizzes = quizRepository.countDraftQuizzes();
+            startedSessions = quizSessionRepository.countStartedSessions();
+            completedSessions = quizSessionRepository.countCompletedSessions();
+            averageScorePercentage = nullSafe(quizSessionRepository.averageScorePercentage());
+            sessionsByPeriod = toQuizPeriodMap(
+                    quizSessionRepository.countSessionsByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+        } else if (Boolean.FALSE.equals(isLocal)) {
+            totalQuizzes = quizRepository.countGlobalQuizzes();
+            publishedQuizzes = quizRepository.countGlobalPublishedQuizzes();
+            draftQuizzes = quizRepository.countGlobalDraftQuizzes();
+            startedSessions = quizSessionRepository.countStartedSessionsByScope(false);
+            completedSessions = quizSessionRepository.countCompletedSessionsByScope(false);
+            averageScorePercentage = nullSafe(quizSessionRepository.averageScorePercentageByScope(false));
+            sessionsByPeriod = toQuizPeriodMap(
+                    quizSessionRepository.countSessionsByPeriodAndScope(
+                            range.fromDateTime(), range.toExclusive(), bucket, false));
+        } else {
+            totalQuizzes = quizRepository.countLocalQuizzes();
+            publishedQuizzes = quizRepository.countLocalPublishedQuizzes();
+            draftQuizzes = quizRepository.countLocalDraftQuizzes();
+            startedSessions = quizSessionRepository.countStartedSessionsByScope(true);
+            completedSessions = quizSessionRepository.countCompletedSessionsByScope(true);
+            averageScorePercentage = nullSafe(quizSessionRepository.averageScorePercentageByScope(true));
+            sessionsByPeriod = toQuizPeriodMap(
+                    quizSessionRepository.countSessionsByPeriodAndScope(
+                            range.fromDateTime(), range.toExclusive(), bucket, true));
+        }
 
         List<DashboardQuizAnalyticsResponse.QuizSessionTrendPoint> trend = initializePeriods(
                 range.from(), range.to(), bucket)
@@ -394,41 +612,90 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 })
                 .toList();
 
+        List<DashboardQuizAnalyticsResponse.TopWrongQuestion> topWrongQuestions = (isLocal == null
+                ? quizAnswerDetailRepository.findTopWrongQuestionsForDashboard(range.fromDateTime(), range.toExclusive(), 5)
+                : quizAnswerDetailRepository.findTopWrongQuestionsForDashboardByScope(
+                        range.fromDateTime(), range.toExclusive(), isLocal, 5))
+                .stream()
+                .map(this::toTopWrongQuestion)
+                .toList();
+
         return DashboardQuizAnalyticsResponse.builder()
                 .summary(DashboardQuizAnalyticsResponse.QuizSummary.builder()
-                        .totalQuizzes(quizRepository.countAllQuizzes())
-                        .publishedQuizzes(quizRepository.countPublishedQuizzes())
-                        .draftQuizzes(quizRepository.countDraftQuizzes())
+                        .totalQuizzes(totalQuizzes)
+                        .publishedQuizzes(publishedQuizzes)
+                        .draftQuizzes(draftQuizzes)
                         .deletedQuizzes(quizRepository.countDeletedQuizzes())
                         .startedSessions(startedSessions)
                         .completedSessions(completedSessions)
                         .completionRate(percentage(completedSessions, startedSessions))
-                        .averageScorePercentage(nullSafe(quizSessionRepository.averageScorePercentage()))
+                        .averageScorePercentage(averageScorePercentage)
                         .build())
                 .sessionsTrend(trend)
-                .topQuizzes(quizRepository.findTopQuizzesForDashboard(
-                                range.fromDateTime(), range.toExclusive(), 5)
+                .topQuizzes(quizRepository.findTopQuizzesForDashboardByScope(
+                                range.fromDateTime(), range.toExclusive(), isLocal, 5)
                         .stream()
                         .map(this::toTopQuiz)
                         .toList())
-                .topWrongQuestions(quizAnswerDetailRepository.findTopWrongQuestionsForDashboard(
-                                range.fromDateTime(), range.toExclusive(), 5)
-                        .stream()
-                        .map(this::toTopWrongQuestion)
-                        .toList())
+                .topWrongQuestions(topWrongQuestions)
                 .build();
     }
 
     @Override
-    public DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity) {
+    public DashboardTokenUsageResponse getTokens(LocalDate from, LocalDate to, String granularity, String scope) {
         DateRange range = resolveDateRange(from, to);
         String bucket = normalizeGranularity(granularity);
+        DashboardScope resolvedScope = normalizeScope(scope);
 
-        DashboardTokenSummaryProjection tokenSummary = messageRepository.sumTokensBetween(
-                range.fromDateTime(), range.toExclusive());
-        DashboardTokenBalanceSummaryProjection balanceSummary = userRepository.getTokenBalanceSummary();
-        Map<String, DashboardTokenTrendProjection> tokensByPeriod = toTokenPeriodMap(
-                messageRepository.sumTokensByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+        DashboardTokenSummaryProjection tokenSummary;
+        DashboardTokenBalanceSummaryProjection balanceSummary;
+        Map<String, DashboardTokenTrendProjection> tokensByPeriod;
+        List<DashboardTokenUsageResponse.TokenBalanceByTier> tokenBalanceByTier;
+        List<DashboardTokenUsageResponse.TopTokenUser> topUsers;
+
+        if (resolvedScope == DashboardScope.B2B) {
+            tokenSummary = messageRepository.sumTokensBetweenByRoles(
+                    range.fromDateTime(), range.toExclusive(), B2B_ROLE_NAMES);
+            balanceSummary = userRepository.getTokenBalanceSummaryByRoles(B2B_ROLE_NAMES);
+            tokensByPeriod = toTokenPeriodMap(messageRepository.sumTokensByPeriodByRoles(
+                    range.fromDateTime(), range.toExclusive(), bucket, B2B_ROLE_NAMES));
+            tokenBalanceByTier = List.of();
+            topUsers = messageRepository.findTopTokenUsersByRoles(
+                            range.fromDateTime(), range.toExclusive(), B2B_ROLE_NAMES, 10)
+                    .stream()
+                    .map(this::toTopTokenUser)
+                    .toList();
+        } else if (resolvedScope == DashboardScope.B2C) {
+            tokenSummary = messageRepository.sumTokensBetweenByRoles(
+                    range.fromDateTime(), range.toExclusive(), B2C_ROLE_NAMES);
+            balanceSummary = userRepository.getTokenBalanceSummary();
+            tokensByPeriod = toTokenPeriodMap(messageRepository.sumTokensByPeriodByRoles(
+                    range.fromDateTime(), range.toExclusive(), bucket, B2C_ROLE_NAMES));
+            tokenBalanceByTier = userRepository.countTokenBalanceByTier()
+                    .stream()
+                    .map(this::toTokenBalanceByTier)
+                    .toList();
+            topUsers = messageRepository.findTopTokenUsers(
+                            range.fromDateTime(), range.toExclusive(), 10)
+                    .stream()
+                    .map(this::toTopTokenUser)
+                    .toList();
+        } else {
+            tokenSummary = messageRepository.sumTokensBetween(
+                    range.fromDateTime(), range.toExclusive());
+            balanceSummary = userRepository.getTokenBalanceSummary();
+            tokensByPeriod = toTokenPeriodMap(
+                    messageRepository.sumTokensByPeriod(range.fromDateTime(), range.toExclusive(), bucket));
+            tokenBalanceByTier = userRepository.countTokenBalanceByTier()
+                    .stream()
+                    .map(this::toTokenBalanceByTier)
+                    .toList();
+            topUsers = messageRepository.findTopTokenUsers(
+                            range.fromDateTime(), range.toExclusive(), 10)
+                    .stream()
+                    .map(this::toTopTokenUser)
+                    .toList();
+        }
 
         List<DashboardTokenUsageResponse.TokenTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
                 .stream()
@@ -456,15 +723,8 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                         .estimatedCost(0L)
                         .build())
                 .trend(trend)
-                .tokenBalanceByTier(userRepository.countTokenBalanceByTier()
-                        .stream()
-                        .map(this::toTokenBalanceByTier)
-                        .toList())
-                .topUsersByTokenUsage(messageRepository.findTopTokenUsers(
-                                range.fromDateTime(), range.toExclusive(), 10)
-                        .stream()
-                        .map(this::toTopTokenUser)
-                        .toList())
+                .tokenBalanceByTier(tokenBalanceByTier)
+                .topUsersByTokenUsage(topUsers)
                 .build();
     }
 
@@ -473,6 +733,9 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                 .customers(userRepository.countActiveUsersByRole(UserRole.CUSTOMER))
                 .contentAdmins(userRepository.countActiveUsersByRole(UserRole.CONTENT_ADMIN))
                 .systemAdmins(userRepository.countActiveUsersByRole(UserRole.SYSTEM_ADMIN))
+                .schoolAdmins(userRepository.countActiveUsersByRole(UserRole.SCHOOL_ADMIN))
+                .teachers(userRepository.countActiveUsersByRole(UserRole.TEACHER))
+                .schoolStudents(userRepository.countActiveUsersByRole(UserRole.SCHOOL_STUDENT))
                 .build();
     }
 
@@ -608,12 +871,15 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
         return result;
     }
 
-    private List<DashboardRevenueResponse.StatusCount> buildOrderStatusCounts() {
+    private List<DashboardRevenueResponse.StatusCount> buildOrderStatusCounts(PaymentOrderType orderType) {
         Map<String, Long> counts = new LinkedHashMap<>();
         for (PaymentOrderStatus status : PaymentOrderStatus.values()) {
             counts.put(status.name(), 0L);
         }
-        for (DashboardStatusCountProjection row : paymentOrderRepository.countOrdersByStatus()) {
+        List<DashboardStatusCountProjection> rows = orderType == null
+                ? paymentOrderRepository.countOrdersByStatus()
+                : paymentOrderRepository.countOrdersByStatusAndOrderType(orderType.name());
+        for (DashboardStatusCountProjection row : rows) {
             counts.put(row.getStatus(), nullSafe(row.getCount()));
         }
         return counts.entrySet().stream()
@@ -622,6 +888,45 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
                         .count(entry.getValue())
                         .build())
                 .toList();
+    }
+
+    private long countOrders(PaymentOrderStatus status, PaymentOrderType orderType) {
+        return orderType == null
+                ? paymentOrderRepository.countByDeletedAtIsNullAndStatus(status)
+                : paymentOrderRepository.countByDeletedAtIsNullAndStatusAndOrderType(status, orderType);
+    }
+
+    private DashboardOverviewResponse.TopCharacterOverview toTopCharacterOverview(
+            com.historytalk.repository.dashboard.DashboardTopCharacterProjection c) {
+        return DashboardOverviewResponse.TopCharacterOverview.builder()
+                .characterId(c.getCharacterId())
+                .name(c.getName())
+                .title(c.getTitle() != null ? c.getTitle() : "")
+                .imageUrl(c.getImageUrl() != null ? c.getImageUrl() : "")
+                .totalMessages(nullSafe(c.getTotalMessages()))
+                .userMessages(nullSafe(c.getUserMessages()))
+                .aiMessages(nullSafe(c.getAiMessages()))
+                .build();
+    }
+
+    private DashboardScope normalizeScope(String scope) {
+        if (scope == null || scope.isBlank()) {
+            return DashboardScope.ALL;
+        }
+        return switch (scope.trim().toUpperCase(Locale.ROOT)) {
+            case "ALL" -> DashboardScope.ALL;
+            case "B2C", "GLOBAL" -> DashboardScope.B2C;
+            case "B2B", "LOCAL" -> DashboardScope.B2B;
+            default -> throw new InvalidRequestException("scope phải là ALL, B2C, B2B, GLOBAL hoặc LOCAL");
+        };
+    }
+
+    private PaymentOrderType resolveOrderType(DashboardScope scope) {
+        return switch (scope) {
+            case B2C -> PaymentOrderType.TIER_SUBSCRIPTION;
+            case B2B -> PaymentOrderType.SCHOOL_TOKEN_TOPUP;
+            case ALL -> null;
+        };
     }
 
     private DashboardRevenueResponse.RevenueByTier toRevenueByTier(DashboardTierRevenueProjection row) {
@@ -665,6 +970,7 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
             DashboardTopWrongQuestionProjection row) {
         return DashboardQuizAnalyticsResponse.TopWrongQuestion.builder()
                 .questionId(row.getQuestionId())
+                .questionContent(row.getQuestionContent())
                 .quizId(row.getQuizId())
                 .quizTitle(row.getQuizTitle())
                 .wrongAnswers(nullSafe(row.getWrongAnswers()))
@@ -746,6 +1052,10 @@ public class SystemDashboardServiceImpl implements SystemDashboardService {
             cursor = cursor.plusDays(1);
         }
         return periods;
+    }
+
+    private enum DashboardScope {
+        ALL, B2C, B2B
     }
 
     private record DateRange(LocalDate from, LocalDate to, LocalDateTime fromDateTime, LocalDateTime toExclusive) {

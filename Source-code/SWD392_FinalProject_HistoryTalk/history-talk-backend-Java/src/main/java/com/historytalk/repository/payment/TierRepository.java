@@ -18,8 +18,8 @@ public interface TierRepository extends JpaRepository<Tier, UUID> {
     long countByIsActiveTrueAndDeletedAtIsNull();
 
     @Query(value = """
-            SELECT CAST(t.tier_id AS text) AS "tierId",
-                   t.title AS "tierTitle",
+            SELECT MIN(CAST(t.tier_id AS text)) AS "tierId",
+                   LOWER(t.title) AS "tierTitle",
                    COUNT(DISTINCT u.uid) AS users
             FROM tier t
             LEFT JOIN user_tier ut
@@ -47,8 +47,8 @@ public interface TierRepository extends JpaRepository<Tier, UUID> {
              AND u.deleted_at IS NULL
              AND u.role = 'CUSTOMER'
             WHERE t.deleted_at IS NULL
-            GROUP BY t.tier_id, t.title
-            ORDER BY users DESC, t.title ASC
+            GROUP BY LOWER(t.title)
+            ORDER BY users DESC, "tierTitle" ASC
             """, nativeQuery = true)
     List<DashboardTierUsersProjection> countCustomerUsersByTier();
 
