@@ -364,6 +364,8 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             JOIN "user" u ON u.uid = cs.uid
             WHERE u.school_id = :schoolId
               AND u.role = 'SCHOOL_STUDENT'
+              AND u.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
               AND m.deleted_at IS NULL
             """, nativeQuery = true)
     long sumTokensUsedBySchoolStudents(@Param("schoolId") UUID schoolId);
@@ -375,9 +377,172 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             JOIN "user" u ON u.uid = cs.uid
             WHERE u.school_id = :schoolId
               AND u.role = 'TEACHER'
+              AND u.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
               AND m.deleted_at IS NULL
             """, nativeQuery = true)
     long sumTokensUsedBySchoolTeachers(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL AND m.chatSession.user.deletedAt IS NULL AND m.chatSession.user.school.id = :schoolId")
+    long countCurrentBySchoolId(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.isFromAi = :isFromAi AND m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL AND m.chatSession.user.deletedAt IS NULL AND m.chatSession.user.school.id = :schoolId")
+    long countByAiFlagAndSchoolId(@Param("isFromAi") boolean isFromAi, @Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.createdAt >= :from AND m.createdAt < :to AND m.deletedAt IS NULL AND m.chatSession.deletedAt IS NULL AND m.chatSession.user.deletedAt IS NULL AND m.chatSession.user.school.id = :schoolId")
+    long countCreatedBetweenBySchoolId(@Param("from") LocalDateTime from,
+                                       @Param("to") LocalDateTime to,
+                                       @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
+                    ELSE date_trunc('day', m.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countMessagesByPeriodAndSchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT CAST(c.character_id AS text) AS "characterId",
+                   c.name AS name,
+                   COALESCE(c.title, '') AS title,
+                   COALESCE(c.image_url, '') AS "imageUrl",
+                   COUNT(m.message_id) AS "totalMessages",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN 1 ELSE 0 END), 0) AS "userMessages",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN 1 ELSE 0 END), 0) AS "aiMessages"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id AND cs.deleted_at IS NULL
+            JOIN character c ON c.character_id = cs.character_id AND c.deleted_at IS NULL
+            WHERE m.deleted_at IS NULL
+              AND c.school_id = :schoolId
+            GROUP BY c.character_id, c.name, c.title, c.image_url
+            ORDER BY "totalMessages" DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<com.historytalk.repository.dashboard.DashboardTopCharacterProjection> findTopLocalCharactersBySchoolId(
+            @Param("schoolId") UUID schoolId,
+            @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            """, nativeQuery = true)
+    DashboardTokenSummaryProjection sumTokensBetweenBySchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+              AND u.role = :role
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            """, nativeQuery = true)
+    DashboardTokenSummaryProjection sumTokensBetweenBySchoolIdAndRole(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("schoolId") UUID schoolId,
+            @Param("role") String role);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
+                    ELSE date_trunc('day', m.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+            COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+            COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens"
+            FROM message m
+            JOIN chat_session cs ON cs.session_id = m.session_id
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE m.deleted_at IS NULL
+              AND cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+              AND m.created_at >= :from
+              AND m.created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardTokenTrendProjection> sumTokensByPeriodBySchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT CAST(u.uid AS text) AS uid,
+                   u.user_name AS "userName",
+                   u.email AS email,
+                   CAST(NULL AS text) AS "tierId",
+                   COALESCE(CAST(u.role AS text), 'SCHOOL_STUDENT') AS "tierTitle",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = FALSE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "promptTokens",
+                   COALESCE(SUM(CASE WHEN m.is_from_ai = TRUE THEN COALESCE(m.token, 0) ELSE 0 END), 0) AS "completionTokens",
+                   COALESCE(SUM(COALESCE(m.token, 0)), 0) AS "totalTokens",
+                   COALESCE(u.token, 0) AS "remainingTokens"
+            FROM "user" u
+            JOIN chat_session cs
+              ON cs.uid = u.uid
+             AND cs.deleted_at IS NULL
+            JOIN message m
+              ON m.session_id = cs.session_id
+             AND m.deleted_at IS NULL
+             AND m.created_at >= :from
+             AND m.created_at < :to
+            WHERE u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+            GROUP BY u.uid, u.user_name, u.email, u.role, u.token
+            ORDER BY "totalTokens" DESC, "promptTokens" DESC, u.user_name ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<DashboardTopTokenUserProjection> findTopTokenUsersBySchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("schoolId") UUID schoolId,
+            @Param("limit") int limit);
 
     @Query(value = """
             SELECT COALESCE(SUM(COALESCE(m.token, 0)), 0)

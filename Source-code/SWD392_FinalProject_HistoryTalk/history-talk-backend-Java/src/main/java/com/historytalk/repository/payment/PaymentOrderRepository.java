@@ -163,6 +163,35 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
 
     long countByDeletedAtIsNullAndStatusAndOrderType(PaymentOrderStatus status, PaymentOrderType orderType);
 
+    long countByDeletedAtIsNullAndSchool_IdAndStatusAndOrderType(
+            UUID schoolId, PaymentOrderStatus status, PaymentOrderType orderType);
+
+    @Query("""
+        SELECT COALESCE(SUM(o.amount), 0)
+        FROM PaymentOrder o
+        WHERE o.deletedAt IS NULL
+          AND o.school.id = :schoolId
+          AND o.status = :status
+          AND o.orderType = :orderType
+    """)
+    Long sumAmountBySchoolIdAndStatusAndOrderType(
+            @Param("schoolId") UUID schoolId,
+            @Param("status") PaymentOrderStatus status,
+            @Param("orderType") PaymentOrderType orderType);
+
+    @Query("""
+        SELECT COALESCE(SUM(o.topupTokens), 0)
+        FROM PaymentOrder o
+        WHERE o.deletedAt IS NULL
+          AND o.school.id = :schoolId
+          AND o.status = :status
+          AND o.orderType = :orderType
+    """)
+    Long sumTopupTokensBySchoolIdAndStatusAndOrderType(
+            @Param("schoolId") UUID schoolId,
+            @Param("status") PaymentOrderStatus status,
+            @Param("orderType") PaymentOrderType orderType);
+
     @Query(value = """
             SELECT status AS status,
                    COUNT(*) AS count

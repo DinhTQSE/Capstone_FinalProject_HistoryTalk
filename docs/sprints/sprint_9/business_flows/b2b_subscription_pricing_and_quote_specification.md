@@ -20,24 +20,29 @@
 
 ---
 
-### 1.2. Công thức Tính giá B2B Tổng quát (Áp dụng cho cả Gói Cố định & Gói Customize B2B)
+### 1.2. Công thức Tính giá B2B Tổng quát & Tùy chỉnh Chuyên sâu (Deep Customization)
 
-Khi nhà trường có **$S$ Học sinh** và **$T$ Giáo viên**:
+Khi nhà trường tùy chỉnh quy mô và chu kỳ học vụ gồm: **$S$ Học sinh** (`1 – 50.000`), **$T$ Giáo viên** (`1 – 5.000`), **Chu kỳ học vụ $W$ tuần** (`1 – 60` tuần, mặc định `35` tuần; kèm `subscriptionStartDate` – `subscriptionEndDate`), **Hạn mức ngày** của Học sinh $D_S$ & Giáo viên $D_T$ (`1.000 – 50.000 tokens/ngày`, mặc định `5.000`), **Số ngày dùng thực tế/tuần** của Học sinh $N_S$ (`1 – 7`, mặc định `4`) & Giáo viên $N_T$ (`1 – 7`, mặc định `6`):
 
 1. **Bước 1 — Tính Tổng Quỹ Token Chung của Trường (`Total Token Pool`):**
-   $$\text{Tổng Quỹ Token} = (S \times 700.000) + (T \times 1.050.000)$$
+   - Định mức 1 Học sinh / chu kỳ: $\text{Token}_{\text{HS}} = D_S \times N_S \times W$ *(Chuẩn 35 tuần: $5.000 \times 4 \times 35 = 700.000\text{ tokens}$)*
+   - Định mức 1 Giáo viên / chu kỳ: $\text{Token}_{\text{GV}} = D_T \times N_T \times W$ *(Chuẩn 35 tuần: $5.000 \times 6 \times 35 = 1.050.000\text{ tokens}$)*
+   $$\text{Tổng Quỹ Token} = (S \times D_S \times N_S \times W) + (T \times D_T \times N_T \times W)$$
 2. **Bước 2 — Tính Tổng Tiền Token AI (`× 0,15 đ/token`):**
-   $$\text{Tiền Token AI} = \text{Tổng Quỹ Token} \times 0,15\text{ đ} = (S \times 105.000\text{ đ}) + (T \times 157.500\text{ đ})$$
-3. **Bước 3 — Cộng Tiền Database, Lưu trữ (S3 PDF/Video, Vector DB), Quiz & LMS:**
-   $$\text{Tiền DB, Lưu trữ, Quiz, LMS} = (S \times 7.000\text{ đ}) + (T \times 42.500\text{ đ})$$
+   $$\text{Tiền Token AI} = \text{Tổng Quỹ Token} \times 0,15\text{ đ} \quad (\text{Chuẩn 35 tuần: } S \times 105.000\text{ đ} + T \times 157.500\text{ đ})$$
+3. **Bước 3 — Cộng Tiền Database, Lưu trữ (S3 PDF/Video, Vector DB), Quiz & LMS (Co giãn theo số tuần $W$):**
+   - Phí nền tảng 1 Học sinh: $\text{Phí}_{\text{HS}} = \text{round}\left(7.000\text{ đ} \times \frac{W}{35}\right)$
+   - Phí LMS 1 Giáo viên: $\text{Phí}_{\text{GV}} = \text{round}\left(42.500\text{ đ} \times \frac{W}{35}\right)$
+   $$\text{Tiền DB, Lưu trữ, Quiz, LMS} = (S \times \text{Phí}_{\text{HS}}) + (T \times \text{Phí}_{\text{GV}})$$
 4. **Bước 4 — Tính Tổng Giá Chưa Chiết Khấu (`Subtotal`):**
-   $$\text{Giá Chưa Chiết Khấu} = \text{Tiền Token AI} + \text{Tiền DB/Quiz/LMS} = (S \times 112.000\text{ đ}) + (T \times 200.000\text{ đ})$$
-5. **Bước 5 — Áp dụng Bậc thang Chiết khấu theo Quy mô Học sinh & Tính Giá Cuối Cùng (`Final Price`):**
+   $$\text{Giá Chưa Chiết Khấu} = \text{Tiền Token AI} + \text{Tiền DB/Quiz/LMS} \quad (\text{Chuẩn 35 tuần: } S \times 112.000\text{ đ} + T \times 200.000\text{ đ})$$
+5. **Bước 5 — Áp dụng Bậc thang Chiết khấu theo Quy mô Học sinh, Mã ưu đãi & Tính Giá Cuối Cùng (`Final Price`):**
    * Dưới 600 Học sinh ($S < 600$): **`0%`**
    * Từ 600 đến 1.199 Học sinh ($600 \le S < 1.200$ — chuẩn gói `Small`): **`10%`**
    * Từ 1.200 đến 1.799 Học sinh ($1.200 \le S < 1.800$ — chuẩn gói `Medium`): **`20%`**
    * Từ 1.800 Học sinh trở lên ($S \ge 1.800$ — chuẩn gói `Large`): **`30%`**
-   $$\text{Giá Cuối Cùng} = \text{Giá Chưa Chiết Khấu} \times \left(100\% - \% \text{ Chiết khấu}\right)$$
+   * Mã ưu đãi giáo dục hợp lệ (`EDU2026` hoặc `HISTORYTALK5`): **Cộng thêm `+5%` chiết khấu** (tối đa tổng chiết khấu `50%`).
+   $$\text{Giá Cuối Cùng} = \text{Giá Chưa Chiết Khấu} \times \left(100\% - \text{Tổng \% Chiết khấu}\right)$$
 
 ---
 

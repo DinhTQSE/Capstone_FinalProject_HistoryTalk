@@ -50,7 +50,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"school"})
     List<User> findBySchoolIdAndRoleAndDeletedAtIsNull(UUID schoolId, UserRole role);
 
-    long countBySchoolIdAndRole(UUID schoolId, UserRole role);
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.role = :role AND u.deletedAt IS NULL")
+    long countBySchoolIdAndRole(@Param("schoolId") UUID schoolId, @Param("role") UserRole role);
 
     boolean existsByEmailIgnoreCaseAndUidNot(String email, UUID uid);
 
@@ -258,6 +259,89 @@ public interface UserRepository extends JpaRepository<User, UUID> {
               AND u.role IN (:roles)
             """, nativeQuery = true)
     DashboardTokenBalanceSummaryProjection getTokenBalanceSummaryByRoles(@Param("roles") java.util.Collection<String> roles);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NULL")
+    long countAllUsersBySchoolId(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NULL AND (u.accountStatus IS NULL OR u.accountStatus <> com.historytalk.entity.enums.AccountStatus.DEACTIVATED)")
+    long countActiveUsersBySchoolId(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NULL AND u.accountStatus = com.historytalk.entity.enums.AccountStatus.DEACTIVATED")
+    long countInactiveUsersBySchoolId(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NOT NULL")
+    long countDeletedUsersBySchoolId(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NULL AND u.role = :role")
+    long countActiveUsersBySchoolIdAndRole(@Param("schoolId") UUID schoolId, @Param("role") UserRole role);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NULL AND u.createdAt >= :from AND u.createdAt < :to")
+    long countCreatedBetweenBySchoolId(@Param("schoolId") UUID schoolId,
+                                       @Param("from") LocalDateTime from,
+                                       @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.school.id = :schoolId AND u.deletedAt IS NULL AND u.lastActiveDate >= :from")
+    long countRecentlyActiveUsersBySchoolId(@Param("schoolId") UUID schoolId,
+                                            @Param("from") LocalDateTime from);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', created_at)
+                    ELSE date_trunc('day', created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM "user"
+            WHERE deleted_at IS NULL
+              AND school_id = :schoolId
+              AND created_at >= :from
+              AND created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countNewUsersByPeriodAndSchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', last_active_date)
+                    WHEN :bucket = 'week' THEN date_trunc('week', last_active_date)
+                    ELSE date_trunc('day', last_active_date)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM "user"
+            WHERE deleted_at IS NULL
+              AND school_id = :schoolId
+              AND last_active_date IS NOT NULL
+              AND last_active_date >= :from
+              AND last_active_date < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countActiveUsersByPeriodAndSchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(u.token, 0)), 0) AS "remainingTokens",
+                   COALESCE(AVG(COALESCE(u.token, 0)), 0) AS "averageRemainingTokens",
+                   COALESCE(SUM(CASE WHEN COALESCE(u.token, 0) <= 0 THEN 1 ELSE 0 END), 0) AS "usersOutOfTokens"
+            FROM "user" u
+            WHERE u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+            """, nativeQuery = true)
+    DashboardTokenBalanceSummaryProjection getTokenBalanceSummaryBySchoolId(@Param("schoolId") UUID schoolId);
 
     @Query(value = """
             WITH ranked_tiers AS (

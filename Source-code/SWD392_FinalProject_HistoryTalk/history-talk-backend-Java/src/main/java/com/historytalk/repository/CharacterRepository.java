@@ -102,6 +102,15 @@ public interface CharacterRepository extends JpaRepository<Character, UUID> {
     @Query("SELECT COUNT(c) FROM Character c WHERE c.school IS NOT NULL AND c.deletedAt IS NULL AND c.isPublished = true")
     long countLocalActive();
 
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.school.id = :schoolId AND c.deletedAt IS NULL")
+    long countBySchoolIdCurrent(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.school.id = :schoolId AND c.deletedAt IS NULL AND c.isPublished = true")
+    long countBySchoolIdPublished(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(c) FROM Character c WHERE c.school.id = :schoolId AND c.deletedAt IS NULL AND c.isPublished = true")
+    long countBySchoolIdActive(@Param("schoolId") UUID schoolId);
+
     @Query(value = """
             SELECT c, hc FROM Character c
             JOIN c.historicalContexts hc

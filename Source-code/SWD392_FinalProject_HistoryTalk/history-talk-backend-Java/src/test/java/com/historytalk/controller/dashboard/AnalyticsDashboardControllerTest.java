@@ -118,6 +118,151 @@ class AnalyticsDashboardControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/school-admin/dashboard/overview - Success returns 200 OK with local characters & school token overview")
+    void getSchoolAdminOverview_Success() throws Exception {
+        DashboardOverviewResponse response = DashboardOverviewResponse.builder()
+                .users(DashboardOverviewResponse.UserOverview.builder().total(631L).active(631L).build())
+                .roles(DashboardOverviewResponse.RoleOverview.builder().schoolAdmins(1L).teachers(30L).schoolStudents(600L).build())
+                .content(DashboardOverviewResponse.ContentOverview.builder().historicalContexts(3L).characters(4L).documents(5L).build())
+                .chat(DashboardOverviewResponse.ChatOverview.builder().sessions(50L).messages(200L).messagesToday(20L).build())
+                .topCharacters(java.util.List.of(
+                        DashboardOverviewResponse.TopCharacterOverview.builder()
+                                .characterId(UUID.randomUUID().toString())
+                                .name("Nhân vật Địa phương")
+                                .totalMessages(40L)
+                                .build()
+                ))
+                .topGlobalCharacters(java.util.List.of())
+                .topLocalCharacters(java.util.List.of(
+                        DashboardOverviewResponse.TopCharacterOverview.builder()
+                                .characterId(UUID.randomUUID().toString())
+                                .name("Nhân vật Địa phương")
+                                .totalMessages(40L)
+                                .build()
+                ))
+                .schoolTokenOverview(DashboardOverviewResponse.SchoolTokenOverview.builder()
+                        .schoolId(schoolId)
+                        .schoolName("THPT Chu Văn An")
+                        .totalSchoolTokenQuota(100000)
+                        .unallocatedTokenQuota(30000)
+                        .allocatedTokens(70000)
+                        .build())
+                .build();
+
+        when(analyticsDashboardService.getSchoolAdminOverview(schoolId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/school-admin/dashboard/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.users.total").value(631))
+                .andExpect(jsonPath("$.data.roles.schoolStudents").value(600))
+                .andExpect(jsonPath("$.data.topGlobalCharacters").isEmpty())
+                .andExpect(jsonPath("$.data.topLocalCharacters[0].name").value("Nhân vật Địa phương"))
+                .andExpect(jsonPath("$.data.schoolTokenOverview.totalSchoolTokenQuota").value(100000));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/dashboard/users - Success returns 200 OK")
+    void getSchoolAdminUserAnalytics_Success() throws Exception {
+        DashboardUserAnalyticsResponse response = DashboardUserAnalyticsResponse.builder()
+                .summary(DashboardUserAnalyticsResponse.UserSummary.builder().total(631L).active(631L).build())
+                .byRole(java.util.List.of(
+                        DashboardUserAnalyticsResponse.RoleCount.builder().role("SCHOOL_STUDENT").count(600L).build()
+                ))
+                .trend(Collections.emptyList())
+                .build();
+
+        when(analyticsDashboardService.getSchoolAdminUserAnalytics(eq(schoolId), any(), any(), eq("day")))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/school-admin/dashboard/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.summary.total").value(631))
+                .andExpect(jsonPath("$.data.byRole[0].role").value("SCHOOL_STUDENT"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/dashboard/content - Success returns 200 OK")
+    void getSchoolAdminContentSummary_Success() throws Exception {
+        DashboardContentSummaryResponse response = DashboardContentSummaryResponse.builder()
+                .historicalContexts(DashboardContentSummaryResponse.InventoryStats.builder().total(3L).published(2L).active(2L).build())
+                .characters(DashboardContentSummaryResponse.InventoryStats.builder().total(4L).published(3L).active(3L).build())
+                .documents(DashboardContentSummaryResponse.DocumentStats.builder().total(6L).active(6L).build())
+                .build();
+
+        when(analyticsDashboardService.getSchoolAdminContentSummary(schoolId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/school-admin/dashboard/content"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.historicalContexts.total").value(3))
+                .andExpect(jsonPath("$.data.characters.total").value(4));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/dashboard/chat-activity - Success returns 200 OK")
+    void getSchoolAdminChatActivity_Success() throws Exception {
+        DashboardChatActivityResponse response = DashboardChatActivityResponse.builder()
+                .summary(DashboardChatActivityResponse.ChatSummary.builder().sessions(20L).activeSessions(2L).messages(80L).build())
+                .trend(Collections.emptyList())
+                .build();
+
+        when(analyticsDashboardService.getSchoolAdminChatActivity(eq(schoolId), any(), any(), eq("day")))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/school-admin/dashboard/chat-activity"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.summary.activeSessions").value(2));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/dashboard/quiz - Success returns 200 OK")
+    void getSchoolAdminQuizAnalytics_Success() throws Exception {
+        DashboardQuizAnalyticsResponse response = DashboardQuizAnalyticsResponse.builder()
+                .summary(DashboardQuizAnalyticsResponse.QuizSummary.builder().totalQuizzes(5L).publishedQuizzes(4L).build())
+                .sessionsTrend(Collections.emptyList())
+                .topQuizzes(Collections.emptyList())
+                .topWrongQuestions(Collections.emptyList())
+                .build();
+
+        when(analyticsDashboardService.getSchoolAdminQuizAnalytics(eq(schoolId), any(), any(), eq("day")))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/school-admin/dashboard/quiz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.summary.totalQuizzes").value(5));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/school-admin/dashboard/tokens - Success returns 200 OK with school token management")
+    void getSchoolAdminTokenAnalytics_Success() throws Exception {
+        DashboardTokenUsageResponse response = DashboardTokenUsageResponse.builder()
+                .summary(DashboardTokenUsageResponse.TokenSummary.builder().totalTokens(30000L).remainingTokens(70000L).build())
+                .schoolTokenManagement(DashboardTokenUsageResponse.SchoolTokenManagement.builder()
+                        .schoolId(schoolId)
+                        .schoolName("THPT Chu Văn An")
+                        .totalSchoolTokenQuota(100000)
+                        .unallocatedTokenQuota(70000)
+                        .allocatedTokens(30000)
+                        .build())
+                .trend(Collections.emptyList())
+                .topUsersByTokenUsage(Collections.emptyList())
+                .build();
+
+        when(analyticsDashboardService.getSchoolAdminTokenAnalytics(eq(schoolId), any(), any(), eq("day")))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/school-admin/dashboard/tokens"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.summary.totalTokens").value(30000))
+                .andExpect(jsonPath("$.data.schoolTokenManagement.totalSchoolTokenQuota").value(100000));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/teacher/dashboard/classrooms/{classId} - Success returns 200 OK")
     void getTeacherClassroomDashboard_Success() throws Exception {
         TeacherClassroomDashboardResponse response = TeacherClassroomDashboardResponse.builder()

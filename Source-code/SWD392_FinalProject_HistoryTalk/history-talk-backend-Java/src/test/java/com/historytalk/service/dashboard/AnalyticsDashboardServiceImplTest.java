@@ -58,6 +58,18 @@ class AnalyticsDashboardServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
+    private HistoricalContextRepository historicalContextRepository;
+
+    @Mock
+    private CharacterRepository characterRepository;
+
+    @Mock
+    private DocumentRepository documentRepository;
+
+    @Mock
+    private ChatSessionRepository chatSessionRepository;
+
+    @Mock
     private QuizRepository quizRepository;
 
     @Mock
@@ -597,5 +609,100 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(2500L, response.getPlatformOverview().getTotalUsers());
         assertEquals(80L, response.getPlatformOverview().getTotalQuizzes());
         assertEquals(45000000L, response.getPlatformOverview().getTotalRevenue());
+    }
+
+    @Test
+    @DisplayName("Sprint 10: getSchoolAdminOverview returns school-scoped users, B2B roles, local-only characters/content, and schoolTokenOverview")
+    void getSchoolAdminOverview_ReturnsLocalOnlyAndSchoolTokens() {
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(userRepository.countAllUsersBySchoolId(schoolId)).thenReturn(476L);
+        when(userRepository.countActiveUsersBySchoolId(schoolId)).thenReturn(475L);
+        when(userRepository.countInactiveUsersBySchoolId(schoolId)).thenReturn(1L);
+        when(userRepository.countDeletedUsersBySchoolId(schoolId)).thenReturn(2L);
+        when(userRepository.countActiveUsersBySchoolIdAndRole(schoolId, UserRole.SCHOOL_ADMIN)).thenReturn(1L);
+        when(userRepository.countBySchoolIdAndRole(schoolId, UserRole.TEACHER)).thenReturn(25L);
+        when(userRepository.countBySchoolIdAndRole(schoolId, UserRole.SCHOOL_STUDENT)).thenReturn(450L);
+
+        when(historicalContextRepository.countBySchoolIdCurrent(schoolId)).thenReturn(3L);
+        when(historicalContextRepository.countBySchoolIdPublished(schoolId)).thenReturn(2L);
+        when(characterRepository.countBySchoolIdCurrent(schoolId)).thenReturn(4L);
+        when(characterRepository.countBySchoolIdPublished(schoolId)).thenReturn(3L);
+        when(documentRepository.countBySchoolIdCurrent(schoolId)).thenReturn(6L);
+
+        when(chatSessionRepository.countCurrentBySchoolId(schoolId)).thenReturn(40L);
+        when(messageRepository.countCurrentBySchoolId(schoolId)).thenReturn(120L);
+
+        com.historytalk.repository.dashboard.DashboardTopCharacterProjection localChar =
+                mock(com.historytalk.repository.dashboard.DashboardTopCharacterProjection.class);
+        when(localChar.getCharacterId()).thenReturn("char-local-1");
+        when(localChar.getName()).thenReturn("Chu Văn An (Địa phương)");
+        when(localChar.getTitle()).thenReturn("Vạn thế sư biểu");
+        when(localChar.getTotalMessages()).thenReturn(32L);
+        when(messageRepository.findTopLocalCharactersBySchoolId(schoolId, 10)).thenReturn(List.of(localChar));
+
+        when(messageRepository.sumTokensUsedBySchoolStudents(schoolId)).thenReturn(45000L);
+        when(messageRepository.sumTokensUsedBySchoolTeachers(schoolId)).thenReturn(15000L);
+
+        DashboardOverviewResponse overview = dashboardService.getSchoolAdminOverview(schoolId);
+
+        assertNotNull(overview);
+        assertEquals(476L, overview.getUsers().getTotal());
+        assertEquals(1L, overview.getRoles().getSchoolAdmins());
+        assertEquals(25L, overview.getRoles().getTeachers());
+        assertEquals(450L, overview.getRoles().getSchoolStudents());
+        assertEquals(0L, overview.getRoles().getCustomers());
+
+        assertEquals(3L, overview.getContent().getHistoricalContexts());
+        assertEquals(4L, overview.getContent().getCharacters());
+        assertEquals(6L, overview.getContent().getDocuments());
+
+        // School Admin only has local characters, topGlobalCharacters is empty
+        assertTrue(overview.getTopGlobalCharacters().isEmpty());
+        assertEquals(1, overview.getTopLocalCharacters().size());
+        assertEquals("Chu Văn An (Địa phương)", overview.getTopCharacters().get(0).getName());
+
+        assertNotNull(overview.getSchoolTokenOverview());
+        assertEquals(100000, overview.getSchoolTokenOverview().getTotalSchoolTokenQuota());
+        assertEquals(40000, overview.getSchoolTokenOverview().getUnallocatedTokenQuota());
+        assertEquals(60000, overview.getSchoolTokenOverview().getAllocatedTokens());
+        assertEquals(60.0, overview.getSchoolTokenOverview().getQuotaUsagePercentage());
+    }
+
+    @Test
+    @DisplayName("Sprint 10: getSchoolAdminTokenAnalytics returns school token pool management, role breakdown, and top users")
+    void getSchoolAdminTokenAnalytics_ReturnsSchoolTokenManagement() {
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+
+        com.historytalk.repository.dashboard.DashboardTokenSummaryProjection tokenSummary =
+                mock(com.historytalk.repository.dashboard.DashboardTokenSummaryProjection.class);
+        when(tokenSummary.getPromptTokens()).thenReturn(20000L);
+        when(tokenSummary.getCompletionTokens()).thenReturn(40000L);
+        when(tokenSummary.getTotalTokens()).thenReturn(60000L);
+        when(messageRepository.sumTokensBetweenBySchoolId(any(), any(), eq(schoolId))).thenReturn(tokenSummary);
+
+        when(messageRepository.sumTokensUsedBySchoolStudents(schoolId)).thenReturn(45000L);
+        when(messageRepository.sumTokensUsedBySchoolTeachers(schoolId)).thenReturn(15000L);
+        when(paymentOrderRepository.countByDeletedAtIsNullAndSchool_IdAndStatusAndOrderType(
+                schoolId, PaymentOrderStatus.PAID, com.historytalk.entity.enums.PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                .thenReturn(2L);
+        when(paymentOrderRepository.sumTopupTokensBySchoolIdAndStatusAndOrderType(
+                schoolId, PaymentOrderStatus.PAID, com.historytalk.entity.enums.PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                .thenReturn(500000L);
+        when(paymentOrderRepository.sumAmountBySchoolIdAndStatusAndOrderType(
+                schoolId, PaymentOrderStatus.PAID, com.historytalk.entity.enums.PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                .thenReturn(75000L);
+
+        DashboardTokenUsageResponse response = dashboardService.getSchoolAdminTokenAnalytics(
+                schoolId, java.time.LocalDate.of(2026, 11, 1), java.time.LocalDate.of(2026, 11, 15), "day");
+
+        assertNotNull(response);
+        assertEquals(60000L, response.getSummary().getTotalTokens());
+        assertEquals(40000L, response.getSummary().getRemainingTokens());
+        assertNotNull(response.getSchoolTokenManagement());
+        assertEquals(100000, response.getSchoolTokenManagement().getTotalSchoolTokenQuota());
+        assertEquals(2L, response.getSchoolTokenManagement().getTopupPaidOrders());
+        assertEquals(500000L, response.getSchoolTokenManagement().getTopupTokensPurchased());
+        assertEquals(75000L, response.getSchoolTokenManagement().getTopupAmountPaid());
+        assertEquals(2, response.getTokenUsageByRole().size());
     }
 }

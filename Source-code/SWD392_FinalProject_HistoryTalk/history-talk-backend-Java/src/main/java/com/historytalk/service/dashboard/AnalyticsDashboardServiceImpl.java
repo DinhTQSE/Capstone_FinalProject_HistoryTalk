@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.historytalk.entity.classroom.Classroom;
 import com.historytalk.entity.enums.PaymentOrderStatus;
+import com.historytalk.entity.enums.PaymentOrderType;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.payment.PaymentOrder;
 import com.historytalk.entity.payment.UserTier;
@@ -24,6 +25,14 @@ import com.historytalk.exception.UnauthorizedException;
 import com.historytalk.repository.*;
 import com.historytalk.repository.classroom.ClassStudentRepository;
 import com.historytalk.repository.classroom.ClassroomRepository;
+import com.historytalk.repository.dashboard.DashboardPeriodCountProjection;
+import com.historytalk.repository.dashboard.DashboardQuizTrendProjection;
+import com.historytalk.repository.dashboard.DashboardTokenBalanceSummaryProjection;
+import com.historytalk.repository.dashboard.DashboardTokenSummaryProjection;
+import com.historytalk.repository.dashboard.DashboardTokenTrendProjection;
+import com.historytalk.repository.dashboard.DashboardTopCharacterProjection;
+import com.historytalk.repository.dashboard.DashboardTopQuizProjection;
+import com.historytalk.repository.dashboard.DashboardTopTokenUserProjection;
 import com.historytalk.repository.dashboard.DashboardTopWrongQuestionProjection;
 import com.historytalk.repository.dashboard.DashboardUserTopCharacterProjection;
 import com.historytalk.repository.payment.PaymentOrderRepository;
@@ -40,8 +49,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.management.ManagementFactory;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -51,10 +65,20 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService {
 
+    private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final int DEFAULT_RANGE_DAYS = 29;
+    private static final int MAX_RANGE_DAYS = 180;
+    private static final long ACTIVE_SESSION_WINDOW_MINUTES = 2L;
+    private static final double TOKEN_UNIT_PRICE_VND = 0.15;
+
     private final SchoolRepository schoolRepository;
     private final ClassroomRepository classroomRepository;
     private final ClassStudentRepository classStudentRepository;
     private final UserRepository userRepository;
+    private final HistoricalContextRepository historicalContextRepository;
+    private final CharacterRepository characterRepository;
+    private final DocumentRepository documentRepository;
+    private final ChatSessionRepository chatSessionRepository;
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
     private final QuizSessionRepository quizSessionRepository;
@@ -68,16 +92,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Override
     @Transactional(readOnly = true)
     public SchoolAdminDashboardResponse getSchoolAdminDashboard(UUID schoolId) {
-        UUID resolvedSchoolId = schoolId;
-        if (resolvedSchoolId == null) {
-            UserPrincipal resolvedPrincipal = resolvePrincipal(null);
-            resolvedSchoolId = resolvedPrincipal.getSchoolId();
-        }
-        if (resolvedSchoolId == null) {
-            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
-        }
-
-        UUID finalSchoolId = resolvedSchoolId;
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
         log.info("Fetching School Admin Dashboard for schoolId: {}", finalSchoolId);
         School school = schoolRepository.findById(finalSchoolId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + finalSchoolId));
@@ -89,6 +104,9 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
         int totalQuota = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0;
         int unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
         int allocated = Math.max(0, totalQuota - unallocated);
+        double quotaUsagePercentage = totalQuota > 0
+                ? Math.round((allocated * 100.0 / totalQuota) * 10.0) / 10.0
+                : 0.0;
         long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(finalSchoolId);
         long tokensUsedByTeachers = messageRepository.sumTokensUsedBySchoolTeachers(finalSchoolId);
         long tokensUsedTotal = tokensUsedByStudents + tokensUsedByTeachers;
@@ -117,37 +135,37 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .toList() : new ArrayList<>();
 
         int defaultDailyQuota = school.getDefaultDailyStudentQuota() != null ? school.getDefaultDailyStudentQuota() : 1000;
-        long pendingBoostRequests = 0L;
-        if (tokenBoostRequestRepository != null) {
-            pendingBoostRequests = tokenBoostRequestRepository.countBySchool_IdAndStatus(
-                    finalSchoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
-                    + tokenBoostRequestRepository.countBySchool_IdAndStatus(
-                    finalSchoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING_ADMIN);
-        }
+        int defaultDailyTeacherQuota = school.getDefaultDailyTeacherQuota() != null ? school.getDefaultDailyTeacherQuota() : 5000;
+        long pendingBoostRequests = countPendingBoostRequests(finalSchoolId);
 
-        // Assignment progress distribution
-        com.historytalk.repository.dashboard.AssignmentSubmissionStatsProjection stats =
-                assignmentSubmissionRepository.getSubmissionStatsBySchoolId(finalSchoolId);
-        long totalSubmissions = (stats != null && stats.getTotalSubmissions() != null) ? stats.getTotalSubmissions() : 0L;
-        long submittedCount = (stats != null && stats.getSubmittedCount() != null) ? stats.getSubmittedCount() : 0L;
-        long lateCount = (stats != null && stats.getLateSubmittedCount() != null) ? stats.getLateSubmittedCount() : 0L;
-        long notStartedCount = (stats != null && stats.getNotStartedCount() != null) ? stats.getNotStartedCount() : 0L;
+        long topupPaidOrders = paymentOrderRepository != null
+                ? paymentOrderRepository.countByDeletedAtIsNullAndSchool_IdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP)
+                : 0L;
+        long topupTokensPurchased = paymentOrderRepository != null
+                ? toLong(paymentOrderRepository.sumTopupTokensBySchoolIdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                : 0L;
+        long topupAmountPaid = paymentOrderRepository != null
+                ? toLong(paymentOrderRepository.sumAmountBySchoolIdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                : 0L;
 
-        double completedRate = totalSubmissions > 0
-                ? Math.round((submittedCount * 100.0 / totalSubmissions) * 10.0) / 10.0
-                : 0.0;
-        double lateSubmittedRate = totalSubmissions > 0
-                ? Math.round((lateCount * 100.0 / totalSubmissions) * 10.0) / 10.0
-                : 0.0;
-        double notStartedRate = totalSubmissions > 0
-                ? Math.round((notStartedCount * 100.0 / totalSubmissions) * 10.0) / 10.0
-                : 0.0;
-        SchoolAdminDashboardResponse.AssignmentStats assignmentStats = SchoolAdminDashboardResponse.AssignmentStats.builder()
-                .totalSubmissions(totalSubmissions)
-                .completedRate(completedRate)
-                .lateSubmittedRate(lateSubmittedRate)
-                .notStartedRate(notStartedRate)
-                .build();
+        SchoolAdminDashboardResponse.AssignmentStats assignmentStats = buildSchoolAssignmentStats(finalSchoolId);
+
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDateTime utcTodayStart = today.atStartOfDay();
+        LocalDateTime utcTomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime utcMonthStart = today.withDayOfMonth(1).atStartOfDay();
+
+        DashboardOverviewResponse.UserOverview userOverview = buildSchoolUserOverview(
+                finalSchoolId, utcTodayStart, utcTomorrowStart, utcMonthStart);
+        DashboardOverviewResponse.RoleOverview roleOverview = buildSchoolRoleOverview(finalSchoolId);
+        DashboardContentSummaryResponse contentSummary = buildSchoolContentSummaryInternal(finalSchoolId);
+        DashboardOverviewResponse.ChatOverview chatOverview = buildSchoolChatOverview(
+                finalSchoolId, utcTodayStart, utcTomorrowStart);
+        List<DashboardOverviewResponse.TopCharacterOverview> topLocalCharacters = buildSchoolTopLocalCharacters(finalSchoolId);
+        DashboardQuizAnalyticsResponse.QuizSummary quizSummary = buildSchoolQuizSummary(finalSchoolId);
 
         return SchoolAdminDashboardResponse.builder()
                 .schoolId(school.getId())
@@ -166,6 +184,7 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .totalSchoolTokenQuota(totalQuota)
                 .unallocatedTokenQuota(unallocated)
                 .allocatedTokens(allocated)
+                .quotaUsagePercentage(quotaUsagePercentage)
                 .tokensUsedByStudents(tokensUsedByStudents)
                 .tokensUsedByTeachers(tokensUsedByTeachers)
                 .tokensUsedTotal(tokensUsedTotal)
@@ -173,8 +192,500 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .teacherTokenUsagePercentage(teacherPercent)
                 .topClassroomsByTokenUsage(topClassrooms)
                 .defaultDailyStudentQuota(defaultDailyQuota)
+                .defaultDailyTeacherQuota(defaultDailyTeacherQuota)
                 .pendingTokenBoostRequests(pendingBoostRequests)
+                .topupPaidOrders(topupPaidOrders)
+                .topupTokensPurchased(topupTokensPurchased)
+                .topupAmountPaid(topupAmountPaid)
                 .assignmentStats(assignmentStats)
+                .users(userOverview)
+                .roles(roleOverview)
+                .content(contentSummary)
+                .chat(chatOverview)
+                .topLocalCharacters(topLocalCharacters)
+                .quiz(quizSummary)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardOverviewResponse getSchoolAdminOverview(UUID schoolId) {
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
+        log.info("Fetching School Admin Overview Dashboard for schoolId: {}", finalSchoolId);
+        School school = schoolRepository.findById(finalSchoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + finalSchoolId));
+
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+
+        DashboardOverviewResponse.UserOverview userOverview = buildSchoolUserOverview(
+                finalSchoolId, todayStart, tomorrowStart, monthStart);
+        DashboardOverviewResponse.RoleOverview roleOverview = buildSchoolRoleOverview(finalSchoolId);
+
+        long localContexts = historicalContextRepository != null
+                ? historicalContextRepository.countBySchoolIdCurrent(finalSchoolId)
+                : 0L;
+        long publishedLocalContexts = historicalContextRepository != null
+                ? historicalContextRepository.countBySchoolIdPublished(finalSchoolId)
+                : 0L;
+        long localChars = characterRepository != null
+                ? characterRepository.countBySchoolIdCurrent(finalSchoolId)
+                : 0L;
+        long publishedLocalChars = characterRepository != null
+                ? characterRepository.countBySchoolIdPublished(finalSchoolId)
+                : 0L;
+        long localDocs = documentRepository != null
+                ? documentRepository.countBySchoolIdCurrent(finalSchoolId)
+                : 0L;
+
+        DashboardOverviewResponse.ContentOverview contentOverview = DashboardOverviewResponse.ContentOverview.builder()
+                .historicalContexts(localContexts)
+                .publishedHistoricalContexts(publishedLocalContexts)
+                .characters(localChars)
+                .publishedCharacters(publishedLocalChars)
+                .documents(localDocs)
+                .build();
+
+        DashboardOverviewResponse.ChatOverview chatOverview = buildSchoolChatOverview(
+                finalSchoolId, todayStart, tomorrowStart);
+
+        // School Admin chỉ thống kê nhân vật Local của trường, không thống kê nhân vật Global
+        List<DashboardOverviewResponse.TopCharacterOverview> topLocalCharacters = buildSchoolTopLocalCharacters(finalSchoolId);
+
+        long totalClassrooms = classroomRepository != null
+                ? classroomRepository.countBySchoolIdAndDeletedAtIsNull(finalSchoolId)
+                : 0L;
+        long totalTeachers = userRepository.countBySchoolIdAndRole(finalSchoolId, UserRole.TEACHER);
+        long totalStudents = userRepository.countBySchoolIdAndRole(finalSchoolId, UserRole.SCHOOL_STUDENT);
+
+        int totalQuota = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0;
+        int unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
+        int allocated = Math.max(0, totalQuota - unallocated);
+        double quotaUsagePercentage = totalQuota > 0
+                ? Math.round((allocated * 100.0 / totalQuota) * 10.0) / 10.0
+                : 0.0;
+        long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(finalSchoolId);
+        long tokensUsedByTeachers = messageRepository.sumTokensUsedBySchoolTeachers(finalSchoolId);
+        long tokensUsedTotal = tokensUsedByStudents + tokensUsedByTeachers;
+        double studentPercent = tokensUsedTotal > 0
+                ? Math.round((tokensUsedByStudents * 100.0 / tokensUsedTotal) * 10.0) / 10.0
+                : 0.0;
+        double teacherPercent = tokensUsedTotal > 0
+                ? Math.round((tokensUsedByTeachers * 100.0 / tokensUsedTotal) * 10.0) / 10.0
+                : 0.0;
+
+        int defaultDailyStudentQuota = school.getDefaultDailyStudentQuota() != null ? school.getDefaultDailyStudentQuota() : 5000;
+        int defaultDailyTeacherQuota = school.getDefaultDailyTeacherQuota() != null ? school.getDefaultDailyTeacherQuota() : 5000;
+        long pendingBoostRequests = countPendingBoostRequests(finalSchoolId);
+
+        long topupPaidOrders = paymentOrderRepository != null
+                ? paymentOrderRepository.countByDeletedAtIsNullAndSchool_IdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP)
+                : 0L;
+        long topupTokensPurchased = paymentOrderRepository != null
+                ? toLong(paymentOrderRepository.sumTopupTokensBySchoolIdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                : 0L;
+        long topupAmountPaid = paymentOrderRepository != null
+                ? toLong(paymentOrderRepository.sumAmountBySchoolIdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                : 0L;
+
+        DashboardOverviewResponse.SchoolTokenOverview schoolTokenOverview = DashboardOverviewResponse.SchoolTokenOverview.builder()
+                .schoolId(school.getId())
+                .schoolName(school.getName())
+                .schoolCode(school.getSchoolCode())
+                .packageType(school.getPackageType())
+                .status(school.getStatus())
+                .subscriptionStartDate(school.getSubscriptionStartDate())
+                .subscriptionEndDate(school.getSubscriptionEndDate())
+                .renewedForNextYear(school.getRenewedForNextYear())
+                .nextPackageType(school.getNextPackageType())
+                .totalClassrooms(totalClassrooms)
+                .totalTeachers(totalTeachers)
+                .totalStudents(totalStudents)
+                .totalSchoolTokenQuota(totalQuota)
+                .unallocatedTokenQuota(unallocated)
+                .allocatedTokens(allocated)
+                .quotaUsagePercentage(quotaUsagePercentage)
+                .tokensUsedByStudents(tokensUsedByStudents)
+                .tokensUsedByTeachers(tokensUsedByTeachers)
+                .tokensUsedTotal(tokensUsedTotal)
+                .studentTokenUsagePercentage(studentPercent)
+                .teacherTokenUsagePercentage(teacherPercent)
+                .defaultDailyStudentQuota(defaultDailyStudentQuota)
+                .defaultDailyTeacherQuota(defaultDailyTeacherQuota)
+                .pendingTokenBoostRequests(pendingBoostRequests)
+                .topupPaidOrders(topupPaidOrders)
+                .topupTokensPurchased(topupTokensPurchased)
+                .topupAmountPaid(topupAmountPaid)
+                .assignmentStats(buildSchoolAssignmentStats(finalSchoolId))
+                .build();
+
+        return DashboardOverviewResponse.builder()
+                .users(userOverview)
+                .roles(roleOverview)
+                .content(contentOverview)
+                .chat(chatOverview)
+                .topCharacters(topLocalCharacters)
+                .topGlobalCharacters(List.of())
+                .topLocalCharacters(topLocalCharacters)
+                .systemHealth(DashboardOverviewResponse.SystemHealthOverview.builder()
+                        .status("UP")
+                        .lastCheckedAt(LocalDateTime.now(ZoneOffset.UTC))
+                        .build())
+                .schoolTokenOverview(schoolTokenOverview)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardUserAnalyticsResponse getSchoolAdminUserAnalytics(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity) {
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+        validateSchoolExists(finalSchoolId);
+
+        Map<String, Long> newUsersByPeriod = toPeriodMap(
+                userRepository.countNewUsersByPeriodAndSchoolId(
+                        range.fromDateTime(), range.toExclusive(), bucket, finalSchoolId));
+        Map<String, Long> activeUsersByPeriod = toPeriodMap(
+                userRepository.countActiveUsersByPeriodAndSchoolId(
+                        range.fromDateTime(), range.toExclusive(), bucket, finalSchoolId));
+
+        DashboardUserAnalyticsResponse.UserSummary summary = DashboardUserAnalyticsResponse.UserSummary.builder()
+                .total(userRepository.countAllUsersBySchoolId(finalSchoolId))
+                .active(userRepository.countActiveUsersBySchoolId(finalSchoolId))
+                .inactive(userRepository.countInactiveUsersBySchoolId(finalSchoolId))
+                .deleted(userRepository.countDeletedUsersBySchoolId(finalSchoolId))
+                .recentlyActive(userRepository.countRecentlyActiveUsersBySchoolId(
+                        finalSchoolId, LocalDateTime.now(ZoneOffset.UTC).minusDays(7)))
+                .build();
+
+        List<DashboardUserAnalyticsResponse.RoleCount> byRole = List.of(
+                DashboardUserAnalyticsResponse.RoleCount.builder()
+                        .role(UserRole.SCHOOL_ADMIN.name())
+                        .count(userRepository.countActiveUsersBySchoolIdAndRole(finalSchoolId, UserRole.SCHOOL_ADMIN))
+                        .build(),
+                DashboardUserAnalyticsResponse.RoleCount.builder()
+                        .role(UserRole.TEACHER.name())
+                        .count(userRepository.countActiveUsersBySchoolIdAndRole(finalSchoolId, UserRole.TEACHER))
+                        .build(),
+                DashboardUserAnalyticsResponse.RoleCount.builder()
+                        .role(UserRole.SCHOOL_STUDENT.name())
+                        .count(userRepository.countActiveUsersBySchoolIdAndRole(finalSchoolId, UserRole.SCHOOL_STUDENT))
+                        .build()
+        );
+
+        List<DashboardUserAnalyticsResponse.UserTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> DashboardUserAnalyticsResponse.UserTrendPoint.builder()
+                        .date(period)
+                        .newUsers(newUsersByPeriod.getOrDefault(period, 0L))
+                        .activeUsers(activeUsersByPeriod.getOrDefault(period, 0L))
+                        .build())
+                .toList();
+
+        return DashboardUserAnalyticsResponse.builder()
+                .summary(summary)
+                .byRole(byRole)
+                .trend(trend)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardContentSummaryResponse getSchoolAdminContentSummary(UUID schoolId) {
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
+        validateSchoolExists(finalSchoolId);
+        return buildSchoolContentSummaryInternal(finalSchoolId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardChatActivityResponse getSchoolAdminChatActivity(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity) {
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+        validateSchoolExists(finalSchoolId);
+
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime activeCutoff = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(ACTIVE_SESSION_WINDOW_MINUTES);
+
+        Map<String, Long> sessionsByPeriod = chatSessionRepository != null
+                ? toPeriodMap(chatSessionRepository.countSessionsByPeriodAndSchoolId(
+                        range.fromDateTime(), range.toExclusive(), bucket, finalSchoolId))
+                : Map.of();
+        Map<String, Long> messagesByPeriod = toPeriodMap(
+                messageRepository.countMessagesByPeriodAndSchoolId(
+                        range.fromDateTime(), range.toExclusive(), bucket, finalSchoolId));
+
+        DashboardChatActivityResponse.ChatSummary summary = DashboardChatActivityResponse.ChatSummary.builder()
+                .sessions(chatSessionRepository != null ? chatSessionRepository.countCurrentBySchoolId(finalSchoolId) : 0L)
+                .activeSessions(chatSessionRepository != null ? chatSessionRepository.countActiveSinceBySchoolId(activeCutoff, finalSchoolId) : 0L)
+                .messages(messageRepository.countCurrentBySchoolId(finalSchoolId))
+                .userMessages(messageRepository.countByAiFlagAndSchoolId(false, finalSchoolId))
+                .aiMessages(messageRepository.countByAiFlagAndSchoolId(true, finalSchoolId))
+                .sessionsToday(chatSessionRepository != null
+                        ? chatSessionRepository.countCreatedBetweenBySchoolId(todayStart, tomorrowStart, finalSchoolId)
+                        : 0L)
+                .messagesToday(messageRepository.countCreatedBetweenBySchoolId(todayStart, tomorrowStart, finalSchoolId))
+                .build();
+
+        List<DashboardChatActivityResponse.ChatTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> DashboardChatActivityResponse.ChatTrendPoint.builder()
+                        .date(period)
+                        .sessions(sessionsByPeriod.getOrDefault(period, 0L))
+                        .messages(messagesByPeriod.getOrDefault(period, 0L))
+                        .build())
+                .toList();
+
+        return DashboardChatActivityResponse.builder()
+                .summary(summary)
+                .trend(trend)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardQuizAnalyticsResponse getSchoolAdminQuizAnalytics(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity) {
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+        validateSchoolExists(finalSchoolId);
+
+        DashboardQuizAnalyticsResponse.QuizSummary summary = buildSchoolQuizSummary(finalSchoolId);
+
+        Map<String, DashboardQuizTrendProjection> sessionsByPeriod = quizSessionRepository != null
+                ? toQuizPeriodMap(quizSessionRepository.countSessionsByPeriodAndSchoolId(
+                        range.fromDateTime(), range.toExclusive(), bucket, finalSchoolId))
+                : Map.of();
+
+        List<DashboardQuizAnalyticsResponse.QuizSessionTrendPoint> trend = initializePeriods(
+                range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> {
+                    DashboardQuizTrendProjection row = sessionsByPeriod.get(period);
+                    return DashboardQuizAnalyticsResponse.QuizSessionTrendPoint.builder()
+                            .date(period)
+                            .started(row == null ? 0L : nullSafe(row.getStarted()))
+                            .completed(row == null ? 0L : nullSafe(row.getCompleted()))
+                            .build();
+                })
+                .toList();
+
+        List<DashboardQuizAnalyticsResponse.TopQuiz> topQuizzes = quizRepository != null
+                ? quizRepository.findTopQuizzesForDashboardBySchoolId(
+                                range.fromDateTime(), range.toExclusive(), finalSchoolId, 5)
+                        .stream()
+                        .map(this::toTopQuiz)
+                        .toList()
+                : List.of();
+
+        List<DashboardQuizAnalyticsResponse.TopWrongQuestion> topWrongQuestions = quizAnswerDetailRepository != null
+                ? quizAnswerDetailRepository.findTopWrongQuestionsForDashboardBySchoolId(
+                                range.fromDateTime(), range.toExclusive(), finalSchoolId, 5)
+                        .stream()
+                        .map(this::toTopWrongQuestion)
+                        .toList()
+                : List.of();
+
+        return DashboardQuizAnalyticsResponse.builder()
+                .summary(summary)
+                .sessionsTrend(trend)
+                .topQuizzes(topQuizzes)
+                .topWrongQuestions(topWrongQuestions)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardTokenUsageResponse getSchoolAdminTokenAnalytics(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity) {
+        UUID finalSchoolId = resolveSchoolIdOrThrow(schoolId);
+        DateRange range = resolveDateRange(from, to);
+        String bucket = normalizeGranularity(granularity);
+
+        School school = schoolRepository.findById(finalSchoolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy trường học với ID: " + finalSchoolId));
+
+        DashboardTokenSummaryProjection tokenSummary = messageRepository.sumTokensBetweenBySchoolId(
+                range.fromDateTime(), range.toExclusive(), finalSchoolId);
+        DashboardTokenBalanceSummaryProjection balanceSummary =
+                userRepository.getTokenBalanceSummaryBySchoolId(finalSchoolId);
+        Map<String, DashboardTokenTrendProjection> tokensByPeriod = toTokenPeriodMap(
+                messageRepository.sumTokensByPeriodBySchoolId(
+                        range.fromDateTime(), range.toExclusive(), bucket, finalSchoolId));
+
+        List<DashboardTokenUsageResponse.TokenTrendPoint> trend = initializePeriods(range.from(), range.to(), bucket)
+                .stream()
+                .map(period -> {
+                    DashboardTokenTrendProjection row = tokensByPeriod.get(period);
+                    return DashboardTokenUsageResponse.TokenTrendPoint.builder()
+                            .date(period)
+                            .promptTokens(row == null ? 0L : nullSafe(row.getPromptTokens()))
+                            .completionTokens(row == null ? 0L : nullSafe(row.getCompletionTokens()))
+                            .totalTokens(row == null ? 0L : nullSafe(row.getTotalTokens()))
+                            .build();
+                })
+                .toList();
+
+        List<DashboardTokenUsageResponse.TopTokenUser> topUsers = messageRepository
+                .findTopTokenUsersBySchoolId(range.fromDateTime(), range.toExclusive(), finalSchoolId, 10)
+                .stream()
+                .map(this::toTopTokenUser)
+                .toList();
+
+        int totalQuota = school.getTotalSchoolTokenQuota() != null ? school.getTotalSchoolTokenQuota() : 0;
+        int unallocated = school.getUnallocatedTokenQuota() != null ? school.getUnallocatedTokenQuota() : 0;
+        int allocated = Math.max(0, totalQuota - unallocated);
+        double quotaUsagePercentage = totalQuota > 0
+                ? Math.round((allocated * 100.0 / totalQuota) * 10.0) / 10.0
+                : 0.0;
+
+        long tokensUsedByStudents = messageRepository.sumTokensUsedBySchoolStudents(finalSchoolId);
+        long tokensUsedByTeachers = messageRepository.sumTokensUsedBySchoolTeachers(finalSchoolId);
+        long tokensUsedTotal = tokensUsedByStudents + tokensUsedByTeachers;
+        double studentPercent = tokensUsedTotal > 0
+                ? Math.round((tokensUsedByStudents * 100.0 / tokensUsedTotal) * 10.0) / 10.0
+                : 0.0;
+        double teacherPercent = tokensUsedTotal > 0
+                ? Math.round((tokensUsedByTeachers * 100.0 / tokensUsedTotal) * 10.0) / 10.0
+                : 0.0;
+
+        int defaultDailyStudentQuota = school.getDefaultDailyStudentQuota() != null ? school.getDefaultDailyStudentQuota() : 5000;
+        int defaultDailyTeacherQuota = school.getDefaultDailyTeacherQuota() != null ? school.getDefaultDailyTeacherQuota() : 5000;
+        long pendingBoostRequests = countPendingBoostRequests(finalSchoolId);
+
+        long topupPaidOrders = paymentOrderRepository != null
+                ? paymentOrderRepository.countByDeletedAtIsNullAndSchool_IdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP)
+                : 0L;
+        long topupTokensPurchased = paymentOrderRepository != null
+                ? toLong(paymentOrderRepository.sumTopupTokensBySchoolIdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                : 0L;
+        long topupAmountPaid = paymentOrderRepository != null
+                ? toLong(paymentOrderRepository.sumAmountBySchoolIdAndStatusAndOrderType(
+                        finalSchoolId, PaymentOrderStatus.PAID, PaymentOrderType.SCHOOL_TOKEN_TOPUP))
+                : 0L;
+
+        DashboardTokenUsageResponse.SchoolTokenManagement schoolTokenManagement =
+                DashboardTokenUsageResponse.SchoolTokenManagement.builder()
+                        .schoolId(school.getId())
+                        .schoolName(school.getName())
+                        .schoolCode(school.getSchoolCode())
+                        .packageType(school.getPackageType())
+                        .status(school.getStatus())
+                        .subscriptionStartDate(school.getSubscriptionStartDate())
+                        .subscriptionEndDate(school.getSubscriptionEndDate())
+                        .renewedForNextYear(school.getRenewedForNextYear())
+                        .nextPackageType(school.getNextPackageType())
+                        .totalSchoolTokenQuota(totalQuota)
+                        .unallocatedTokenQuota(unallocated)
+                        .allocatedTokens(allocated)
+                        .quotaUsagePercentage(quotaUsagePercentage)
+                        .tokensUsedByStudents(tokensUsedByStudents)
+                        .tokensUsedByTeachers(tokensUsedByTeachers)
+                        .tokensUsedTotal(tokensUsedTotal)
+                        .studentTokenUsagePercentage(studentPercent)
+                        .teacherTokenUsagePercentage(teacherPercent)
+                        .defaultDailyStudentQuota(defaultDailyStudentQuota)
+                        .defaultDailyTeacherQuota(defaultDailyTeacherQuota)
+                        .pendingTokenBoostRequests(pendingBoostRequests)
+                        .topupPaidOrders(topupPaidOrders)
+                        .topupTokensPurchased(topupTokensPurchased)
+                        .topupAmountPaid(topupAmountPaid)
+                        .build();
+
+        DashboardTokenSummaryProjection studentPeriodTokens = messageRepository.sumTokensBetweenBySchoolIdAndRole(
+                range.fromDateTime(), range.toExclusive(), finalSchoolId, UserRole.SCHOOL_STUDENT.name());
+        DashboardTokenSummaryProjection teacherPeriodTokens = messageRepository.sumTokensBetweenBySchoolIdAndRole(
+                range.fromDateTime(), range.toExclusive(), finalSchoolId, UserRole.TEACHER.name());
+
+        long periodPrompt = tokenSummary == null ? 0L : nullSafe(tokenSummary.getPromptTokens());
+        long periodCompletion = tokenSummary == null ? 0L : nullSafe(tokenSummary.getCompletionTokens());
+        long periodTotal = tokenSummary == null ? 0L : nullSafe(tokenSummary.getTotalTokens());
+
+        long studentPeriodTotal = studentPeriodTokens == null ? 0L : nullSafe(studentPeriodTokens.getTotalTokens());
+        long teacherPeriodTotal = teacherPeriodTokens == null ? 0L : nullSafe(teacherPeriodTokens.getTotalTokens());
+
+        List<DashboardTokenUsageResponse.RoleTokenUsage> tokenUsageByRole = List.of(
+                DashboardTokenUsageResponse.RoleTokenUsage.builder()
+                        .role(UserRole.SCHOOL_STUDENT.name())
+                        .users(userRepository.countActiveUsersBySchoolIdAndRole(finalSchoolId, UserRole.SCHOOL_STUDENT))
+                        .promptTokens(studentPeriodTokens == null ? 0L : nullSafe(studentPeriodTokens.getPromptTokens()))
+                        .completionTokens(studentPeriodTokens == null ? 0L : nullSafe(studentPeriodTokens.getCompletionTokens()))
+                        .totalTokens(studentPeriodTotal)
+                        .usagePercentage(periodTotal > 0
+                                ? Math.round((studentPeriodTotal * 100.0 / periodTotal) * 10.0) / 10.0
+                                : studentPercent)
+                        .defaultDailyQuota(defaultDailyStudentQuota)
+                        .build(),
+                DashboardTokenUsageResponse.RoleTokenUsage.builder()
+                        .role(UserRole.TEACHER.name())
+                        .users(userRepository.countActiveUsersBySchoolIdAndRole(finalSchoolId, UserRole.TEACHER))
+                        .promptTokens(teacherPeriodTokens == null ? 0L : nullSafe(teacherPeriodTokens.getPromptTokens()))
+                        .completionTokens(teacherPeriodTokens == null ? 0L : nullSafe(teacherPeriodTokens.getCompletionTokens()))
+                        .totalTokens(teacherPeriodTotal)
+                        .usagePercentage(periodTotal > 0
+                                ? Math.round((teacherPeriodTotal * 100.0 / periodTotal) * 10.0) / 10.0
+                                : teacherPercent)
+                        .defaultDailyQuota(defaultDailyTeacherQuota)
+                        .build()
+        );
+
+        LocalDateTime todayStart = TokenDay.startOfToday();
+        List<ClassroomTokenUsageProjection> topClassProjections = classroomRepository != null
+                ? classroomRepository.findTopClassroomsByTokenUsage(finalSchoolId, todayStart, 5)
+                : List.of();
+        List<ClassroomTokenUsageSummaryDto> topClassrooms = (topClassProjections != null) ? topClassProjections.stream()
+                .map(p -> ClassroomTokenUsageSummaryDto.builder()
+                        .classroomId(p.getClassroomId())
+                        .className(p.getClassName())
+                        .classCode(p.getClassCode())
+                        .gradeLevel(p.getGradeLevel())
+                        .academicYear(p.getAcademicYear())
+                        .status(p.getStatus())
+                        .teacherName(p.getTeacherName())
+                        .teacherUid(p.getTeacherUid())
+                        .studentCount(p.getStudentCount() != null ? p.getStudentCount() : 0L)
+                        .tokensUsedTotal(p.getTokensUsedTotal() != null ? p.getTokensUsedTotal() : 0L)
+                        .tokensUsedToday(p.getTokensUsedToday() != null ? p.getTokensUsedToday() : 0L)
+                        .percentageOfSchoolUsage(tokensUsedTotal > 0 && p.getTokensUsedTotal() != null
+                                ? Math.round((p.getTokensUsedTotal() * 100.0 / tokensUsedTotal) * 10.0) / 10.0
+                                : 0.0)
+                        .build())
+                .toList() : List.of();
+
+        long estimatedCost = Math.round(periodTotal * TOKEN_UNIT_PRICE_VND);
+
+        return DashboardTokenUsageResponse.builder()
+                .summary(DashboardTokenUsageResponse.TokenSummary.builder()
+                        .promptTokens(periodPrompt)
+                        .completionTokens(periodCompletion)
+                        .totalTokens(periodTotal)
+                        .remainingTokens(unallocated)
+                        .averageRemainingTokens(balanceSummary == null ? 0.0
+                                : nullSafe(balanceSummary.getAverageRemainingTokens()))
+                        .usersOutOfTokens(balanceSummary == null ? 0L
+                                : nullSafe(balanceSummary.getUsersOutOfTokens()))
+                        .estimatedCost(estimatedCost)
+                        .build())
+                .trend(trend)
+                .tokenBalanceByTier(List.of())
+                .topUsersByTokenUsage(topUsers)
+                .schoolTokenManagement(schoolTokenManagement)
+                .tokenUsageByRole(tokenUsageByRole)
+                .topClassroomsByTokenUsage(topClassrooms)
                 .build();
     }
 
@@ -783,6 +1294,314 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 .totalTokensUsedByAllClasses(totalTokensUsed)
                 .classrooms(classroomDtos)
                 .build();
+    }
+
+    private UUID resolveSchoolIdOrThrow(UUID schoolId) {
+        UUID resolvedSchoolId = schoolId;
+        if (resolvedSchoolId == null) {
+            UserPrincipal resolvedPrincipal = resolvePrincipal(null);
+            resolvedSchoolId = resolvedPrincipal.getSchoolId();
+        }
+        if (resolvedSchoolId == null) {
+            throw new InvalidRequestException("Tài khoản Quản trị viên chưa được liên kết với trường học nào.");
+        }
+        return resolvedSchoolId;
+    }
+
+    private void validateSchoolExists(UUID schoolId) {
+        if (!schoolRepository.existsById(schoolId)) {
+            throw new ResourceNotFoundException("Không tìm thấy trường học với ID: " + schoolId);
+        }
+    }
+
+    private long countPendingBoostRequests(UUID schoolId) {
+        if (tokenBoostRequestRepository == null) {
+            return 0L;
+        }
+        return tokenBoostRequestRepository.countBySchool_IdAndStatus(
+                schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING)
+                + tokenBoostRequestRepository.countBySchool_IdAndStatus(
+                schoolId, com.historytalk.entity.enums.TokenBoostRequestStatus.PENDING_ADMIN);
+    }
+
+    private SchoolAdminDashboardResponse.AssignmentStats buildSchoolAssignmentStats(UUID schoolId) {
+        AssignmentSubmissionStatsProjection stats = assignmentSubmissionRepository != null
+                ? assignmentSubmissionRepository.getSubmissionStatsBySchoolId(schoolId)
+                : null;
+        long totalSubmissions = (stats != null && stats.getTotalSubmissions() != null) ? stats.getTotalSubmissions() : 0L;
+        long submittedCount = (stats != null && stats.getSubmittedCount() != null) ? stats.getSubmittedCount() : 0L;
+        long lateCount = (stats != null && stats.getLateSubmittedCount() != null) ? stats.getLateSubmittedCount() : 0L;
+        long notStartedCount = (stats != null && stats.getNotStartedCount() != null) ? stats.getNotStartedCount() : 0L;
+
+        double completedRate = totalSubmissions > 0
+                ? Math.round((submittedCount * 100.0 / totalSubmissions) * 10.0) / 10.0
+                : 0.0;
+        double lateSubmittedRate = totalSubmissions > 0
+                ? Math.round((lateCount * 100.0 / totalSubmissions) * 10.0) / 10.0
+                : 0.0;
+        double notStartedRate = totalSubmissions > 0
+                ? Math.round((notStartedCount * 100.0 / totalSubmissions) * 10.0) / 10.0
+                : 0.0;
+        return SchoolAdminDashboardResponse.AssignmentStats.builder()
+                .totalSubmissions(totalSubmissions)
+                .completedRate(completedRate)
+                .lateSubmittedRate(lateSubmittedRate)
+                .notStartedRate(notStartedRate)
+                .build();
+    }
+
+    private DashboardOverviewResponse.UserOverview buildSchoolUserOverview(
+            UUID schoolId, LocalDateTime todayStart, LocalDateTime tomorrowStart, LocalDateTime monthStart) {
+        return DashboardOverviewResponse.UserOverview.builder()
+                .total(userRepository.countAllUsersBySchoolId(schoolId))
+                .active(userRepository.countActiveUsersBySchoolId(schoolId))
+                .inactive(userRepository.countInactiveUsersBySchoolId(schoolId))
+                .deleted(userRepository.countDeletedUsersBySchoolId(schoolId))
+                .newToday(userRepository.countCreatedBetweenBySchoolId(schoolId, todayStart, tomorrowStart))
+                .newThisMonth(userRepository.countCreatedBetweenBySchoolId(schoolId, monthStart, tomorrowStart))
+                .build();
+    }
+
+    private DashboardOverviewResponse.RoleOverview buildSchoolRoleOverview(UUID schoolId) {
+        return DashboardOverviewResponse.RoleOverview.builder()
+                .customers(0L)
+                .contentAdmins(0L)
+                .systemAdmins(0L)
+                .schoolAdmins(userRepository.countActiveUsersBySchoolIdAndRole(schoolId, UserRole.SCHOOL_ADMIN))
+                .teachers(userRepository.countBySchoolIdAndRole(schoolId, UserRole.TEACHER))
+                .schoolStudents(userRepository.countBySchoolIdAndRole(schoolId, UserRole.SCHOOL_STUDENT))
+                .build();
+    }
+
+    private DashboardContentSummaryResponse buildSchoolContentSummaryInternal(UUID schoolId) {
+        DashboardContentSummaryResponse.InventoryStats localContexts =
+                DashboardContentSummaryResponse.InventoryStats.builder()
+                        .total(historicalContextRepository != null ? historicalContextRepository.countBySchoolIdCurrent(schoolId) : 0L)
+                        .published(historicalContextRepository != null ? historicalContextRepository.countBySchoolIdPublished(schoolId) : 0L)
+                        .active(historicalContextRepository != null ? historicalContextRepository.countBySchoolIdActive(schoolId) : 0L)
+                        .build();
+        DashboardContentSummaryResponse.InventoryStats localCharacters =
+                DashboardContentSummaryResponse.InventoryStats.builder()
+                        .total(characterRepository != null ? characterRepository.countBySchoolIdCurrent(schoolId) : 0L)
+                        .published(characterRepository != null ? characterRepository.countBySchoolIdPublished(schoolId) : 0L)
+                        .active(characterRepository != null ? characterRepository.countBySchoolIdActive(schoolId) : 0L)
+                        .build();
+        DashboardContentSummaryResponse.DocumentStats localDocuments =
+                DashboardContentSummaryResponse.DocumentStats.builder()
+                        .total(documentRepository != null ? documentRepository.countBySchoolIdCurrent(schoolId) : 0L)
+                        .active(documentRepository != null ? documentRepository.countBySchoolIdActive(schoolId) : 0L)
+                        .build();
+
+        return DashboardContentSummaryResponse.builder()
+                .historicalContexts(localContexts)
+                .characters(localCharacters)
+                .documents(localDocuments)
+                .localHistoricalContexts(localContexts)
+                .localCharacters(localCharacters)
+                .build();
+    }
+
+    private DashboardOverviewResponse.ChatOverview buildSchoolChatOverview(
+            UUID schoolId, LocalDateTime todayStart, LocalDateTime tomorrowStart) {
+        return DashboardOverviewResponse.ChatOverview.builder()
+                .sessions(chatSessionRepository != null ? chatSessionRepository.countCurrentBySchoolId(schoolId) : 0L)
+                .messages(messageRepository.countCurrentBySchoolId(schoolId))
+                .messagesToday(messageRepository.countCreatedBetweenBySchoolId(todayStart, tomorrowStart, schoolId))
+                .build();
+    }
+
+    private List<DashboardOverviewResponse.TopCharacterOverview> buildSchoolTopLocalCharacters(UUID schoolId) {
+        List<DashboardTopCharacterProjection> rows = messageRepository.findTopLocalCharactersBySchoolId(schoolId, 10);
+        if (rows == null) {
+            return List.of();
+        }
+        return rows.stream()
+                .map(c -> DashboardOverviewResponse.TopCharacterOverview.builder()
+                        .characterId(c.getCharacterId())
+                        .name(c.getName())
+                        .title(c.getTitle() != null ? c.getTitle() : "")
+                        .imageUrl(c.getImageUrl() != null ? c.getImageUrl() : "")
+                        .totalMessages(nullSafe(c.getTotalMessages()))
+                        .userMessages(nullSafe(c.getUserMessages()))
+                        .aiMessages(nullSafe(c.getAiMessages()))
+                        .build())
+                .toList();
+    }
+
+    private DashboardQuizAnalyticsResponse.QuizSummary buildSchoolQuizSummary(UUID schoolId) {
+        long totalQuizzes = quizRepository != null ? quizRepository.countBySchoolIdAllQuizzes(schoolId) : 0L;
+        long publishedQuizzes = quizRepository != null ? quizRepository.countBySchoolIdPublishedQuizzes(schoolId) : 0L;
+        long draftQuizzes = quizRepository != null ? quizRepository.countBySchoolIdDraftQuizzes(schoolId) : 0L;
+        long deletedQuizzes = quizRepository != null ? quizRepository.countBySchoolIdDeletedQuizzes(schoolId) : 0L;
+        long startedSessions = quizSessionRepository != null ? quizSessionRepository.countStartedSessionsBySchoolId(schoolId) : 0L;
+        long completedSessions = quizSessionRepository != null ? quizSessionRepository.countCompletedSessionsBySchoolId(schoolId) : 0L;
+        double avgScore = quizSessionRepository != null
+                ? nullSafe(quizSessionRepository.averageScorePercentageBySchoolId(schoolId))
+                : 0.0;
+
+        return DashboardQuizAnalyticsResponse.QuizSummary.builder()
+                .totalQuizzes(totalQuizzes)
+                .publishedQuizzes(publishedQuizzes)
+                .draftQuizzes(draftQuizzes)
+                .deletedQuizzes(deletedQuizzes)
+                .startedSessions(startedSessions)
+                .completedSessions(completedSessions)
+                .completionRate(percentage(completedSessions, startedSessions))
+                .averageScorePercentage(avgScore)
+                .build();
+    }
+
+    private DateRange resolveDateRange(LocalDate from, LocalDate to) {
+        LocalDate resolvedTo = to == null ? LocalDate.now(ZoneOffset.UTC) : to;
+        LocalDate resolvedFrom = from == null ? resolvedTo.minusDays(DEFAULT_RANGE_DAYS) : from;
+
+        if (resolvedFrom.isAfter(resolvedTo)) {
+            throw new InvalidRequestException("từ (from) phải trước hoặc bằng đến (to)");
+        }
+        if (resolvedFrom.plusDays(MAX_RANGE_DAYS).isBefore(resolvedTo)) {
+            throw new InvalidRequestException("Khoảng thời gian không được vượt quá " + MAX_RANGE_DAYS + " days");
+        }
+
+        return new DateRange(
+                resolvedFrom,
+                resolvedTo,
+                resolvedFrom.atStartOfDay(),
+                resolvedTo.plusDays(1).atStartOfDay()
+        );
+    }
+
+    private String normalizeGranularity(String granularity) {
+        if (granularity == null || granularity.isBlank()) {
+            return "day";
+        }
+        String normalized = granularity.toLowerCase(Locale.ROOT).trim();
+        if (!List.of("day", "week", "month").contains(normalized)) {
+            throw new InvalidRequestException("granularity (đơn vị thời gian) phải là day, week hoặc month");
+        }
+        return normalized;
+    }
+
+    private List<String> initializePeriods(LocalDate from, LocalDate to, String bucket) {
+        List<String> periods = new ArrayList<>();
+        if ("month".equals(bucket)) {
+            YearMonth cursor = YearMonth.from(from);
+            YearMonth end = YearMonth.from(to);
+            while (!cursor.isAfter(end)) {
+                periods.add(cursor.atDay(1).format(PERIOD_FORMATTER));
+                cursor = cursor.plusMonths(1);
+            }
+            return periods;
+        }
+
+        if ("week".equals(bucket)) {
+            LocalDate cursor = from.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            LocalDate end = to.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            while (!cursor.isAfter(end)) {
+                periods.add(cursor.format(PERIOD_FORMATTER));
+                cursor = cursor.plusWeeks(1);
+            }
+            return periods;
+        }
+
+        LocalDate cursor = from;
+        while (!cursor.isAfter(to)) {
+            periods.add(cursor.format(PERIOD_FORMATTER));
+            cursor = cursor.plusDays(1);
+        }
+        return periods;
+    }
+
+    private Map<String, Long> toPeriodMap(List<DashboardPeriodCountProjection> rows) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        if (rows == null) {
+            return result;
+        }
+        for (DashboardPeriodCountProjection row : rows) {
+            result.put(row.getPeriod(), row.getCount() == null ? 0L : row.getCount());
+        }
+        return result;
+    }
+
+    private Map<String, DashboardQuizTrendProjection> toQuizPeriodMap(List<DashboardQuizTrendProjection> rows) {
+        Map<String, DashboardQuizTrendProjection> result = new LinkedHashMap<>();
+        if (rows == null) {
+            return result;
+        }
+        for (DashboardQuizTrendProjection row : rows) {
+            result.put(row.getPeriod(), row);
+        }
+        return result;
+    }
+
+    private Map<String, DashboardTokenTrendProjection> toTokenPeriodMap(List<DashboardTokenTrendProjection> rows) {
+        Map<String, DashboardTokenTrendProjection> result = new LinkedHashMap<>();
+        if (rows == null) {
+            return result;
+        }
+        for (DashboardTokenTrendProjection row : rows) {
+            result.put(row.getPeriod(), row);
+        }
+        return result;
+    }
+
+    private DashboardQuizAnalyticsResponse.TopQuiz toTopQuiz(DashboardTopQuizProjection row) {
+        return DashboardQuizAnalyticsResponse.TopQuiz.builder()
+                .quizId(row.getQuizId())
+                .title(row.getTitle())
+                .level(row.getLevel())
+                .startedSessions(nullSafe(row.getStartedSessions()))
+                .completedSessions(nullSafe(row.getCompletedSessions()))
+                .averageScorePercentage(nullSafe(row.getAverageScorePercentage()))
+                .build();
+    }
+
+    private DashboardQuizAnalyticsResponse.TopWrongQuestion toTopWrongQuestion(
+            DashboardTopWrongQuestionProjection row) {
+        return DashboardQuizAnalyticsResponse.TopWrongQuestion.builder()
+                .questionId(row.getQuestionId())
+                .questionContent(row.getQuestionContent())
+                .quizId(row.getQuizId())
+                .quizTitle(row.getQuizTitle())
+                .wrongAnswers(nullSafe(row.getWrongAnswers()))
+                .totalAnswers(nullSafe(row.getTotalAnswers()))
+                .wrongRate(nullSafe(row.getWrongRate()) * 100.0)
+                .build();
+    }
+
+    private DashboardTokenUsageResponse.TopTokenUser toTopTokenUser(DashboardTopTokenUserProjection row) {
+        return DashboardTokenUsageResponse.TopTokenUser.builder()
+                .uid(row.getUid())
+                .userName(row.getUserName())
+                .email(row.getEmail())
+                .tierId(row.getTierId())
+                .tierTitle(row.getTierTitle())
+                .promptTokens(nullSafe(row.getPromptTokens()))
+                .completionTokens(nullSafe(row.getCompletionTokens()))
+                .totalTokens(nullSafe(row.getTotalTokens()))
+                .remainingTokens(nullSafe(row.getRemainingTokens()))
+                .build();
+    }
+
+    private long toLong(Number value) {
+        return value == null ? 0L : value.longValue();
+    }
+
+    private long nullSafe(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private double nullSafe(Double value) {
+        return value == null ? 0.0 : value;
+    }
+
+    private double percentage(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return 0.0;
+        }
+        return numerator * 100.0 / denominator;
+    }
+
+    private record DateRange(LocalDate from, LocalDate to, LocalDateTime fromDateTime, LocalDateTime toExclusive) {
     }
 
 }
