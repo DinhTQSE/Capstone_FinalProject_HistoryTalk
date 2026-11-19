@@ -180,3 +180,18 @@ Auth: `Bearer <JWT>` với role `SYSTEM_ADMIN` (`@PreAuthorize("hasRole('SYSTEM_
 - **Thay đổi quan trọng**:
   - Đồng bộ phạm vi `scope=B2C` (`CUSTOMER`) và `scope=B2B` (`SCHOOL_ADMIN`, `TEACHER`, `SCHOOL_STUDENT`) giữa tổng token tiêu thụ, token còn lại và top user.
   - `tokenBalanceByTier` gộp theo `LOWER(t.title)` (trả `[]` khi `scope=B2B`).
+
+---
+
+## 3. Đồng bộ sang School Admin Dashboard (`/api/v1/school-admin/dashboard/*`)
+
+School Admin Dashboard có bộ endpoints đối xứng 1-1 với System Admin Dashboard (lọc theo `school_id` của trường, chỉ thống kê nhân vật/nội dung Local của trường, và thay Doanh thu bằng Thống kê Quản lý Token của trường):
+- `GET /api/v1/school-admin/dashboard/overview`
+- `GET /api/v1/school-admin/dashboard/users` (`from`, `to`, `granularity`)
+- `GET /api/v1/school-admin/dashboard/content`
+- `GET /api/v1/school-admin/dashboard/chat-activity` (`from`, `to`, `granularity`)
+- `GET /api/v1/school-admin/dashboard/quiz` (`from`, `to`, `granularity`)
+- `GET /api/v1/school-admin/dashboard/tokens` (`from`, `to`, `granularity`)
+- `GET /api/v1/school-admin/dashboard` (Root endpoint tổng hợp)
+
+👉 Xem chi tiết đầy đủ payload của School Admin Dashboard tại: [school_admin_dashboard_api_contract.md](./school_admin_dashboard_api_contract.md).

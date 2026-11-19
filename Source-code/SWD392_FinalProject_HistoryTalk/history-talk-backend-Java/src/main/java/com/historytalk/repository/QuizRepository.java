@@ -157,6 +157,58 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.school IS NOT NULL AND q.isPublished = false")
     long countLocalDraftQuizzes();
 
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.deletedAt IS NULL AND q.historicalContext.school.id = :schoolId")
+    long countBySchoolIdAllQuizzes(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.deletedAt IS NULL AND q.historicalContext.school.id = :schoolId AND q.isPublished = true")
+    long countBySchoolIdPublishedQuizzes(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL AND q.historicalContext.deletedAt IS NULL AND q.historicalContext.school.id = :schoolId AND q.isPublished = false")
+    long countBySchoolIdDraftQuizzes(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NOT NULL AND q.historicalContext.school.id = :schoolId")
+    long countBySchoolIdDeletedQuizzes(@Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT CAST(q.quiz_id AS text) AS "quizId",
+                   q.title AS title,
+                   CAST(NULL AS varchar) AS level,
+                   COUNT(qs.session_id) AS "startedSessions",
+                   COUNT(qs.session_id) FILTER (WHERE qs.end_time IS NOT NULL) AS "completedSessions",
+                   COALESCE(AVG(
+                       CASE
+                           WHEN qs.end_time IS NOT NULL
+                            AND qs.score IS NOT NULL
+                            AND qc.question_count > 0
+                           THEN qs.score * 100.0 / qc.question_count
+                       END
+                   ), 0.0) AS "averageScorePercentage"
+            FROM quiz q
+            JOIN historical_context hc ON hc.context_id = q.context_id AND hc.deleted_at IS NULL
+            LEFT JOIN (
+                SELECT qq.quiz_id, COUNT(*) AS question_count
+                FROM quiz_question qq
+                JOIN question qu ON qu.question_id = qq.question_id
+                WHERE qu.deleted_at IS NULL
+                GROUP BY qq.quiz_id
+            ) qc ON qc.quiz_id = q.quiz_id
+            LEFT JOIN quiz_session qs
+              ON qs.quiz_id = q.quiz_id
+             AND qs.deleted_at IS NULL
+             AND qs.created_at >= :from
+             AND qs.created_at < :to
+            WHERE q.deleted_at IS NULL
+              AND hc.school_id = :schoolId
+            GROUP BY q.quiz_id, q.title
+            ORDER BY "completedSessions" DESC, "startedSessions" DESC, q.title ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<DashboardTopQuizProjection> findTopQuizzesForDashboardBySchoolId(
+            @Param("from") java.time.LocalDateTime from,
+            @Param("to") java.time.LocalDateTime to,
+            @Param("schoolId") UUID schoolId,
+            @Param("limit") int limit);
+
     @Query(value = """
             SELECT CAST(q.quiz_id AS text) AS "quizId",
                    q.title AS title,

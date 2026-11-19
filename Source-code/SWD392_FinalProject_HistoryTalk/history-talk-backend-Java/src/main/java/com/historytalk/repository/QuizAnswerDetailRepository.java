@@ -90,4 +90,39 @@ public interface QuizAnswerDetailRepository extends JpaRepository<QuizAnswerDeta
             @Param("to") LocalDateTime to,
             @Param("isLocal") boolean isLocal,
             @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT CAST(qad.question_id AS text) AS "questionId",
+                   question.content AS "questionContent",
+                   CAST(q.quiz_id AS text) AS "quizId",
+                   q.title AS "quizTitle",
+                   COUNT(*) FILTER (WHERE qad.is_correct = false) AS "wrongAnswers",
+                   COUNT(*) AS "totalAnswers",
+                   CASE
+                       WHEN COUNT(*) = 0 THEN 0.0
+                       ELSE COUNT(*) FILTER (WHERE qad.is_correct = false) * 1.0 / COUNT(*)
+                   END AS "wrongRate"
+            FROM quiz_answer_detail qad
+            JOIN question question ON question.question_id = qad.question_id
+            JOIN quiz_session qs ON qs.session_id = qad.session_id
+            JOIN quiz q ON q.quiz_id = qs.quiz_id
+            JOIN historical_context hc ON hc.context_id = q.context_id
+            WHERE qad.deleted_at IS NULL
+              AND question.deleted_at IS NULL
+              AND q.deleted_at IS NULL
+              AND hc.deleted_at IS NULL
+              AND qs.deleted_at IS NULL
+              AND qad.created_at >= :from
+              AND qad.created_at < :to
+              AND hc.school_id = :schoolId
+            GROUP BY qad.question_id, question.content, q.quiz_id, q.title
+            HAVING COUNT(*) > 0
+            ORDER BY "wrongRate" DESC, "wrongAnswers" DESC, q.title ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<DashboardTopWrongQuestionProjection> findTopWrongQuestionsForDashboardBySchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("schoolId") UUID schoolId,
+            @Param("limit") int limit);
 }

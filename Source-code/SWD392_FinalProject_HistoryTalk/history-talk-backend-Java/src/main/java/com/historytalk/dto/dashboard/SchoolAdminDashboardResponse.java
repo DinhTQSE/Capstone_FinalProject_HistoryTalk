@@ -45,7 +45,12 @@ public class SchoolAdminDashboardResponse {
     private double studentTokenUsagePercentage;
     private double teacherTokenUsagePercentage;
     private int defaultDailyStudentQuota;
+    private int defaultDailyTeacherQuota;
+    private double quotaUsagePercentage;
     private long pendingTokenBoostRequests;
+    private long topupPaidOrders;
+    private long topupTokensPurchased;
+    private long topupAmountPaid;
 
     // Top các lớp học tiêu thụ nhiều token nhất trong trường
     @Builder.Default
@@ -53,6 +58,15 @@ public class SchoolAdminDashboardResponse {
 
     // Tỷ lệ hoàn thành bài tập toàn trường
     private AssignmentStats assignmentStats;
+
+    // Thống kê đồng bộ theo chuẩn System Admin Dashboard (fit theo B2B & từng trường)
+    private DashboardOverviewResponse.UserOverview users;
+    private DashboardOverviewResponse.RoleOverview roles;
+    private DashboardContentSummaryResponse content;
+    private DashboardOverviewResponse.ChatOverview chat;
+    @Builder.Default
+    private List<DashboardOverviewResponse.TopCharacterOverview> topLocalCharacters = new ArrayList<>();
+    private DashboardQuizAnalyticsResponse.QuizSummary quiz;
 
     @Data
     @NoArgsConstructor

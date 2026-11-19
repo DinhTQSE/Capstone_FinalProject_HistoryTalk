@@ -124,4 +124,41 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
             @Param("to") LocalDateTime to,
             @Param("bucket") String bucket,
             @Param("roles") java.util.Collection<String> roles);
+
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.user.deletedAt IS NULL AND cs.user.school.id = :schoolId")
+    long countCurrentBySchoolId(@Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.user.deletedAt IS NULL AND cs.lastMessageAt IS NOT NULL AND cs.lastMessageAt >= :cutoff AND cs.user.school.id = :schoolId")
+    long countActiveSinceBySchoolId(@Param("cutoff") LocalDateTime cutoff, @Param("schoolId") UUID schoolId);
+
+    @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.user.deletedAt IS NULL AND cs.createdAt >= :from AND cs.createdAt < :to AND cs.user.school.id = :schoolId")
+    long countCreatedBetweenBySchoolId(@Param("from") LocalDateTime from,
+                                       @Param("to") LocalDateTime to,
+                                       @Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT to_char(
+                CASE
+                    WHEN :bucket = 'month' THEN date_trunc('month', cs.created_at)
+                    WHEN :bucket = 'week' THEN date_trunc('week', cs.created_at)
+                    ELSE date_trunc('day', cs.created_at)
+                END,
+                'YYYY-MM-DD'
+            ) AS period,
+            COUNT(*) AS count
+            FROM chat_session cs
+            JOIN "user" u ON u.uid = cs.uid
+            WHERE cs.deleted_at IS NULL
+              AND u.deleted_at IS NULL
+              AND u.school_id = :schoolId
+              AND cs.created_at >= :from
+              AND cs.created_at < :to
+            GROUP BY 1
+            ORDER BY 1
+            """, nativeQuery = true)
+    List<DashboardPeriodCountProjection> countSessionsByPeriodAndSchoolId(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("bucket") String bucket,
+            @Param("schoolId") UUID schoolId);
 }

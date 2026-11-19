@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -44,6 +46,84 @@ public class AnalyticsDashboardController {
         log.info("GET /api/v1/school-admin/dashboard by user: {}", principal != null ? principal.getUsername() : "security-context");
         SchoolAdminDashboardResponse response = analyticsDashboardService.getSchoolAdminDashboard(principal != null ? principal.getSchoolId() : null);
         return ResponseEntity.ok(ApiResponse.success(response, "Lấy dashboard quản trị trường thành công"));
+    }
+
+    @GetMapping("/school-admin/dashboard/overview")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin Dashboard Overview", description = "Returns first-screen School Admin dashboard overview (users, B2B roles, local content, chat, top local characters, and school token overview)")
+    public ResponseEntity<ApiResponse<DashboardOverviewResponse>> getSchoolAdminOverview(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/dashboard/overview by user: {}", principal != null ? principal.getUsername() : "security-context");
+        DashboardOverviewResponse response = analyticsDashboardService.getSchoolAdminOverview(
+                principal != null ? principal.getSchoolId() : null);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy tổng quan dashboard trường học thành công"));
+    }
+
+    @GetMapping("/school-admin/dashboard/users")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin User Analytics", description = "Returns school user summary, B2B role distribution, and user trend within the school")
+    public ResponseEntity<ApiResponse<DashboardUserAnalyticsResponse>> getSchoolAdminUserAnalytics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/dashboard/users - from: {}, to: {}, granularity: {}", from, to, granularity);
+        DashboardUserAnalyticsResponse response = analyticsDashboardService.getSchoolAdminUserAnalytics(
+                principal != null ? principal.getSchoolId() : null, from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thống kê người dùng của trường thành công"));
+    }
+
+    @GetMapping("/school-admin/dashboard/content")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin Local Content Summary", description = "Returns local historical context, local character, and local document inventory of the school")
+    public ResponseEntity<ApiResponse<DashboardContentSummaryResponse>> getSchoolAdminContentSummary(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/dashboard/content by user: {}", principal != null ? principal.getUsername() : "security-context");
+        DashboardContentSummaryResponse response = analyticsDashboardService.getSchoolAdminContentSummary(
+                principal != null ? principal.getSchoolId() : null);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy tổng hợp nội dung địa phương của trường thành công"));
+    }
+
+    @GetMapping("/school-admin/dashboard/chat-activity")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin Chat Activity", description = "Returns chat session/message summary (including 2-minute active sessions) and trend for the school")
+    public ResponseEntity<ApiResponse<DashboardChatActivityResponse>> getSchoolAdminChatActivity(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/dashboard/chat-activity - from: {}, to: {}, granularity: {}", from, to, granularity);
+        DashboardChatActivityResponse response = analyticsDashboardService.getSchoolAdminChatActivity(
+                principal != null ? principal.getSchoolId() : null, from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thống kê hoạt động trò chuyện của trường thành công"));
+    }
+
+    @GetMapping("/school-admin/dashboard/quiz")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin Quiz Analytics", description = "Returns local quiz inventory, quiz session trend, top quizzes, and wrong-answer analytics of the school")
+    public ResponseEntity<ApiResponse<DashboardQuizAnalyticsResponse>> getSchoolAdminQuizAnalytics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/dashboard/quiz - from: {}, to: {}, granularity: {}", from, to, granularity);
+        DashboardQuizAnalyticsResponse response = analyticsDashboardService.getSchoolAdminQuizAnalytics(
+                principal != null ? principal.getSchoolId() : null, from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thống kê quiz của trường thành công"));
+    }
+
+    @GetMapping("/school-admin/dashboard/tokens")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @Operation(summary = "School Admin Token Management & Usage Analytics", description = "Returns school token pool management, student/teacher token usage breakdown, token usage trend, top classrooms, and top token users")
+    public ResponseEntity<ApiResponse<DashboardTokenUsageResponse>> getSchoolAdminTokenAnalytics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "day") String granularity,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.info("GET /api/v1/school-admin/dashboard/tokens - from: {}, to: {}, granularity: {}", from, to, granularity);
+        DashboardTokenUsageResponse response = analyticsDashboardService.getSchoolAdminTokenAnalytics(
+                principal != null ? principal.getSchoolId() : null, from, to, granularity);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thống kê quản lý và sử dụng token của trường thành công"));
     }
 
     @GetMapping("/teacher/dashboard/classrooms/{classId}")

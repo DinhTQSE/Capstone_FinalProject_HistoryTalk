@@ -94,6 +94,28 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("SELECT COUNT(d) FROM Document d WHERE d.deletedAt IS NULL")
     long countActive();
 
+    @Query(value = """
+            SELECT COUNT(d.doc_id)
+            FROM document d
+            LEFT JOIN historical_context hc ON d.entity_type = 'HISTORICAL_CONTEXT' AND hc.context_id = d.entity_id
+            LEFT JOIN character c ON d.entity_type = 'CHARACTER' AND c.character_id = d.entity_id
+            WHERE d.deleted_at IS NULL
+              AND ((hc.school_id = :schoolId AND hc.deleted_at IS NULL)
+                   OR (c.school_id = :schoolId AND c.deleted_at IS NULL))
+            """, nativeQuery = true)
+    long countBySchoolIdCurrent(@Param("schoolId") UUID schoolId);
+
+    @Query(value = """
+            SELECT COUNT(d.doc_id)
+            FROM document d
+            LEFT JOIN historical_context hc ON d.entity_type = 'HISTORICAL_CONTEXT' AND hc.context_id = d.entity_id
+            LEFT JOIN character c ON d.entity_type = 'CHARACTER' AND c.character_id = d.entity_id
+            WHERE d.deleted_at IS NULL
+              AND ((hc.school_id = :schoolId AND hc.deleted_at IS NULL)
+                   OR (c.school_id = :schoolId AND c.deleted_at IS NULL))
+            """, nativeQuery = true)
+    long countBySchoolIdActive(@Param("schoolId") UUID schoolId);
+
     List<Document> findByEntityIdAndEntityType(UUID entityId, EntityType entityType);
 
     /**

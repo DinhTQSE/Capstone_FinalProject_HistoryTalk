@@ -5,6 +5,7 @@ import com.historytalk.dto.dashboard.*;
 import com.historytalk.security.UserPrincipal;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 public interface AnalyticsDashboardService {
@@ -13,6 +14,26 @@ public interface AnalyticsDashboardService {
      * US-SP6-06: Thống kê Dashboard trường học cho School Admin.
      */
     SchoolAdminDashboardResponse getSchoolAdminDashboard(UUID schoolId);
+
+    /**
+     * Sprint 10: Các API Dashboard chi tiết cho School Admin đồng bộ cấu trúc với System Admin Dashboard
+     * (chỉ thống kê dữ liệu Local của trường & Quản lý Quỹ Token trường).
+     */
+    DashboardOverviewResponse getSchoolAdminOverview(UUID schoolId);
+
+    DashboardUserAnalyticsResponse getSchoolAdminUserAnalytics(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity);
+
+    DashboardContentSummaryResponse getSchoolAdminContentSummary(UUID schoolId);
+
+    DashboardChatActivityResponse getSchoolAdminChatActivity(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity);
+
+    DashboardQuizAnalyticsResponse getSchoolAdminQuizAnalytics(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity);
+
+    DashboardTokenUsageResponse getSchoolAdminTokenAnalytics(
+            UUID schoolId, LocalDate from, LocalDate to, String granularity);
 
     /**
      * Thống kê chi tiết mức độ tiêu thụ Token của tất cả các lớp trong trường cho School Admin.

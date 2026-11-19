@@ -66,3 +66,18 @@ Mọi số liệu thống kê hiện hành trên Dashboard **không tính** các
 - **Tính nhất quán Token (`/tokens`)**:
   - `scope=B2C`: đồng bộ thống kê message token (`CUSTOMER`), token còn lại (`CUSTOMER`), phân bổ theo tier và top user (`CUSTOMER`).
   - `scope=B2B`: đồng bộ thống kê message token (`SCHOOL_ADMIN`, `TEACHER`, `SCHOOL_STUDENT`), token còn lại của các user B2B và top user B2B; `tokenBalanceByTier` trả `[]`.
+
+---
+
+## 3. Đồng bộ cấu trúc sang School Admin Dashboard (`/api/v1/school-admin/dashboard/*`)
+
+School Admin Dashboard được thiết kế **đồng bộ 1-1 về mặt cấu trúc endpoint và DTO** với System Admin Dashboard, nhưng được điều chỉnh (fit) riêng cho mô hình B2B và giới hạn trong phạm vi **trường học (`school_id`) của School Admin đang đăng nhập**:
+
+| Module | System Admin (`/api/v1/system-admin/dashboard/*`) | School Admin (`/api/v1/school-admin/dashboard/*`) |
+|---|---|---|
+| **Tổng quan (`/overview`)** | Có cả `topGlobalCharacters` và `topLocalCharacters`; thống kê toàn hệ thống (hoặc theo `scope`). | **Chỉ có nhân vật Local của trường** (`topLocalCharacters`, `topCharacters = topLocalCharacters`, `topGlobalCharacters = []`). Kèm thêm `schoolTokenOverview` (quỹ token và tiến độ bài tập của trường). |
+| **Người dùng (`/users`)** | Tất cả roles B2C + B2B + Admin hệ thống. | Chỉ thống kê người dùng thuộc trường (`school_id = :schoolId`) với 3 role B2B: `SCHOOL_ADMIN`, `TEACHER`, `SCHOOL_STUDENT`. |
+| **Kho nội dung (`/content`)** | Thống kê cả nội dung Global (`school_id IS NULL`) và Local (`school_id IS NOT NULL`). | **Chỉ thống kê nội dung Local của trường** (`hc.school_id = :schoolId`, `c.school_id = :schoolId` và tài liệu gắn với bối cảnh/nhân vật Local của trường). |
+| **Hoạt động Chat (`/chat-activity`)** | Hội thoại toàn hệ thống (hoặc lọc B2C/B2B); `activeSessions` trong 2 phút gần nhất. | Hội thoại của học sinh/giáo viên trong trường (`u.school_id = :schoolId`); `activeSessions` trong 2 phút gần nhất. |
+| **Quiz (`/quiz`)** | Quiz Global và Local; `topWrongQuestions` kèm `questionContent`. | Chỉ thống kê Quiz Local của trường (`hc.school_id = :schoolId`), lượt làm bài và `topWrongQuestions` (kèm `questionContent`) của trường. |
+| **Doanh thu vs Quản lý Token (`/tokens`)** | System Admin có `/revenue`, `/payments`, `/tiers` và `/tokens`. | School Admin không có doanh thu/tier B2C; thay bằng **Quản lý & Thống kê Token của Trường (`/tokens`)**: trả về `summary`, `trend`, `topUsersByTokenUsage`, cộng thêm `schoolTokenManagement` (tổng quỹ trường, quỹ còn lại, đã dùng, % sử dụng, học sinh vs giáo viên, hạn mức ngày, số yêu cầu xin token chờ duyệt, tổng token/tiền đã mua thêm qua PayOS), `tokenUsageByRole` và `topClassroomsByTokenUsage`. |
