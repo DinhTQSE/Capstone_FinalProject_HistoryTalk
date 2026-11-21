@@ -490,61 +490,12 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     // storyScript JSON helpers
     // ────────────────────────────────────────────────────────────────────────
 
-    static final int STORY_MAX_NODES = 300;
-    static final int STORY_MAX_BYTES = 500 * 1024;
-    private static final Set<String> VALID_STORY_STATUSES = Set.of("draft", "published");
+    static final int STORY_MAX_NODES = StoryScripts.MAX_NODES;
+    static final int STORY_MAX_BYTES = StoryScripts.MAX_BYTES;
 
-    /**
-     * Validates a story script from the request and returns the JSON stored in the DB column
-     * (null when raw is null). The inside of nodes/edges is the FE's business and is not checked.
-     *
-     * @throws InvalidRequestException (400) when the object breaks the storyScript contract.
-     */
+    /** Validates a story script from the request; see {@link StoryScripts#serialize}. */
     private String serializeStoryScript(Object raw) {
-        if (raw == null) {
-            return null;
-        }
-        Map<String, Object> map;
-        String json;
-        try {
-            Object value = raw instanceof String s ? objectMapper.readValue(s, Object.class) : raw;
-            if (!(value instanceof Map<?, ?>)) {
-                throw new InvalidRequestException("storyScript phải là một object");
-            }
-            json = objectMapper.writeValueAsString(value);
-            map = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (JsonProcessingException ex) {
-            throw new InvalidRequestException("storyScript không phải JSON hợp lệ");
-        }
-
-        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > STORY_MAX_BYTES) {
-            throw new InvalidRequestException("storyScript vượt quá dung lượng tối đa 500 KB");
-        }
-        Object version = map.get("version");
-        if (!(version instanceof Number n) || n.doubleValue() != 1d) {
-            throw new InvalidRequestException("storyScript.version phải là 1");
-        }
-        if (!(map.get("title") instanceof String)) {
-            throw new InvalidRequestException("storyScript.title phải là chuỗi");
-        }
-        Object status = map.get("status");
-        if (!(status instanceof String st) || !VALID_STORY_STATUSES.contains(st)) {
-            throw new InvalidRequestException("storyScript.status phải là 'draft' hoặc 'published'");
-        }
-        Object narratorId = map.get("narratorId");
-        if (narratorId != null && !(narratorId instanceof String)) {
-            throw new InvalidRequestException("storyScript.narratorId phải là chuỗi hoặc null");
-        }
-        if (!(map.get("nodes") instanceof List<?> nodes)) {
-            throw new InvalidRequestException("storyScript.nodes phải là mảng");
-        }
-        if (!(map.get("edges") instanceof List<?>)) {
-            throw new InvalidRequestException("storyScript.edges phải là mảng");
-        }
-        if (nodes.size() > STORY_MAX_NODES) {
-            throw new InvalidRequestException("storyScript tối đa " + STORY_MAX_NODES + " node");
-        }
-        return json;
+        return StoryScripts.serialize(raw, objectMapper);
     }
 
     /**
@@ -552,11 +503,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
      * only get a published script, otherwise null (the key itself is always present).
      */
     private Object visibleStoryScript(String json) {
-        Object script = deserializeJson(json);
-        if (script == null || isStaffOrAdmin(SecurityUtils.getRoleName())) {
-            return script;
-        }
-        return script instanceof Map<?, ?> m && "published".equals(m.get("status")) ? script : null;
+        return StoryScripts.visible(deserializeJson(json), isStaffOrAdmin(SecurityUtils.getRoleName()));
     }
 
     /**

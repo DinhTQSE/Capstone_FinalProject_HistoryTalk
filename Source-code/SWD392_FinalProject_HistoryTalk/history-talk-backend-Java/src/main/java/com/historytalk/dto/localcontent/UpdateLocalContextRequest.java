@@ -1,5 +1,6 @@
 package com.historytalk.dto.localcontent;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.historytalk.entity.enums.ContentScope;
 import com.historytalk.entity.enums.EventCategory;
@@ -81,4 +82,21 @@ public class UpdateLocalContextRequest {
      */
     @JsonProperty("battleMap")
     private Object battleMap;
+
+    /**
+     * Optional story script (visual novel), same contract as the global contexts' one.
+     * Absent key = keep the stored script; {"storyScript": null} = delete it.
+     */
+    @JsonProperty("storyScript")
+    private Object storyScript;
+
+    /** True when the request body contained the "storyScript" key (even with a null value). */
+    @JsonIgnore
+    private boolean storyScriptPresent;
+
+    @JsonProperty("storyScript")
+    public void setStoryScript(Object storyScript) {
+        this.storyScript = storyScript;
+        this.storyScriptPresent = true;
+    }
 }

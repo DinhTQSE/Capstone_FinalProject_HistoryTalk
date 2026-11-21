@@ -146,6 +146,17 @@ public class SchoolAdminLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(response, message));
     }
 
+    @GetMapping("/characters/{characterId}/published-stories")
+    @Operation(summary = "Kịch bản kể chuyện đã xuất bản đang dùng nhân vật",
+            description = "Ẩn nhân vật (DRAFT/INACTIVE) sẽ chuyển các kịch bản này về nháp. FE dùng để cảnh báo trước.")
+    public ResponseEntity<ApiResponse<java.util.List<com.historytalk.dto.localcontent.LocalStoryUsageResponse>>> getCharacterPublishedStories(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var list = localContentService.getCharacterPublishedStories(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách kịch bản dùng nhân vật thành công"));
+    }
+
     @GetMapping("/characters/{characterId}/documents")
     @Operation(
             summary = "Xem tài liệu đính kèm nhân vật (Admin review)",

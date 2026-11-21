@@ -119,6 +119,9 @@ public interface LocalContentService {
 
     List<LocalContentResponse> getCharacterContexts(String characterId, UserPrincipal principal);
 
+    /** Published local stories showing the character (they go back to draft if it is hidden, deleted or unlinked). */
+    List<com.historytalk.dto.localcontent.LocalStoryUsageResponse> getCharacterPublishedStories(String characterId, UserPrincipal principal);
+
     // ── School Trash & Restore ───────────────────────────────────────────────
 
     PaginatedResponse<LocalContentResponse> getTrashedContexts(int page, int size, UserPrincipal principal);

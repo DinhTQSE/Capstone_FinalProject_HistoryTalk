@@ -32,6 +32,7 @@ import com.historytalk.repository.UserRepository;
 import com.historytalk.repository.school.SchoolRepository;
 import com.historytalk.security.UserPrincipal;
 import com.historytalk.service.chat.AiServiceClient;
+import com.historytalk.service.historicalContext.StoryScripts;
 import com.historytalk.utils.SecurityUtils;
 import com.historytalk.service.character.CharacterPronouns;
 import com.historytalk.service.speech.CharacterVoices;
@@ -48,7 +49,10 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -81,6 +85,10 @@ public class LocalContentServiceImpl implements LocalContentService {
     private final AiServiceClient aiServiceClient;
     private final ClassLocalContentRepository classLocalContentRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    /** Roles that see a local story while it is still a draft; students only get a published one. */
+    private static final java.util.Set<String> STORY_DRAFT_READERS =
+            java.util.Set.of("TEACHER", "SCHOOL_ADMIN", "CONTENT_ADMIN", "SYSTEM_ADMIN");
     private final com.historytalk.service.historicalContext.strategy.DocumentProcessorFactory documentProcessorFactory;
     private final com.historytalk.repository.QuizRepository quizRepository;
     private final com.historytalk.repository.QuestionRepository questionRepository;
@@ -162,6 +170,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         if (req.getLatitude() != null)                 ctx.setLatitude(req.getLatitude());
         if (req.getLongitude() != null)                ctx.setLongitude(req.getLongitude());
         if (req.getBattleMap() != null)                ctx.setBattleMap(serializeBattleMap(req.getBattleMap()));
+        // storyScript: absent key keeps the stored script, an explicit null deletes it
+        if (req.isStoryScriptPresent())                ctx.setStoryScript(StoryScripts.serialize(req.getStoryScript(), objectMapper));
 
         if (req.getIsPublished() != null) {
             ctx.setIsPublished(req.getIsPublished());
@@ -174,9 +184,147 @@ public class LocalContentServiceImpl implements LocalContentService {
             saveClassAssignments(ctx.getContextId(), EntityType.CONTEXT, req.getClassIds(), teacher.getUid(), school.getId());
         }
 
+        // Checked last, against the context's final state (status, scope, classes) of this same request.
+        if (req.isStoryScriptPresent() && StoryScripts.isPublished(ctx.getStoryScript(), objectMapper)) {
+            ensureStoryPublishable(ctx);
+        } else if (req.getContentScope() != null || req.getClassIds() != null) {
+            draftStoryIfSpeakersHidden(ctx);
+        }
+
         ctx = localContextRepo.save(ctx);
         log.info("Teacher {} updated local context {}", teacher.getUid(), ctx.getContextId());
         return mapContextToResponse(ctx);
+    }
+
+    /**
+     * A published local story must only show what its students can see: the context itself must be published, and
+     * every narrator / speaker must be a published local character linked to the context whose scope covers the
+     * context's (otherwise the player shows that character's lines as the narrator, without name or portrait).
+     */
+    private void ensureStoryPublishable(HistoricalContext ctx) {
+        if (!isVisibleToStudents(ctx.getIsPublished(), ctx.getContentStatus())) {
+            throw new InvalidRequestException("Hãy xuất bản bối cảnh trước khi xuất bản kịch bản kể chuyện.");
+        }
+        Set<String> ids = StoryScripts.characterIds(ctx.getStoryScript(), objectMapper);
+        if (ids.isEmpty()) {
+            return;
+        }
+        Set<UUID> contextClasses = new HashSet<>(classLocalContentRepo
+                .findClassIdsByEntityIdAndEntityType(ctx.getContextId(), EntityType.CONTEXT));
+
+        List<String> problems = new ArrayList<>();
+        for (String id : ids) {
+            Character c = parseUuid(id).flatMap(localCharacterRepo::findById).orElse(null);
+            String problem = characterProblem(c, ctx, contextClasses);
+            if (problem != null) {
+                problems.add(problem);
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new InvalidRequestException("Chưa xuất bản được kịch bản: học sinh sẽ không thấy nhân vật "
+                    + String.join(", ", problems) + ". Hãy xuất bản/liên kết nhân vật hoặc chuyển kịch bản về bản nháp.");
+        }
+    }
+
+    /** Why students of the context would not see this story character, or null when they would. */
+    private String characterProblem(Character c, HistoricalContext ctx, Set<UUID> contextClasses) {
+        if (c == null) {
+            return "một nhân vật đã bị xóa";
+        }
+        if (c.getDeletedAt() != null) {
+            return c.getName() + " (đã bị xóa)";
+        }
+        boolean linked = c.getHistoricalContexts() != null && c.getHistoricalContexts().stream()
+                .anyMatch(hc -> ctx.getContextId().equals(hc.getContextId()));
+        if (!linked) {
+            return c.getName() + " (chưa liên kết với bối cảnh)";
+        }
+        if (!isVisibleToStudents(c.getIsPublished(), c.getContentStatus())) {
+            return c.getName() + " (chưa xuất bản)";
+        }
+        if (!scopeCovers(c, ctx, contextClasses)) {
+            return c.getName() + " (phạm vi lớp hẹp hơn bối cảnh)";
+        }
+        return null;
+    }
+
+    /** Published, not deleted local stories among these contexts that show the character. */
+    private List<HistoricalContext> publishedStoriesShowing(Character c, java.util.Collection<HistoricalContext> contexts) {
+        String id = c.getCharacterId().toString();
+        return contexts.stream()
+                .filter(ctx -> ctx.getSchool() != null && ctx.getDeletedAt() == null)
+                .filter(ctx -> StoryScripts.isPublished(ctx.getStoryScript(), objectMapper))
+                .filter(ctx -> StoryScripts.characterIds(ctx.getStoryScript(), objectMapper).contains(id))
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * Cascade after a character change (delete, hide/unpublish, unlink, narrower scope or classes): a published story
+     * that shows the character but whose students no longer see it goes back to draft, its content kept.
+     */
+    private void draftStoriesHiding(Character c, java.util.Collection<HistoricalContext> contexts) {
+        for (HistoricalContext ctx : publishedStoriesShowing(c, contexts)) {
+            Set<UUID> contextClasses = new HashSet<>(classLocalContentRepo
+                    .findClassIdsByEntityIdAndEntityType(ctx.getContextId(), EntityType.CONTEXT));
+            if (characterProblem(c, ctx, contextClasses) != null) {
+                ctx.setStoryScript(StoryScripts.asDraft(ctx.getStoryScript(), objectMapper));
+                localContextRepo.save(ctx);
+                log.info("Local story of context {} moved to draft: character {} is no longer visible to its students",
+                        ctx.getContextId(), c.getCharacterId());
+            }
+        }
+    }
+
+    /** Cascade after a context's scope/classes change: its published story goes back to draft if a speaker no longer fits. */
+    private void draftStoryIfSpeakersHidden(HistoricalContext ctx) {
+        if (!StoryScripts.isPublished(ctx.getStoryScript(), objectMapper)) {
+            return;
+        }
+        Set<UUID> contextClasses = new HashSet<>(classLocalContentRepo
+                .findClassIdsByEntityIdAndEntityType(ctx.getContextId(), EntityType.CONTEXT));
+        boolean hidden = StoryScripts.characterIds(ctx.getStoryScript(), objectMapper).stream()
+                .map(id -> parseUuid(id).flatMap(localCharacterRepo::findById).orElse(null))
+                .anyMatch(c -> characterProblem(c, ctx, contextClasses) != null);
+        if (hidden) {
+            ctx.setStoryScript(StoryScripts.asDraft(ctx.getStoryScript(), objectMapper));
+            log.info("Local story of context {} moved to draft: a speaker no longer covers the context's classes", ctx.getContextId());
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LocalStoryUsageResponse> getCharacterPublishedStories(String characterId, UserPrincipal principal) {
+        UUID schoolId = resolveSchoolId(principal);
+        Character c = requireLocalCharacter(UUID.fromString(characterId), schoolId);
+        return publishedStoriesShowing(c, c.getHistoricalContexts()).stream()
+                .map(ctx -> new LocalStoryUsageResponse(ctx.getContextId().toString(), ctx.getName(),
+                        StoryScripts.title(ctx.getStoryScript(), objectMapper)))
+                .toList();
+    }
+
+    private static boolean isVisibleToStudents(Boolean isPublished, ContentStatus status) {
+        return Boolean.TRUE.equals(isPublished) && (status == null || status == ContentStatus.ACTIVE);
+    }
+
+    /** A SCHOOL_WIDE character reaches everyone; a CLASS_ONLY one only covers a CLASS_ONLY context within its classes. */
+    private boolean scopeCovers(Character c, HistoricalContext ctx, Set<UUID> contextClasses) {
+        if (c.getSchool() == null || c.getContentScope() != ContentScope.CLASS_ONLY) {
+            return true;
+        }
+        if (ctx.getContentScope() != ContentScope.CLASS_ONLY) {
+            return false;
+        }
+        return new HashSet<>(classLocalContentRepo.findClassIdsByEntityIdAndEntityType(c.getCharacterId(), EntityType.CHARACTER))
+                .containsAll(contextClasses);
+    }
+
+    private static Optional<UUID> parseUuid(String value) {
+        try {
+            return Optional.of(UUID.fromString(value));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     @Override
@@ -289,6 +437,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         School school = resolveSchool(principal);
         User teacher = resolveUser(principal);
         Character character = findLocalCharacterOwned(characterId, school.getId(), teacher.getUid());
+        // Contexts linked before this update: unlinking one of them may hide the character from its story.
+        Set<HistoricalContext> touchedContexts = new HashSet<>(character.getHistoricalContexts());
 
         if (StringUtils.hasText(req.getName()))        character.setName(req.getName());
         if (StringUtils.hasText(req.getBackground()))  character.setBackground(req.getBackground());
@@ -332,6 +482,8 @@ public class LocalContentServiceImpl implements LocalContentService {
         }
 
         Character saved = localCharacterRepo.save(character);
+        touchedContexts.addAll(saved.getHistoricalContexts());
+        draftStoriesHiding(saved, touchedContexts);
         log.info("Teacher {} updated local character {}", teacher.getUid(), saved.getCharacterId());
         return mapCharacterToResponse(saved);
     }
@@ -348,6 +500,7 @@ public class LocalContentServiceImpl implements LocalContentService {
                 "Không thể xóa nhân vật vì đang có bài tập giao cho học sinh sử dụng. Vui lòng hủy bài tập trước.");
         character.setDeletedAt(LocalDateTime.now(ZoneOffset.UTC));
         localCharacterRepo.save(character);
+        draftStoriesHiding(character, character.getHistoricalContexts());
         log.info("Teacher {} soft-deleted local character {}", teacher.getUid(), character.getCharacterId());
     }
 
@@ -440,6 +593,7 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         applyStatus(character, req.getStatus(), req.getNote(), teacher);
         Character saved = localCharacterRepo.save(character);
+        draftStoriesHiding(saved, saved.getHistoricalContexts());
         log.info("Teacher {} set local character {} to status={}", teacher.getUid(), saved.getCharacterId(), req.getStatus());
         return mapCharacterToResponse(saved);
     }
@@ -512,6 +666,7 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         applyStatus(character, req.getStatus(), req.getNote(), admin);
         Character saved = localCharacterRepo.save(character);
+        draftStoriesHiding(saved, saved.getHistoricalContexts());
         log.info("School Admin {} set local character {} to status={}", admin.getUid(), saved.getCharacterId(), req.getStatus());
         return mapCharacterToResponse(saved);
     }
@@ -944,6 +1099,8 @@ public class LocalContentServiceImpl implements LocalContentService {
                 .latitude(ctx.getLatitude())
                 .longitude(ctx.getLongitude())
                 .battleMap(deserializeJson(ctx.getBattleMap()))
+                .storyScript(StoryScripts.visible(deserializeJson(ctx.getStoryScript()),
+                        STORY_DRAFT_READERS.contains(SecurityUtils.getRoleName())))
                 .classIds(classIds.isEmpty() ? null : classIds)
                 .createdBy(createdByInfo)
                 .approvedBy(approvedByInfo)
@@ -1375,6 +1532,7 @@ public class LocalContentServiceImpl implements LocalContentService {
 
         if (character.getHistoricalContexts().remove(context)) {
             localCharacterRepo.save(character);
+            draftStoriesHiding(character, List.of(context));
             log.info("Teacher {} unlinked local character {} from context {}", teacher.getUid(), characterId, contextId);
         }
     }

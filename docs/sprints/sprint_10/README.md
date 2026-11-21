@@ -8,5 +8,7 @@ Tài liệu tổng hợp các thay đổi Backend trong Sprint 10 nhằm xử l�
    - [system_dashboard_api_contract.md](./fe_contracts/system_dashboard_api_contract.md) — API Contract đầy đủ cho cụm `/api/v1/system-admin/dashboard/*`.
    - [school_admin_dashboard_api_contract.md](./fe_contracts/school_admin_dashboard_api_contract.md) — API Contract đầy đủ cho cụm `/api/v1/school-admin/dashboard/*` (bê cấu trúc từ System Admin qua School Admin, chỉ lấy dữ liệu Local của trường & thay Doanh thu bằng Quản lý Quỹ Token của trường).
    - [system_dashboard_fe_migration_guide.md](./fe_contracts/system_dashboard_fe_migration_guide.md) — Chi tiết từng bug đã sửa ở BE, những field/param thay đổi và **checklist những chỗ FE cần sửa/cập nhật lại cho cả System Admin và School Admin**.
+   - [local_visual_novel_fe_contract.md](./fe_contracts/local_visual_novel_fe_contract.md) — **Visual novel (`storyScript`) cho bối cảnh địa phương**: API teacher/student/school admin, quyền xem bản nháp, nguồn nhân vật, bản cài đặt FE hiện có, việc FE còn thiếu, rủi ro và checklist test.
 2. **Business Flows (`business_flows/`)**:
    - [system_dashboard_b2b_b2c_separation_flow.md](./business_flows/system_dashboard_b2b_b2c_separation_flow.md) — Business flow và quy tắc lọc/tổng hợp dữ liệu B2B vs B2C, Global vs Local, soft-delete, active session 2 phút và đối xứng giữa System Admin vs School Admin.
+   - [local_visual_novel_flow.md](./business_flows/local_visual_novel_flow.md) — Luồng Teacher soạn → Student xem kịch bản kể chuyện của bối cảnh địa phương, đối xứng với Content Admin → Customer.

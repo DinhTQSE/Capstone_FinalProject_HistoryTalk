@@ -89,6 +89,10 @@ public class LocalContentResponse {
     @JsonProperty("battleMap")
     private Object battleMap;
 
+    /** Story script (visual novel); students only receive a published one. */
+    @JsonProperty("storyScript")
+    private Object storyScript;
+
     // ── Character-specific ───────────────────────────────────────────────────
     @JsonProperty("title")
     private String title;

@@ -547,6 +547,17 @@ public class TeacherLocalContentController {
         return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách bối cảnh của nhân vật thành công"));
     }
 
+    @GetMapping("/characters/{characterId}/published-stories")
+    @Operation(summary = "Kịch bản kể chuyện đã xuất bản đang dùng nhân vật",
+            description = "Ẩn/gỡ xuất bản, xóa hoặc hủy liên kết nhân vật sẽ chuyển các kịch bản này về nháp. FE dùng để cảnh báo trước.")
+    public ResponseEntity<ApiResponse<List<com.historytalk.dto.localcontent.LocalStoryUsageResponse>>> getCharacterPublishedStories(
+            @PathVariable String characterId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        var list = localContentService.getCharacterPublishedStories(characterId, principal);
+        return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách kịch bản dùng nhân vật thành công"));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // TRASH & RESTORE (THÙNG RÁC NỘI BỘ TRƯỜNG)
     // ══════════════════════════════════════════════════════════════════════════
