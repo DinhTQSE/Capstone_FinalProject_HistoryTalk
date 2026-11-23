@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -96,7 +97,8 @@ class RefreshTokenServiceImplTest {
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
         assertThat(response.getRefreshToken()).isNotBlank();
         assertThat(response.getRefreshToken()).isNotEqualTo(rawToken);
-        assertThat(existingToken.isRevoked()).isTrue();
+        verify(refreshTokenRepository).markRevokedIfActive(existingToken.getTokenId());
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
     }
 
     @Test

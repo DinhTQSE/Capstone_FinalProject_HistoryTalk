@@ -21,11 +21,11 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     List<RefreshToken> findByUserUid(UUID userUid);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE RefreshToken r SET r.isRevoked = true WHERE r.tokenId = :tokenId AND r.isRevoked = false")
     int markRevokedIfActive(@Param("tokenId") UUID tokenId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE RefreshToken r SET r.isRevoked = true WHERE r.familyId = :familyId")
     void revokeFamily(@Param("familyId") UUID familyId);
 
