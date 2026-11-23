@@ -138,13 +138,13 @@ class CharacterMediaControllerPortraitSettingsTest {
     }
 
     @Test
-    void put_isRestrictedToContentAdminSystemAdminTeacher() throws Exception {
+    void put_isRestrictedToContentAdminAndTeacher() throws Exception {
         PreAuthorize preAuthorize = CharacterMediaController.class
                 .getMethod("savePortraitSettings", String.class, byte[].class)
                 .getAnnotation(PreAuthorize.class);
 
         assertThat(preAuthorize).isNotNull();
-        assertThat(preAuthorize.value()).isEqualTo("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER')");
+        assertThat(preAuthorize.value()).isEqualTo("hasAnyRole('CONTENT_ADMIN', 'TEACHER')");
     }
 
     @Test

@@ -27,6 +27,6 @@ public class UpdateAssignmentRequest {
     @Schema(description = "Số lượng tiêu chuẩn yêu cầu để đạt điểm tối đa (thang 10)", example = "10")
     private Integer minRequirement;
 
-    @Schema(description = "Trạng thái bài tập: ACTIVE, CANCELLED, ARCHIVED", example = "ACTIVE")
+    @Schema(description = "Trạng thái bài tập: ACTIVE, CANCELLED", example = "ACTIVE")
     private AssignmentStatus status;
 }

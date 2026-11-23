@@ -136,7 +136,7 @@ public class CharacterMediaController {
     }
 
     @PutMapping(value = "/portrait-settings", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER')")
+    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(
         summary = "Save lip-sync portrait settings of a character",

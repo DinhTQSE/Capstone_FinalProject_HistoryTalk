@@ -26,7 +26,7 @@ public class StaffQuestController {
     private final GamificationService gamificationService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('CONTENT_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "List all quest definitions")
     public ResponseEntity<ApiResponse<List<DailyQuest>>> listQuests() {
@@ -36,7 +36,7 @@ public class StaffQuestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('CONTENT_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Get a quest definition by ID")
     public ResponseEntity<ApiResponse<DailyQuest>> getQuest(@PathVariable String id) {
@@ -46,7 +46,7 @@ public class StaffQuestController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasRole('CONTENT_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update a quest definition")
     public ResponseEntity<ApiResponse<DailyQuest>> updateQuest(

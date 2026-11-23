@@ -1,5 +1,6 @@
 package com.historytalk.service.localcontent;
 
+import com.historytalk.dto.localcontent.CreateLocalCharacterRequest;
 import com.historytalk.dto.localcontent.CreateLocalContextRequest;
 import com.historytalk.entity.classroom.Classroom;
 import com.historytalk.entity.enums.ContentScope;
@@ -30,6 +31,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -62,13 +64,13 @@ class LocalContentClassAssignmentTest {
 
     @BeforeEach
     void setUp() {
-        school = School.builder().id(UUID.randomUUID()).name("THPT A").build();
+        school = School.builder().id(UUID.randomUUID()).name("THPT A").localHistoryPolicyAccepted(true).build();
         teacher = User.builder().uid(UUID.randomUUID()).userName("teacher").role(UserRole.TEACHER).school(school).build();
         principal = new UserPrincipal(teacher);
 
         when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
-        when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
-        when(localContextRepo.save(any(HistoricalContext.class))).thenAnswer(inv -> {
+        lenient().when(userRepository.findById(teacher.getUid())).thenReturn(Optional.of(teacher));
+        lenient().when(localContextRepo.save(any(HistoricalContext.class))).thenAnswer(inv -> {
             HistoricalContext ctx = inv.getArgument(0);
             if (ctx.getContextId() == null) ctx.setContextId(UUID.randomUUID());
             return ctx;
@@ -82,6 +84,27 @@ class LocalContentClassAssignmentTest {
                 .contentScope(ContentScope.CLASS_ONLY)
                 .classIds(classIds)
                 .build();
+    }
+
+    @Test
+    void createLocalContext_rejectsWhenPolicyNotAccepted() {
+        school.setLocalHistoryPolicyAccepted(false);
+
+        assertThatThrownBy(() -> localContentService.createLocalContext(request(List.of()), principal))
+                .isInstanceOf(InvalidRequestException.class);
+        verify(localContextRepo, never()).save(any());
+    }
+
+    @Test
+    void createLocalCharacter_rejectsWhenPolicyNotAccepted() {
+        school.setLocalHistoryPolicyAccepted(false);
+        CreateLocalCharacterRequest req = CreateLocalCharacterRequest.builder()
+                .name("Trưng Trắc")
+                .background("Vua nữ đầu tiên")
+                .build();
+
+        assertThatThrownBy(() -> localContentService.createLocalCharacter(req, principal))
+                .isInstanceOf(InvalidRequestException.class);
     }
 
     @Test

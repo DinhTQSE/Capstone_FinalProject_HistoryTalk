@@ -180,4 +180,15 @@ class AuthControllerTest {
 
         verify(authService).resetPassword("reset-token-123", "NewPass@123", "NewPass@123");
     }
+
+    @Test
+    @DisplayName("PATCH /api/v1/auth/me/deactivate is restricted to CUSTOMER role")
+    void deactivateMe_isRestrictedToCustomerRole() throws Exception {
+        var preAuthorize = AuthController.class
+                .getMethod("deactivateMe")
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+
+        org.assertj.core.api.Assertions.assertThat(preAuthorize).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(preAuthorize.value()).isEqualTo("hasRole('CUSTOMER')");
+    }
 }

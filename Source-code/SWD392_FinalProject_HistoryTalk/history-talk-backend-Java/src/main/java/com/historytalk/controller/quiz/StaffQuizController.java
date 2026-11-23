@@ -28,9 +28,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 @RequestMapping("/api/v1/staff/quizzes")
-@PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'SYSTEM_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
+@PreAuthorize("hasAnyRole('CONTENT_ADMIN', 'TEACHER', 'SCHOOL_ADMIN')")
 @SecurityRequirement(name = "bearerAuth")
-@Tag(name = "Quizzes (Staff)", description = "Endpoints for content admin and system admin to manage quizzes")
+@Tag(name = "Quizzes (Staff)", description = "Endpoints for content admin, teacher, and school admin to manage quizzes (SYSTEM_ADMIN may view session history)")
 public class StaffQuizController {
 
     private final QuizService quizService;
