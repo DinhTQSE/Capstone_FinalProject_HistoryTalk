@@ -5,6 +5,7 @@ import com.historytalk.dto.map.MapFocusResponse;
 import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.map.MapFocus;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.HistoricalContextRepository;
 import com.historytalk.repository.MapFocusRepository;
@@ -61,7 +62,7 @@ class MapFocusServiceImplTest {
         request.setLongitude(103.02);
 
         MapFocusResponse response = mapFocusService.createFocus(
-                ctxUuid.toString(), request, callerUuid.toString(), "SYSTEM_ADMIN");
+                ctxUuid.toString(), request, callerUuid.toString(), "CONTENT_ADMIN");
 
         ArgumentCaptor<MapFocus> saved = ArgumentCaptor.forClass(MapFocus.class);
         verify(focusRepository).save(saved.capture());
@@ -70,6 +71,24 @@ class MapFocusServiceImplTest {
         assertThat(response.getContextId()).isEqualTo(ctxUuid.toString());
         assertThat(response.getCreatedBy()).isEqualTo(callerUuid.toString());
         assertThat(response.getName()).isEqualTo("A1 Hill");
+    }
+
+    @Test
+    void createFocus_rejectsSystemAdmin() {
+        UUID ctxUuid = UUID.randomUUID();
+        UUID callerUuid = UUID.randomUUID();
+        when(contextRepository.findById(ctxUuid))
+                .thenReturn(Optional.of(HistoricalContext.builder().contextId(ctxUuid).build()));
+
+        CreateMapFocusRequest request = new CreateMapFocusRequest();
+        request.setName("A1 Hill");
+        request.setLatitude(21.38);
+        request.setLongitude(103.02);
+
+        assertThatThrownBy(() -> mapFocusService.createFocus(
+                ctxUuid.toString(), request, callerUuid.toString(), "SYSTEM_ADMIN"))
+                .isInstanceOf(InvalidRequestException.class);
+        verify(focusRepository, never()).save(any());
     }
 
     @Test
@@ -86,7 +105,7 @@ class MapFocusServiceImplTest {
                         .build()));
 
         assertThatThrownBy(() -> mapFocusService.deleteFocus(
-                ctxUuid.toString(), focusUuid.toString(), "SYSTEM_ADMIN"))
+                ctxUuid.toString(), focusUuid.toString(), "CONTENT_ADMIN"))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(focusRepository, never()).save(any());
     }

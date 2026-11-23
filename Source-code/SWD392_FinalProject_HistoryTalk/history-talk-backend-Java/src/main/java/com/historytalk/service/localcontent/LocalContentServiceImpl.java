@@ -114,6 +114,9 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional
     public LocalContentResponse createLocalContext(CreateLocalContextRequest req, UserPrincipal principal) {
         School school = resolveSchool(principal);
+        if (!Boolean.TRUE.equals(school.getLocalHistoryPolicyAccepted())) {
+            throw new InvalidRequestException("Trường học chưa xác nhận chính sách nội dung lịch sử địa phương.");
+        }
         User teacher = resolveUser(principal);
 
         boolean publish = req.getIsPublished() != null ? req.getIsPublished() : true;
@@ -386,6 +389,9 @@ public class LocalContentServiceImpl implements LocalContentService {
     @Transactional
     public LocalContentResponse createLocalCharacter(CreateLocalCharacterRequest req, UserPrincipal principal) {
         School school = resolveSchool(principal);
+        if (!Boolean.TRUE.equals(school.getLocalHistoryPolicyAccepted())) {
+            throw new InvalidRequestException("Trường học chưa xác nhận chính sách nội dung lịch sử địa phương.");
+        }
         User teacher = resolveUser(principal);
 
         boolean publish = req.getIsPublished() != null ? req.getIsPublished() : true;

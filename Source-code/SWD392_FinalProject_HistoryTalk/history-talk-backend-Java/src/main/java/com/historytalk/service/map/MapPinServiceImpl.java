@@ -300,7 +300,6 @@ public class MapPinServiceImpl implements MapPinService {
     private boolean isAdminRole(String role) {
         return role != null && (
                 "CONTENT_ADMIN".equalsIgnoreCase(role)
-                || "SYSTEM_ADMIN".equalsIgnoreCase(role)
                 || "STAFF".equalsIgnoreCase(role)
                 || "ADMIN".equalsIgnoreCase(role)
         );

@@ -61,7 +61,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = UnauthorizedException.class)
     public RefreshTokenResponse rotateRefreshToken(String rawRefreshToken, String ipAddress, String deviceInfo) {
         if (!StringUtils.hasText(rawRefreshToken)) {
             throw new UnauthorizedException("Refresh token không được để trống");
@@ -90,13 +90,20 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             throw new UnauthorizedException("Tài khoản đã bị vô hiệu hóa");
         }
 
-        // 3. Xoay vòng token hợp lệ: Hủy token cũ
-        oldToken.setRevoked(true);
+        // Capture claims and metadata before clearAutomatically clears the persistence context
+        UserPrincipal principal = new UserPrincipal(user);
+        String userEmail = user.getEmail();
+        UUID userUid = user.getUid();
+        UUID familyId = oldToken.getFamilyId();
+        String effectiveDeviceInfo = StringUtils.hasText(deviceInfo) ? deviceInfo : oldToken.getDeviceInfo();
+        String effectiveIpAddress = StringUtils.hasText(ipAddress) ? ipAddress : oldToken.getIpAddress();
+
+        // 3. Xoay vòng token hợp lệ: Hủy token cũ nguyên tử dưới DB (không mutate oldToken trước JPQL để tránh auto-flush)
         int updated = refreshTokenRepository.markRevokedIfActive(oldToken.getTokenId());
         if (updated == 0) {
             log.warn("SECURITY ALERT: Phát hiện race condition / tái sử dụng Refresh Token! FamilyId: {}, User: {}",
-                    oldToken.getFamilyId(), user.getEmail());
-            refreshTokenRepository.revokeFamily(oldToken.getFamilyId());
+                    familyId, userEmail);
+            refreshTokenRepository.revokeFamily(familyId);
             throw new UnauthorizedException("Cảnh báo an ninh: Refresh token đã bị thu hồi trước đó. Toàn bộ phiên làm việc liên quan đã bị hủy.");
         }
 
@@ -105,20 +112,19 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         RefreshToken newToken = RefreshToken.builder()
                 .user(user)
                 .tokenHash(sha256Hex(newRawRefreshToken))
-                .familyId(oldToken.getFamilyId())
+                .familyId(familyId)
                 .isRevoked(false)
-                .deviceInfo(StringUtils.hasText(deviceInfo) ? deviceInfo : oldToken.getDeviceInfo())
-                .ipAddress(StringUtils.hasText(ipAddress) ? ipAddress : oldToken.getIpAddress())
+                .deviceInfo(effectiveDeviceInfo)
+                .ipAddress(effectiveIpAddress)
                 .expiresAt(Instant.now().plusMillis(jwtRefreshExpirationInMs))
                 .build();
         refreshTokenRepository.save(newToken);
 
         // 5. Sinh Access Token mới (15 phút)
-        UserPrincipal principal = new UserPrincipal(user);
         Map<String, Object> claims = buildClaims(principal);
-        String newAccessToken = jwtService.generateAccessToken(user.getEmail(), claims);
+        String newAccessToken = jwtService.generateAccessToken(userEmail, claims);
 
-        log.info("Rotated refresh token successfully for user {} in familyId {}", user.getUid(), oldToken.getFamilyId());
+        log.info("Rotated refresh token successfully for user {} in familyId {}", userUid, familyId);
 
         return RefreshTokenResponse.builder()
                 .accessToken(newAccessToken)

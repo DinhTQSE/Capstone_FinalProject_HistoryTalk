@@ -238,7 +238,7 @@ class DailyTokenAllowanceServiceImplTest {
     void refreshDailyAllowance_SameDay_KeepsBonus() {
         activeStudent.setDailyTokensUsed(200);
         activeStudent.setDailyBonusTokens(500);
-        activeStudent.setLastTokenResetAt(LocalDateTime.now());
+        activeStudent.setLastTokenResetAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
         when(classStudentRepository.findActiveClassroomsByStudentUid(activeStudent.getUid()))
                 .thenReturn(Collections.emptyList());
 
@@ -247,11 +247,11 @@ class DailyTokenAllowanceServiceImplTest {
     }
 
     @Test
-    @DisplayName("TokenDay rolls over at 00:00 Vietnam time, not at UTC midnight")
-    void tokenDay_RollsOverAtVietnamMidnight() {
-        java.time.ZonedDateTime vnMidnight = TokenDay.today().atStartOfDay(TokenDay.ZONE);
-        LocalDateTime justBefore = vnMidnight.minusMinutes(30).withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime();
-        LocalDateTime justAfter = vnMidnight.plusMinutes(30).withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime();
+    @DisplayName("TokenDay rolls over at 00:00 UTC")
+    void tokenDay_RollsOverAtUtcMidnight() {
+        java.time.ZonedDateTime utcMidnight = TokenDay.today().atStartOfDay(java.time.ZoneOffset.UTC);
+        LocalDateTime justBefore = utcMidnight.minusMinutes(1).toLocalDateTime();
+        LocalDateTime justAfter = utcMidnight.plusMinutes(1).toLocalDateTime();
 
         assertTrue(TokenDay.isNewDay(justBefore));
         assertFalse(TokenDay.isNewDay(justAfter));

@@ -222,9 +222,9 @@ public class AuthController {
     }
 
     @PatchMapping("/me/deactivate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Deactivate my account", description = "Deactivate the currently logged in user account")
+    @Operation(summary = "Deactivate my account", description = "Deactivate the currently logged in customer account")
     public ResponseEntity<ApiResponse<?>> deactivateMe() {
         String userId = SecurityUtils.getUserId();
         log.info("PATCH /api/v1/auth/me/deactivate - user {}", userId);
