@@ -34,6 +34,7 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
                 .queryParam("refreshToken", loginResponse.getRefreshToken())
                 .queryParam("tokenType", loginResponse.getTokenType())
                 .queryParam("expiresIn", loginResponse.getExpiresIn())
+                .queryParam("refreshExpiresIn", loginResponse.getRefreshExpiresIn())
                 .queryParam("uid", loginResponse.getUid())
                 .queryParam("userName", loginResponse.getUserName())
                 .queryParam("email", loginResponse.getEmail())

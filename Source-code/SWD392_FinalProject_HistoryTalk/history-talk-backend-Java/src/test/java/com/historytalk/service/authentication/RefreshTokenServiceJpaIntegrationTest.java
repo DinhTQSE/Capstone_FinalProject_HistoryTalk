@@ -105,6 +105,8 @@ class RefreshTokenServiceJpaIntegrationTest {
 
         assertThat(response.getAccessToken()).isEqualTo("rotated-access-jwt");
         assertThat(response.getRefreshToken()).isNotBlank().isNotEqualTo(initialRawToken);
+        assertThat(response.getExpiresIn()).isEqualTo(900000L);
+        assertThat(response.getRefreshExpiresIn()).isEqualTo(604800000L);
 
         List<RefreshToken> familyTokens = refreshTokenRepository.findByFamilyId(familyId);
         assertThat(familyTokens).hasSize(2);

@@ -97,6 +97,8 @@ class RefreshTokenServiceImplTest {
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
         assertThat(response.getRefreshToken()).isNotBlank();
         assertThat(response.getRefreshToken()).isNotEqualTo(rawToken);
+        assertThat(response.getExpiresIn()).isEqualTo(900000L);
+        assertThat(response.getRefreshExpiresIn()).isEqualTo(604800000L);
         verify(refreshTokenRepository).markRevokedIfActive(existingToken.getTokenId());
         verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
     }

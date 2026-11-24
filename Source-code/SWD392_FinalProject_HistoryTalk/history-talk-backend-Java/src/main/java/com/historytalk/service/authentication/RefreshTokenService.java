@@ -29,4 +29,9 @@ public interface RefreshTokenService {
      * Revoke all refresh tokens for a user (logout-all, password change, deactivation).
      */
     void revokeAllUserTokens(UUID userId);
+
+    /**
+     * Configured refresh token lifetime in milliseconds.
+     */
+    long getRefreshTokenExpirationMs();
 }
