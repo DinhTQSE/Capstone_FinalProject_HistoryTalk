@@ -54,6 +54,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 .refreshToken("refresh-token")
                 .tokenType("Bearer")
                 .expiresIn(3600000L)
+                .refreshExpiresIn(604800000L)
                 .uid("user-id")
                 .userName("user")
                 .email("user@gmail.com")
@@ -66,6 +67,6 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
-        verify(response).sendRedirect("http://localhost:5173/auth/google/success?accessToken=access-token&refreshToken=refresh-token&tokenType=Bearer&expiresIn=3600000&uid=user-id&userName=user&email=user@gmail.com&role=CUSTOMER");
+        verify(response).sendRedirect("http://localhost:5173/auth/google/success?accessToken=access-token&refreshToken=refresh-token&tokenType=Bearer&expiresIn=3600000&refreshExpiresIn=604800000&uid=user-id&userName=user&email=user@gmail.com&role=CUSTOMER");
     }
 }

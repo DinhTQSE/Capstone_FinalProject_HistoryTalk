@@ -191,6 +191,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenExpirationMs())
+                .refreshExpiresIn(refreshTokenService.getRefreshTokenExpirationMs())
                 .uid(user.getUid().toString())
                 .userName(user.getUserName())
                 .email(user.getEmail())

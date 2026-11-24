@@ -131,6 +131,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .refreshToken(newRawRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenExpirationMs())
+                .refreshExpiresIn(jwtRefreshExpirationInMs)
                 .build();
     }
 
@@ -153,6 +154,11 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     public void revokeAllUserTokens(UUID userId) {
         refreshTokenRepository.revokeAllUserTokens(userId);
         log.info("Revoked all refresh tokens for user {}", userId);
+    }
+
+    @Override
+    public long getRefreshTokenExpirationMs() {
+        return jwtRefreshExpirationInMs;
     }
 
     private Map<String, Object> buildClaims(UserPrincipal principal) {
