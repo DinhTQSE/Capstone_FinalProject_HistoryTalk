@@ -16,6 +16,11 @@ public interface DailyCheckInRepository extends JpaRepository<DailyCheckIn, UUID
     Optional<DailyCheckIn> findByUserUidAndDate(UUID userUid, LocalDate date);
     Optional<DailyCheckIn> findFirstByUserUidOrderByDateDesc(UUID userUid);
 
+    long countByUserUid(UUID userUid);
+
+    @Query("SELECT COALESCE(MAX(c.streakCount), 0) FROM DailyCheckIn c WHERE c.user.uid = :userUid")
+    int findLongestStreak(@Param("userUid") UUID userUid);
+
     /** Trả về danh sách ngày đã học của user trong khoảng [from, to] (dùng cho lịch tháng). */
     @Query("SELECT c.date FROM DailyCheckIn c WHERE c.user.uid = :userUid AND c.date BETWEEN :from AND :to ORDER BY c.date ASC")
     List<LocalDate> findAllDatesInRange(@Param("userUid") UUID userUid,
