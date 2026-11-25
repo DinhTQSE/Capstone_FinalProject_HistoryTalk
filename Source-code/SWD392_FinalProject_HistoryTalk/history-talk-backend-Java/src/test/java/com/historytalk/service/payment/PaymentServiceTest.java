@@ -1,6 +1,7 @@
 package com.historytalk.service.payment;
 
 import com.historytalk.config.PayOSConfig;
+import com.historytalk.dto.payment.AdminPaymentHistoryResponse;
 import com.historytalk.dto.payment.CreatePaymentResponse;
 import com.historytalk.dto.payment.PayOSReturnRequest;
 import com.historytalk.dto.payment.PayOSReturnResponse;
@@ -357,6 +358,7 @@ class PaymentServiceTest {
                 .topupTokens(5_000_000L)
                 .amount(750_000)
                 .status(PaymentOrderStatus.PAID)
+                .createdAt(LocalDateTime.of(2026, 11, 25, 10, 40, 0))
                 .build();
 
         Page<PaymentOrder> page = new PageImpl<>(List.of(order), PageRequest.of(0, 10), 1);
@@ -371,7 +373,42 @@ class PaymentServiceTest {
         assertThat(history.getContent().get(0).getOrderCode()).isEqualTo(888777666L);
         assertThat(history.getContent().get(0).getTokens()).isEqualTo(5_000_000L);
         assertThat(history.getContent().get(0).getAmount()).isEqualTo(750_000);
+        assertThat(history.getContent().get(0).getCreatedAt()).isEqualTo("2026-11-25T10:40:00Z");
 
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("getAllPaymentHistory handles SCHOOL_TOKEN_TOPUP orders with null tier without NPE")
+    void getAllPaymentHistory_NullTierSchoolTopup_DoesNotThrowNpeAndFormatsUtc() {
+        School school = School.builder()
+                .id(UUID.randomUUID())
+                .name("THPT Demo WF1")
+                .build();
+        PaymentOrder topupOrder = PaymentOrder.builder()
+                .orderId(UUID.randomUUID())
+                .orderCode(1795603222636564L)
+                .user(customer)
+                .school(school)
+                .tier(null)
+                .orderType(PaymentOrderType.SCHOOL_TOKEN_TOPUP)
+                .topupTokens(100_000L)
+                .amount(15_000)
+                .status(PaymentOrderStatus.PENDING)
+                .createdAt(LocalDateTime.of(2026, 11, 25, 10, 40, 0))
+                .build();
+
+        Page<PaymentOrder> page = new PageImpl<>(List.of(topupOrder), PageRequest.of(0, 20), 1);
+        when(paymentOrderRepository.findAllForAdmin(isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(page);
+
+        PaginatedResponse<AdminPaymentHistoryResponse> result =
+                paymentService.getAllPaymentHistory(null, null, PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).hasSize(1);
+        AdminPaymentHistoryResponse item = result.getContent().get(0);
+        assertThat(item.getTierId()).isNull();
+        assertThat(item.getTierTitle()).isEqualTo("Nạp quỹ token trường — THPT Demo WF1");
+        assertThat(item.getCreatedAt()).isEqualTo("2026-11-25T10:40:00Z");
     }
 }

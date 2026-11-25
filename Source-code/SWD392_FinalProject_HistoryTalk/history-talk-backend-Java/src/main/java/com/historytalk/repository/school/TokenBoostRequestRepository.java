@@ -32,7 +32,9 @@ public interface TokenBoostRequestRepository extends JpaRepository<TokenBoostReq
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"classroom", "student", "requester", "teacherReviewedBy", "adminReviewedBy", "reviewedBy"})
     @Query("SELECT r FROM TokenBoostRequest r " +
-            "WHERE (r.classroom.teacher.uid = :teacherUid OR r.requester.uid = :teacherUid) " +
+            "LEFT JOIN r.classroom c " +
+            "LEFT JOIN c.teacher t " +
+            "WHERE (t.uid = :teacherUid OR r.requester.uid = :teacherUid) " +
             "AND (:status IS NULL OR r.status = :status) " +
             "ORDER BY r.createdAt DESC")
     Page<TokenBoostRequest> findByTeacherUidAndStatus(

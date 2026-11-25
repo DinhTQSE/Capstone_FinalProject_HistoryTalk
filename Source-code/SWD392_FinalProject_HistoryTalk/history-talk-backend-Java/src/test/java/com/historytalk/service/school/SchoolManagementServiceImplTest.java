@@ -65,6 +65,8 @@ class SchoolManagementServiceImplTest {
         SchoolResponse response = schoolManagementService.createSchool(request);
 
         assertThat(response.getSchoolCode()).isEqualTo("LHP-HCM");
+        assertThat(response.getDefaultDailyStudentQuota()).isEqualTo(5000);
+        assertThat(response.getDefaultDailyTeacherQuota()).isEqualTo(5000);
         ArgumentCaptor<School> captor = ArgumentCaptor.forClass(School.class);
         verify(schoolRepository).save(captor.capture());
         assertThat(captor.getValue().getSchoolCode()).isEqualTo("LHP-HCM");

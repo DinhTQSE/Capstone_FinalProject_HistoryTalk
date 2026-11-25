@@ -1,0 +1,4 @@
+﻿student_code,full_name,email,dob,gender,phone_number,password,additional_token
+TS991,<script>alert(1)</script>,ts991@selftest26.edu.vn,2010-01-01,MALE,0939999001,HistoryTalk@2026,0
+TS992,' OR '1'='1,ts992@selftest26.edu.vn,2010-01-02,MALE,0939999002,HistoryTalk@2026,0
+TS993,Student {{7*7}},ts993@selftest26.edu.vn,2010-01-03,FEMALE,0939999003,HistoryTalk@2026,0

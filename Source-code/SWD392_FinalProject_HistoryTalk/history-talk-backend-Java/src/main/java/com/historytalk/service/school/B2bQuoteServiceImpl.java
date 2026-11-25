@@ -480,6 +480,9 @@ public class B2bQuoteServiceImpl implements B2bQuoteService {
         createdSchool.setUnallocatedTokenQuota(exactPool);
         createdSchool.setDefaultDailyStudentQuota(quote.getStudentDailyTokenLimit());
         createdSchool.setDefaultDailyTeacherQuota(quote.getTeacherDailyTokenLimit());
+        createdSchool.setBaseCustomTokenQuota(exactPool);
+        createdSchool.setMaxStudents(quote.getNumberOfStudents());
+        createdSchool.setMaxTeachers(quote.getNumberOfTeachers());
         createdSchool.setRecommendedStudents(quote.getNumberOfStudents());
         createdSchool.setSubscriptionStartDate(schoolEntity.getSubscriptionStartDate());
         createdSchool.setSubscriptionEndDate(schoolEntity.getSubscriptionEndDate());

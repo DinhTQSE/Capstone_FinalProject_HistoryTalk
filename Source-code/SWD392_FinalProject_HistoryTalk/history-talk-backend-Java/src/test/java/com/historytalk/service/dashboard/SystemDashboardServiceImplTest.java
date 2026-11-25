@@ -260,4 +260,20 @@ class SystemDashboardServiceImplTest {
 
         assertThrows(InvalidRequestException.class, () -> service.getOverview("INVALID_SCOPE"));
     }
+
+    @Test
+    @DisplayName("getChatActivity accepts granularity='year' and rejects invalid granularity")
+    void getChatActivity_SupportsYearGranularityAndRejectsInvalid() {
+        LocalDate from = LocalDate.of(2025, 12, 1);
+        LocalDate to = LocalDate.of(2026, 1, 15);
+        when(chatSessionRepository.countSessionsByPeriod(any(), any(), eq("year"))).thenReturn(Collections.emptyList());
+        when(messageRepository.countMessagesByPeriod(any(), any(), eq("year"))).thenReturn(Collections.emptyList());
+        when(chatSessionRepository.countActiveSince(any())).thenReturn(0L);
+
+        DashboardChatActivityResponse result = service.getChatActivity(from, to, "year", "ALL");
+
+        assertEquals(List.of("2025-01-01", "2026-01-01"),
+                result.getTrend().stream().map(DashboardChatActivityResponse.ChatTrendPoint::getDate).toList());
+        assertThrows(InvalidRequestException.class, () -> service.getChatActivity(from, to, "quarter", "ALL"));
+    }
 }

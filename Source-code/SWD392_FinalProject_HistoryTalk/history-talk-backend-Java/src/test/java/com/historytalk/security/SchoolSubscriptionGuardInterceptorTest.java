@@ -120,4 +120,19 @@ class SchoolSubscriptionGuardInterceptorTest {
         assertThat(result).isTrue();
         verifyNoInteractions(userRepository);
     }
+
+    @Test
+    void preHandle_whenExpiredSchoolAdminCallsRenew_shouldAllow() {
+        user.setRole(UserRole.SCHOOL_ADMIN);
+        school.setStatus(SchoolStatus.EXPIRED);
+        school.setSubscriptionEndDate(LocalDate.now(ZoneOffset.UTC).minusDays(1));
+        when(userRepository.findByIdWithSchool(userId)).thenReturn(Optional.of(user));
+
+        org.springframework.mock.web.MockHttpServletRequest request =
+                new org.springframework.mock.web.MockHttpServletRequest("POST", "/Historical-tell/api/v1/school-admin/subscription/renew");
+
+        boolean result = interceptor.preHandle(request, null, null);
+
+        assertThat(result).isTrue();
+    }
 }

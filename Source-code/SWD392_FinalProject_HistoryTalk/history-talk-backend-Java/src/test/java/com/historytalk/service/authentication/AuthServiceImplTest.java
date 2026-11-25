@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -341,6 +342,30 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> authService.resendVerificationEmail("customer@gmail.com"))
                 .isInstanceOf(InvalidRequestException.class);
         verify(emailVerificationService, never()).sendVerificationEmail(any(), any(), any());
+    }
+
+    @Test
+    void loginMapsDisabledExceptionToAccountDeactivatedMessage() {
+        doThrow(new DisabledException("Tài khoản đã bị vô hiệu hóa"))
+                .when(authenticationManager).authenticate(any());
+
+        LoginRequest request = new LoginRequest("locked@example.com", "password");
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "Chrome"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("ACCOUNT_DEACTIVATED");
+    }
+
+    @Test
+    void logoutAllDoesNotClearMustChangePasswordFlag() {
+        User user = user("schooladmin", "admin@school.edu.vn");
+        user.setMustChangePassword(true);
+        when(userRepository.findById(user.getUid())).thenReturn(Optional.of(user));
+
+        authService.logoutAll(user.getUid().toString());
+
+        assertThat(user.getMustChangePassword()).isTrue();
+        verify(refreshTokenService).revokeAllUserTokens(user.getUid());
+        verify(userRepository).save(user);
     }
 
     private User user(String userName, String email) {

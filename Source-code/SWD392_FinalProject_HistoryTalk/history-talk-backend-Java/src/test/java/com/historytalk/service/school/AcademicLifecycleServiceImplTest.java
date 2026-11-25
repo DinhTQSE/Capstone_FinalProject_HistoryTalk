@@ -397,4 +397,17 @@ class AcademicLifecycleServiceImplTest {
         assertNotNull(student.getDeletedAt());
         assertEquals(1_000_000, school.getUnallocatedTokenQuota());
     }
+
+    @Test
+    @DisplayName("Renewed activation before subscriptionEndDate is rejected even during Sept-Dec")
+    void activateRenewedSubscription_BeforeCurrentEndDateInOctober_ThrowsInvalidRequest() {
+        school.setRenewedForNextYear(true);
+        school.setNextPackageType(EnterprisePackage.ENTERPRISE_MEDIUM);
+        school.setSubscriptionStartDate(LocalDate.of(2026, 9, 1));
+        school.setSubscriptionEndDate(LocalDate.of(2027, 5, 31));
+        when(schoolRepository.findById(school.getId())).thenReturn(Optional.of(school));
+
+        assertThrows(InvalidRequestException.class, () ->
+                academicLifecycleService.activateRenewedSubscription(school.getId(), LocalDate.of(2026, 10, 15)));
+    }
 }

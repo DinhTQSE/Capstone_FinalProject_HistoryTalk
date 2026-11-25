@@ -80,6 +80,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', cs.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', cs.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', cs.created_at)
                     ELSE date_trunc('day', cs.created_at)
@@ -102,6 +103,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', cs.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', cs.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', cs.created_at)
                     ELSE date_trunc('day', cs.created_at)
@@ -139,6 +141,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', cs.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', cs.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', cs.created_at)
                     ELSE date_trunc('day', cs.created_at)

@@ -72,7 +72,8 @@ public class B2bQuoteController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         int pageIndex = Math.max(0, page - 1);
-        Pageable pageable = PageRequest.of(pageIndex, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        int safeSize = Math.max(1, size);
+        Pageable pageable = PageRequest.of(pageIndex, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         PaginatedResponse<B2bQuoteResponse> result = b2bQuoteService.getQuoteRequests(status, search, pageable);
         return ResponseEntity.ok(ApiResponse.success(result, "Lấy danh sách yêu cầu báo giá B2B thành công"));
     }

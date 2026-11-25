@@ -235,8 +235,8 @@ public class ClassroomStudentServiceImpl implements ClassroomStudentService {
             ClassStudent enrollment = classStudentRepository.findByClassroomIdAndStudentUid(fromClassroomId, studentId)
                     .orElse(null);
 
-            if (enrollment == null) {
-                notes.add(String.format("Học sinh ID %s không có trong lớp %s", studentId, fromClass.getClassName()));
+            if (enrollment == null || !"ACTIVE".equals(enrollment.getStatus())) {
+                notes.add(String.format("Học sinh ID %s không có trạng thái đang học trong lớp %s", studentId, fromClass.getClassName()));
                 continue;
             }
 

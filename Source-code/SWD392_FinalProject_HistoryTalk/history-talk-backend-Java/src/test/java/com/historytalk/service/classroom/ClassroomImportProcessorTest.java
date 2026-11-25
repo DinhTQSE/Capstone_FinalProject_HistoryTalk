@@ -299,4 +299,70 @@ class ClassroomImportProcessorTest {
 
         assertThrows(ResourceNotFoundException.class, () -> processor.processImport(file, context));
     }
+
+    @Test
+    @DisplayName("Import CSV: Tệp có UTF-8 BOM vẫn đọc đúng cột student_code đầu tiên")
+    void testProcessImport_Utf8BomHeader_ReadsStudentCode() {
+        String csv = "\uFEFFstudent_code,full_name,email,dob,gender,phone_number,password,additional_token\n"
+                + "HS888,Nguyễn Bom Test,bom@cva.edu.vn,2009-05-15,MALE,0912345688,,0\n";
+        MockMultipartFile file = new MockMultipartFile("file", "students_bom.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+        StudentImportContext context = StudentImportContext.builder()
+                .schoolId(schoolId)
+                .classroomId(classroomId)
+                .build();
+
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(userRepository.findBySchoolIdAndStudentCodeIgnoreCase(schoolId, "HS888")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setUid(UUID.randomUUID());
+            return u;
+        });
+
+        StudentImportResultDto result = processor.processImport(file, context);
+
+        assertEquals(1, result.getSuccessCount());
+        assertEquals(0, result.getFailureCount());
+        assertEquals("HS888", result.getSuccessfulAccounts().get(0).getStudentCode());
+        assertEquals("cva_hs_hs888", result.getSuccessfulAccounts().get(0).getUserName());
+    }
+
+    @Test
+    @DisplayName("Import CSV: Học sinh đã tồn tại lặp lại 2 lần trong cùng file -> Chỉ thêm 1, dòng lặp báo lỗi trùng")
+    void testProcessImport_DuplicateExistingStudentInSameFile_RejectsSecondRow() {
+        String csv = "student_code,full_name,email,dob,gender,phone_number,password,additional_token\n"
+                + "HS001,Trần Bảo Nam,nam@cva.edu.vn,2009-05-15,MALE,0912345601,,0\n"
+                + "HS001,Trần Bảo Nam,nam@cva.edu.vn,2009-05-15,MALE,0912345601,,0\n";
+        MockMultipartFile file = new MockMultipartFile("file", "dup_existing.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+        User existingStudent = User.builder()
+                .uid(UUID.randomUUID())
+                .studentCode("HS001")
+                .userName("cva_hs_hs001")
+                .fullName("Trần Bảo Nam")
+                .email("nam@cva.edu.vn")
+                .school(school)
+                .role(UserRole.SCHOOL_STUDENT)
+                .token(1000)
+                .build();
+
+        StudentImportContext context = StudentImportContext.builder()
+                .schoolId(schoolId)
+                .classroomId(classroomId)
+                .build();
+
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(classroomRepository.findByIdAndSchoolIdAndDeletedAtIsNull(classroomId, schoolId)).thenReturn(Optional.of(classroom));
+        when(userRepository.findBySchoolIdAndStudentCodeIgnoreCase(schoolId, "HS001")).thenReturn(Optional.of(existingStudent));
+        when(classStudentRepository.findByClassroomIdAndStudentUid(classroomId, existingStudent.getUid())).thenReturn(Optional.empty());
+
+        StudentImportResultDto result = processor.processImport(file, context);
+
+        assertEquals(2, result.getTotalRows());
+        assertEquals(1, result.getSuccessCount());
+        assertEquals(1, result.getFailureCount());
+    }
 }

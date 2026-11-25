@@ -73,6 +73,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', m.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
                     ELSE date_trunc('day', m.created_at)
@@ -97,6 +98,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', m.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
                     ELSE date_trunc('day', m.created_at)
@@ -159,6 +161,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', m.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
                     ELSE date_trunc('day', m.created_at)
@@ -185,6 +188,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', m.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
                     ELSE date_trunc('day', m.created_at)
@@ -397,6 +401,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', m.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
                     ELSE date_trunc('day', m.created_at)
@@ -486,6 +491,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', m.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', m.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', m.created_at)
                     ELSE date_trunc('day', m.created_at)

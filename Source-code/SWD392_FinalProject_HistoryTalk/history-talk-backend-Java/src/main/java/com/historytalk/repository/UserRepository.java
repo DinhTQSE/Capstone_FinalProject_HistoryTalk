@@ -149,6 +149,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', created_at)
                     ELSE date_trunc('day', created_at)
@@ -171,6 +172,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', created_at)
                     ELSE date_trunc('day', created_at)
@@ -195,6 +197,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', last_active_date)
                     WHEN :bucket = 'month' THEN date_trunc('month', last_active_date)
                     WHEN :bucket = 'week' THEN date_trunc('week', last_active_date)
                     ELSE date_trunc('day', last_active_date)
@@ -218,6 +221,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', last_active_date)
                     WHEN :bucket = 'month' THEN date_trunc('month', last_active_date)
                     WHEN :bucket = 'week' THEN date_trunc('week', last_active_date)
                     ELSE date_trunc('day', last_active_date)
@@ -287,6 +291,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', created_at)
                     ELSE date_trunc('day', created_at)
@@ -311,6 +316,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', last_active_date)
                     WHEN :bucket = 'month' THEN date_trunc('month', last_active_date)
                     WHEN :bucket = 'week' THEN date_trunc('week', last_active_date)
                     ELSE date_trunc('day', last_active_date)
@@ -376,6 +382,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<DashboardTokenBalanceByTierProjection> countTokenBalanceByTier();
 
     @org.springframework.data.jpa.repository.Modifying
-    @Query("UPDATE User u SET u.deletedAt = null WHERE u.deletedAt IS NOT NULL")
+    @Query("UPDATE User u SET u.deletedAt = null, u.accountStatus = com.historytalk.entity.enums.AccountStatus.ACTIVE, u.deactivatedReason = null WHERE u.deletedAt IS NOT NULL")
     int restoreAllUsers();
 }

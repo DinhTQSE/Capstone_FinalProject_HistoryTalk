@@ -8,6 +8,7 @@ import com.historytalk.dto.user.UpdateUserRoleRequest;
 import com.historytalk.dto.user.UserProfileResponse;
 import com.historytalk.dto.user.BulkRestoreUsersResponse;
 import com.historytalk.dto.user.UserDashboardResponse;
+import com.historytalk.entity.enums.AccountStatus;
 import com.historytalk.entity.enums.Gender;
 import com.historytalk.entity.enums.UserRole;
 import com.historytalk.entity.payment.Tier;
@@ -177,6 +178,8 @@ public class UserServiceImpl implements UserService {
             throw new InvalidRequestException("Tài khoản người dùng đang hoạt động");
         }
         user.setDeletedAt(null);
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setDeactivatedReason(null);
         return userMapper.toProfileResponse(userRepository.save(user), null, null);
     }
 
@@ -193,6 +196,8 @@ public class UserServiceImpl implements UserService {
 
         for (User user : deactivatedUsers) {
             user.setDeletedAt(null);
+            user.setAccountStatus(AccountStatus.ACTIVE);
+            user.setDeactivatedReason(null);
         }
         userRepository.saveAll(deactivatedUsers);
 

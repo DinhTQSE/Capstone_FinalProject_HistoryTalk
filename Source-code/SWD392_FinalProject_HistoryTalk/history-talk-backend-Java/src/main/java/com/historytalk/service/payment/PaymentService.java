@@ -38,6 +38,7 @@ import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -181,14 +182,14 @@ public class PaymentService {
                 .map(o -> PaymentHistoryResponse.builder()
                         .orderId(o.getOrderId().toString())
                         .orderCode(o.getOrderCode())
-                        .tierId(o.getTier().getTierId().toString())
-                        .tierTitle(o.getTier().getTitle())
+                        .tierId(resolveTierId(o))
+                        .tierTitle(resolveTierTitle(o))
                         .amount(o.getAmount())
                         .status(o.getStatus().name())
                         .paymentLinkId(o.getPaymentLinkId())
-                        .createdAt(o.getCreatedAt() != null ? o.getCreatedAt().toString() : null)
-                        .paidAt(o.getPaidAt() != null ? o.getPaidAt().toString() : null)
-                        .expiredAt(o.getExpiredAt() != null ? o.getExpiredAt().toString() : null)
+                        .createdAt(formatUtcIso(o.getCreatedAt()))
+                        .paidAt(formatUtcIso(o.getPaidAt()))
+                        .expiredAt(formatUtcIso(o.getExpiredAt()))
                         .build())
                 .toList();
     }
@@ -205,18 +206,18 @@ public class PaymentService {
                 .map(o -> AdminPaymentHistoryResponse.builder()
                         .orderId(o.getOrderId().toString())
                         .orderCode(o.getOrderCode())
-                        .tierId(o.getTier().getTierId().toString())
-                        .tierTitle(o.getTier().getTitle())
+                        .tierId(resolveTierId(o))
+                        .tierTitle(resolveTierTitle(o))
                         .amount(o.getAmount())
                         .status(o.getStatus().name())
                         .fulfillmentStatus(o.getFulfillmentStatus() != null ? o.getFulfillmentStatus().name() : null)
-                        .fulfilledAt(o.getFulfilledAt() != null ? o.getFulfilledAt().toString() : null)
+                        .fulfilledAt(formatUtcIso(o.getFulfilledAt()))
                         .fulfillmentAttempts(o.getFulfillmentAttempts())
                         .fulfillmentError(o.getFulfillmentError())
                         .paymentLinkId(o.getPaymentLinkId())
-                        .createdAt(o.getCreatedAt() != null ? o.getCreatedAt().toString() : null)
-                        .paidAt(o.getPaidAt() != null ? o.getPaidAt().toString() : null)
-                        .expiredAt(o.getExpiredAt() != null ? o.getExpiredAt().toString() : null)
+                        .createdAt(formatUtcIso(o.getCreatedAt()))
+                        .paidAt(formatUtcIso(o.getPaidAt()))
+                        .expiredAt(formatUtcIso(o.getExpiredAt()))
                         .userId(o.getUser().getUid().toString())
                         .userName(o.getUser().getUserName())
                         .userEmail(o.getUser().getEmail())
@@ -444,8 +445,8 @@ public class PaymentService {
                         .amount(o.getAmount())
                         .status(o.getStatus() != null ? o.getStatus().name() : null)
                         .fulfillmentStatus(o.getFulfillmentStatus() != null ? o.getFulfillmentStatus().name() : null)
-                        .paidAt(o.getPaidAt() != null ? o.getPaidAt().toString() : null)
-                        .createdAt(o.getCreatedAt() != null ? o.getCreatedAt().toString() : null)
+                        .paidAt(formatUtcIso(o.getPaidAt()))
+                        .createdAt(formatUtcIso(o.getCreatedAt()))
                         .build())
                 .toList();
 
@@ -458,5 +459,28 @@ public class PaymentService {
                 .hasNext(orders.hasNext())
                 .hasPrevious(orders.hasPrevious())
                 .build();
+    }
+
+    private String resolveTierId(PaymentOrder order) {
+        return order.getTier() != null ? order.getTier().getTierId().toString() : null;
+    }
+
+    private String resolveTierTitle(PaymentOrder order) {
+        if (order.getTier() != null) {
+            return order.getTier().getTitle();
+        }
+        if (order.getOrderType() == PaymentOrderType.SCHOOL_TOKEN_TOPUP) {
+            return order.getSchool() != null
+                    ? "Nạp quỹ token trường — " + order.getSchool().getName()
+                    : "Nạp quỹ token trường";
+        }
+        return "Gói dịch vụ";
+    }
+
+    private String formatUtcIso(LocalDateTime value) {
+        if (value == null) {
+            return null;
+        }
+        return DateTimeFormatter.ISO_INSTANT.format(value.atZone(ZoneOffset.UTC).toInstant());
     }
 }

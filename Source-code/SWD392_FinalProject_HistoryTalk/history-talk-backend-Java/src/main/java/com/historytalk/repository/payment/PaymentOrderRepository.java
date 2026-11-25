@@ -214,6 +214,7 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', paid_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', paid_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', paid_at)
                     ELSE date_trunc('day', paid_at)
@@ -239,6 +240,7 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', paid_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', paid_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', paid_at)
                     ELSE date_trunc('day', paid_at)

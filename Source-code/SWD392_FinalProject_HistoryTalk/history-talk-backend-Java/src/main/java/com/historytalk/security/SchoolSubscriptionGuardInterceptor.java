@@ -18,12 +18,14 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * Enforces two-level B2B school locking:
  * 1. Deactivated student account (graduated / transferred) -> Blocks all access (403 ACCOUNT_DEACTIVATED).
- * 2. Expired school subscription (outside 01/09 - 31/05 or status EXPIRED/SUSPENDED) -> Locks the entire platform for the school (403 SCHOOL_SUBSCRIPTION_EXPIRED).
+ * 2. Expired school subscription (outside 01/09 - 31/05 or status EXPIRED/SUSPENDED) -> Locks the entire platform for the school (403 SCHOOL_SUBSCRIPTION_EXPIRED),
+ *    while allowing SCHOOL_ADMIN access to self-service subscription renewal and profile/password endpoints.
  * 3. Active school subscription with 0 tokens -> Allows all non-AI endpoints (Quizzes, Assignments, Local Content, Dashboards); only AI Chat is blocked by DailyTokenAllowanceService.
  */
 @Slf4j
@@ -31,8 +33,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SchoolSubscriptionGuardInterceptor implements HandlerInterceptor {
 
+    private static final List<String> SCHOOL_ADMIN_LIFECYCLE_SUFFIXES = List.of(
+            "/api/v1/school-admin/subscription/renew",
+            "/api/v1/school-admin/my-school",
+            "/api/v1/users/me",
+            "/api/v1/users/me/password"
+    );
+
     private final UserRepository userRepository;
     private final SchoolRepository schoolRepository;
+
+    private boolean isSchoolAdminLifecycleExempt(UserRole role, HttpServletRequest request) {
+        if (role != UserRole.SCHOOL_ADMIN || request == null) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        if (uri == null || uri.isBlank()) {
+            return false;
+        }
+        return SCHOOL_ADMIN_LIFECYCLE_SUFFIXES.stream().anyMatch(uri::endsWith);
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -59,6 +79,9 @@ public class SchoolSubscriptionGuardInterceptor implements HandlerInterceptor {
 
         UserRole role = user.getRole();
         if (role == UserRole.SCHOOL_ADMIN || role == UserRole.TEACHER || role == UserRole.SCHOOL_STUDENT) {
+            if (isSchoolAdminLifecycleExempt(role, request)) {
+                return true;
+            }
             School school = user.getSchool();
             if (school != null) {
                 LocalDate today = LocalDate.now(ZoneOffset.UTC);

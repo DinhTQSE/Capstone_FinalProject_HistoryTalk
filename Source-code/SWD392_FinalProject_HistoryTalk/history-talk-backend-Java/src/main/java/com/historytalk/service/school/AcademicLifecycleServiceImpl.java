@@ -149,7 +149,7 @@ public class AcademicLifecycleServiceImpl implements AcademicLifecycleService {
 
         LocalDate refDate = referenceDate != null ? referenceDate : LocalDate.now(ZoneOffset.UTC);
         LocalDate subEnd = school.getSubscriptionEndDate();
-        boolean canActivate = (subEnd != null && !refDate.isBefore(subEnd)) || refDate.getMonthValue() >= 9;
+        boolean canActivate = (subEnd != null) ? !refDate.isBefore(subEnd) : refDate.getMonthValue() >= 9;
         if (!canActivate) {
             throw new InvalidRequestException("Gói gia hạn năm học mới chỉ được kích hoạt sau khi gói cũ kết thúc (hoặc bắt đầu từ ngày 01/09).");
         }

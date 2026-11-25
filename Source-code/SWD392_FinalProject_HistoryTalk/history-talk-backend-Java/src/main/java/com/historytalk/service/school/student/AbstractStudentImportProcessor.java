@@ -99,57 +99,59 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
         }
 
         List<StudentImportRowDto> rows = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
-             CSVParser parser = CSVFormat.DEFAULT
-                     .builder()
-                     .setHeader()
-                     .setSkipHeaderRecord(true)
-                     .setIgnoreHeaderCase(true)
-                     .setTrim(true)
-                     .build()
-                     .parse(reader)) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            stripUtf8Bom(reader);
+            try (CSVParser parser = CSVFormat.DEFAULT
+                    .builder()
+                    .setHeader()
+                    .setSkipHeaderRecord(true)
+                    .setIgnoreHeaderCase(true)
+                    .setTrim(true)
+                    .build()
+                    .parse(reader)) {
 
-            int rowNumber = 1;
-            for (CSVRecord record : parser) {
-                rowNumber++;
-                String studentCode = getRecordValue(record, "student_code");
-                String fullName = getRecordValue(record, "full_name");
-                String email = getRecordValue(record, "email");
-                String dobStr = getRecordValue(record, "dob");
-                String gender = getRecordValue(record, "gender");
-                String phoneNumber = getRecordValue(record, "phone_number");
-                String password = getRecordValue(record, "password");
-                String additionalTokenStr = getRecordValue(record, "additional_token");
-                String classCode = getRecordValue(record, "class_code");
+                int rowNumber = 1;
+                for (CSVRecord record : parser) {
+                    rowNumber++;
+                    String studentCode = getRecordValue(record, "student_code");
+                    String fullName = getRecordValue(record, "full_name");
+                    String email = getRecordValue(record, "email");
+                    String dobStr = getRecordValue(record, "dob");
+                    String gender = getRecordValue(record, "gender");
+                    String phoneNumber = getRecordValue(record, "phone_number");
+                    String password = getRecordValue(record, "password");
+                    String additionalTokenStr = getRecordValue(record, "additional_token");
+                    String classCode = getRecordValue(record, "class_code");
 
-                LocalDate dob = null;
-                if (dobStr != null && !dobStr.isEmpty()) {
-                    try {
-                        dob = LocalDate.parse(dobStr);
-                    } catch (DateTimeParseException ignored) {
-                        // Sẽ validate ở bước sau
+                    LocalDate dob = null;
+                    if (dobStr != null && !dobStr.isEmpty()) {
+                        try {
+                            dob = LocalDate.parse(dobStr);
+                        } catch (DateTimeParseException ignored) {
+                            // Sẽ validate ở bước sau
+                        }
                     }
-                }
 
-                Integer additionalToken = 0;
-                if (additionalTokenStr != null && !additionalTokenStr.isEmpty()) {
-                    try {
-                        additionalToken = Integer.parseInt(additionalTokenStr);
-                    } catch (NumberFormatException ignored) {}
-                }
+                    Integer additionalToken = 0;
+                    if (additionalTokenStr != null && !additionalTokenStr.isEmpty()) {
+                        try {
+                            additionalToken = Integer.parseInt(additionalTokenStr);
+                        } catch (NumberFormatException ignored) {}
+                    }
 
-                rows.add(StudentImportRowDto.builder()
-                        .rowNumber(rowNumber)
-                        .studentCode(studentCode)
-                        .fullName(fullName)
-                        .email(email)
-                        .dob(dob)
-                        .gender(gender)
-                        .phoneNumber(phoneNumber)
-                        .password(password)
-                        .additionalToken(additionalToken)
-                        .classCode(classCode)
-                        .build());
+                    rows.add(StudentImportRowDto.builder()
+                            .rowNumber(rowNumber)
+                            .studentCode(studentCode)
+                            .fullName(fullName)
+                            .email(email)
+                            .dob(dob)
+                            .gender(gender)
+                            .phoneNumber(phoneNumber)
+                            .password(password)
+                            .additionalToken(additionalToken)
+                            .classCode(classCode)
+                            .build());
+                }
             }
         } catch (Exception e) {
             log.error("Error reading CSV file: {}", e.getMessage(), e);
@@ -157,6 +159,14 @@ public abstract class AbstractStudentImportProcessor implements StudentImportPro
         }
 
         return rows;
+    }
+
+    private void stripUtf8Bom(BufferedReader reader) throws java.io.IOException {
+        reader.mark(1);
+        int firstChar = reader.read();
+        if (firstChar != '\uFEFF' && firstChar != -1) {
+            reader.reset();
+        }
     }
 
     protected List<StudentImportRowDto> validateRows(

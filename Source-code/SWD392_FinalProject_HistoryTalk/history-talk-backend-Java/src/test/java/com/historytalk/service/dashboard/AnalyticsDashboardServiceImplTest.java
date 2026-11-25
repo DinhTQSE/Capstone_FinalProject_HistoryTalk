@@ -11,6 +11,7 @@ import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.quiz.QuizSession;
 import com.historytalk.entity.school.School;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.InvalidRequestException;
 import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.*;
 import com.historytalk.repository.classroom.ClassStudentRepository;
@@ -704,5 +705,22 @@ class AnalyticsDashboardServiceImplTest {
         assertEquals(500000L, response.getSchoolTokenManagement().getTopupTokensPurchased());
         assertEquals(75000L, response.getSchoolTokenManagement().getTopupAmountPaid());
         assertEquals(2, response.getTokenUsageByRole().size());
+    }
+
+    @Test
+    @DisplayName("Sprint 10: getSchoolAdminTokenAnalytics accepts granularity='year' and rejects invalid granularity")
+    void getSchoolAdminTokenAnalytics_SupportsYearGranularity() {
+        when(schoolRepository.findById(schoolId)).thenReturn(Optional.of(school));
+        when(messageRepository.sumTokensBetweenBySchoolId(any(), any(), eq(schoolId))).thenReturn(null);
+        when(messageRepository.sumTokensByPeriodBySchoolId(any(), any(), eq("year"), eq(schoolId)))
+                .thenReturn(Collections.emptyList());
+
+        DashboardTokenUsageResponse response = dashboardService.getSchoolAdminTokenAnalytics(
+                schoolId, java.time.LocalDate.of(2025, 12, 1), java.time.LocalDate.of(2026, 1, 15), "year");
+
+        assertEquals(List.of("2025-01-01", "2026-01-01"),
+                response.getTrend().stream().map(DashboardTokenUsageResponse.TokenTrendPoint::getDate).toList());
+        assertThrows(InvalidRequestException.class, () -> dashboardService.getSchoolAdminTokenAnalytics(
+                schoolId, java.time.LocalDate.of(2026, 11, 1), java.time.LocalDate.of(2026, 11, 15), "quarter"));
     }
 }

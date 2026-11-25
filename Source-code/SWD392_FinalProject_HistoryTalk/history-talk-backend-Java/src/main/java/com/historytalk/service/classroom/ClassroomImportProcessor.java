@@ -82,6 +82,7 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
         List<RowPlan> plans = new ArrayList<>();
         Set<String> seenCodesInFile = new HashSet<>();
         Set<String> seenEmailsInFile = new HashSet<>();
+        Set<UUID> seenExistingUidsInFile = new HashSet<>();
 
         for (StudentImportRowDto row : rawRows) {
             boolean hasError = false;
@@ -99,6 +100,17 @@ public class ClassroomImportProcessor extends AbstractStudentImportProcessor {
 
             if (existingStudentOpt.isPresent()) {
                 User existingStudent = existingStudentOpt.get();
+                // Prevent duplicate entries for the same existing student within one CSV file
+                if (!seenExistingUidsInFile.add(existingStudent.getUid())) {
+                    addError(resultDto, row.getRowNumber(), rawCode, "student_code", "Học sinh bị lặp lại trong tệp");
+                    continue;
+                }
+                if (rawCode != null && !rawCode.isEmpty()) {
+                    seenCodesInFile.add(rawCode.toLowerCase());
+                }
+                if (rawEmail != null && !rawEmail.isEmpty()) {
+                    seenEmailsInFile.add(rawEmail);
+                }
                 // CASE 1: Học sinh ĐÃ TỒN TẠI trong trường
                 Optional<ClassStudent> existingCs = classStudentRepository.findByClassroomIdAndStudentUid(classroom.getId(), existingStudent.getUid());
                 boolean isCurrentlyActive = existingCs.isPresent() && "ACTIVE".equals(existingCs.get().getStatus());

@@ -28,6 +28,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -161,6 +163,8 @@ public class AuthServiceImpl implements AuthService {
                             request.getPassword()
                     )
             );
+        } catch (DisabledException | LockedException ex) {
+            throw new UnauthorizedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa");
         } catch (BadCredentialsException ex) {
             throw new UnauthorizedException("Email hoặc mật khẩu không hợp lệ");
         }
@@ -387,7 +391,6 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(uid)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
         user.setPasswordChangedAt(LocalDateTime.now(ZoneOffset.UTC));
-        user.setMustChangePassword(false);
         userRepository.save(user);
         refreshTokenService.revokeAllUserTokens(uid);
         log.info("User {} logged out from all devices", userId);

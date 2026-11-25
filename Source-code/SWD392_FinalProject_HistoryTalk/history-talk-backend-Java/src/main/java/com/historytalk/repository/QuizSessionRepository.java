@@ -214,6 +214,7 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', qs.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', qs.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', qs.created_at)
                     ELSE date_trunc('day', qs.created_at)
@@ -239,6 +240,7 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', qs.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', qs.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', qs.created_at)
                     ELSE date_trunc('day', qs.created_at)
@@ -311,6 +313,7 @@ public interface QuizSessionRepository extends JpaRepository<QuizSession, UUID> 
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', qs.created_at)
                     WHEN :bucket = 'month' THEN date_trunc('month', qs.created_at)
                     WHEN :bucket = 'week' THEN date_trunc('week', qs.created_at)
                     ELSE date_trunc('day', qs.created_at)

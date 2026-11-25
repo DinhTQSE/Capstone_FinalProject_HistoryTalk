@@ -1475,14 +1475,21 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             return "day";
         }
         String normalized = granularity.toLowerCase(Locale.ROOT).trim();
-        if (!List.of("day", "week", "month").contains(normalized)) {
-            throw new InvalidRequestException("granularity (đơn vị thời gian) phải là day, week hoặc month");
+        if (!List.of("day", "week", "month", "year").contains(normalized)) {
+            throw new InvalidRequestException("granularity (đơn vị thời gian) phải là day, week, month hoặc year");
         }
         return normalized;
     }
 
     private List<String> initializePeriods(LocalDate from, LocalDate to, String bucket) {
         List<String> periods = new ArrayList<>();
+        if ("year".equals(bucket)) {
+            for (int year = from.getYear(); year <= to.getYear(); year++) {
+                periods.add(LocalDate.of(year, 1, 1).format(PERIOD_FORMATTER));
+            }
+            return periods;
+        }
+
         if ("month".equals(bucket)) {
             YearMonth cursor = YearMonth.from(from);
             YearMonth end = YearMonth.from(to);

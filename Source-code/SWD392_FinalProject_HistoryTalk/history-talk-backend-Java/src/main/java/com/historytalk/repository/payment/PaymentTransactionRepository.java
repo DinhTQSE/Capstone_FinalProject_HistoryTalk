@@ -33,6 +33,7 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', COALESCE(pt.transaction_date, pt.created_at))
                     WHEN :bucket = 'month' THEN date_trunc('month', COALESCE(pt.transaction_date, pt.created_at))
                     WHEN :bucket = 'week' THEN date_trunc('week', COALESCE(pt.transaction_date, pt.created_at))
                     ELSE date_trunc('day', COALESCE(pt.transaction_date, pt.created_at))
@@ -56,6 +57,7 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     @Query(value = """
             SELECT to_char(
                 CASE
+                    WHEN :bucket = 'year' THEN date_trunc('year', COALESCE(pt.transaction_date, pt.created_at))
                     WHEN :bucket = 'month' THEN date_trunc('month', COALESCE(pt.transaction_date, pt.created_at))
                     WHEN :bucket = 'week' THEN date_trunc('week', COALESCE(pt.transaction_date, pt.created_at))
                     ELSE date_trunc('day', COALESCE(pt.transaction_date, pt.created_at))
