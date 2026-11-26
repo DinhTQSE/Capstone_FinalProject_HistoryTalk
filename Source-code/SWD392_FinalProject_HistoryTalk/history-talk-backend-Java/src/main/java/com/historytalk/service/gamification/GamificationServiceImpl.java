@@ -82,9 +82,29 @@ public class GamificationServiceImpl implements GamificationService {
         Optional<DailyCheckIn> todayCheckIn = checkInRepository.findByUserUidAndDate(userUid, today);
         Optional<DailyCheckIn> lastCheckIn = checkInRepository.findFirstByUserUidOrderByDateDesc(userUid);
 
-        int streakCount = todayCheckIn.map(DailyCheckIn::getStreakCount)
-                .orElseGet(() -> lastCheckIn.map(DailyCheckIn::getStreakCount).orElse(0));
+        // The streak is still alive only when the last check-in was today or yesterday;
+        // an older one means the chain is broken, so it must not be shown as the current streak.
+        int streakCount = lastCheckIn
+                .filter(c -> !c.getDate().isBefore(today.minusDays(1)))
+                .map(DailyCheckIn::getStreakCount)
+                .orElse(0);
         boolean studiedToday = todayCheckIn.isPresent();
+        int longestStreak = Math.max(checkInRepository.findLongestStreak(userUid), streakCount);
+        int totalStudyDays = (int) checkInRepository.countByUserUid(userUid);
+
+        LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        java.util.Set<LocalDate> studiedThisWeek = new java.util.HashSet<>(
+                checkInRepository.findAllDatesInRange(userUid, monday, monday.plusDays(6)));
+        List<TodayGamificationResponse.WeekDayDto> week = new ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            LocalDate day = monday.plusDays(i);
+            week.add(TodayGamificationResponse.WeekDayDto.builder()
+                    .date(day.toString())
+                    .weekday(i)
+                    .studied(studiedThisWeek.contains(day))
+                    .isToday(day.equals(today))
+                    .build());
+        }
 
         List<DailyQuest> activeQuests = questRepository.findByIsActiveTrueOrderByOrderIndexAsc();
         List<UserQuestProgress> todayProgressList = progressRepository.findByUserUidAndDate(userUid, today);
@@ -121,8 +141,11 @@ public class GamificationServiceImpl implements GamificationService {
         return TodayGamificationResponse.builder()
                 .date(today.toString())
                 .streakCount(streakCount)
+                .longestStreak(longestStreak)
+                .totalStudyDays(totalStudyDays)
                 .studiedToday(studiedToday)
                 .claimableTokens(claimableTokens)
+                .week(week)
                 .quests(questDtos)
                 .build();
     }

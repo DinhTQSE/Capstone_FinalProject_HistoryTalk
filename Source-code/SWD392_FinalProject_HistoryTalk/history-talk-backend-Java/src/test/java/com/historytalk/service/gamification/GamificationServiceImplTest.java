@@ -274,6 +274,37 @@ class GamificationServiceImplTest {
     }
 
     @Test
+    @DisplayName("WF-03 / F-11: a check-in older than yesterday breaks the streak; stats and week are filled")
+    void getTodayState_StaleLastCheckIn_ResetsStreakAndReturnsStatsAndWeek() {
+        LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
+        DailyCheckIn oldCheckIn = DailyCheckIn.builder()
+                .user(user)
+                .date(today.minusDays(3))
+                .streakCount(4)
+                .build();
+
+        when(checkInRepository.findByUserUidAndDate(userId, today)).thenReturn(Optional.empty());
+        when(checkInRepository.findFirstByUserUidOrderByDateDesc(userId)).thenReturn(Optional.of(oldCheckIn));
+        when(checkInRepository.findLongestStreak(userId)).thenReturn(4);
+        when(checkInRepository.countByUserUid(userId)).thenReturn(9L);
+        when(checkInRepository.findAllDatesInRange(eq(userId), any(), any())).thenReturn(List.of(today.minusDays(3)));
+        when(questRepository.findByIsActiveTrueOrderByOrderIndexAsc()).thenReturn(List.of());
+        when(progressRepository.findByUserUidAndDate(userId, today)).thenReturn(List.of());
+
+        TodayGamificationResponse state = gamificationService.getTodayState(userId.toString());
+
+        assertThat(state.getStreakCount()).isZero();
+        assertThat(state.getStudiedToday()).isFalse();
+        assertThat(state.getLongestStreak()).isEqualTo(4);
+        assertThat(state.getTotalStudyDays()).isEqualTo(9);
+        assertThat(state.getWeek()).hasSize(7);
+        assertThat(state.getWeek().get(0).getWeekday()).isZero();
+        assertThat(state.getWeek()).filteredOn(TodayGamificationResponse.WeekDayDto::getIsToday)
+                .singleElement()
+                .satisfies(d -> assertThat(d.getDate()).isEqualTo(today.toString()));
+    }
+
+    @Test
     @DisplayName("WF-03 / F-11: staffUpdateQuest updates quest configuration fields")
     void staffUpdateQuest_UpdatesQuestFields() {
         UpdateQuestRequest req = new UpdateQuestRequest(
