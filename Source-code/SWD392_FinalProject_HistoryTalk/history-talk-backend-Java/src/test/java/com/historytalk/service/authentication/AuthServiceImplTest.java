@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -353,6 +354,29 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "Chrome"))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("ACCOUNT_DEACTIVATED");
+    }
+
+    @Test
+    void loginMapsWrappedDisabledExceptionFromUserDetailsServiceToAccountDeactivatedMessage() {
+        // What DaoAuthenticationProvider really throws when CustomUserDetailsService rejects a soft-deleted account.
+        doThrow(new InternalAuthenticationServiceException("Tài khoản đã bị vô hiệu hóa",
+                new DisabledException("Tài khoản đã bị vô hiệu hóa")))
+                .when(authenticationManager).authenticate(any());
+
+        LoginRequest request = new LoginRequest("locked.teacher@school.edu.vn", "password");
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "Chrome"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("ACCOUNT_DEACTIVATED");
+    }
+
+    @Test
+    void loginRethrowsWrappedInternalErrorsThatAreNotAccountStatus() {
+        InternalAuthenticationServiceException dbDown =
+                new InternalAuthenticationServiceException("DB down", new IllegalStateException("DB down"));
+        doThrow(dbDown).when(authenticationManager).authenticate(any());
+
+        LoginRequest request = new LoginRequest("user@example.com", "password");
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "Chrome")).isSameAs(dbDown);
     }
 
     @Test

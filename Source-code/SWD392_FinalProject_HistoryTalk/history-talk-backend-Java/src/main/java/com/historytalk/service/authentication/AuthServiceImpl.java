@@ -26,9 +26,11 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -165,6 +167,14 @@ public class AuthServiceImpl implements AuthService {
             );
         } catch (DisabledException | LockedException ex) {
             throw new UnauthorizedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa");
+        } catch (InternalAuthenticationServiceException ex) {
+            // CustomUserDetailsService throws DisabledException for soft-deleted (locked) accounts, but
+            // DaoAuthenticationProvider wraps anything thrown while loading the user. Unwrapped, it would escape as an
+            // AuthenticationException and the entry point would answer a generic 401 "Bạn cần đăng nhập...".
+            if (ex.getCause() instanceof AccountStatusException) {
+                throw new UnauthorizedException("ACCOUNT_DEACTIVATED: Tài khoản đã bị vô hiệu hóa");
+            }
+            throw ex;
         } catch (BadCredentialsException ex) {
             throw new UnauthorizedException("Email hoặc mật khẩu không hợp lệ");
         }
