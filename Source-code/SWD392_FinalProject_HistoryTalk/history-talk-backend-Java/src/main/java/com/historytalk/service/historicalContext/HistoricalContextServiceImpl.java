@@ -49,6 +49,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
         private final ContentAccessPolicy contentAccessPolicy;
         private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
+        private final ContextCascadeRestorer contextCascadeRestorer;
     
     /**
      * Get all historical contexts with pagination and search
@@ -306,12 +307,18 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     @Transactional
     public void restoreContext(String contextId) {
         UUID uuid = UUID.fromString(contextId);
+        HistoricalContext context = contextRepository.findById(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
+        // Read before restoreById clears it: the cascade restore matches children on this exact value
+        java.time.LocalDateTime deletedAt = context.getDeletedAt();
         int updated = contextRepository.restoreById(uuid);
         if (updated == 0) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
         documentRepository.findByEntityIdAndEntityType(uuid, EntityType.CONTEXT)
                 .forEach(doc -> doc.setDeletedAt(null));
+        contextCascadeRestorer.restoreChildren(uuid, deletedAt);
     }
 
     @Transactional

@@ -39,6 +39,7 @@ public class TrashServiceImpl implements TrashService {
     private final ChatSessionRepository chatSessionRepository;
     private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
     private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
+    private final com.historytalk.service.historicalContext.ContextCascadeRestorer contextCascadeRestorer;
 
     @Override
     @Transactional(readOnly = true)
@@ -88,9 +89,11 @@ public class TrashServiceImpl implements TrashService {
                     if (context.getDeletedAt() == null) {
                         return result(id, NOT_TRASHED, "Bối cảnh lịch sử không nằm trong thùng rác");
                     }
+                    java.time.LocalDateTime deletedAt = context.getDeletedAt();
                     context.setDeletedAt(null);
                     documentRepository.findByEntityIdAndEntityType(context.getContextId(), EntityType.CONTEXT)
                             .forEach(doc -> doc.setDeletedAt(null));
+                    contextCascadeRestorer.restoreChildren(context.getContextId(), deletedAt);
                     return result(id, RESTORED, "Đã khôi phục bối cảnh lịch sử");
                 })
                 .orElseGet(() -> result(id, NOT_FOUND, "Không tìm thấy bối cảnh lịch sử")));

@@ -69,6 +69,9 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
 
     List<ChatSession> findByHistoricalContextContextId(UUID contextId);
 
+    /** Chat sessions of a context soft-deleted at exactly {@code deletedAt} (restore path, so no deletedAt IS NULL). */
+    List<ChatSession> findByHistoricalContext_ContextIdAndDeletedAt(UUID contextId, LocalDateTime deletedAt);
+
     @Query("SELECT COUNT(cs) FROM ChatSession cs WHERE cs.deletedAt IS NULL AND cs.createdAt >= :from AND cs.createdAt < :to")
     long countCreatedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 

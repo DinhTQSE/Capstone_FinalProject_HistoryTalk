@@ -7,6 +7,7 @@ import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
@@ -27,9 +28,11 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +55,9 @@ class HistoricalContextServiceImplTest {
 
     @Mock
     private com.historytalk.security.ContentAccessPolicy contentAccessPolicy;
+
+    @Mock
+    private ContextCascadeRestorer contextCascadeRestorer;
 
     @InjectMocks
     private HistoricalContextServiceImpl historicalContextService;
@@ -151,6 +157,34 @@ class HistoricalContextServiceImplTest {
         verify(mapPinService).softDeleteAllPinsForContext(eq(contextId), ts.capture());
         assertThat(ts.getValue()).isEqualTo(context.getDeletedAt()).isEqualTo(quiz.getDeletedAt());
         assertThat(ts.getValue().getNano() % 1_000).isZero();
+    }
+
+    @Test
+    void restoreContext_restoresChildrenWithContextTimestamp() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 28, 10, 0, 0, 123_456_000);
+        HistoricalContext context = activeContext();
+        context.setDeletedAt(t);
+        UUID uuid = context.getContextId();
+        when(contextRepository.findById(uuid)).thenReturn(java.util.Optional.of(context));
+        when(contextRepository.restoreById(uuid)).thenReturn(1);
+        when(documentRepository.findByEntityIdAndEntityType(uuid, com.historytalk.entity.enums.EntityType.CONTEXT))
+                .thenReturn(List.of());
+
+        historicalContextService.restoreContext(uuid.toString());
+
+        verify(contextCascadeRestorer).restoreChildren(uuid, t);
+    }
+
+    @Test
+    void restoreContext_notTrashed_throwsAndRestoresNothing() {
+        HistoricalContext context = activeContext();
+        UUID uuid = context.getContextId();
+        when(contextRepository.findById(uuid)).thenReturn(java.util.Optional.of(context));
+        when(contextRepository.restoreById(uuid)).thenReturn(0);
+
+        assertThatThrownBy(() -> historicalContextService.restoreContext(uuid.toString()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(contextCascadeRestorer);
     }
 
     private HistoricalContext activeContext() {
