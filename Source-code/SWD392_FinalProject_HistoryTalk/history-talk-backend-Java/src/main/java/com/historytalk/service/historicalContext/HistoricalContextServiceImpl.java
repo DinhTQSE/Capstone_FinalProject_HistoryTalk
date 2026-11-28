@@ -276,19 +276,25 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 context.getContextId(), EntityType.CONTEXT, true)
             .forEach(doc -> doc.setDeletedAt(now));
 
-        chatSessionRepository.findByHistoricalContextContextId(context.getContextId()).forEach(session -> {
-            session.setDeletedAt(now);
-            if (session.getMessages() != null) {
-                session.getMessages().forEach(msg -> msg.setDeletedAt(now));
-            }
-        });
+        // Only live children get the context's stamp: rows deleted on their own keep their older deletedAt,
+        // so restoring the context (exact-timestamp match in ContextCascadeRestorer) leaves them deleted
+        chatSessionRepository.findByHistoricalContextContextId(context.getContextId()).stream()
+            .filter(session -> session.getDeletedAt() == null)
+            .forEach(session -> {
+                session.setDeletedAt(now);
+                if (session.getMessages() != null) {
+                    session.getMessages().stream()
+                        .filter(msg -> msg.getDeletedAt() == null)
+                        .forEach(msg -> msg.setDeletedAt(now));
+                }
+            });
 
         // Cascade to Quizzes
         if (context.getQuizzes() != null) {
-            context.getQuizzes().forEach(quiz -> {
+            context.getQuizzes().stream()
                 // Questions live in the bank and may be shared by other quizzes, so only the quiz is soft-deleted
-                quiz.setDeletedAt(now);
-            });
+                .filter(quiz -> quiz.getDeletedAt() == null)
+                .forEach(quiz -> quiz.setDeletedAt(now));
         }
 
         // Cascade to Map Pins (admin + user pins for this context)

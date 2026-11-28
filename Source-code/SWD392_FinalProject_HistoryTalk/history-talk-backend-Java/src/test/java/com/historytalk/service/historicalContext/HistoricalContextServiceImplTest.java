@@ -160,6 +160,38 @@ class HistoricalContextServiceImplTest {
     }
 
     @Test
+    void softDeleteContext_keepsTimestampOfChildrenDeletedEarlier() {
+        LocalDateTime earlier = LocalDateTime.of(2026, 1, 1, 8, 0);
+        Quiz trashedQuiz = Quiz.builder().quizId(UUID.randomUUID()).deletedAt(earlier).build();
+        Quiz liveQuiz = Quiz.builder().quizId(UUID.randomUUID()).build();
+        com.historytalk.entity.chat.Message oldMsg = com.historytalk.entity.chat.Message.builder()
+                .messageId(UUID.randomUUID()).deletedAt(earlier).build();
+        com.historytalk.entity.chat.ChatSession userDeletedSession = com.historytalk.entity.chat.ChatSession.builder()
+                .sessionId(UUID.randomUUID()).deletedAt(earlier)
+                .messages(new java.util.ArrayList<>(List.of(oldMsg))).build();
+        com.historytalk.entity.chat.Message liveMsg = com.historytalk.entity.chat.Message.builder()
+                .messageId(UUID.randomUUID()).build();
+        com.historytalk.entity.chat.ChatSession liveSession = com.historytalk.entity.chat.ChatSession.builder()
+                .sessionId(UUID.randomUUID())
+                .messages(new java.util.ArrayList<>(List.of(liveMsg))).build();
+        HistoricalContext context = activeContext();
+        context.setQuizzes(new java.util.ArrayList<>(List.of(trashedQuiz, liveQuiz)));
+        when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
+        when(chatSessionRepository.findByHistoricalContextContextId(context.getContextId()))
+                .thenReturn(List.of(userDeletedSession, liveSession));
+
+        historicalContextService.softDeleteContext(
+                context.getContextId().toString(), UUID.randomUUID().toString(), "CONTENT_ADMIN");
+
+        assertThat(trashedQuiz.getDeletedAt()).isEqualTo(earlier);
+        assertThat(userDeletedSession.getDeletedAt()).isEqualTo(earlier);
+        assertThat(oldMsg.getDeletedAt()).isEqualTo(earlier);
+        assertThat(liveQuiz.getDeletedAt()).isEqualTo(context.getDeletedAt());
+        assertThat(liveSession.getDeletedAt()).isEqualTo(context.getDeletedAt());
+        assertThat(liveMsg.getDeletedAt()).isEqualTo(context.getDeletedAt());
+    }
+
+    @Test
     void restoreContext_restoresChildrenWithContextTimestamp() {
         LocalDateTime t = LocalDateTime.of(2026, 11, 28, 10, 0, 0, 123_456_000);
         HistoricalContext context = activeContext();
