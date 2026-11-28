@@ -55,12 +55,9 @@ public class MapPinServiceImpl implements MapPinService {
 
         boolean isEduManager = isEducationalManager(role, callerId, context);
 
-        // Non-admin callers can only query published contexts
-        if (!isEduManager && !isAdminRole(role) && context.getDeletedAt() != null) {
-            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
-        }
-        if (!isEduManager && !isAdminRole(role) && !Boolean.TRUE.equals(context.getIsPublished())) {
-            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+        // Callers other than admins and school managers only see pins of published, live contexts
+        if (!isEduManager && !isAdminRole(role)) {
+            assertContextOpenToLearners(context, contextId);
         }
 
         // School-owned isolation check: outsiders cannot load pins of school-owned context
@@ -181,6 +178,7 @@ public class MapPinServiceImpl implements MapPinService {
                 throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
             }
         } else {
+            assertContextOpenToLearners(pin.getHistoricalContext(), contextId);
             // Regular users can only delete their own USER pins
             if (!PIN_OWNER_USER.equals(pin.getPinOwnerType())
                     || !pin.getCreatedBy().getUid().toString().equals(callerId)) {
@@ -221,6 +219,7 @@ public class MapPinServiceImpl implements MapPinService {
                 throw new ResourceNotFoundException("Không tìm thấy map pin với ID: " + pinId);
             }
         } else {
+            assertContextOpenToLearners(pin.getHistoricalContext(), contextId);
             // Regular users can only update their own USER pins
             if (!PIN_OWNER_USER.equals(pin.getPinOwnerType())
                     || !pin.getCreatedBy().getUid().toString().equals(callerId)) {
@@ -303,6 +302,16 @@ public class MapPinServiceImpl implements MapPinService {
                 || "STAFF".equalsIgnoreCase(role)
                 || "ADMIN".equalsIgnoreCase(role)
         );
+    }
+
+    /**
+     * Learners only work with pins of a published, non-deleted context (BUS-SPEC §3 "View Public Contexts").
+     * A hidden context answers 404 so its existence is not leaked.
+     */
+    private void assertContextOpenToLearners(HistoricalContext context, String contextId) {
+        if (context.getDeletedAt() != null || !Boolean.TRUE.equals(context.getIsPublished())) {
+            throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
+        }
     }
 
     /**
