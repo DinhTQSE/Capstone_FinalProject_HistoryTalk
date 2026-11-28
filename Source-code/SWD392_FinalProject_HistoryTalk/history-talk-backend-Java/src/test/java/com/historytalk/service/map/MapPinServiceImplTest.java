@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -148,6 +149,36 @@ class MapPinServiceImplTest {
                 pin.getPinId().toString(), request, callerUuid.toString(), "CONTENT_ADMIN");
 
         assertThat(response.getLabel()).isEqualTo("New");
+    }
+
+    @Test
+    void softDeleteAllPinsForContext_stampsGivenTimestamp() {
+        HistoricalContext context = context(true, null);
+        MapPin p1 = pin(context, UUID.randomUUID(), "ADMIN");
+        MapPin p2 = pin(context, UUID.randomUUID(), "USER");
+        LocalDateTime t = LocalDateTime.of(2026, 11, 28, 10, 0, 0, 123_456_000);
+        when(mapPinRepository.findByHistoricalContext_ContextIdAndDeletedAtIsNull(context.getContextId()))
+                .thenReturn(List.of(p1, p2));
+
+        mapPinService.softDeleteAllPinsForContext(context.getContextId().toString(), t);
+
+        assertThat(p1.getDeletedAt()).isEqualTo(t);
+        assertThat(p2.getDeletedAt()).isEqualTo(t);
+    }
+
+    @Test
+    void restorePinsForContext_clearsPinsWithMatchingTimestamp() {
+        HistoricalContext context = context(true, null);
+        LocalDateTime t = LocalDateTime.of(2026, 11, 28, 10, 0, 0, 123_456_000);
+        MapPin p1 = pin(context, UUID.randomUUID(), "USER");
+        p1.setDeletedAt(t);
+        when(mapPinRepository.findByHistoricalContext_ContextIdAndDeletedAt(context.getContextId(), t))
+                .thenReturn(List.of(p1));
+
+        mapPinService.restorePinsForContext(context.getContextId().toString(), t);
+
+        assertThat(p1.getDeletedAt()).isNull();
+        verify(mapPinRepository).saveAll(List.of(p1));
     }
 
     private HistoricalContext context(boolean published, LocalDateTime deletedAt) {

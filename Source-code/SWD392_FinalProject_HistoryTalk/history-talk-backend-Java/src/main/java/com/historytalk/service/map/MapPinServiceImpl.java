@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.historytalk.exception.ForbiddenException;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -259,20 +258,31 @@ public class MapPinServiceImpl implements MapPinService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CASCADE – called by HistoricalContextServiceImpl.softDeleteContext()
+    // CASCADE – called by HistoricalContextServiceImpl.softDeleteContext() / ContextCascadeRestorer
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
-    public void softDeleteAllPinsForContext(String contextId) {
+    public void softDeleteAllPinsForContext(String contextId, LocalDateTime deletedAt) {
         UUID ctxUuid = parseUuid(contextId, "context");
         List<MapPin> pins = mapPinRepository.findByHistoricalContext_ContextIdAndDeletedAtIsNull(ctxUuid);
         if (pins.isEmpty()) return;
 
-        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        pins.forEach(p -> p.setDeletedAt(now));
+        pins.forEach(p -> p.setDeletedAt(deletedAt));
         mapPinRepository.saveAll(pins);
         log.info("Cascade soft-deleted {} map pins for contextId={}", pins.size(), contextId);
+    }
+
+    @Override
+    @Transactional
+    public void restorePinsForContext(String contextId, LocalDateTime deletedAt) {
+        UUID ctxUuid = parseUuid(contextId, "context");
+        List<MapPin> pins = mapPinRepository.findByHistoricalContext_ContextIdAndDeletedAt(ctxUuid, deletedAt);
+        if (pins.isEmpty()) return;
+
+        pins.forEach(p -> p.setDeletedAt(null));
+        mapPinRepository.saveAll(pins);
+        log.info("Cascade restored {} map pins for contextId={}", pins.size(), contextId);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

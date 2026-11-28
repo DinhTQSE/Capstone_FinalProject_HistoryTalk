@@ -266,7 +266,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             throw new InvalidRequestException("Bạn không có quyền xóa mềm bối cảnh lịch sử này");
         }
         
-        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         context.setDeletedAt(now);
         contextRepository.save(context);
 
@@ -291,7 +291,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         }
 
         // Cascade to Map Pins (admin + user pins for this context)
-        mapPinService.softDeleteAllPinsForContext(contextId);
+        mapPinService.softDeleteAllPinsForContext(contextId, now);
         
         log.info("Historical context soft-deleted successfully with ID: {}", contextId);
     }

@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -137,15 +138,19 @@ class HistoricalContextServiceImplTest {
     }
 
     @Test
-    void softDeleteContext_cascadesToPinsWithoutMapFocus() {
+    void softDeleteContext_stampsChildrenWithOneMicrosecondTimestamp() {
+        Quiz quiz = Quiz.builder().quizId(UUID.randomUUID()).build();
         HistoricalContext context = activeContext();
+        context.setQuizzes(new java.util.ArrayList<>(List.of(quiz)));
         String contextId = context.getContextId().toString();
         when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
 
         historicalContextService.softDeleteContext(contextId, UUID.randomUUID().toString(), "CONTENT_ADMIN");
 
-        verify(mapPinService).softDeleteAllPinsForContext(contextId);
-        assertThat(context.getDeletedAt()).isNotNull();
+        ArgumentCaptor<LocalDateTime> ts = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(mapPinService).softDeleteAllPinsForContext(eq(contextId), ts.capture());
+        assertThat(ts.getValue()).isEqualTo(context.getDeletedAt()).isEqualTo(quiz.getDeletedAt());
+        assertThat(ts.getValue().getNano() % 1_000).isZero();
     }
 
     private HistoricalContext activeContext() {

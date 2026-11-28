@@ -4,6 +4,7 @@ import com.historytalk.dto.map.CreateMapPinRequest;
 import com.historytalk.dto.map.MapPinResponse;
 import com.historytalk.dto.map.UpdateMapPinRequest;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface MapPinService {
@@ -44,8 +45,14 @@ public interface MapPinService {
                              String callerId, String role);
 
     /**
-     * Soft-delete all non-deleted pins for a context.
+     * Soft-delete all non-deleted pins for a context, stamping the context's own deletedAt.
      * Called from HistoricalContextServiceImpl.softDeleteContext() cascade.
      */
-    void softDeleteAllPinsForContext(String contextId);
+    void softDeleteAllPinsForContext(String contextId, LocalDateTime deletedAt);
+
+    /**
+     * Restore the pins the context soft-delete cascade removed: only pins whose deletedAt equals
+     * the given value. Called from ContextCascadeRestorer when a context is restored.
+     */
+    void restorePinsForContext(String contextId, LocalDateTime deletedAt);
 }
