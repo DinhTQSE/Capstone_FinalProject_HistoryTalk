@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,4 +55,10 @@ public interface MapPinRepository extends JpaRepository<MapPin, UUID> {
      * Used for cascade soft-delete when the parent context is soft-deleted.
      */
     List<MapPin> findByHistoricalContext_ContextIdAndDeletedAtIsNull(UUID contextId);
+
+    /**
+     * Load the pins of a context soft-deleted at exactly {@code deletedAt}.
+     * Used to restore the pins the context soft-delete cascade removed (admin/trash path, so no deletedAt IS NULL).
+     */
+    List<MapPin> findByHistoricalContext_ContextIdAndDeletedAt(UUID contextId, LocalDateTime deletedAt);
 }

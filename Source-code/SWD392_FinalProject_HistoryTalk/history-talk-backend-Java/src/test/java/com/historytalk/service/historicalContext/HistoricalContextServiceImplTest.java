@@ -7,6 +7,7 @@ import com.historytalk.entity.historicalContext.HistoricalContext;
 import com.historytalk.entity.quiz.Question;
 import com.historytalk.entity.quiz.Quiz;
 import com.historytalk.entity.user.User;
+import com.historytalk.exception.ResourceNotFoundException;
 import com.historytalk.repository.ChatSessionRepository;
 import com.historytalk.repository.DocumentRepository;
 import com.historytalk.repository.HistoricalContextRepository;
@@ -22,13 +23,16 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,6 +55,9 @@ class HistoricalContextServiceImplTest {
 
     @Mock
     private com.historytalk.security.ContentAccessPolicy contentAccessPolicy;
+
+    @Mock
+    private ContextCascadeRestorer contextCascadeRestorer;
 
     @InjectMocks
     private HistoricalContextServiceImpl historicalContextService;
@@ -137,15 +144,79 @@ class HistoricalContextServiceImplTest {
     }
 
     @Test
-    void softDeleteContext_cascadesToPinsWithoutMapFocus() {
+    void softDeleteContext_stampsChildrenWithOneMicrosecondTimestamp() {
+        Quiz quiz = Quiz.builder().quizId(UUID.randomUUID()).build();
         HistoricalContext context = activeContext();
+        context.setQuizzes(new java.util.ArrayList<>(List.of(quiz)));
         String contextId = context.getContextId().toString();
         when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
 
         historicalContextService.softDeleteContext(contextId, UUID.randomUUID().toString(), "CONTENT_ADMIN");
 
-        verify(mapPinService).softDeleteAllPinsForContext(contextId);
-        assertThat(context.getDeletedAt()).isNotNull();
+        ArgumentCaptor<LocalDateTime> ts = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(mapPinService).softDeleteAllPinsForContext(eq(contextId), ts.capture());
+        assertThat(ts.getValue()).isEqualTo(context.getDeletedAt()).isEqualTo(quiz.getDeletedAt());
+        assertThat(ts.getValue().getNano() % 1_000).isZero();
+    }
+
+    @Test
+    void softDeleteContext_keepsTimestampOfChildrenDeletedEarlier() {
+        LocalDateTime earlier = LocalDateTime.of(2026, 1, 1, 8, 0);
+        Quiz trashedQuiz = Quiz.builder().quizId(UUID.randomUUID()).deletedAt(earlier).build();
+        Quiz liveQuiz = Quiz.builder().quizId(UUID.randomUUID()).build();
+        com.historytalk.entity.chat.Message oldMsg = com.historytalk.entity.chat.Message.builder()
+                .messageId(UUID.randomUUID()).deletedAt(earlier).build();
+        com.historytalk.entity.chat.ChatSession userDeletedSession = com.historytalk.entity.chat.ChatSession.builder()
+                .sessionId(UUID.randomUUID()).deletedAt(earlier)
+                .messages(new java.util.ArrayList<>(List.of(oldMsg))).build();
+        com.historytalk.entity.chat.Message liveMsg = com.historytalk.entity.chat.Message.builder()
+                .messageId(UUID.randomUUID()).build();
+        com.historytalk.entity.chat.ChatSession liveSession = com.historytalk.entity.chat.ChatSession.builder()
+                .sessionId(UUID.randomUUID())
+                .messages(new java.util.ArrayList<>(List.of(liveMsg))).build();
+        HistoricalContext context = activeContext();
+        context.setQuizzes(new java.util.ArrayList<>(List.of(trashedQuiz, liveQuiz)));
+        when(contextRepository.findById(context.getContextId())).thenReturn(java.util.Optional.of(context));
+        when(chatSessionRepository.findByHistoricalContextContextId(context.getContextId()))
+                .thenReturn(List.of(userDeletedSession, liveSession));
+
+        historicalContextService.softDeleteContext(
+                context.getContextId().toString(), UUID.randomUUID().toString(), "CONTENT_ADMIN");
+
+        assertThat(trashedQuiz.getDeletedAt()).isEqualTo(earlier);
+        assertThat(userDeletedSession.getDeletedAt()).isEqualTo(earlier);
+        assertThat(oldMsg.getDeletedAt()).isEqualTo(earlier);
+        assertThat(liveQuiz.getDeletedAt()).isEqualTo(context.getDeletedAt());
+        assertThat(liveSession.getDeletedAt()).isEqualTo(context.getDeletedAt());
+        assertThat(liveMsg.getDeletedAt()).isEqualTo(context.getDeletedAt());
+    }
+
+    @Test
+    void restoreContext_restoresChildrenWithContextTimestamp() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 28, 10, 0, 0, 123_456_000);
+        HistoricalContext context = activeContext();
+        context.setDeletedAt(t);
+        UUID uuid = context.getContextId();
+        when(contextRepository.findById(uuid)).thenReturn(java.util.Optional.of(context));
+        when(contextRepository.restoreById(uuid)).thenReturn(1);
+        when(documentRepository.findByEntityIdAndEntityType(uuid, com.historytalk.entity.enums.EntityType.CONTEXT))
+                .thenReturn(List.of());
+
+        historicalContextService.restoreContext(uuid.toString());
+
+        verify(contextCascadeRestorer).restoreChildren(uuid, t);
+    }
+
+    @Test
+    void restoreContext_notTrashed_throwsAndRestoresNothing() {
+        HistoricalContext context = activeContext();
+        UUID uuid = context.getContextId();
+        when(contextRepository.findById(uuid)).thenReturn(java.util.Optional.of(context));
+        when(contextRepository.restoreById(uuid)).thenReturn(0);
+
+        assertThatThrownBy(() -> historicalContextService.restoreContext(uuid.toString()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(contextCascadeRestorer);
     }
 
     private HistoricalContext activeContext() {

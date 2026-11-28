@@ -49,6 +49,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
         private final com.historytalk.service.document.SupabaseDocumentStorageService supabaseDocumentStorageService;
         private final ContentAccessPolicy contentAccessPolicy;
         private final com.historytalk.service.chat.AiServiceClient aiServiceClient;
+        private final ContextCascadeRestorer contextCascadeRestorer;
     
     /**
      * Get all historical contexts with pagination and search
@@ -266,7 +267,7 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
             throw new InvalidRequestException("Bạn không có quyền xóa mềm bối cảnh lịch sử này");
         }
         
-        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         context.setDeletedAt(now);
         contextRepository.save(context);
 
@@ -275,23 +276,29 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
                 context.getContextId(), EntityType.CONTEXT, true)
             .forEach(doc -> doc.setDeletedAt(now));
 
-        chatSessionRepository.findByHistoricalContextContextId(context.getContextId()).forEach(session -> {
-            session.setDeletedAt(now);
-            if (session.getMessages() != null) {
-                session.getMessages().forEach(msg -> msg.setDeletedAt(now));
-            }
-        });
+        // Only live children get the context's stamp: rows deleted on their own keep their older deletedAt,
+        // so restoring the context (exact-timestamp match in ContextCascadeRestorer) leaves them deleted
+        chatSessionRepository.findByHistoricalContextContextId(context.getContextId()).stream()
+            .filter(session -> session.getDeletedAt() == null)
+            .forEach(session -> {
+                session.setDeletedAt(now);
+                if (session.getMessages() != null) {
+                    session.getMessages().stream()
+                        .filter(msg -> msg.getDeletedAt() == null)
+                        .forEach(msg -> msg.setDeletedAt(now));
+                }
+            });
 
         // Cascade to Quizzes
         if (context.getQuizzes() != null) {
-            context.getQuizzes().forEach(quiz -> {
+            context.getQuizzes().stream()
                 // Questions live in the bank and may be shared by other quizzes, so only the quiz is soft-deleted
-                quiz.setDeletedAt(now);
-            });
+                .filter(quiz -> quiz.getDeletedAt() == null)
+                .forEach(quiz -> quiz.setDeletedAt(now));
         }
 
         // Cascade to Map Pins (admin + user pins for this context)
-        mapPinService.softDeleteAllPinsForContext(contextId);
+        mapPinService.softDeleteAllPinsForContext(contextId, now);
         
         log.info("Historical context soft-deleted successfully with ID: {}", contextId);
     }
@@ -306,12 +313,18 @@ public class HistoricalContextServiceImpl implements HistoricalContextService {
     @Transactional
     public void restoreContext(String contextId) {
         UUID uuid = UUID.fromString(contextId);
+        HistoricalContext context = contextRepository.findById(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy bối cảnh lịch sử với ID: " + contextId));
+        // Read before restoreById clears it: the cascade restore matches children on this exact value
+        java.time.LocalDateTime deletedAt = context.getDeletedAt();
         int updated = contextRepository.restoreById(uuid);
         if (updated == 0) {
             throw new ResourceNotFoundException("Không tìm thấy bối cảnh lịch sử với ID: " + contextId);
         }
         documentRepository.findByEntityIdAndEntityType(uuid, EntityType.CONTEXT)
                 .forEach(doc -> doc.setDeletedAt(null));
+        contextCascadeRestorer.restoreChildren(uuid, deletedAt);
     }
 
     @Transactional

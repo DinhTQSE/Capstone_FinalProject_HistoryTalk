@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -126,6 +127,9 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
 
     @Query("SELECT q FROM Quiz q LEFT JOIN FETCH q.historicalContext LEFT JOIN FETCH q.createdBy WHERE q.deletedAt IS NOT NULL ORDER BY q.createdAt DESC")
     List<Quiz> findAllDeleted();
+
+    /** Quizzes of a context soft-deleted at exactly {@code deletedAt} (restore path, so no deletedAt IS NULL). */
+    List<Quiz> findByHistoricalContext_ContextIdAndDeletedAt(UUID contextId, LocalDateTime deletedAt);
 
     @Query("SELECT COUNT(q) FROM Quiz q WHERE q.deletedAt IS NULL")
     long countAllQuizzes();
